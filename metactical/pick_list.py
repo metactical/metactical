@@ -35,6 +35,6 @@ def create_pick_list(source_name, target_doc=None):
 
 	doc.purpose = 'Delivery'
 
-	doc.set_item_locations()
+	#doc.set_item_locations()
 
 	return doc
