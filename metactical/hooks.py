@@ -83,6 +83,11 @@ doc_events = {
 	"Purchase Order": {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
+	},
+	"Pick List": {
+		"before_save": {
+			"before_save": "metactical.pick_list.before_save"
+		}
 	}
 }
 
@@ -115,9 +120,10 @@ doc_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "metactical.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.pick_list.create_pick_list"
+	#"frappe.desk.doctype.event.event.get_events": "metactical.event.get_events"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
