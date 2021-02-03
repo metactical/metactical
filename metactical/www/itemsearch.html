@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <link href="https://getbootstrap.com/docs/4.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+</head>
+
+<body>
+  <header>
+    <div class="bg-dark" id="navbarHeader">
+      <div class="container">
+          <div class="form-row py-4 text-center">
+            <div class="col-7">
+              <input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
+                id="searchinput" value="">
+            </div>
+            <div class="col">
+              <button type="submit" onclick="test()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
+            </div>
+          </div>
+      </div>
+    </div>
+  </header>
+
+  <main role="main">
+    {% if columns %}
+    <div class="album py-5 bg-light">
+      <div class="container">
+        <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover">
+          <thead class="thead-dark">
+            <tr>
+              {% for column in columns %}
+              <th scope="col">{{column}}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in data %}
+            <tr>
+              {% for value in row %}
+              <td>
+                {{value}}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      </div>
+    </div>
+
+    {% endif %}
+  </main>
+
+  <footer class="text-muted">
+    <div class="container">
+      <p class="float-right">
+        <a href="#">Back to top</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    var input = document.getElementById("searchinput");
+
+    // Execute a function when the user releases a key on the keyboard
+    input.addEventListener("keyup", function (event) {
+      // Number 13 is the "Enter" key on the keyboard
+      if (event.keyCode === 13) {
+        // Cancel the default action, if needed
+        event.preventDefault();
+        // Trigger the button element with a click
+        document.getElementById("searchbutton").click();
+      }
+    });
+    function test() {
+      console.log("test")
+      var search_text = document.getElementById("searchinput").value
+      var new_url = `${window.location.origin}/itemsearch?searchtext=${search_text}`
+      window.location.href = new_url
+    }
+  </script>
+</body>
+
+</html>

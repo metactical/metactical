@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include metactical *.css
+recursive-include metactical *.csv
+recursive-include metactical *.html
+recursive-include metactical *.ico
+recursive-include metactical *.js
+recursive-include metactical *.json
+recursive-include metactical *.md
+recursive-include metactical *.png
+recursive-include metactical *.py
+recursive-include metactical *.svg
+recursive-include metactical *.txt
+recursive-exclude metactical *.pyc

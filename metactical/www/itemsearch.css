@@ -1,0 +1,33 @@
+/* @import "bootstrap.min.css"; */
+
+.white-text {
+    border: 1px solid #fff;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+.table .thead-dark th {
+    white-space: nowrap;
+}
+
+tbody td:nth-child(3) {
+    text-align: right;
+}
+
+tbody td {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.container, .container-lg, .container-md, .container-sm, .container-xl {
+    max-width: 98%;
+}
+
+.header{
+    position:sticky !important;
+    top: 0 !important;
+}
+body { 
+    height: 800px; 
+}
