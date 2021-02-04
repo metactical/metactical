@@ -23,6 +23,7 @@ def create_pick_list(source_name, target_doc=None):
 	def update_item_quantity(source, target, source_parent):
 		target.qty = flt(source.qty) - flt(source.delivered_qty)
 		target.stock_qty = (flt(source.qty) - flt(source.delivered_qty)) * flt(source.conversion_factor)
+		target.picked_qty = flt(source.qty) - flt(source.delivered_qty)
 
 	doc = get_mapped_doc('Sales Order', source_name, {
 		'Sales Order': {
