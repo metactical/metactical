@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from . import __version__ as app_version
+import metactical
 
 app_name = "metactical"
 app_title = "Metactical"
@@ -26,6 +27,7 @@ app_license = "MIT"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
+doctype_js = {"Sales Order" : ["public/pick_list.js"]}
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -85,9 +87,8 @@ doc_events = {
 		"validate": "metactical.barcode_generator.po_validate",
 	},
 	"Pick List": {
-		"before_save": {
-			"before_save": "metactical.pick_list.before_save"
-		}
+		"before_save": "metactical.pick_list.custom_on_save",
+		"validate": "metactical.pick_list.custom_on_save"
 	}
 }
 
@@ -130,4 +131,5 @@ override_whitelisted_methods = {
 # override_doctype_dashboards = {
 # 	"Task": "metactical.task.get_dashboard_data"
 # }
+
 

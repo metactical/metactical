@@ -4,9 +4,19 @@ import json
 from six import iteritems
 from frappe.model.document import Document
 from frappe import _
+from frappe.model.mapper import get_mapped_doc
+from frappe.utils import cstr, flt, getdate, cint, nowdate, add_days, get_link_to_form, strip_html
+from erpnext.stock.doctype.pick_list.pick_list import PickList
 
-def before_update(self):
-	#Do nothing
+def custom_before_save(self):
+	return None
+	
+def custom_on_save(self, method):
+	PickList.before_save = custom_before_save
+	
+@frappe.whitelist()
+def before_save_on_create():
+	PickList.before_save = custom_before_save
 	
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
@@ -34,6 +44,7 @@ def create_pick_list(source_name, target_doc=None):
 	}, target_doc)
 
 	doc.purpose = 'Delivery'
+	PickList.before_save = custom_before_save
 
 	#doc.set_item_locations()
 
