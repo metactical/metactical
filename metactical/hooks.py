@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from . import __version__ as _app_version
-import metactical
 
 app_name = "metactical"
 app_title = "Metactical"
