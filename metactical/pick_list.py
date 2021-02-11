@@ -7,12 +7,12 @@ from frappe import _
 from frappe.model.mapper import get_mapped_doc
 from frappe.utils import cstr, flt, getdate, cint, nowdate, add_days, get_link_to_form, strip_html
 from erpnext.stock.doctype.pick_list.pick_list import PickList
-import barcode
+import barcode as _barcode
 from io import BytesIO
 
 def custom_before_save(self):
 	rv = BytesIO()
-	barcode.get('code128', self.locations[0].sales_order).write(rv)
+	_barcode.get('code128', self.locations[0].sales_order).write(rv)
 	bstring = rv.getvalue()
 	self.barcode = bstring.decode('ISO-8859-1')
 	
