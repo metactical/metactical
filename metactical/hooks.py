@@ -122,7 +122,8 @@ doc_events = {
 # ------------------------------
 #
 override_whitelisted_methods = {
-	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.pick_list.create_pick_list"
+	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.pick_list.create_pick_list",
+	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf"
 }
 #
 # each overriding function accepts a `data` argument;
