@@ -109,7 +109,10 @@ def prepare_options(html, options):
 		'encoding': "UTF-8",
 		#'load-error-handling': 'ignore'
 	})
-
+	
+	#Set landscape orientation
+	options['orientation'] = 'Landscape'
+	
 	if not options.get("margin-right"):
 		options['margin-right'] = '15mm'
 
