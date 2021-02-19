@@ -21,7 +21,7 @@ tbody td {
 }
 
 .container, .container-lg, .container-md, .container-sm, .container-xl {
-    max-width: 98%;
+    max-width: 100%;
 }
 
 .header{

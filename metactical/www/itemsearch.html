@@ -2,52 +2,73 @@
 <html lang="en">
 
 <head>
-  <link href="https://getbootstrap.com/docs/4.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+  <link href="bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="all.css">
+  <link rel="stylesheet" href="bootstrap-table.min.css">
+  <link rel="stylesheet" href="bootstrap-table-fixed-columns.min.css">
+  <link rel="stylesheet" href="bootstrap-table-sticky-header.css">
+  <style>
+	.fix-sticky{
+		top: 80px !important; 
+	}
+	
+	.bootstrap-table{
+		margin-top: 100px;
+	}
+	
+	.fixed-table-toolbar{
+		display: none !important;
+	}
+		 
+  </style>
 </head>
 
 <body>
+
   <header>
-    <div class="bg-dark" id="navbarHeader">
+    <div class="bg-dark" id="navbarHeader" style="position: fixed; top: 0px; width: 100%; z-index: 200;">
       <div class="container">
-          <div class="form-row py-4 text-center">
-            <div class="col-7">
-              <input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
-                id="searchinput" value="">
-            </div>
-            <div class="col">
-              <button type="submit" onclick="test()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
-            </div>
+        <div class="form-row py-4 text-center">
+          <div class="col-7">
+            <input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
+              id="searchinput" value="">
           </div>
+          <div class="col">
+			  <input  class="form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 20px; font-weight: bold;" />
+			  <a href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
+			  <button type="submit" onclick="test()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
-
+  <table data-toggle="table" data-fixed-columns="true" data-sticky-header="true" data-sortable="true" data-fixed-number="1" data-search="true">
+    <thead class="thead-dark">
+      <tr>
+        {% for column in columns %}
+        <th data-sortable="true" scope="col">{{column}}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in data %}
+      <tr>
+        {% for value in row %}
+        <td>
+          {{value}}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   <main role="main">
     {% if columns %}
     <div class="album py-5 bg-light">
       <div class="container">
         <div class="table-responsive">
-        <table class="table table-sm table-bordered table-hover">
-          <thead class="thead-dark">
-            <tr>
-              {% for column in columns %}
-              <th scope="col">{{column}}</th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in data %}
-            <tr>
-              {% for value in row %}
-              <td>
-                {{value}}
-              </td>
-              {% endfor %}
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+
+        </div>
 
       </div>
     </div>
@@ -82,6 +103,34 @@
       var new_url = `${window.location.origin}/itemsearch?searchtext=${search_text}`
       window.location.href = new_url
     }
+    
+    function copy_item_code() {
+	  var copyText = document.getElementById("item_code");
+
+	  /* Select the text field */
+	  copyText.select();
+	  copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+	  /* Copy the text inside the text field */
+	  document.execCommand("copy");
+	}
+  </script>
+  <script src="jquery.min.js"></script>
+  <script src="bootstrap-table.min.js"></script>
+  <script src="bootstrap-table-sticky-header.min.js"></script>
+  <script src="bootstrap-table-fixed-columns.min.js"></script>
+  <script>
+	  $(document).ready(function() {
+			$("#item_code").hide();
+			$("#copy-btn").hide();
+			$("table > tbody > tr").on("click", function() {
+				item_column = this.cells.length - 2;
+				$("#item_code").val(this.cells[item_column].innerHTML);
+				console.log(this.cells[item_column].innerHTML);
+				$("#item_code").show();
+				$("#copy-btn").show();
+			});
+		});
   </script>
 </body>
 
