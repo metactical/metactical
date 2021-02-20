@@ -62,7 +62,7 @@ def get_items(search_value=""):
     items_data = frappe.db.sql(query ,as_dict=1)
 
     if items_data:
-        table_columns = ["RetailSKU Suffix", "Item Name", "Price"]
+        table_columns = ["RetailSKU", "Item Name", "Price"]
         table_data = []
         items = [d.item_code for d in items_data]
 
