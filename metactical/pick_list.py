@@ -55,3 +55,10 @@ def create_pick_list(source_name, target_doc=None):
 	#doc.set_item_locations()
 
 	return doc
+	
+@frappe.whitelist()
+def save_cancel_reason(**args):
+	args = frappe._dict(args)
+	doc = frappe.get_doc("Pick List", args.docname)
+	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
+	return 'Success'
