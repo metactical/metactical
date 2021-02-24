@@ -19,20 +19,19 @@ def get_items(search_value=""):
         it1.item_code,
         it1.item_name,
         it1.stock_uom,
-        it1.idx AS idx,
         it1.is_stock_item,
         it1.ifw_retailskusuffix,
         it1.ifw_location,
         it1.variant_of,
-        it1.barcode,
+        GROUP_CONCAT(it1.barcode SEPARATOR '<br>') AS barcode,
         ip.price_list_rate,
-        ip.currency from 
+        ip.currency 
+        FROM 
 		(
             SELECT
 			it.item_code,
 			it.item_name,
 			it.stock_uom,
-			it.idx AS idx,
 			it.is_stock_item,
             it.ifw_retailskusuffix,
             it.ifw_location,
@@ -55,6 +54,9 @@ def get_items(search_value=""):
             it1.disabled = 0
 			AND it1.has_variants = 0
 			AND it1.is_sales_item = 1
+		GROUP BY
+			item_code, item_name, stock_uom, is_stock_item, ifw_retailskusuffix, it1.ifw_location, it1.variant_of,
+			ip.price_list_rate, ip.currency
 		ORDER BY
 			it1.ifw_retailskusuffix asc""".format(
             search_text=search_value
