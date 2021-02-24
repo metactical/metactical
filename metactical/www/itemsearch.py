@@ -74,7 +74,7 @@ def get_items(search_value=""):
         # query item bin
         bin_data = frappe.get_all(
             "Bin",
-            fields=["item_code", "warehouse", "sum(actual_qty) as actual_qty"],
+            fields=["item_code", "warehouse", "sum(actual_qty) as actual_qty", "SUM(reserved_qty) AS reserved_qty"],
             filters=bin_filters,
             group_by="item_code, warehouse",
         )
@@ -97,7 +97,7 @@ def get_items(search_value=""):
         for b in bin_data:
             warehouse = b.get("warehouse")
             item_code = b.get("item_code")
-            qty = b.get("actual_qty")
+            qty = b.get("actual_qty") - b.get("reserved_qty")
             if warehouse not in warehouses_to_display:
                 continue
             warehouse_wise_items[warehouse][item_code] = qty
