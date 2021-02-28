@@ -19,6 +19,11 @@
 	.fixed-table-toolbar{
 		display: none !important;
 	}
+	
+	.copy{
+		font-size: 10px;
+		padding: 0px !important;
+	}
 		 
   </style>
 </head>
@@ -28,15 +33,21 @@
   <header>
     <div class="bg-dark" id="navbarHeader" style="position: fixed; top: 0px; width: 100%; z-index: 200;">
       <div class="container">
-        <div class="form-row py-4 text-center">
+        <div class="form-row py-4">
           <div class="col-7">
             <input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
               id="searchinput" value="">
           </div>
           <div class="col">
-			  <input  class="form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 20px; font-weight: bold;" />
-			  <a href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
-			  <button type="submit" onclick="test()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
+			  <div style="float: left; width: 30%;">
+				  <b id="item-title" style="font-size: 10px; color: #FFF; text-align: left !important;">Item Code</b><br>
+				  <input  class="copy form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" />
+				  <a class="copy" href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
+			  </div>
+			  <div style="float: left; width: 30%;" id="copy-barcode"></div>
+			  <div style="float: left; width: 30%;">
+				  <button type="submit" onclick="test()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
+			  </div>
           </div>
         </div>
       </div>
@@ -114,6 +125,17 @@
 	  /* Copy the text inside the text field */
 	  document.execCommand("copy");
 	}
+	
+	function copy_barcode(barcode) {
+	  var copyText = document.getElementById(barcode);
+
+	  /* Select the text field */
+	  copyText.select();
+	  copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+	  /* Copy the text inside the text field */
+	  document.execCommand("copy");
+	}
   </script>
   <script src="jquery.min.js"></script>
   <script src="bootstrap-table.min.js"></script>
@@ -123,12 +145,32 @@
 	  $(document).ready(function() {
 			$("#item_code").hide();
 			$("#copy-btn").hide();
+			$("#item-title").hide();
 			$("table > tbody > tr").on("click", function() {
 				item_column = this.cells.length - 2;
+				barcode_column = this.cells.length - 4;
 				$("#item_code").val(this.cells[item_column].innerHTML);
-				console.log(this.cells[item_column].innerHTML);
 				$("#item_code").show();
 				$("#copy-btn").show();
+				$("#item-title").show();
+				
+				//For barcodes
+				var barcode_html = this.cells[barcode_column].innerHTML;
+				console.log(barcode_html)
+				if(barcode_html != 'None' && barcode_html != ''){
+					var barcodes = barcode_html.split('<br>')
+					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
+					barcodes.forEach(function(barcode){
+						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
+								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a> <br>';
+						barcode_copy = barcode_copy + html;
+					});
+					$('#copy-barcode').html(barcode_copy);
+				}
+				else{
+					//Clear barcode html
+					$('#copy-barcode').html('');
+				}
 			});
 		});
   </script>
