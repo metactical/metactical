@@ -23,26 +23,7 @@ def execute(filters=None):
 			"fieldtype": "Link",
 			"options": "Sales Order",
 			"fieldname": "sales_order",
-			"label": "Sales Order",
-			"width": 150
-		},
-		{
-			"fieldtype": "Data",
-			"fieldname": "status",
-			"label": "Status",
-			"width": 100
-		},
-		{
-			"fieldtype": "Data",
-			"fieldname": "source",
-			"label": "Website",
-			"width": 100
-		},
-		{
-			"fieldtype": "Link",
-			"options": "Pick List",
-			"fieldname": "pick_list",
-			"label": "Pick List",
+			"label": "Sales Order #",
 			"width": 150
 		},
 		{
@@ -65,15 +46,40 @@ def execute(filters=None):
 		},
 		{
 			"fieldtype": "Data",
+			"fieldname": "pick_list_notes",
+			"label": "Reason for Cancelation",
+			"width": 150
+		},
+		{
+			"fieldtype": "Data",
+			"fieldname": "notes",
+			"label": "Notes",
+			"width": 100
+		},
+		{
+			"fieldtype": "Link",
+			"options": "Pick List",
+			"fieldname": "pick_list",
+			"label": "Pick List #",
+			"width": 150
+		},
+		{
+			"fieldtype": "Data",
 			"fieldname": "tracking_no",
 			"label": "Tracking No",
 			"width": 150
 		},
 		{
 			"fieldtype": "Data",
-			"fieldname": "pick_list_notes",
-			"label": "Pick List Notes",
-			"width": 150
+			"fieldname": "status",
+			"label": "Order Status",
+			"width": 100
+		},
+		{
+			"fieldtype": "Data",
+			"fieldname": "source",
+			"label": "Source of Website",
+			"width": 100
 		}
 	]
 	
@@ -117,7 +123,8 @@ def get_pick_lists(filters, sales_orders):
 											ELSE 'No'
 										END AS pick_list_cancelled,
 										delivery_note.lr_no AS tracking_no,
-										pick_list.cancel_reason AS pick_list_notes
+										pick_list.cancel_reason AS pick_list_notes,
+										notes
 									FROM 
 										`tabPick List` AS pick_list
 									LEFT JOIN
@@ -131,7 +138,16 @@ def get_pick_lists(filters, sales_orders):
 																GROUP BY parent)''', {"sales_order": order.name}, as_dict=1)
 																	
 			for pick_list in ret:
-				sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}													
+				if not pick_list['notes']:
+					pick_list.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + pick_list['pick_list'] + '\')">Add Notes</button>'})
+				sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}												
 				sdata.update(pick_list)
 				data.append(sdata)
 	return data
+	
+@frappe.whitelist()
+def insert_notes(**args):
+	args = frappe._dict(args)
+	doc = frappe.get_doc('Pick List', args.pick_list)
+	doc.db_set("notes", args.notes, notify=True)
+	return "Success"
