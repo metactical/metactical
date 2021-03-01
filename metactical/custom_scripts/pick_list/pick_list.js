@@ -18,7 +18,7 @@ frappe.ui.form.on('Pick List', {
 	
 	before_cancel_event: function(frm){
 		frappe.prompt([
-			{'fieldname': 'cancel_reason', 'fieldtype': 'Small Text', 'label': 'Cancel Reason', 'reqd': 1}
+			{'fieldname': 'cancel_reason', 'fieldtype': 'Small Text', 'label': 'Enter Reason', 'reqd': 1}
 		],
 		function(values){
 			frappe.call({
@@ -32,7 +32,7 @@ frappe.ui.form.on('Pick List', {
 				}
 			});
 		},
-		'Please provide a reason for canceling.',
+		'Please reason for cancellation.',
 		'Cancel'
 		)
 	}
