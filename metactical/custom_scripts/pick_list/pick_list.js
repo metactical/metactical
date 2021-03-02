@@ -22,7 +22,7 @@ frappe.ui.form.on('Pick List', {
 		],
 		function(values){
 			frappe.call({
-				'method': 'metactical.pick_list.save_cancel_reason',
+				'method': 'metactical.custom_scripts.pick_list.pick_list.save_cancel_reason',
 				'args': {
 					'docname': cur_frm.docname,
 					'cancel_reason': values.cancel_reason

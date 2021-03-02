@@ -8,7 +8,7 @@ frappe.ui.form.on('Sales Order', {
 	
 	create_pick_list_custom() {
 		frappe.model.open_mapped_doc({
-			method: "metactical.pick_list.create_pick_list",
+			method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 			frm: cur_frm
 		})
 	}

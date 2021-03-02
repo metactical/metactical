@@ -89,8 +89,10 @@ doc_events = {
 		"validate": "metactical.barcode_generator.po_validate",
 	},
 	"Pick List": {
-		"before_save": "metactical.pick_list.custom_on_save",
-		"validate": "metactical.pick_list.custom_on_save"
+		"before_save": "metactical.custom_scripts.pick_list.pick_list.custom_on_save",
+		"validate": "metactical.custom_scripts.pick_list.pick_list.custom_on_save",
+		"on_submit": "metactical.custom_scripts.pick_list.pick_list.on_submit",
+		"on_cancel": "metactical.custom_scripts.pick_list.pick_list.on_cancel"
 	}
 }
 
@@ -124,7 +126,7 @@ doc_events = {
 # ------------------------------
 #
 override_whitelisted_methods = {
-	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.pick_list.create_pick_list",
+	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf"
 }
 #
