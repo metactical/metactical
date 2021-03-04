@@ -104,6 +104,9 @@ def create_pick_list(source_name, target_doc=None):
 			'doctype': 'Pick List',
 			'validation': {
 				'docstatus': ['=', 1]
+			},
+			'field_map': {
+				'sales_order': 'name'
 			}
 		},
 		'Sales Order Item': {
