@@ -118,7 +118,7 @@ def get_pick_lists(filters, sales_orders):
 										`tabPick List Item`  
 									WHERE 
 										`tabPick List Item`.sales_order = %(sales_order)s
-								''', {"sales_order": order.name}, as_dict)
+								''', {"sales_order": order.name}, as_dict=1)
 			for pick in picks:
 				ret = frappe.db.sql('''SELECT
 											pick_list.name AS pick_list,
