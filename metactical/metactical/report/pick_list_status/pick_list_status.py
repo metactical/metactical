@@ -84,7 +84,8 @@ def execute(filters=None):
 	]
 	
 	sales_orders = get_sales_orders(filters)
-	data = get_pick_lists(filters, sales_orders)
+	pick_lists = get_pick_lists(filters, sales_orders)
+	data = get_packed(pick_lists)
 	return columns, data
 	
 
@@ -103,7 +104,7 @@ def get_sales_orders(filters):
 								`tabSales Order` 
 							WHERE 
 								transaction_date BETWEEN %(from_date)s AND %(to_date)s 
-								AND status IN ('To Deliver', 'To Deliver and Bill') ''' + where, where_filter, as_dict=1)
+								AND docstatus = 1''' + where, where_filter, as_dict=1)
 	return ret
 
 def get_pick_lists(filters, sales_orders):
@@ -124,7 +125,8 @@ def get_pick_lists(filters, sales_orders):
 										END AS pick_list_cancelled,
 										delivery_note.lr_no AS tracking_no,
 										pick_list.cancel_reason AS pick_list_notes,
-										notes
+										notes,
+										delivery_note.name AS delivery
 									FROM 
 										`tabPick List` AS pick_list
 									LEFT JOIN
@@ -145,6 +147,22 @@ def get_pick_lists(filters, sales_orders):
 				data.append(sdata)
 	return data
 	
+def get_packed(delivery_notes):
+	if delivery_notes:
+		for delivery_note in delivery_notes:
+			if delivery_note['delivery']:
+				ret = frappe.db.sql('''SELECT name FROM `tabPacking Slip` WHERE delivery_note = %(delivery_note)s''', {"delivery_note": delivery_note['delivery']}, as_dict=1)
+				
+				if ret:
+					delivery_note.update({"pick_list_packed": 'Yes'})
+				else:
+					delivery_note.update({"pick_list_packed": 'No'})
+			else:
+				delivery_note.update({"pick_list_packed": "No"})
+	return delivery_notes
+
+
+
 @frappe.whitelist()
 def insert_notes(**args):
 	args = frappe._dict(args)
