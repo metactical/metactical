@@ -9,6 +9,11 @@ frappe.ui.form.on('Pick List', {
 				cur_frm.events.before_cancel_event();
 			});
 		}
+		
+		if(frm.doc.docstatus == 0 && frm.doc.__islocal == 1){
+			frm.set_value('print_date_time', '');
+			frm.set_value('track_print_user', '');
+		}
 	},
 	
 	on_submit: function(frm){
