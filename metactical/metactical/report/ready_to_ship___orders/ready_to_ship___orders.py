@@ -19,9 +19,15 @@ def execute(filters=None):
 			"fieldtype": "Data",
 		},
 		{
-			"label": "SE Reference",
-			"fieldname": "ifw_old_reference",
-			"fieldtype": "Data"
+			"label": "Warehouse",
+			"fieldname": "warehouse",
+			"fieldtype": "Link",
+			"options": "Warehouse"
+		},
+		{
+			"label": "Date",
+			"fieldname": "transaction_date",
+			"fieldtype": "Date"
 		},
 		{
 			"label": "Status",
@@ -29,14 +35,8 @@ def execute(filters=None):
 			"fieldtype": "Data"
 		},
 		{
-			"label": "Customer",
-			"fieldname": "customer",
-			"fieldtype": "Link",
-			"options": "Customer",
-		},
-		{
-			"label": "Customer Name",
-			"fieldname": "customer_name",
+			"label": "Tag",
+			"fieldname": "tag",
 			"fieldtype": "Data"
 		},
 		{
@@ -46,20 +46,15 @@ def execute(filters=None):
 			"options": "Lead Source"
 		},
 		{
-			"label": "Date",
-			"fieldname": "transaction_date",
-			"fieldtype": "Date"
-		},
-		{
-			"label": "Tag",
-			"fieldname": "tag",
+			"label": "SE Reference",
+			"fieldname": "ifw_old_reference",
 			"fieldtype": "Data"
 		},
 		{
-			"label": "Item",
-			"fieldname": "item_code",
+			"label": "Customer",
+			"fieldname": "customer",
 			"fieldtype": "Link",
-			"options": "item"
+			"options": "Customer",
 		},
 		{
 			"label": "Ordered Qty",
@@ -87,10 +82,10 @@ def execute(filters=None):
 			"fieldtype": "Float"
 		},
 		{
-			"label": "Warehouse",
-			"fieldname": "warehouse",
+			"label": "Item",
+			"fieldname": "item_code",
 			"fieldtype": "Link",
-			"options": "Warehouse"
+			"options": "item"
 		},
 		{
 			"label": "Retail SKU Suffix",
@@ -128,6 +123,18 @@ def execute(filters=None):
 			"fieldtype": "Data"
 		}
 	]
+	
+	where = ''
+	where_filter = {}
+	
+	if filters.from_date and filters.to_date:
+		where = ' AND so.transaction_date BETWEEN %(from_date)s AND %(to_date)s '
+		where_filter.update({'from_date': filters.from_date, 'to_date': filters.to_date})
+		
+	if filters.source:
+		where = ' AND so.source = %(source)s '
+		where_filter.update({'source': filters.source})
+	
 	data = frappe.db.sql('''
 							SELECT
 								T.parent AS sales_order,
@@ -172,7 +179,9 @@ def execute(filters=None):
 									LEFT JOIN `tabSales Order` so ON soi.parent = so.NAME
 								WHERE
 									( bin.actual_qty ) > 0 
-									AND ( so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft") 
+									AND ( so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft") '''
+									+ where +
+								'''
 								GROUP BY
 									soi.parent,
 									bin.warehouse
@@ -183,5 +192,5 @@ def execute(filters=None):
 								LEFT JOIN `tabBin` bin1 ON bin1.item_code = soi1.item_code 
 							WHERE
 								bin1.warehouse = T.warehouse;
-					''', as_dict=1)
+					''', where_filter, as_dict=1)
 	return columns, data
