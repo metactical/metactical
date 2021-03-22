@@ -159,7 +159,7 @@ def get_pick_lists(filters, sales_orders):
 						for pick_list in ret:
 							if not pick_list['notes']:
 								pick_list.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + pick_list['pick_list'] + '\')">Add Notes</button>'})
-							sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}												
+							sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status, "po_no": order.po_no}												
 							sdata.update(pick_list)
 							data.append(sdata)
 	return data
