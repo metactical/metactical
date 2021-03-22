@@ -111,6 +111,7 @@ def get_pick_lists(filters, sales_orders):
 	data = []
 	if sales_orders:
 		for order in sales_orders:
+			sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}	
 			quaried_picks = []
 			picks = frappe.db.sql('''
 									SELECT 
@@ -148,10 +149,9 @@ def get_pick_lists(filters, sales_orders):
 																			
 					for pick_list in ret:
 						if not pick_list['notes']:
-							pick_list.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + pick_list['pick_list'] + '\')">Add Notes</button>'})
-						sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}												
+							pick_list.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + pick_list['pick_list'] + '\')">Add Notes</button>'})											
 						sdata.update(pick_list)
-						data.append(sdata)
+			data.append(sdata)
 	return data
 	
 def get_packed(delivery_notes):
