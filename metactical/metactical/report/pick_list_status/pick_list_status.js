@@ -4,7 +4,7 @@
 
 var aday = new Date();
 var to_date = aday.toISOString().split('T')[0];
-aday.setDate(aday.getDate() - 30);
+aday.setDate(aday.getDate() - 7);
 var from_date = aday.toISOString().split('T')[0];
 var cur_report = null;
 
