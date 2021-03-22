@@ -111,7 +111,6 @@ def get_pick_lists(filters, sales_orders):
 	data = []
 	if sales_orders:
 		for order in sales_orders:
-			sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}	
 			quaried_picks = []
 			picks = frappe.db.sql('''
 									SELECT 
@@ -121,37 +120,49 @@ def get_pick_lists(filters, sales_orders):
 									WHERE 
 										`tabPick List Item`.sales_order = %(sales_order)s
 								''', {"sales_order": order.name}, as_dict=1)
-			for pick in picks:
-				if pick not in quaried_picks:
-					quaried_picks.append(pick)
-					ret = frappe.db.sql('''SELECT
-												pick_list.name AS pick_list,
-												pick_list.date AS pick_list_date,
-												pick_list.po_no,
-												CASE
-													WHEN pick_list.print_date_time IS NOT NULL THEN 'Yes'
-													ELSE 'No'
-												END AS pick_list_printed,
-												CASE
-													WHEN pick_list.docstatus = 2 THEN 'Yes'
-													ELSE 'No'
-												END AS pick_list_cancelled,
-												delivery_note.lr_no AS tracking_no,
-												pick_list.cancel_reason AS pick_list_notes,
-												notes,
-												delivery_note.name AS delivery
-											FROM 
-												`tabPick List` AS pick_list
-											LEFT JOIN
-												`tabDelivery Note` AS delivery_note ON delivery_note.pick_list = pick_list.name
-											WHERE
-												pick_list.name = %(pick_list)s''', {"pick_list": pick.pick_list}, as_dict=1)
-																			
-					for pick_list in ret:
-						if not pick_list['notes']:
-							pick_list.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + pick_list['pick_list'] + '\')">Add Notes</button>'})											
-						sdata.update(pick_list)
-			data.append(sdata)
+			if not picks:
+				#If there are no pick lists associated with the Sales Order
+				sdata = {
+					"transaction_date": order.transaction_date, 
+					"sales_order": order.name, 
+					"status": order.status, 
+					"pick_list_printed": "No Picklist", 
+					"pick_list_cancelled": "No Picklist",
+					"delivery": None}
+				data.append(sdata)	
+			else:
+				for pick in picks:
+					if pick not in quaried_picks:
+						quaried_picks.append(pick)
+						ret = frappe.db.sql('''SELECT
+													pick_list.name AS pick_list,
+													pick_list.date AS pick_list_date,
+													pick_list.po_no,
+													CASE
+														WHEN pick_list.print_date_time IS NOT NULL THEN 'Yes'
+														ELSE 'No'
+													END AS pick_list_printed,
+													CASE
+														WHEN pick_list.docstatus = 2 THEN 'Yes'
+														ELSE 'No'
+													END AS pick_list_cancelled,
+													delivery_note.lr_no AS tracking_no,
+													pick_list.cancel_reason AS pick_list_notes,
+													notes,
+													delivery_note.name AS delivery
+												FROM 
+													`tabPick List` AS pick_list
+												LEFT JOIN
+													`tabDelivery Note` AS delivery_note ON delivery_note.pick_list = pick_list.name
+												WHERE
+													pick_list.name = %(pick_list)s''', {"pick_list": pick.pick_list}, as_dict=1)
+																				
+						for pick_list in ret:
+							if not pick_list['notes']:
+								pick_list.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + pick_list['pick_list'] + '\')">Add Notes</button>'})
+							sdata = {"transaction_date": order.transaction_date, "sales_order": order.name, "status": order.status}												
+							sdata.update(pick_list)
+							data.append(sdata)
 	return data
 	
 def get_packed(delivery_notes):
@@ -165,7 +176,7 @@ def get_packed(delivery_notes):
 				else:
 					delivery_note.update({"pick_list_packed": 'No'})
 			else:
-				delivery_note.update({"pick_list_packed": "No"})
+				delivery_note.update({"pick_list_packed": "No Delivery Note"})
 	return delivery_notes
 
 
