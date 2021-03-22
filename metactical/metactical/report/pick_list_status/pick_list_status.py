@@ -99,7 +99,7 @@ def get_sales_orders(filters):
 		where_filter.update({"source": filters.source})
 	
 	ret = frappe.db.sql('''SELECT 
-								name, source, status, transaction_date
+								name, source, status, transaction_date, po_no
 							FROM 
 								`tabSales Order` 
 							WHERE 
@@ -137,7 +137,6 @@ def get_pick_lists(filters, sales_orders):
 						ret = frappe.db.sql('''SELECT
 													pick_list.name AS pick_list,
 													pick_list.date AS pick_list_date,
-													pick_list.po_no,
 													CASE
 														WHEN pick_list.print_date_time IS NOT NULL THEN 'Yes'
 														ELSE 'No'
