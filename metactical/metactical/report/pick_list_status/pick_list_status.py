@@ -128,7 +128,8 @@ def get_pick_lists(filters, sales_orders):
 					"status": order.status, 
 					"pick_list_printed": "No Picklist", 
 					"pick_list_cancelled": "No Picklist",
-					"delivery": None}
+					"delivery": None,
+					"po_no": order.po_no}
 				data.append(sdata)	
 			else:
 				for pick in picks:
