@@ -137,4 +137,7 @@ override_whitelisted_methods = {
 # 	"Task": "metactical.task.get_dashboard_data"
 # }
 
+#Fixtures
+fixtures = ["Custom Field", "Property Setter"]
+
 
