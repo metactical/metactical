@@ -11,6 +11,7 @@ from frappe.core.doctype.access_log.access_log import make_access_log
 from frappe.utils import cint, sanitize_html, strip_html
 from six import string_types
 import datetime
+from pytz import timezone
 
 no_cache = 1
 
@@ -33,7 +34,7 @@ def get_context(context):
 	
 	#For setting print datetime if it's pick_list
 	if doc.doctype=="Pick List":
-		doc.print_date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		doc.print_date_time = datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")
 		doc.track_print_user = frappe.db.get_value("User", frappe.session.user, "full_name")
 		#Get the doc gain in case it is loaded from frappe.form_dict
 		sdoc = frappe.get_doc(doc.doctype, doc.name)
