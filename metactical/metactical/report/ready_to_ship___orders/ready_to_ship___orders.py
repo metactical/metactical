@@ -121,6 +121,11 @@ def execute(filters=None):
 			"label": "Description",
 			"fieldname": "description",
 			"fieldtype": "Data"
+		},
+		{
+			"label": "Pick List Printed",
+			"fieldname": "pick_list_print",
+			"fieldtype": "Datetime"
 		}
 	]
 	
@@ -135,7 +140,7 @@ def execute(filters=None):
 		where = ' AND so.source = %(source)s '
 		where_filter.update({'source': filters.source})
 	
-	data = frappe.db.sql('''
+	query = frappe.db.sql('''
 							SELECT
 								T.parent AS sales_order,
 								T.po_no,
@@ -193,4 +198,20 @@ def execute(filters=None):
 							WHERE
 								bin1.warehouse = T.warehouse;
 					''', where_filter, as_dict=1)
+	data = get_print_date(query)
 	return columns, data
+
+def get_print_date(data):
+	for row in data:
+		query = frappe.db.sql('''SELECT 
+									pl.print_date_time 
+								FROM 
+									`tabPick List Item` pli
+								LEFT JOIN
+									`tabPick List` pl ON pl.name = pli.parent
+								WHERE pl.docstatus  = 1 AND pli.sales_order = %(sales_order)s''', {"sales_order": row.sales_order}, as_dict=1)
+		if query:
+			row.update({"pick_list_print": query[0].print_date_time})
+	return data
+								
+
