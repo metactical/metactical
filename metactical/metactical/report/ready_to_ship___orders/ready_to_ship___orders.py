@@ -203,15 +203,17 @@ def execute(filters=None):
 
 def get_print_date(data):
 	for row in data:
-		query = frappe.db.sql('''SELECT 
-									pl.print_date_time 
-								FROM 
-									`tabPick List Item` pli
-								LEFT JOIN
-									`tabPick List` pl ON pl.name = pli.parent
-								WHERE pl.docstatus  = 1 AND pli.sales_order = %(sales_order)s''', {"sales_order": row.sales_order}, as_dict=1)
-		if query:
-			row.update({"pick_list_print": query[0].print_date_time})
+		if row.STATUS != 'Draft':
+			query = frappe.db.sql('''SELECT 
+										pl.print_date_time 
+									FROM 
+										`tabPick List Item` pli
+									LEFT JOIN
+										`tabPick List` pl ON pl.name = pli.parent
+									WHERE pl.docstatus  = 1 AND pli.sales_order = %(sales_order)s
+									LIMIT 1''', {"sales_order": row.sales_order}, as_dict=1)
+			if query:
+				row.update({"pick_list_print": query[0].print_date_time})
 	return data
 								
 
