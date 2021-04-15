@@ -2,6 +2,17 @@
  {
   "docstatus": 0,
   "doctype": "Custom Script",
+  "dt": "Stock Entry",
+  "modified": "2021-02-08 07:17:22.320597",
+  "name": "Stock Entry-Client",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "script": "// frappe.ui.form.on('Stock Entry', {\n// \trefresh(frm) {\n\t    \n//     frm.add_custom_button(\"Print\", function() {\n//         if (frm.track_reprint == null) {\n//             alert(\"Track Date is Null \")\n//             //frm.set_value(\"track_reprint\", new Date());\n//             //var a  = frm.track_reprint;\n//             //alert(a)\n//             alert(frm.doc.name)\n//             frappe.db.set_value('Stock Entry', frm.doc.name , frm.track_reprint, new Date() )\n            \n// //            frappe.set_route('Print', frm.doc.reference_type, frm.doc.reference_name);\n//         }\n//         else{\n//             alert(\"Date is not null \")\n//         }\n// \t    // code to be executed after button is click\n//     })\n\n\n// \t}\n// })"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Script",
   "dt": "Pick List",
   "modified": "2021-02-22 05:37:55.868940",
   "name": "Pick List-Client",
@@ -47,12 +58,12 @@
   "docstatus": 0,
   "doctype": "Custom Script",
   "dt": "Customer",
-  "modified": "2021-02-22 04:52:28.880733",
+  "modified": "2021-04-15 02:30:27.931254",
   "name": "Customer-Client",
   "parent": null,
   "parentfield": null,
   "parenttype": null,
-  "script": "frappe.ui.form.on('Customer', {\n    setup(frm){\n      show_hide(frm);  \n    },\n    onload(frm){\n      show_hide(frm);  \n    },\n    refresh(frm) {\n        show_hide(frm);\n    } ,\n    mobile(frm){\n        frm.set_value(\"mobile_no\", frm.doc.mobile);\n    },\n    email(frm){\n        frm.set_value(\"email_id\", frm.doc.email);\n    },\n    validate(frm) {\n\t\tif(frm.doc.first_name!=null && frm.doc.last_name==null){\n\t\t    frm.set_value(\"customer_name\", frm.doc.first_name);\n\t\t}\n\t\telse if(frm.doc.first_name!=null && frm.doc.last_name!=null){\n\t        frm.set_value(\"customer_name\", frm.doc.first_name + \" \" +frm.doc.last_name);\n\t\t}\n\t//\tfrappe.db.set_value('Customer', frm.doc.name,  \"customer_name\", full_name )\n    } \n})\n\nvar show_hide = function(frm){\n    frm.toggle_reqd(\"default_price_list\", true);\n\tfrm.toggle_reqd(\"tax_category\", true);\n\tfrm.toggle_reqd(\"first_name\", true);\n\tfrm.toggle_reqd(\"last_name\", true);\n    if((frm.doc.first_name== null)  && (frm.doc.last_name == null)){\n        frm.set_value(\"first_name\", frm.doc.customer_name);\n    }\n    if(frm.doc.__islocal){\n        frm.toggle_enable(\"mobile\", true);\n        frm.toggle_display(\"mobile\", true);\n\n        // frm.toggle_display(\"primary_address_and_contact_detail\", false);\n        frm.toggle_display(\"customer_primary_contact\", false);\n        frm.toggle_display(\"customer_primary_address\", false);\n\n        \n        frm.toggle_enable(\"email\", true);\n        frm.toggle_display(\"email\", true);\n        \n        frm.toggle_display(\"mobile_no\", false);\n        frm.toggle_display(\"email_id\", false);\n        \n        $(\"[data-fieldname=mobile_no]\").hide();\n        $(\"[data-fieldname=email_id]\").hide();\n    }\n    else{\n        frm.toggle_enable(\"mobile\", false);\n        frm.toggle_display(\"mobile\", false);\n\n        frm.toggle_display(\"customer_primary_contact\", true);\n        frm.toggle_display(\"customer_primary_address\", true);\n\n        \n        frm.toggle_enable(\"email\", false);\n        frm.toggle_display(\"email\", false);\n        \n        frm.toggle_display(\"mobile_no\", true);\n        frm.toggle_display(\"email_id\", true);\n        \n        $(\"[data-fieldname=mobile_no]\").show();\n        $(\"[data-fieldname=email_id]\").show();\n    }\n}"
+  "script": "frappe.ui.form.on('Customer', {\n    setup(frm){\n      show_hide(frm);  \n    },\n    onload(frm){\n      show_hide(frm);  \n    },\n    refresh(frm) {\n        show_hide(frm);\n    } ,\n    mobile(frm){\n        frm.set_value(\"mobile_no\", frm.doc.mobile);\n    },\n    email(frm){\n        frm.set_value(\"email_id\", frm.doc.email);\n    },\n    validate(frm) {\n\t\tif(frm.doc.first_name!=null && frm.doc.last_name==null){\n\t\t    frm.set_value(\"customer_name\", frm.doc.first_name);\n\t\t}\n\t\telse if(frm.doc.first_name!=null && frm.doc.last_name!=null){\n\t        frm.set_value(\"customer_name\", frm.doc.first_name + \" \" +frm.doc.last_name);\n\t\t}\n\t//\tfrappe.db.set_value('Customer', frm.doc.name,  \"customer_name\", full_name )\n    } \n})\n\nvar show_hide = function(frm){\n    frm.toggle_reqd(\"default_price_list\", true);\n\t//frm.toggle_reqd(\"tax_category\", true);\n\tfrm.toggle_reqd(\"first_name\", true);\n\tfrm.toggle_reqd(\"last_name\", true);\n    if((frm.doc.first_name== null)  && (frm.doc.last_name == null)){\n        frm.set_value(\"first_name\", frm.doc.customer_name);\n    }\n    if(frm.doc.__islocal){\n        frm.toggle_enable(\"mobile\", true);\n        frm.toggle_display(\"mobile\", true);\n\n        // frm.toggle_display(\"primary_address_and_contact_detail\", false);\n        frm.toggle_display(\"customer_primary_contact\", false);\n        frm.toggle_display(\"customer_primary_address\", false);\n\n        \n        frm.toggle_enable(\"email\", true);\n        frm.toggle_display(\"email\", true);\n        \n        frm.toggle_display(\"mobile_no\", false);\n        frm.toggle_display(\"email_id\", false);\n        \n        $(\"[data-fieldname=mobile_no]\").hide();\n        $(\"[data-fieldname=email_id]\").hide();\n    }\n    else{\n        frm.toggle_enable(\"mobile\", false);\n        frm.toggle_display(\"mobile\", false);\n\n        frm.toggle_display(\"customer_primary_contact\", true);\n        frm.toggle_display(\"customer_primary_address\", true);\n\n        \n        frm.toggle_enable(\"email\", false);\n        frm.toggle_display(\"email\", false);\n        \n        frm.toggle_display(\"mobile_no\", true);\n        frm.toggle_display(\"email_id\", true);\n        \n        $(\"[data-fieldname=mobile_no]\").show();\n        $(\"[data-fieldname=email_id]\").show();\n    }\n}"
  },
  {
   "docstatus": 0,
