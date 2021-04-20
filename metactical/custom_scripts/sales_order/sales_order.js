@@ -1,7 +1,9 @@
+{% include 'erpnext/selling/sales_common.js' %}
+var old_tax_template;
+var base_in_words;
 frappe.ui.form.on('Sales Order', {
 	refresh: function(frm){
 		//Clear update qty and rate button
-		console.log(frm);
 		/*if(frm.doc.docstatus === 1 && frm.doc.status !== 'Closed'
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
 			frm.clear_custom_buttons();
@@ -19,6 +21,11 @@ frappe.ui.form.on('Sales Order', {
 				cur_frm.events.before_cancel_event();
 			});
 		}
+	},
+	
+	onload: function(frm){
+		old_tax_template = frm.doc.taxes_and_charges;
+		base_in_words = frm.doc.base_in_words;
 	},
 	
 	create_pick_list_custom() {
@@ -49,3 +56,18 @@ frappe.ui.form.on('Sales Order', {
 		)
 	}
 });
+
+
+erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
+	customer_address: function(doc, dt, dn){
+		if(doc.docstatus == 1){
+			erpnext.utils.get_address_display(this.frm, "customer_address");		
+		}
+		else{
+			erpnext.utils.get_address_display(this.frm, "customer_address");
+			erpnext.utils.set_taxes_from_address(this.frm, "customer_address", "customer_address", "shipping_address_name");
+		}
+	}
+});
+$.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
+
