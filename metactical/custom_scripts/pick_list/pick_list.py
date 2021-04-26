@@ -11,6 +11,8 @@ import barcode as _barcode
 from io import BytesIO
 from erpnext.stock.doctype.pick_list.pick_list import validate_item_locations, set_delivery_note_missing_values, update_delivery_note_item
 from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note as create_delivery_note_from_sales_order
+import datetime
+from pytz import timezone
 
 def custom_before_save(self):
 	rv = BytesIO()
@@ -32,6 +34,10 @@ def on_submit(self, method):
 	for sales_order in sales_orders:
 		delivery_note = create_delivery_note_from_sales_order(sales_order,
 			delivery_note, skip_item_mapping=True)
+		#Add pick list submitted date in sales order
+		sales_doc = frappe.get_doc("Sales Order", sales_order)
+		sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
+		sales_doc.save()
 
 	# map rows without sales orders as well
 	if not delivery_note:
@@ -81,11 +87,23 @@ def on_submit(self, method):
 	delivery_note.customer = pick_list.customer if pick_list.customer else None
 	delivery_note.save()
 	
+	
 def on_cancel(self, method):
 	delivery_notes = frappe.get_all('Delivery Note', filters={'pick_list': self.name, 'docstatus': 0}, fields=['name'])
 	for delivery_note in delivery_notes:
 		doc = frappe.get_doc('Delivery Note', delivery_note.name)
 		doc.delete()
+		
+	#Clear pick list submitted date in sales order
+	pick_list = frappe.get_doc('Pick List', self.name)
+
+	sales_orders = [d.sales_order for d in pick_list.locations if d.sales_order]
+	sales_orders = set(sales_orders)
+	for sales_order in sales_orders:
+		sales_doc = frappe.get_doc("Sales Order", sales_order)
+		sales_doc.update({"pick_list_submitted_date": ""})
+		sales_doc.save()
+	
 	
 	
 @frappe.whitelist()
