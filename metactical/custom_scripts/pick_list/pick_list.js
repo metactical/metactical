@@ -78,8 +78,5 @@ frappe.templates["dashboard_pick_list_doctype"] = ' \
     	<a class="badge-link small">{{ __(doctype) }}</a> \
     	<span class="text-muted small count"></span> \
     	<span class="open-notification hidden" title="{{ __("Open {0}", [__(doctype)])}}"></span> \
-    		<button class="btn btn-new btn-default btn-xs hidden" data-doctype="{{ doctype }}"> \
-    				<i class="octicon octicon-plus" style="font-size: 12px;"></i> \
-    		</button>\
     	</div>';
 
