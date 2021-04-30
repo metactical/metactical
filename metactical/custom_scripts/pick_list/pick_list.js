@@ -14,6 +14,7 @@ frappe.ui.form.on('Pick List', {
 			frm.set_value('print_date_time', '');
 			frm.set_value('track_print_user', '');
 		}
+		dashboard_pick_list_doctype(frm, "Sales Order");
 	},
 	
 	on_submit: function(frm){
@@ -42,3 +43,43 @@ frappe.ui.form.on('Pick List', {
 		)
 	}
 });
+
+
+//Add Sales Order in dashboard
+var dashboard_pick_list_doctype = function (frm, doctype) {
+	var sales_orders = ['in'];
+	var count = 0;
+	var locations = frm.doc.locations;
+	locations.forEach(function(location){
+		if(sales_orders.indexOf(location.sales_order) == -1){
+			count++;
+			sales_orders.push(location.sales_order);
+		}
+	});
+	var parent = $('.form-dashboard-wrapper [data-doctype="Delivery Note"]').closest('div').parent();
+	parent.find('[data-doctype="' + doctype + '"]').remove();
+	parent.append(frappe.render_template("dashboard_pick_list_doctype", {
+		doctype: doctype
+	}));
+	var self = parent.find('[data-doctype="' + doctype + '"]');
+	//set_open_count(frm, doctype);
+	// bind links
+	self.find(".badge-link").on('click', function () {
+		frappe.route_options = {
+			"name": sales_orders
+		}
+		frappe.set_route("List", doctype);
+	});
+	self.find('.count').html(count);
+}
+
+frappe.templates["dashboard_pick_list_doctype"] = ' \
+    	<div class="document-link" data-doctype="{{ doctype }}"> \
+    	<a class="badge-link small">{{ __(doctype) }}</a> \
+    	<span class="text-muted small count"></span> \
+    	<span class="open-notification hidden" title="{{ __("Open {0}", [__(doctype)])}}"></span> \
+    		<button class="btn btn-new btn-default btn-xs hidden" data-doctype="{{ doctype }}"> \
+    				<i class="octicon octicon-plus" style="font-size: 12px;"></i> \
+    		</button>\
+    	</div>';
+
