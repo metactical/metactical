@@ -151,4 +151,5 @@ def save_cancel_reason(**args):
 	args = frappe._dict(args)
 	doc = frappe.get_doc("Pick List", args.docname)
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
+	doc.db_set("pick_list_cancel_date", datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S"))
 	return 'Success'
