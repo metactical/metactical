@@ -1,6 +1,38 @@
 [
  {
   "default_value": null,
+  "doc_type": "Sales Taxes and Charges",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "tax_amount",
+  "modified": "2021-04-15 22:12:48.404848",
+  "name": "Sales Taxes and Charges-tax_amount-precision",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "precision",
+  "property_type": "Select",
+  "value": ""
+ },
+ {
+  "default_value": null,
+  "doc_type": "Sales Taxes and Charges",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "total",
+  "modified": "2021-04-15 22:12:48.449592",
+  "name": "Sales Taxes and Charges-total-precision",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "precision",
+  "property_type": "Select",
+  "value": ""
+ },
+ {
+  "default_value": null,
   "doc_type": "Salary Slip",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -3342,5 +3374,21 @@
   "property": "in_list_view",
   "property_type": "Check",
   "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Delivery Note",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "pick_list",
+  "modified": "2021-04-27 11:51:57.986911",
+  "name": "Delivery Note-pick_list-hidden",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "hidden",
+  "property_type": "Check",
+  "value": "0"
  }
 ]
