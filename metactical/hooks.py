@@ -28,7 +28,8 @@ app_license = "MIT"
 # include js in doctype views
 doctype_js = {
 	"Sales Order" : "custom_scripts/sales_order/sales_order.js",
-	"Pick List": "custom_scripts/pick_list/pick_list.js"
+	"Pick List": "custom_scripts/pick_list/pick_list.js",
+	"Stock Entry": "custom_scripts/stock_entry/stock_entry.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -134,9 +135,9 @@ override_whitelisted_methods = {
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "metactical.task.get_dashboard_data"
-# }
+#override_doctype_dashboards = {
+ 	#"Task": "metactical.task.get_dashboard_data"
+#}
 
 #Fixtures
 fixtures = ["Custom Field", "Property Setter", "Custom Script"]
