@@ -50,6 +50,7 @@ var dashboard_pick_list_doctype = function (frm, doctype) {
 	var sales_orders = ['in'];
 	var count = 0;
 	var locations = frm.doc.locations;
+	
 	locations.forEach(function(location){
 		if(sales_orders.indexOf(location.sales_order) == -1){
 			count++;
@@ -62,6 +63,7 @@ var dashboard_pick_list_doctype = function (frm, doctype) {
 		doctype: doctype
 	}));
 	var self = parent.find('[data-doctype="' + doctype + '"]');
+	
 	//set_open_count(frm, doctype);
 	// bind links
 	self.find(".badge-link").on('click', function () {
@@ -70,6 +72,7 @@ var dashboard_pick_list_doctype = function (frm, doctype) {
 		}
 		frappe.set_route("List", doctype);
 	});
+	
 	self.find('.count').html(count);
 }
 
