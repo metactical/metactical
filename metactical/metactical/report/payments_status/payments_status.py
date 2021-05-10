@@ -90,6 +90,10 @@ def get_balance(data):
 				row.update({
 					"balance_due": c_or_b
 				})
+			else:
+				row.update({
+					"balance_due": 0
+				})
 	return data
 	
 def get_credit(data):
@@ -104,8 +108,12 @@ def get_credit(data):
 				account_list += "'" + account.name + "'"
 				no = no + 1
 		account_list += ")"
+		
 			
+		
 		for row in data:
+			credit_due = 0.0
+			#For extra unassigned payment
 			query = frappe.db.sql('''
 				SELECT
 					SUM(credit_in_account_currency) AS credit_due
@@ -117,7 +125,14 @@ def get_credit(data):
 			'''.format(account_list), {"party": row.customer}, as_dict=1)
 			
 			if query[0]:
-				row.update({"credit_due": query[0].credit_due})
+				credit_due = query[0].credit_due
+		
+			#For extra advance paid then Sales Order amended to reduce amount due
+			c_or_b = row.grand_total - row.advance_paid
+			if c_or_b < 0:
+				credit_due = credit_due + (c_or_b * -1)
+			
+			row.update({"credit_due": credit_due})		
 	return data
 	
 @frappe.whitelist()
