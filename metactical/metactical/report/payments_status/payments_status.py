@@ -52,6 +52,12 @@ def execute(filters=None):
 			'width': 150
 		},
 		{
+			"fieldname": "status",
+			"label": "Status",
+			"fieldtype": 'Data',
+			'width': 150
+		},
+		{
 			"fieldname": "notes",
 			"label": "Notes",
 			"fieldtype": 'Data',
@@ -60,6 +66,11 @@ def execute(filters=None):
 	]
 	
 	where_filter = {"from_date": filters.from_date, "to_date": filters.to_date}
+	where = ""
+	
+	if filters.source:
+		where = " AND so.source = %(source)s"
+		where_filter.update({"source": filters.source})
 	
 	initial = frappe.db.sql('''SELECT
 								so.transaction_date AS so_date,
@@ -67,13 +78,14 @@ def execute(filters=None):
 								so.customer,
 								so.grand_total,
 								so.advance_paid,
+								so.status,
 								so.ais_payment_notes AS notes
 							FROM
 								`tabSales Order` AS so
 							WHERE
 								so.transaction_date BETWEEN %(from_date)s AND %(to_date)s
 								AND so.docstatus = 1
-						''', where_filter, as_dict=1)
+						''' + where, where_filter, as_dict=1)
 	for sales_order in initial:
 		if not sales_order['notes']:
 			sales_order.update({"notes": '<button class="btn btn-xs btn-default" onClick="add_notes(\'' + sales_order['sales_order'] + '\')">Add Notes</button>'})

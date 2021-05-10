@@ -20,6 +20,12 @@ frappe.query_reports["Payments Status"] = {
             "label": __("To Date"),
             "fieldtype": "Date",
             "default": to_date
+        },
+        {
+            "fieldname":"source",
+            "label": __("Source of Website"),
+            "fieldtype": "Link",
+            "options": "Lead Source"
         }
 	],
 	
