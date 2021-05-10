@@ -124,7 +124,7 @@ def get_credit(data):
 					AND party_type = 'Customer' AND against_voucher IS NULL
 			'''.format(account_list), {"party": row.customer}, as_dict=1)
 			
-			if query[0]:
+			if query[0] and query[0].credit_due is not None:
 				credit_due = query[0].credit_due
 		
 			#For extra advance paid then Sales Order amended to reduce amount due
