@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<link href="bootstrap.min.css" rel="stylesheet">
+	<link rel="stylesheet" type="text/css" href="datatables/datatables.min.css"/>
+	<script type="text/javascript" src="datatables/jQuery-3.3.1/jquery-3.3.1.min.js"></script>
+	<script type="text/javascript" src="datatables/DataTables-1.10.24/js/jquery.dataTables.min.js"></script>
+	<script type="text/javascript" src="datatables/dataTables.fixedColumns.min.js"></script>
+	<script type="text/javascript" src="datatables/dataTables.buttons.min.js"></script>
+	<script type="text/javascript" src="datatables/jszip.min.js"></script>
+	<script type="text/javascript" src="datatables/pdfmake.min.js"></script>
+	<script type="text/javascript" src="datatables/vfs_fonts.js"></script>
+	<script type="text/javascript" src="datatables/buttons.html5.min.js"></script>
+	<script type="text/javascript" src="datatables/buttons.print.min.js "></script>
+	<style>	
+	.copy{
+		font-size: 10px;
+		padding: 0px !important;
+	}
+	.dataTables_info{
+		width: 49%;
+	}
+	.dt-buttons{
+		padding-top: 5px;
+	}
+	</style>
+</head>
+<body>
+	<header>
+		<div class="bg-dark" id="navbarHeader">
+		  <div class="container">
+			<div class="form-row py-4">
+			  <div class="col-7">
+				<input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
+				  id="searchinput" value="">
+			  </div>
+			  <div class="col">
+				  <div style="float: left; width: 30%;">
+					  <b id="item-title" style="font-size: 10px; color: #FFF; text-align: left !important;">Item Code</b><br>
+					  <input  class="copy form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" />
+					  <a class="copy" href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
+				  </div>
+				  <div style="float: left; width: 30%;" id="copy-barcode"></div>
+				  <div style="float: left; width: 30%;">
+					  <button type="submit" onclick="searchItem()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
+				  </div>
+			  </div>
+			</div>
+		  </div>
+		</div>
+	</header>
+	<div>
+	<table id="search_results" class="cell-border order-column hover stripe" style="">
+		<thead class="thead-dark">
+			<tr>
+				{% for column in columns %}
+					<th>{{column}}</th>
+				{% endfor %}
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in data %}
+				<tr>
+					{% for value in row %}
+						<td>
+							{{value}}
+						</td>
+					{% endfor %}
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	<div style="float: right; margin-top: -25px; margin-right: 10px; position: relative; z-index: 1000;"><a href="#" id="to_top">Back to Top</a></div>
+	</div>
+	
+	<script type="text/javascript">
+		var input = document.getElementById("searchinput");
+
+		// Execute a function when the user releases a key on the keyboard
+		input.addEventListener("keyup", function (event) {
+		  // Number 13 is the "Enter" key on the keyboard
+		  if (event.keyCode === 13) {
+			// Cancel the default action, if needed
+			event.preventDefault();
+			// Trigger the button element with a click
+			document.getElementById("searchbutton").click();
+		  }
+		});
+		
+		//Called on search button click
+		function searchItem() {
+			var search_text = document.getElementById("searchinput").value
+			var new_url = `${window.location.origin}/itemsearchnew?searchtext=${search_text}`
+			window.location.href = new_url
+		}
+		
+		//For the item code copy button in header
+		function copy_item_code() {
+			var copyText = document.getElementById("item_code");
+
+			/* Select the text field */
+			copyText.select();
+			copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+			/* Copy the text inside the text field */
+			document.execCommand("copy");
+		}
+		
+		//For the barcode copy button in the header
+		function copy_barcode(barcode) {
+			var copyText = document.getElementById(barcode);
+
+			/* Select the text field */
+			copyText.select();
+			copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+			/* Copy the text inside the text field */
+			document.execCommand("copy");
+		}
+		
+		
+		$(document).ready(function() {
+			//Hide the item code input in header and item code and barcode copy buttons
+			$("#item_code").hide();
+			$("#copy-btn").hide();
+			$("#item-title").hide();
+			
+			//On row selection, display the item code in header with options to copy item code and barcode
+			$("table > tbody > tr").on("click", function() {
+				console.log(this.cells);
+				item_column = this.cells.length - 2;
+				barcode_column = this.cells.length - 4;
+				$("#item_code").val(this.cells[item_column].innerText);
+				$("#item_code").show();
+				$("#copy-btn").show();
+				$("#item-title").show();
+				
+				//For barcodes
+				var barcode_html = this.cells[barcode_column].innerText;
+				console.log(barcode_html)
+				if(barcode_html != 'None' && barcode_html != ''){
+					var barcodes = barcode_html.split('\n')
+					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
+					barcodes.forEach(function(barcode){
+						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
+								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a> <br>';
+						barcode_copy = barcode_copy + html;
+					});
+					$('#copy-barcode').html(barcode_copy);
+				}
+				else{
+					//Clear barcode html
+					$('#copy-barcode').html('');
+				}
+			});
+			
+			
+			//Datatables
+			var datatable = $('#search_results').DataTable({
+				bFilter: false,
+				scrollY: '65vh',
+				scrollX: true,
+				scrollCollapse: true,
+				paging: false,
+				fixedColumns: {
+					leftColumns: 1
+				},
+				dom: 'frtipB',
+				buttons: [
+					'excel'
+				]
+			});
+			
+			$('#to_top').on('click', function(){
+				console.log(datatable);
+				datatable.draw(true);
+			});
+		});
+	</script>
+</body>
+</html>

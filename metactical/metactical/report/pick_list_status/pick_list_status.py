@@ -33,6 +33,12 @@ def execute(filters=None):
 			"width": 100
 		},
 		{
+			"fieldtype": "Datetime",
+			"fieldname": "print_time",
+			"label": "Pick List Printed Date",
+			"width": 100
+		},
+		{
 			"fieldtype": "Data",
 			"fieldname": "pick_list_packed",
 			"label": "Pick List Packed",
@@ -42,6 +48,12 @@ def execute(filters=None):
 			"fieldtype": "Data",
 			"fieldname": "pick_list_cancelled",
 			"label": "Pick List Cancelled",
+			"width": 100
+		},
+		{
+			"fieldtype": "Datetime",
+			"fieldname": "cancel_date",
+			"label": "Pick List Cancelled Date",
 			"width": 100
 		},
 		{
@@ -138,6 +150,7 @@ def get_pick_lists(filters, sales_orders):
 						ret = frappe.db.sql('''SELECT
 													pick_list.name AS pick_list,
 													pick_list.date AS pick_list_date,
+													pick_list.print_date_time AS print_time,
 													CASE
 														WHEN pick_list.print_date_time IS NOT NULL THEN 'Yes'
 														ELSE 'No'
@@ -147,6 +160,7 @@ def get_pick_lists(filters, sales_orders):
 														ELSE 'No'
 													END AS pick_list_cancelled,
 													delivery_note.lr_no AS tracking_no,
+													pick_list.pick_list_cancel_date AS cancel_date,
 													pick_list.cancel_reason AS pick_list_notes,
 													notes,
 													delivery_note.name AS delivery

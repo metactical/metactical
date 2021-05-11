@@ -20,6 +20,19 @@ def custom_before_save(self):
 	bstring = rv.getvalue()
 	self.barcode = bstring.decode('ISO-8859-1')
 	
+	#Check if Sales Order has Balance Due or Credit Due
+	sales_orders = []
+	for item in self.locations:
+		if item.sales_order and item.sales_order not in sales_orders:
+			sales_orders.append(item.sales_order)
+			doc = frappe.get_doc("Sales Order", item.sales_order)
+			c_or_d = doc.grand_total - doc.advance_paid
+			if c_or_d > 0:
+				frappe.msgprint('Warning: Sales Order <a href="/desk#Form/Sales Order/{0}">{0}</a> has not been fully paid'.format(item.sales_order))
+			elif c_or_d < 0:
+				frappe.msgprint('Warning: Sales Order <a href="/desk#Form/Sales Order/{0}">{0}</a> has credit due.'.format(item.sales_order))
+			
+	
 def custom_on_save(self, method):
 	PickList.before_save = custom_before_save
 	
@@ -151,4 +164,5 @@ def save_cancel_reason(**args):
 	args = frappe._dict(args)
 	doc = frappe.get_doc("Pick List", args.docname)
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
+	doc.db_set("pick_list_cancel_date", datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S"))
 	return 'Success'
