@@ -1,0 +1,69 @@
+<div class="controls">
+  <div class="row">
+    <div class="col-md-6">
+      <div class="delivery-note-wrapper"></div>
+    </div>
+    <div class="col-md-6">
+      <div class="item-barcode-wrapper"></div>
+    </div>
+  </div>
+</div>
+
+<section class="packing-slip-wrapper">
+  {% if no_data_feedback != 0 %}
+  <div class="no-data-feedback">
+    <p>{{ no_data_feedback }}</p>
+  </div>
+
+  {% endif %} {% if no_data_feedback == 0 %}
+  <div class="row">
+    <div class="col-md-3">
+      <section class="box pending-items">
+        <h4 class="section-title pending-items-count"></h4>
+        <div class="section-wrapper">
+          <!-- Pending Items -->
+          <div class="pending-items-wrap"></div>
+          <!--/ Pending Items -->
+        </div>
+      </section>
+    </div>
+
+    <div class="col-md-6">
+      <section class="box current-item">
+        <h4 class="section-title cur-item-barcode"></h4>
+        <div class="section-wrapper">
+          <!-- Current Item -->
+          <div class="current-items-wrap">
+            <h3 class="current-section-title cur-item-scan-feedback"></h3>
+
+            <div class="current-packing-item">
+              <div class="item-detail">
+                <h5 class="item-title cur-item-name"></h5>
+                <p class="item-description cur-item-code"></p>
+              </div>
+
+              <div class="item-quantity">
+                <span class="cur-item-quantity-remaining"></span>
+              </div>
+
+              <img src="" alt="" class="cur-item-image" />
+            </div>
+            <!--/ Current Item -->
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-md-3">
+      <section class="box packed-items">
+        <h4 class="section-title packed-items-count"></h4>
+        <div class="section-wrapper">
+          <!-- Packed Items -->
+          <div class="packed-items-wrap"></div>
+          <!--/ Packed Items -->
+        </div>
+      </section>
+    </div>
+  </div>
+  {% endif %}
+</section>
