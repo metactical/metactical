@@ -41,7 +41,7 @@ frappe.ui.form.on('Pick List', {
 		'Please reason for cancellation.',
 		'Cancel'
 		)
-	}
+	},
 });
 
 

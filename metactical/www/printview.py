@@ -34,13 +34,17 @@ def get_context(context):
 	
 	#For setting print datetime if it's pick_list
 	if doc.doctype=="Pick List":
+		if doc.print_date_time:
+			doc.reprinted = 1
 		doc.print_date_time = datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")
 		doc.track_print_user = frappe.db.get_value("User", frappe.session.user, "full_name")
+		
 		#Get the doc gain in case it is loaded from frappe.form_dict
 		sdoc = frappe.get_doc(doc.doctype, doc.name)
 		sdoc.update({
 			"print_date_time": doc.print_date_time,
-			"track_print_user": doc.track_print_user
+			"track_print_user": doc.track_print_user,
+			"reprinted": doc.reprinted
 		})
 		sdoc.save()
 
