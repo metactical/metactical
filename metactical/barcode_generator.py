@@ -9,16 +9,18 @@ import shutil
 import barcode
 from pathlib import Path
 import pyqrcode
+from frappe.utils import cstr
 
 
 def generate(self, method):
+	site = cstr(frappe.local.site)
 	code = self.name
 	name_tobe = code+".svg"
-	check_file = Path("site1.local/public/files/"+name_tobe)
+	check_file = Path(site+"/public/files/"+name_tobe)
 	if not check_file.is_file():
 		bar = barcode.get('code128', str(code))
 		result = bar.save(code)
-		shutil.move(result, 'site1.local/public/files')
+		shutil.move(result, site+'/public/files')
 
 def po_validate(self, method):
 	self.customer_address=None

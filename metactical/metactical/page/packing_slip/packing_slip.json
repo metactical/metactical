@@ -1,0 +1,23 @@
+{
+ "content": null,
+ "creation": "2021-01-13 15:56:41.174800",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2021-05-14 19:19:13.858274",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "packing-slip",
+ "owner": "Administrator",
+ "page_name": "Packing Slip",
+ "roles": [
+  {
+   "role": "All"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Packing Slip"
+}
