@@ -32,8 +32,9 @@ def get_context(context):
 	else:
 		doc = frappe.get_doc(frappe.form_dict.doctype, frappe.form_dict.name)
 	
-	#For setting print datetime if it's pick_list
+	#For setting print datetime if it's pick_list	
 	if doc.doctype=="Pick List":
+			
 		if doc.print_date_time or doc.amended_from:
 			doc.pl_text = "REPRINTED"
 
@@ -45,9 +46,10 @@ def get_context(context):
 		sdoc.update({
 			"print_date_time": doc.print_date_time,
 			"track_print_user": doc.track_print_user,
-			"pl_text": doc.pl_text,
+			"pl_text": doc.pl_text,	
 		})
 		sdoc.save()
+
 
 	meta = frappe.get_meta(doc.doctype)
 
@@ -64,6 +66,7 @@ def get_context(context):
 		"title": doc.get(meta.title_field) if meta.title_field else doc.name,
 		"has_rtl": True if frappe.local.lang in ["ar", "he", "fa"] else False
 	}
+
 
 def get_print_format_doc(print_format_name, meta):
 	"""Returns print format document"""

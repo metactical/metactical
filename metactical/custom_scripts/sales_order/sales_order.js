@@ -3,12 +3,13 @@ var old_tax_template;
 var base_in_words;
 frappe.ui.form.on('Sales Order', {
 		refresh: function(frm){
-
+			console.log(frm);
 		//Clear update qty and rate button
 		/*if(frm.doc.docstatus === 1 && frm.doc.status !== 'Closed'
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
 			frm.clear_custom_buttons();
 		}*/
+		
 		
 		setTimeout(() => {
 			
@@ -35,6 +36,12 @@ frappe.ui.form.on('Sales Order', {
 			});
 		}
 
+		// set taxes and charges after amending
+		if (frm.doc.amended_from && !frm.doc.taxes_and_charges) {
+			var amended_doc = frappe.get_doc("Sales Order", frm.doc.amended_from);
+			frm.doc.taxes_and_charges = amended_doc.taxes_and_charges ;
+		}
+
 		dashboard_sales_order_doctype(frm, "Stock Entry");
 	},
 
@@ -42,7 +49,6 @@ frappe.ui.form.on('Sales Order', {
 	onload: function(frm){
 		old_tax_template = frm.doc.taxes_and_charges;
 		base_in_words = frm.doc.base_in_words;
-
 	},
 	
 	create_pick_list_custom() {
@@ -78,9 +84,9 @@ frappe.ui.form.on('Sales Order', {
 		'Please reason for cancellation.',
 		'Cancel'
 		)
-	}
+	},
+	
 });
-
 
 erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
 	customer_address: function(doc, dt, dn){

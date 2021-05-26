@@ -13,13 +13,24 @@ frappe.ui.form.on('Pick List', {
 		if(frm.doc.docstatus == 0 && frm.doc.__islocal == 1){
 			frm.set_value('print_date_time', '');
 			frm.set_value('track_print_user', '');
+			frm.set_value('pl_text', '');
+
 		}
+
 		dashboard_pick_list_doctype(frm, "Sales Order");
 	},
 	
-	on_submit: function(frm){
-		var new_url = window.location.origin + "/printview?doctype=Pick%20List&name=" + frm.doc.name + "&trigger_print=1&format=Pick%20List%204*6&no_letterhead=0&_lang=en"
+	on_submit: function(frm){				
+		var new_url = window.location.origin + "/printview?doctype=Pick%20List&name=" + frm.doc.name + "&trigger_print=1&format=Pick%20List%204*6&no_letterhead=0&_lang=en"		
 		window.open(new_url)
+		
+	},
+	can_print: function(doctype, frm) {
+		if (frm.doc.flag_qty === 1) {
+			return frappe.boot.user.can_print.indexOf(doctype) ===-1;
+		}
+		/*if(frm) return frm.perm[0].print===1;
+		return frappe.boot.user.can_print.indexOf(doctype)!==-1;*/
 	},
 	
 	before_cancel_event: function(frm){

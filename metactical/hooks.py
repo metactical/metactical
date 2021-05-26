@@ -94,7 +94,7 @@ doc_events = {
 		"validate": "metactical.custom_scripts.pick_list.pick_list.custom_on_save",
 		"on_submit": "metactical.custom_scripts.pick_list.pick_list.on_submit",
 		"on_cancel": "metactical.custom_scripts.pick_list.pick_list.on_cancel"
-	}
+	},
 }
 
 # Scheduled Tasks
