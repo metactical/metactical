@@ -25,13 +25,6 @@ frappe.ui.form.on('Pick List', {
 		window.open(new_url)
 		
 	},
-	can_print: function(doctype, frm) {
-		if (frm.doc.flag_qty === 1) {
-			return frappe.boot.user.can_print.indexOf(doctype) ===-1;
-		}
-		/*if(frm) return frm.perm[0].print===1;
-		return frappe.boot.user.can_print.indexOf(doctype)!==-1;*/
-	},
 	
 	before_cancel_event: function(frm){
 		frappe.prompt([

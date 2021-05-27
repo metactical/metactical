@@ -22,7 +22,7 @@ frappe.ui.form.on('Sales Order', {
 			
 		}, 1000);
 
-		// Code to add Stock Entry (Transfer material) button
+		// Add Stock Entry (Transfer material) button
 		if(frm.doc.docstatus == 1){ 
 			frm.add_custom_button(__('Stock Entry'), 
 				() => frm.events.create_material_transfer_custom(), __("Create"));
@@ -38,14 +38,13 @@ frappe.ui.form.on('Sales Order', {
 
 		// set taxes and charges after amending
 		if (frm.doc.amended_from && !frm.doc.taxes_and_charges) {
-			var amended_doc = frappe.get_doc("Sales Order", frm.doc.amended_from);
-			frm.doc.taxes_and_charges = amended_doc.taxes_and_charges ;
+			var amended_order = frappe.get_doc("Sales Order", frm.doc.amended_from);
+			frm.doc.taxes_and_charges = amended_order.taxes_and_charges ;
 		}
 
 		dashboard_sales_order_doctype(frm, "Stock Entry");
 	},
 
-	
 	onload: function(frm){
 		old_tax_template = frm.doc.taxes_and_charges;
 		base_in_words = frm.doc.base_in_words;
