@@ -1,6 +1,7 @@
 import frappe
 import barcode as _barcode
 from io import BytesIO
+from frappe.model.mapper import get_mapped_doc, map_child_doc
 
 def before_save(self, method):
 	frappe.msgprint('Something')
@@ -10,41 +11,67 @@ def before_save(self, method):
 	self.ais_barcode = bstring.decode('ISO-8859-1')
 
 @frappe.whitelist()
-def create_journal_entry(source_name, target_doc=None):
-	def update_accounts(source, target):
-		accounts = []
-		rows = []
-		for item in source.items:
-			if item.income_account not in accounts:
-				temp = {
-					"account": item.income_account,
-					"party_type": "Customer",
-					"party": source.customer,
-					"cost_center": item.cost_center,
-					"project": item.project,
-					"reference_type": "Sales Invoice",
-					"reference_name": source.name,
-					"debit_in_account_currency": 50
-				}
-		 
+def create_journal_entry(source_name, bank_cash, amount, target_doc=None):
+	def update_accounts(source_doc, target_doc):
+		amount_after_tax = float(amount)
+		target_doc.accounts = []
+		#Add taxes and charges
+		for row in source_doc.taxes:
+			tax_amount = (float(amount) * float(row.rate))/100
+			amount_after_tax = amount_after_tax - tax_amount
+			account = frappe.new_doc('Journal Entry Account')
+			account.update({
+				"account": row.account_head,
+				"cost_center": source_doc.items[0].cost_center,
+				"project": source_doc.items[0].project,
+				"debit_in_account_currency": tax_amount
+			})
+			target_doc.append("accounts", account)
+			
+		#For the simplest implementation, we assume all items on the invoice share the same income account
+		account = frappe.new_doc('Journal Entry Account')
+		account.update({
+			"account": source_doc.items[0].income_account,
+			"cost_center": source_doc.items[0].cost_center,
+			"project": source_doc.items[0].project,
+			"debit_in_account_currency": amount_after_tax
+		})
+		target_doc.append("accounts", account)
 		
-	def update_item_quantity(source, target, source_parent):
-		target.qty = flt(source.qty) - flt(source.delivered_qty)
-		target.stock_qty = (flt(source.qty) - flt(source.delivered_qty)) * flt(source.conversion_factor)
-		target.picked_qty = flt(source.qty) - flt(source.delivered_qty)
+		account = frappe.new_doc('Journal Entry Account')
+		account.update({
+			"account": source_doc.debit_to,
+			"reference_type": "Sales Invoice",
+			"party_type": "Customer",
+			"party": source_doc.customer,
+			"reference_name": source_name,
+			"credit_in_account_currency": amount
+		})
+		target_doc.append("accounts", account)
+		
+		account = frappe.new_doc('Journal Entry Account')
+		account.update({
+			"account": source_doc.debit_to,
+			"reference_type": "Sales Invoice",
+			"party_type": "Customer",
+			"party": source_doc.customer,
+			"reference_name": source_name,
+			"debit_in_account_currency": amount
+		})
+		target_doc.append("accounts", account)
+		
+		account = frappe.new_doc('Journal Entry Account')
+		account.update({
+			"account": bank_cash,
+			"credit_in_account_currency": amount
+		})
+		target_doc.append("accounts", account)
 
-	doc = get_mapped_doc('Sales Invoice', source_name, {
-		'Sales Invoice': {
-			'doctype': 'Journal Entry',
-			'validation': {
-				'docstatus': ['=', 1]
-			}
-		},
-	}, target_doc, update_accounts)
-	doc.purpose = 'Delivery'
-	PickList.before_save = custom_before_save
-
-	#doc.set_item_locations()
-
-	return doc
+	target_doc = frappe.new_doc('Journal Entry')
+	target_doc.update({
+		"voucher_type": "Credit Note"
+	})
+	source_doc = frappe.get_doc('Sales Invoice', source_name)
+	update_accounts(source_doc, target_doc)
+	return target_doc
 		
