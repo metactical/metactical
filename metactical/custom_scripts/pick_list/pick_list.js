@@ -18,6 +18,8 @@ frappe.ui.form.on('Pick List', {
 		}
 
 		dashboard_pick_list_doctype(frm, "Sales Order");
+		get_undelivered_pick_list(frm);
+
 	},
 	
 	on_submit: function(frm){				
@@ -48,6 +50,63 @@ frappe.ui.form.on('Pick List', {
 	},
 });
 
+var get_undelivered_pick_list = function (frm) {
+	
+	var count = 0;
+	var locations = frm.doc.locations;
+	
+	locations.forEach(function(row){
+		frappe.call({
+			'method': 'metactical.custom_scripts.pick_list.pick_list.get_undelivered_pick_list',
+			'args': {
+				'item_code': row.item_code,
+				'warehouse': row.warehouse,
+			},
+			'callback': function(r){
+				var items = [];
+				$.each((r.message), function(i, d){
+					items.push(d);		
+				})
+				set_qoh_flag(frm, items);
+			}
+		});
+	});
+
+}
+
+// set qoh
+var set_qoh_flag = function(frm, items){
+	
+	var undelivered_pick_list = [];
+	/*var flag = 0;
+	var flagged_item = '';*/
+	items.forEach(function(row){
+		console.log(row);	
+		if ((row.actual_qty - row.reserved_qty) < 0){
+			frm.doc.flag_qty = 1;
+			frm.doc.flagged_item = row.item_code;
+		}	
+	
+	});
+	var btn = document.getElementsByClassName('btn-print-print');
+    if(btn) {
+        for(var i = 0; i < btn.length; i++) {
+            if (btn[i].textContent.trim() == "Print") {
+                btn[i].addEventListener("click", function () {
+                	if (frm.doc.flag_qty==1) {
+                		console.log("yesss");
+                		frappe.validated = false;
+                		frappe.msgprint(__("Insufficient Qty for Item: "+ frm.doc.flagged_item))
+                	}
+                    console.log("flag:" +frm.doc.flag_qty);
+                    //frappe.throw(("Not allowed to print as Qty is Insufficient"))
+                    //frappe.msgprint(__("Insufficient Qty for Item: "+ frm.doc.flagged_item))
+                });
+                break;
+            }
+        }
+    }
+}
 
 //Add Sales Order in dashboard
 var dashboard_pick_list_doctype = function (frm, doctype) {

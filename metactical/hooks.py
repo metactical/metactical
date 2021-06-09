@@ -33,7 +33,10 @@ doctype_js = {
 	"Sales Invoice": "custom_scripts/sales_invoice/sales_invoice.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+#doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {
+	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
+}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 

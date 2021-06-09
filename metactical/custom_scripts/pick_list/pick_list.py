@@ -166,3 +166,23 @@ def save_cancel_reason(**args):
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
 	doc.db_set("pick_list_cancel_date", datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S"))
 	return 'Success'
+
+
+
+@frappe.whitelist()
+def get_undelivered_pick_list(**args):
+	args = frappe._dict(args)
+	itm_code = args.item_code
+	warehse = args.warehouse
+
+	doc = frappe.get_all("Bin", 
+		filters={
+			'warehouse': args.warehouse,
+			'item_code': args.item_code,
+		},
+		fields=[
+			'item_code', 'reserved_qty', 'actual_qty'
+		])
+	#frappe.msgprint("Item code: {0}".format(doc[0].item_code))
+	
+	return doc	

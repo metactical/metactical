@@ -106,6 +106,10 @@ def get_rendered_template(doc, name=None, print_format=None, meta=None,
 		if doc.docstatus==2 and not cint(print_settings.allow_print_for_cancelled):
 			frappe.throw(_("Not allowed to print cancelled documents"), frappe.PermissionError)
 
+	# if doc.docstatus==1:
+	# 	if doc.flag_qty ==1:
+	# 		return frappe.throw(("Not allowed to print as Qty is not sufficient"))
+
 	doc.run_method("before_print")
 
 	if not hasattr(doc, "print_heading"): doc.print_heading = None
