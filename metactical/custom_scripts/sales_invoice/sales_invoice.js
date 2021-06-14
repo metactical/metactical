@@ -9,7 +9,7 @@ frappe.ui.form.on('Sales Invoice', {
 				{
 					"fieldtype": "Select",
 					"fieldname": "purpose",
-					"options": "Credit Customer",
+					"options": "Create Credit Note and Refund Customer\nRefund Advance Payment",
 					"reqd": 1,
 					"label": __('Purpose')
 				},
@@ -46,7 +46,8 @@ frappe.ui.form.on('Sales Invoice', {
 					args: {
 						"source_name": cur_frm.docname,
 						"bank_cash": values.bank_cash,
-						"amount": values.credit_amount
+						"amount": values.credit_amount,
+						"purpose": values.purpose
 					},
 					freeze: true,
 					callback: function(r) {
@@ -57,11 +58,6 @@ frappe.ui.form.on('Sales Invoice', {
 						}
 					}
 				});
-				/*frappe.model.open_mapped_doc({
-					method: "metactical.custom_scripts.sales_invoice.sales_invoice.create_journal_entry",
-					frm: sent_frm
-				});*/
-				//d.hide();
 			}
 		});
 		d.show();
