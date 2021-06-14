@@ -4,7 +4,6 @@ from io import BytesIO
 from frappe.model.mapper import get_mapped_doc, map_child_doc
 
 def before_save(self, method):
-	frappe.msgprint('Something')
 	rv = BytesIO()
 	_barcode.get('code128', self.name).write(rv)
 	bstring = rv.getvalue()
