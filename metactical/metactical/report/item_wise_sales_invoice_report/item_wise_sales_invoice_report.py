@@ -23,7 +23,8 @@ def execute(filters=None):
 		row['item_code'] = d.item_code
 		row['qty'] = d.qty
 		row['uom'] = d.uom
-		
+		row['ifw_location'] = d.ifw_location
+
 		data.append(row)
 
 	return columns, data
