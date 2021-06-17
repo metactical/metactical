@@ -22,6 +22,7 @@ def execute(filters=None):
 		row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
 		row['item_code'] = d.item_code
 		row['qty'] = d.qty
+		row['rate'] = d.rate
 		row['uom'] = d.uom
 		row['ifw_location'] = d.ifw_location
 
@@ -66,6 +67,12 @@ def get_column():
 			"width": 120,
 		},
 		{
+			"fieldname":"rate",
+			"label": "Price",
+			"fieldtype": "Float",
+			"width": 120,
+		},
+		{
 			"fieldname":"uom",
 			"label": "UoM",
 			"fieldtype": "Link",
@@ -78,7 +85,7 @@ def get_column():
 def get_data(filters):
 	where_filter = {"from_date": filters.from_date, "to_date": filters.to_date}
 	where = ""
-	data = frappe.db.sql("""select c.item_code, c.item_name, c.qty, c.uom, i.ifw_retailskusuffix, i.ifw_location,
+	data = frappe.db.sql("""select c.item_code, c.item_name, c.qty, c.rate, c.uom, i.ifw_retailskusuffix, i.ifw_location,
 		p.name, p.posting_date
 		from `tabSales Invoice Item` c inner join `tabSales Invoice` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
