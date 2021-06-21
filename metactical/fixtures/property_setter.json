@@ -1,6 +1,38 @@
 [
  {
   "default_value": null,
+  "doc_type": "Stock Reconciliation Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "warehouse",
+  "modified": "2021-06-04 15:28:56.569092",
+  "name": "Stock Reconciliation Item-warehouse-in_standard_filter",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "in_standard_filter",
+  "property_type": "Check",
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Stock Reconciliation",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "cost_center",
+  "modified": "2021-06-05 14:58:52.061488",
+  "name": "Stock Reconciliation-cost_center-in_list_view",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "in_list_view",
+  "property_type": "Check",
+  "value": "1"
+ },
+ {
+  "default_value": null,
   "doc_type": "Purchase Order Item",
   "docstatus": 0,
   "doctype": "Property Setter",

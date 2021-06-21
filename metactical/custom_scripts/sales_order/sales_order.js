@@ -43,6 +43,7 @@ frappe.ui.form.on('Sales Order', {
 		}
 
 		dashboard_sales_order_doctype(frm, "Stock Entry");
+		
 	},
 
 	onload: function(frm){
@@ -50,11 +51,26 @@ frappe.ui.form.on('Sales Order', {
 		base_in_words = frm.doc.base_in_words;
 	},
 	
-	create_pick_list_custom() {
-		frappe.model.open_mapped_doc({
-			method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
-			frm: cur_frm
-		})
+	create_pick_list_custom(frm) {
+		// confirm item availability
+		var items = cur_frm.doc.items
+		var flag = 0;
+		var item_flag = ""
+		items.forEach(function(row){
+			if ((row.actual_qty - (row.qty + row.sal_reserved_qty)) < 0) {
+				flag = 1;
+				item_flag = row.item_code;
+			}
+		});
+		if (flag != 1) {
+			frappe.model.open_mapped_doc({
+				method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
+				frm: cur_frm
+			})
+		}
+		else{
+			frappe.msgprint(__('Warning: Insufficient Stock for Item <a href="/desk#Form/Item/{0}">{0}</a> for this order',[item_flag]))
+		}
 	},
 
 	create_material_transfer_custom() {
@@ -86,6 +102,25 @@ frappe.ui.form.on('Sales Order', {
 	},
 	
 });
+frappe.ui.form.on("Sales Order Item", {
+	item_code: function(frm,cdt,cdn) {
+		var row = locals[cdt][cdn];
+		if (row.item_code && row.warehouse) {
+			return frm.call({
+					method: "erpnext.stock.get_item_details.get_bin_details",
+					child: row,
+					args: {
+						item_code: row.item_code,
+						warehouse: row.warehouse,
+					},
+					callback:function(r){
+						row.sal_reserved_qty =  r.message['reserved_qty']
+						refresh_field("sal_reserved_qty", cdn, "items");
+					}
+				});
+		}
+	},
+});
 
 erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
 	customer_address: function(doc, dt, dn){
@@ -96,8 +131,27 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 			erpnext.utils.get_address_display(this.frm, "customer_address");
 			erpnext.utils.set_taxes_from_address(this.frm, "customer_address", "customer_address", "shipping_address_name");
 		}
-	}
+	},
+	warehouse: function(doc, cdt, cdn){
+		var row = locals[cdt][cdn];
+		if (row.item_code && row.warehouse) {
+			return this.frm.call({
+					method: "erpnext.stock.get_item_details.get_bin_details",
+					child: row,
+					args: {
+						item_code: row.item_code,
+						warehouse: row.warehouse,
+					},
+					callback:function(r){
+						row.sal_reserved_qty =  r.message['reserved_qty']
+						refresh_field("sal_reserved_qty", cdn, "items");
+					}
+				});
+		}
+	},
+
 });
+
 $.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
 
 
