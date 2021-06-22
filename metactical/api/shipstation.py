@@ -121,5 +121,5 @@ def ctext(txt):
 def get_orders(start_date, end_date):
 	orders = frappe.get_all('Sales Order', fields=['name', 'transaction_date', 'status', 'modified', 'currency', 'grand_total', 'customer'], 
 									filters={"delivery_status": ("in", ("Not Delivered", "Partly Delivered")), "billing_status": "Fully Billed", 
-									"transaction_date": ("between", (start_date, end_date))})
+									"modified": ("between", (start_date, end_date))})
 	return orders
