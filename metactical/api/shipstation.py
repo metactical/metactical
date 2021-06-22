@@ -2,7 +2,7 @@ import frappe
 from lxml import etree
 from werkzeug.wrappers import Response
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def shipstation(action, start_date, end_date):
 	if action and action == 'export':
 		return return_orders(start_date, end_date)
