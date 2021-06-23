@@ -39,10 +39,14 @@ def return_orders(start_date, end_date):
 		#For billing info
 		billName, billCompany, billPhone, billEmail = row.customer, '', '', ''
 		address = {}
-		if row.customer_address:
-			address = frappe.get_doc("Address", customer_address)
+		if row.customer_address and row.customer_address is not None:
+			address = frappe.get_doc("Address", row.customer_address)
 			billPhone = ctext(address.get("phone", ""))
 			billEmail = ctext(address.get("email_id", ""))
+		else:
+			#If there is no address break out of the loop to prevent sync errors
+			root.remove(order)
+			continue
 			
 		billTo = etree.SubElement(croot, "BillTo")
 		element = etree.SubElement(billTo, "Name")
@@ -55,22 +59,22 @@ def return_orders(start_date, end_date):
 		#For shipping. Otherwise use billing information
 		shipName, shipCompany, shipAddress1, shipAddress2, shipCity = row.customer, '', '', '', ''
 		shipState, shipPostalCode, shipCountry, shipPhone = '', '', '', ''
-		if row.shipping_address:
-			shipping = frappe.get_doc("Address", row.shipping_address)
+		if row.shipping_address_name and row.shipping_address_name is not None:
+			shipping = frappe.get_doc("Address", row.shipping_address_name)
 			shipAddress1 = ctext(shipping.get("address_line1", ""))
 			shipAddress2 = ctext(shipping.get("address_line2", ""))
 			shipCity = ctext(shipping.get("city", ""))
 			shipState = ctext(shipping.get("state", ""))
 			shipPostalCode = ctext(shipping.get("pincode", ""))
-			shipCountry = ctext(shipping.get("country"), "")
+			shipCountry = ctext(shipping.get("country", ""))
 			shipPhone = ctext(shipping.get("phone", ""))
-		elif row.customer_address:
+		elif row.customer_address is not None:
 			shipAddress1 = ctext(address.get("address_line1", ""))
 			shipAddress2 = ctext(address.get("address_line2", ""))
 			shipCity = ctext(address.get("city", ""))
 			shipState = ctext(address.get("state", ""))
 			shipPostalCode = ctext(address.get("pincode", ""))
-			shipCountry = ctext(address.get("country"), "")
+			shipCountry = ctext(address.get("country", ""))
 			shipPhone = ctext(address.get("phone", ""))
 			
 		shipTo = etree.SubElement(croot, "ShipTo")
@@ -116,10 +120,14 @@ def return_orders(start_date, end_date):
 
 
 def ctext(txt):
-	return '<![CDATA[' + txt + ']]>'
+	if txt is not None:
+		return '<![CDATA[' + txt + ']]>'
+	else:
+		return ''
 	
 def get_orders(start_date, end_date):
-	orders = frappe.get_all('Sales Order', fields=['name', 'transaction_date', 'status', 'modified', 'currency', 'grand_total', 'customer'], 
+	orders = frappe.get_all('Sales Order', fields=['name', 'transaction_date', 'status', 'modified', 'currency', 'grand_total', 'customer', 
+									'customer_address', 'shipping_address_name'], 
 									filters={"delivery_status": ("in", ("Not Delivered", "Partly Delivered")), "billing_status": "Fully Billed", 
 									"modified": ("between", (start_date, end_date))})
 	return orders
