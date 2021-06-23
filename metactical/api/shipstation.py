@@ -66,16 +66,20 @@ def return_orders(start_date, end_date):
 			shipCity = ctext(shipping.get("city", ""))
 			shipState = ctext(shipping.get("state", ""))
 			shipPostalCode = ctext(shipping.get("pincode", ""))
-			shipCountry = ctext(shipping.get("country", ""))
 			shipPhone = ctext(shipping.get("phone", ""))
+			#Get country code
+			country = frappe.get_value("Country", shipping.country, "code")
+			shipCountry = ctext(country)	
 		elif row.customer_address is not None:
 			shipAddress1 = ctext(address.get("address_line1", ""))
 			shipAddress2 = ctext(address.get("address_line2", ""))
 			shipCity = ctext(address.get("city", ""))
 			shipState = ctext(address.get("state", ""))
 			shipPostalCode = ctext(address.get("pincode", ""))
-			shipCountry = ctext(address.get("country", ""))
 			shipPhone = ctext(address.get("phone", ""))
+			#Get country code
+			country = frappe.get_value("Country", address.country, "code")
+			shipCountry = ctext(country)
 			
 		shipTo = etree.SubElement(croot, "ShipTo")
 		element = etree.SubElement(shipTo, "Name")
