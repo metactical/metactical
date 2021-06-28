@@ -30,6 +30,7 @@ def get_context(context):
 	if frappe.form_dict.doc:
 		doc = frappe.form_dict.doc
 	else:
+
 		doc = frappe.get_doc(frappe.form_dict.doctype, frappe.form_dict.name)
 	
 	#For setting print datetime if it's pick_list	
@@ -52,7 +53,7 @@ def get_context(context):
 
 
 	meta = frappe.get_meta(doc.doctype)
-
+	
 	print_format = get_print_format_doc(None, meta = meta)
 
 	make_access_log(doctype=frappe.form_dict.doctype, document=frappe.form_dict.name, file_type='PDF', method='Print')
@@ -105,10 +106,6 @@ def get_rendered_template(doc, name=None, print_format=None, meta=None,
 
 		if doc.docstatus==2 and not cint(print_settings.allow_print_for_cancelled):
 			frappe.throw(_("Not allowed to print cancelled documents"), frappe.PermissionError)
-
-	# if doc.docstatus==1:
-	# 	if doc.flag_qty ==1:
-	# 		return frappe.throw(("Not allowed to print as Qty is not sufficient"))
 
 	doc.run_method("before_print")
 

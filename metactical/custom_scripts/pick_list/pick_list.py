@@ -35,7 +35,8 @@ def custom_before_save(self):
 	
 def custom_on_save(self, method):
 	PickList.before_save = custom_before_save
-	
+
+
 def on_submit(self, method):
 	pick_list = frappe.get_doc('Pick List', self.name)
 	validate_item_locations(pick_list)
@@ -116,8 +117,7 @@ def on_cancel(self, method):
 		sales_doc = frappe.get_doc("Sales Order", sales_order)
 		sales_doc.update({"pick_list_submitted_date": ""})
 		sales_doc.save()
-	
-	
+
 	
 @frappe.whitelist()
 def before_save_on_create():
@@ -166,23 +166,3 @@ def save_cancel_reason(**args):
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
 	doc.db_set("pick_list_cancel_date", datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S"))
 	return 'Success'
-
-
-
-@frappe.whitelist()
-def get_undelivered_pick_list(**args):
-	args = frappe._dict(args)
-	itm_code = args.item_code
-	warehse = args.warehouse
-
-	doc = frappe.get_all("Bin", 
-		filters={
-			'warehouse': args.warehouse,
-			'item_code': args.item_code,
-		},
-		fields=[
-			'item_code', 'reserved_qty', 'actual_qty'
-		])
-	#frappe.msgprint("Item code: {0}".format(doc[0].item_code))
-	
-	return doc	

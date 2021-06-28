@@ -97,7 +97,7 @@ doc_events = {
 		"before_save": "metactical.custom_scripts.pick_list.pick_list.custom_on_save",
 		"validate": "metactical.custom_scripts.pick_list.pick_list.custom_on_save",
 		"on_submit": "metactical.custom_scripts.pick_list.pick_list.on_submit",
-		"on_cancel": "metactical.custom_scripts.pick_list.pick_list.on_cancel"
+		"on_cancel": "metactical.custom_scripts.pick_list.pick_list.on_cancel",
 	},
 	"Sales Invoice": {
 		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save"
