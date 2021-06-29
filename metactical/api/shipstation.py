@@ -69,7 +69,7 @@ def return_orders(start_date, end_date):
 			shipPhone = ctext(shipping.get("phone", ""))
 			#Get country code
 			country = frappe.get_value("Country", shipping.country, "code")
-			shipCountry = ctext(country)	
+			shipCountry = country
 		elif row.customer_address is not None:
 			shipAddress1 = ctext(address.get("address_line1", ""))
 			shipAddress2 = ctext(address.get("address_line2", ""))
@@ -79,7 +79,7 @@ def return_orders(start_date, end_date):
 			shipPhone = ctext(address.get("phone", ""))
 			#Get country code
 			country = frappe.get_value("Country", address.country, "code")
-			shipCountry = ctext(country)
+			shipCountry = country
 			
 		shipTo = etree.SubElement(croot, "ShipTo")
 		element = etree.SubElement(shipTo, "Name")
@@ -111,7 +111,7 @@ def return_orders(start_date, end_date):
 			element = etree.SubElement(ritems, "Name")
 			element.text = ctext(item.get("item_name", ""))
 			element = etree.SubElement(ritems, "Quantity")
-			element.text = str(item.get("qty", 0))
+			element.text = str(int(item.get("qty", 0)))
 			element = etree.SubElement(ritems, "UnitPrice")
 			element.text = str(item.get("rate", 0))
 		
