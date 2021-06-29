@@ -7,7 +7,7 @@ def shipstation(action, start_date, end_date):
 	if action and action == 'export':
 		return return_orders(start_date, end_date)
 
-
+@frappe.whitelist(allow_guest=True)
 def return_orders(start_date, end_date):
 	root = etree.Element("Orders")
 	
@@ -116,6 +116,17 @@ def return_orders(start_date, end_date):
 			element.text = str(item.get("rate", 0))
 		
 	out = etree.tostring(root, pretty_print=True)
+	
+	#Log the request
+	new_req = frappe.get_doc({
+		"doctype": "Shipstation API Requests",
+		"start_date": start_date,
+		"end_date": end_date,
+		"action": "Export",
+		"result": out
+	})
+	new_req.insert(ignore_if_duplicate=True)
+	
 	response = Response()
 	response.mimetype = "text/xml"
 	response.charset = "utf-8"
