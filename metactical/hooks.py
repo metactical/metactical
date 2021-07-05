@@ -107,13 +107,13 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
+scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
-# 	"daily": [
-# 		"metactical.tasks.daily"
-# 	],
+	"daily": [
+		"metactical.reserved_calculation.recalculate_reserved_qty"
+	],
 # 	"hourly": [
 # 		"metactical.tasks.hourly"
 # 	],
@@ -123,7 +123,7 @@ doc_events = {
 # 	"monthly": [
 # 		"metactical.tasks.monthly"
 # 	]
-# }
+}
 
 # Testing
 # -------
