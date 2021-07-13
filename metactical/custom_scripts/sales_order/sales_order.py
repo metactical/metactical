@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import frappe
+from metactical.api.shipstation import create_orders
 
 
 @frappe.whitelist()
@@ -23,3 +24,17 @@ def get_open_count(**args):
 			'name', 'sales_order_no',
 		])
 	return doc
+	
+def on_update(self, method):
+	if self.docstatus == 1:
+		create_orders(self.name)
+		
+@frappe.whitelist()
+def get_bin_details(item_code, warehouse):
+	ret = {}
+	ret = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": warehouse},
+			["projected_qty", "actual_qty", "reserved_qty"], as_dict=True, cache=True) \
+				or {"projected_qty": 0, "actual_qty": 0, "reserved_qty": 0}
+	is_stock = frappe.db.get_value("Item", {"name": item_code}, ["is_stock_item"])
+	ret.update({"is_stock_item": is_stock})
+	return ret

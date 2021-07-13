@@ -57,7 +57,7 @@ frappe.ui.form.on('Sales Order', {
 		var flag = 0;
 		var item_flag = ""
 		items.forEach(function(row){
-			if ((row.actual_qty - (row.qty + row.sal_reserved_qty)) < 0) {
+			if (row.ais_is_stock_item == 1 && (row.actual_qty - (row.qty + row.sal_reserved_qty)) < 0) {
 				flag = 1;
 				item_flag = row.item_code;
 			}
@@ -107,15 +107,17 @@ frappe.ui.form.on("Sales Order Item", {
 		var row = locals[cdt][cdn];
 		if (row.item_code && row.warehouse) {
 			return frm.call({
-					method: "erpnext.stock.get_item_details.get_bin_details",
+					method: "metactical.custom_scripts.sales_order.sales_order.get_bin_details",
 					child: row,
 					args: {
 						item_code: row.item_code,
 						warehouse: row.warehouse,
 					},
 					callback:function(r){
-						row.sal_reserved_qty =  r.message['reserved_qty']
+						row.sal_reserved_qty =  r.message['reserved_qty'];
+						row.ais_is_stock_item = r.message["is_stock_item"]
 						refresh_field("sal_reserved_qty", cdn, "items");
+						refresh_field("ais_is_stock_item", cdn, "items");
 					}
 				});
 		}
@@ -136,15 +138,18 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 		var row = locals[cdt][cdn];
 		if (row.item_code && row.warehouse) {
 			return this.frm.call({
-					method: "erpnext.stock.get_item_details.get_bin_details",
+					method: "metactical.custom_scripts.sales_order.sales_order.get_bin_details",
 					child: row,
 					args: {
 						item_code: row.item_code,
 						warehouse: row.warehouse,
 					},
 					callback:function(r){
-						row.sal_reserved_qty =  r.message['reserved_qty']
+						console.log(r);
+						row.sal_reserved_qty =  r.message['reserved_qty'];
+						row.ais_is_stock_item = r.message["is_stock_item"]
 						refresh_field("sal_reserved_qty", cdn, "items");
+						refresh_field("ais_is_stock_item", cdn, "items");
 					}
 				});
 		}
