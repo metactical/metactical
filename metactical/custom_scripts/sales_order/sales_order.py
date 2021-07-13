@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 import frappe
-from metactical.api.shipstation import create_orders
+#from metactical.api.shipstation import create_orders
 
 
 @frappe.whitelist()
@@ -25,9 +25,9 @@ def get_open_count(**args):
 		])
 	return doc
 	
-def on_update(self, method):
+'''def on_update(self, method):
 	if self.docstatus == 1:
-		create_orders(self.name)
+		create_orders(self.name)'''
 		
 @frappe.whitelist()
 def get_bin_details(item_code, warehouse):
