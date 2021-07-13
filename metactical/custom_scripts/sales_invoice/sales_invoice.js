@@ -1,6 +1,6 @@
 frappe.ui.form.on('Sales Invoice', {
 	refresh: function(frm){
-		frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
+		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	
 	create_journal_entry(frm){
