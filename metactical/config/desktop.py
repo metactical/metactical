@@ -6,9 +6,11 @@ def get_data():
 	return [
 		{
 			"module_name": "Metactical",
+			"category": "Modules",
+			"label": _("Metactical"),
 			"color": "grey",
 			"icon": "octicon octicon-file-directory",
-			"type": "module",
-			"label": _("Metactical")
-		}
+			"type": "module",			
+			"description": "Metactical Custom Items."
+		},
 	]
