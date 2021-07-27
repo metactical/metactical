@@ -102,9 +102,9 @@ doc_events = {
 	"Sales Invoice": {
 		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save"
 	},
-	"Delivery Note": {
-		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update"
-	}
+	#"Delivery Note": {
+	#	"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update"
+	#}
 }
 
 # Scheduled Tasks
