@@ -298,6 +298,7 @@ havenir.packing_slip.fetch_dn_items = (from_refresh=false) => {
               items: items,
             })
             .then((r) => {
+				console.log({"item": r.message});
               items = r.message;
 
               $(".packing-slip-wrapper").html(
@@ -336,7 +337,7 @@ havenir.packing_slip.calc_packing_items = (barcode) => {
     return;
   }
 
-  if (cur_item.item_barcode == barcode) {
+  if (cur_item.item_barcode.indexOf(barcode) != -1) {
     cur_item.qty -= 1;
 
     let cur_packed_item = packed_items.filter(
