@@ -357,6 +357,7 @@ havenir.packing_slip.calc_packing_items = (barcode) => {
 		} else {
 			cur_packed_item = $.extend(true, {}, cur_item);
 			cur_packed_item.qty = 1;
+			cur_packed_item.item_barcode = barcode;
 			packed_items.push(cur_packed_item);
 		}
 
