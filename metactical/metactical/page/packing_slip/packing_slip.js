@@ -337,41 +337,50 @@ havenir.packing_slip.fetch_dn_items = (from_refresh = false) => {
 
 havenir.packing_slip.calc_packing_items = (barcode) => {
 	let packed_items = havenir.packing_slip.packed_items;
-	let cur_item = havenir.packing_slip.current_item;
+	//let cur_item = havenir.packing_slip.current_item;
+	let pending_items = havenir.packing_slip.pending_items;
 
 	if (barcode == "SKIP") {
 		console.log("skip");
 		re_generate_current_item();
 		return;
 	}
+	
+	pending_items.forEach(function(cur_item){
+		if (cur_item.item_barcode.indexOf(barcode) != -1) {
+			havenir.packing_slip.current_item = cur_item;
+			cur_item.qty -= 1;
 
-	if (cur_item.item_barcode.indexOf(barcode) != -1) {
-		cur_item.qty -= 1;
+			let cur_packed_item = packed_items.filter(
+				(item) => item.item_code == cur_item.item_code
+			);
 
-		let cur_packed_item = packed_items.filter(
-			(item) => item.item_code == cur_item.item_code
-		);
+			if (cur_packed_item.length > 0) {
+				cur_packed_item[0].qty += 1;
+			} else {
+				cur_packed_item = $.extend(true, {}, cur_item);
+				cur_packed_item.qty = 1;
+				cur_packed_item.item_barcode = barcode;
+				packed_items.push(cur_packed_item);
+			}
 
-		if (cur_packed_item.length > 0) {
-			cur_packed_item[0].qty += 1;
-		} else {
-			cur_packed_item = $.extend(true, {}, cur_item);
-			cur_packed_item.qty = 1;
-			cur_packed_item.item_barcode = barcode;
-			packed_items.push(cur_packed_item);
+			if (cur_item.qty == 0) {
+				//console.log("not skip");
+				re_generate_current_item();
+			}
+			else{
+				re_generate_current_item(cur_item);
+			}
+
+			populate_dom();
+			//return;
+			throw "Break";
 		}
-
-		if (cur_item.qty == 0) {
-			console.log("not skip");
-			re_generate_current_item();
-		}
-
-		populate_dom();
-		return;
-	}
-
+	});
+	
 	frappe.show_alert({
 		message: __("Wrong Barcode"),
 		indicator: "red"
 	});
+	
 };
