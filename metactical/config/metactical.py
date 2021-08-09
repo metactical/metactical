@@ -51,6 +51,20 @@ def get_data():
 					},
 					{
 						"type": "report",
+						"name": "Sales Report - Full V3",
+						"doctype": "Sales Invoice",
+						"is_query_report": True,
+						
+					},
+					{
+						"type": "report",
+						"name": "Sales Report - Full V4",
+						"doctype": "Sales Invoice",
+						"is_query_report": True,
+						
+					},
+					{
+						"type": "report",
 						"name": "Sales Report RASUSA - Full V1",
 						"doctype": "Sales Invoice",
 						"is_query_report": True,
