@@ -1,6 +1,38 @@
 [
  {
   "default_value": null,
+  "doc_type": "Purchase Order Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "price_list_rate",
+  "modified": "2021-04-28 15:19:19.603927",
+  "name": "Purchase Order Item-price_list_rate-columns",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "columns",
+  "property_type": "Int",
+  "value": "2"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Order Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "base_price_list_rate",
+  "modified": "2021-05-17 07:14:48.474476",
+  "name": "Purchase Order Item-base_price_list_rate-in_list_view",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "in_list_view",
+  "property_type": "Check",
+  "value": "1"
+ },
+ {
+  "default_value": null,
   "doc_type": "Shipstation API Requests",
   "docstatus": 0,
   "doctype": "Property Setter",
