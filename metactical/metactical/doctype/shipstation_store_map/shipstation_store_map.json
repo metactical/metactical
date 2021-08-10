@@ -1,0 +1,38 @@
+{
+ "creation": "2021-08-02 15:02:38.669026",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source",
+  "store_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "source",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source",
+   "options": "Lead Source",
+   "reqd": 1
+  },
+  {
+   "fieldname": "store_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Store ID",
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "modified": "2021-08-02 15:02:38.669026",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Shipstation Store Map",
+ "owner": "Administrator",
+ "permissions": [],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
