@@ -73,7 +73,13 @@ def get_data():
 					"is_query_report": True,
 					"name": "Sales Report - Stores",
 					"doctype": "Stock Ledger Entry",
-				}
+				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Open Purchase Orders",
+					"doctype": "Purchase Order",
+				},
 			]
 		},
 		{
