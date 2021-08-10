@@ -14,7 +14,7 @@ def get_orders(start_date, end_date):
 
 @frappe.whitelist(allow_guest=True)
 def test():
-	response = requests.get('https://ssapi.shipstation.com/carriers',
+	response = requests.get('https://ssapi.shipstation.com/shipments?orderNumber=08052021',
 				auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))	
 	print(response)
 	print(response.json())
@@ -44,6 +44,13 @@ def create_shipstation_orders(order_no=None):
 
 def order_json(order_no, settings):
 	order = frappe.get_doc('Delivery Note', order_no)
+	
+	#Order no is either pick list name or delivery note name
+	order_no = None
+	if order.pick_list and order.pick_list is not None:
+		order_no = order.pick_list
+	else:
+		order_no = order.name
 	
 	#For shipping and taxes charges
 	shipping_settings = settings.shipping_charges_specified
@@ -110,8 +117,8 @@ def order_json(order_no, settings):
 			items.append(row)
 	data = {}
 	data.update({
-		"orderNumber": order.name,
-		"orderKey": order.name,
+		"orderNumber": order_no,
+		"orderKey": order_no,
 		"orderDate": str(order.posting_date),
 		"paymentDate": None,
 		"shipByDate": "",
@@ -191,11 +198,21 @@ def orders_shipped_webhook(resource_url='Test1', resource_type='Test2'):
 			"result": json.dumps(response.json())
 		})
 		shipments = response.json()
+		weight_display = ''
+		size = ''
 		for shipment in shipments.get('shipments'):
+			weight = shipment.get('weight')
+			if weight_display != '':
+				weight_display =+ ' | '
+			weight_display += str(weight.get('value')) + ' ' + weight.get('units')
+			dimensions = shipment.get('dimensions')
+			if size != '':
+				size += ' | '
+			size += str(dimensions.get('length')) + 'l x ' + str(dimensions.get('width')) + 'w x ' + str(dimensions.get('height')) + 'h'
 			#For carrier mapping
 			transporter = ''
 			for row in settings.transporter_mapping:
-				if row.carrier_code == shipment.get('carrier'):
+				if row.carrier_code == shipment.get('carrierCode'):
 					transporter = row.transporter
 			existing_delivery = frappe.db.get_value('Delivery Note', {'po_no': shipment.get('orderNumber'), 'docstatus': 0})
 			if existing_delivery:
@@ -203,9 +220,13 @@ def orders_shipped_webhook(resource_url='Test1', resource_type='Test2'):
 				delivery_note.update({
 					'lr_date': shipment.get('shipDate'),
 					'lr_no': shipment.get('trackingNumber'),
-					'transporter': transporter
+					'transporter': transporter,
+					'ais_shipment_cost': shipment.get('shipmentCost'),
+					'ais_package_weight': weight_display,
+					'ais_package_size': size
 				})
 				delivery_note.save()
+				delivery_note.submit()
 	new_req.insert(ignore_if_duplicate=True)
 	
 	
