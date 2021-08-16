@@ -16,23 +16,24 @@ def execute(filters=None):
 
 	item_sales = get_data(filters)
 	for d in item_sales:
-		rate_discount = (d.get('price_list_rate') - d.get('rate'))/d.get('price_list_rate')
-		if rate_discount >= 0.15:
-			row = {}
-			row['si_date'] = d.posting_date
-			row['warehouse'] = d.warehouse
-			row['si_name'] = d.name
-			row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
-			row['item_code'] = d.item_code
-			row['item_name'] = d.item_name
-			row['qty'] = d.qty
-			row['rate'] = d.rate
-			row['price_list_rate'] = d.price_list_rate
-			row['discount_percentage'] = rate_discount * 100
-			row['uom'] = d.uom
-			row['ifw_location'] = d.ifw_location
+		if d.get('price_list_rate') > 0:
+			rate_discount = (d.get('price_list_rate') - d.get('rate'))/d.get('price_list_rate')
+			if rate_discount >= 0.15:
+				row = {}
+				row['si_date'] = d.posting_date
+				row['warehouse'] = d.warehouse
+				row['si_name'] = d.name
+				row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
+				row['item_code'] = d.item_code
+				row['item_name'] = d.item_name
+				row['qty'] = d.qty
+				row['rate'] = d.rate
+				row['price_list_rate'] = d.price_list_rate
+				row['discount_percentage'] = rate_discount * 100
+				row['uom'] = d.uom
+				row['ifw_location'] = d.ifw_location
 
-			data.append(row)
+				data.append(row)
 
 	return columns, data
 
