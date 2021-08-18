@@ -103,7 +103,9 @@ doc_events = {
 		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save"
 	},
 	"Delivery Note": {
-		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update"
+		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
+		"on_trash": "metactical.custom_scripts.delivery_note.delivery_note.on_trash",
+		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel"
 	}
 }
 

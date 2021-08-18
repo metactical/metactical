@@ -43,7 +43,7 @@ def execute(filters=None):
 		
 		row["barcode"] = frappe.db.get_value("Item Barcode", {"parent": i.get("item_code")}, "barcode")
 
-		row["item_class"] = i.get("asi_item_class,")
+		row["asi_item_class"] = i.get("asi_item_class")
 
 		row["item_image"] =  "<a target="+str("_blank")+" href = "+str(i.get("image"))+"> "+str(i.get("image"))+" </a>"   
 
@@ -145,7 +145,7 @@ def get_column(filters,conditions):
 			},
 			{
 				"label": _("ItemClass"),
-				"fieldname": "asi_item_class,",
+				"fieldname": "asi_item_class",
 				"fieldtype": "Data",
 				"width": 150,
 				"align": "left",
