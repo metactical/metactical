@@ -14,8 +14,8 @@ def get_orders(start_date, end_date):
 
 @frappe.whitelist(allow_guest=True)
 def test():
-	response = requests.get('https://ssapi.shipstation.com/shipments?orderNumber=08052021',
-				auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))	
+	response = requests.get('https://ssapi.shipstation.com/stores',
+				auth=('0e5a20137d73413e930663cb0c6564da', 'e9924cf64d634f53af1d2c858ae76b3c'))	
 	print(response)
 	print(response.json())
 
@@ -28,21 +28,24 @@ def connect():
 	print(response.json())
 	
 @frappe.whitelist()
-def create_shipstation_orders(order_no=None):
-	#order_no = 'MAT-DN-2021-21778'
+def create_shipstation_orders(order_no=None, is_cancelled=False):
+	#order_no = 'MAT-DN-2021-00030'
 	settings = get_settings()
 	if order_no is not None:
-		data = order_json(order_no, settings)
+		data = order_json(order_no, is_cancelled, settings)
 		response = requests.post('https://ssapi.shipstation.com/orders/createorder',
 					auth=(settings.api_key, settings.get_password('api_secret')),
 					json=data)
 		print(response.status_code)
 		print(response.json())
+		if response.status_code == 200:
+			sorder = response.json()
+			frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
 		
 	
 	
 
-def order_json(order_no, settings):
+def order_json(order_no, is_cancelled, settings):
 	order = frappe.get_doc('Delivery Note', order_no)
 	
 	#Order no is either pick list name or delivery note name
@@ -51,6 +54,10 @@ def order_json(order_no, settings):
 		order_no = order.pick_list
 	else:
 		order_no = order.name
+		
+	orderStatus = "awaiting_shipment"
+	if is_cancelled:
+		orderStatus = "cancelled"
 	
 	#For shipping and taxes charges
 	shipping_settings = settings.shipping_charges_specified
@@ -82,6 +89,8 @@ def order_json(order_no, settings):
 		shipping_country = shipping_country.upper()
 	elif order.customer_address and order.customer_address is not None:
 		shipping_address = customer_address
+		shipping_country = frappe.get_value('Country', shipping_address.country, "code")
+		shipping_country = shipping_country.upper()
 		
 	#For stores
 	storeId = None
@@ -122,33 +131,33 @@ def order_json(order_no, settings):
 		"orderDate": str(order.posting_date),
 		"paymentDate": None,
 		"shipByDate": "",
-		"orderStatus": "awaiting_shipment",
+		"orderStatus": orderStatus,
 		"customerUsername": order.customer,
 		"customerEmail": customer_address.email_id,
 		"billTo": {
 			"name": order.customer,
 			"company": '',
-			"street1": customer_address.address_line1,
-			"street2": customer_address.address_line2,
+			"street1": customer_address.get('address_line1'),
+			"street2": customer_address.get('address_line2'),
 			"street3": '',
-			"city": customer_address.city,
-			"state": customer_address.state,
-			"postalCode": customer_address.pincode,
+			"city": customer_address.get('city'),
+			"state": customer_address.get('state'),
+			"postalCode": customer_address.get('pincode'),
 			"country": customer_country,
-			"phone": customer_address.phone,
+			"phone": customer_address.get('phone'),
 			"residential": None
 		},
 		"shipTo": {
 			"name": order.customer,
 			"company": "",
-			"street1": shipping_address.address_line1,
-			"street2": shipping_address.address_line2,
+			"street1": shipping_address.get('address_line1'),
+			"street2": shipping_address.get('address_line2'),
 			"street3": '',
-			"city": shipping_address.city,
-			"state": shipping_address.state,
-			"postalCode": shipping_address.pincode,
+			"city": shipping_address.get('city'),
+			"state": shipping_address.get('state'),
+			"postalCode": shipping_address.get('pincode'),
 			"country": shipping_country,
-			"phone": shipping_address.phone,
+			"phone": shipping_address.get('phone'),
 			"residential": None
 		},
 		"items": items,
@@ -256,3 +265,13 @@ def get_shipment():
 				'lr_no': shipment.get('trackingNumber')
 			})
 			delivery_note.save()
+			
+def delete_order(order_no):
+	#order_no = 'MAT-DN-2021-00030'
+	settings = get_settings()
+	orderId = frappe.db.get_value('Delivery Note', order_no, 'ais_shipstation_orderid')
+	if orderId is not None:
+		response = requests.delete('https://ssapi.shipstation.com/orders/' + orderId,
+				auth=(settings.api_key, settings.get_password('api_secret')))
+	print(response.status_code)
+	print(response.json())
