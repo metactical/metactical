@@ -53,6 +53,7 @@ def get_items(search_value="", offset=0):
 		GROUP_CONCAT(DISTINCT it1.barcode SEPARATOR '<br>') AS barcode,
 		ip.price_list_rate,
 		ip.currency,
+		ipg.price_list_rate AS gorilla_price,
 		GROUP_CONCAT(DISTINCT it1.sqoh SEPARATOR '<br>') AS sqoh
 		FROM 
 		(
@@ -81,6 +82,9 @@ def get_items(search_value="", offset=0):
 		LEFT JOIN
 			`tabItem Price` ip
 			on ip.item_code = it1.item_code and ip.price_list = "RET - Camo"
+		LEFT JOIN
+			`tabItem Price` ipg
+			ON ipg.item_code = it1.item_code and ipg.price_list = "RET - Gorilla"
 		WHERE
 			it1.disabled = 0
 			AND it1.has_variants = 0
@@ -96,7 +100,7 @@ def get_items(search_value="", offset=0):
 	items_data = frappe.db.sql(query ,as_dict=1)
 
 	if items_data:
-		table_columns = ["RetailSKU", "Item Name", "Price", "SQOH"]
+		table_columns = ["RetailSKU", "Item Name", "Price", "GPrice", "SQOH"]
 		table_data = []
 		items = [d.item_code for d in items_data]
 
@@ -152,13 +156,14 @@ def get_items(search_value="", offset=0):
 			item_code = item.item_code
 			item_name = item.item_name
 			item_price = item.price_list_rate
+			gorilla_price = item.gorilla_price
 			retail_skusuffix = item.ifw_retailskusuffix
 			ifw_location = item.ifw_location
 			variant_of = item.variant_of
 			barcode = item.barcode
 			sqoh = item.sqoh
 
-			item_row.extend([retail_skusuffix, item_name, item_price, sqoh])
+			item_row.extend([retail_skusuffix, item_name, item_price, gorilla_price, sqoh])
 			for warehouse in warehouses:
 				warehouse_qty = 0.0
 				if item_code in warehouse_wise_items[warehouse]:
