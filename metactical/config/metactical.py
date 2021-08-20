@@ -86,6 +86,12 @@ def get_data():
 					"name": "Supplier Status Report",
 					"doctype": "Supplier",
 				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Dead Stock Report",
+					"doctype": "Sales Invoice",
+				},
 			]
 		},
 		{
