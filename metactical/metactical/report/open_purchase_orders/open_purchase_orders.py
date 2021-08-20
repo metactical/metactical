@@ -99,7 +99,7 @@ def get_data(filters):
 		p.name, p.transaction_date, p.eta_date, p.status
 		from `tabPurchase Order Item` c inner join `tabPurchase Order` p on p.name = c.parent
 		where 
-			p.docstatus = 1 and (p.status != "Closed" or p.status != "Completed")
+			p.docstatus = 1 and (p.status = "To Receive" or p.status = "To Receive and Bill" )
 			and p.transaction_date BETWEEN %(from_date)s AND %(to_date)s
 		order by p.transaction_date
 		"""+ where, where_filter, as_dict=1)

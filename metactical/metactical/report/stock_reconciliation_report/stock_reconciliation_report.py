@@ -17,16 +17,15 @@ def execute(filters=None):
 	item_sales = get_data(filters)
 	for d in item_sales:
 		row = {}
-		row['sr_date'] = d.posting_date
 		row['warehouse'] = d.warehouse
 		row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
-		row['item_name'] = d.item_name
-		row['qty'] = d.qty
+		row['item_name'] = d.item_name	
 		row['current_qty'] = d.current_qty
 		row['quantity_difference'] = flt(d.quantity_difference)
+		row['qty'] = d.qty
 		row['amount_difference'] = d.amount_difference
 		row['owner'] = d.owner
-		row['ifw_location'] = d.ifw_location
+		
 
 		data.append(row)
 
@@ -93,11 +92,12 @@ def get_data(filters):
 	where_filter = {"from_date": filters.from_date, "to_date": filters.to_date}
 	where = ""
 
-	data = frappe.db.sql("""select c.item_code, c.item_name, c.qty, c.current_qty, c.quantity_difference,
+	data = frappe.db.sql("""select c.item_code, c.qty, c.current_qty, c.quantity_difference,
 		c.valuation_rate, c.amount_difference, c.warehouse, 
-		i.ifw_retailskusuffix, i.ifw_location,
+		i.ifw_retailskusuffix, i.ifw_location, i.item_name,
 		p.name, p.posting_date, p.owner
-		from `tabStock Reconciliation Item` c inner join `tabStock Reconciliation` p on p.name = c.parent
+		from `tabStock Reconciliation Item` c 
+		inner join `tabStock Reconciliation` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
 		where p.docstatus = 1 and p.posting_date BETWEEN %(from_date)s AND %(to_date)s
 		order by p.posting_date

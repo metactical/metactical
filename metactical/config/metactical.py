@@ -80,6 +80,18 @@ def get_data():
 					"name": "Open Purchase Orders",
 					"doctype": "Purchase Order",
 				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Supplier Status Report",
+					"doctype": "Supplier",
+				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Dead Stock Report",
+					"doctype": "Sales Invoice",
+				},
 			]
 		},
 		{
@@ -105,7 +117,17 @@ def get_data():
 					"name": "packing-slip",
 					"label": _("Packing Slip"),
 					"description": _("Packing Slip Page.")
-				}
+				},
+				{
+					"type": "doctype",
+					"name": "Upload Images",
+					"description": _("Upload Large Images.")
+				},
+				{
+					"type": "doctype",
+					"name": "Suspended Invoice",
+					"description": _("Suspended Invoice.")
+				},
 			]
 		},
 	]
