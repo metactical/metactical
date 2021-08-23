@@ -30,9 +30,14 @@ def connect():
 @frappe.whitelist()
 def create_shipstation_orders(order_no=None, is_cancelled=False):
 	#order_no = 'MAT-DN-2021-00030'
-	settings = get_settings()
 	if order_no is not None:
-		data = order_json(order_no, is_cancelled, settings)
+		order = frappe.get_doc('Delivery Note', order_no)
+		source = None
+		if order.get('source') is not None:
+			source = order.get('source')
+		settings = get_settings(source)
+	
+		data = order_json(order, is_cancelled, settings)
 		response = requests.post('https://ssapi.shipstation.com/orders/createorder',
 					auth=(settings.api_key, settings.get_password('api_secret')),
 					json=data)
@@ -45,8 +50,8 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 	
 	
 
-def order_json(order_no, is_cancelled, settings):
-	order = frappe.get_doc('Delivery Note', order_no)
+def order_json(order, is_cancelled, settings):
+	#order = frappe.get_doc('Delivery Note', order_no)
 	
 	#Order no is either pick list name or delivery note name
 	order_no = None
@@ -183,8 +188,16 @@ def order_json(order_no, is_cancelled, settings):
 	})
 	return data
 
-def get_settings():
-	settings = frappe.get_doc('Shipstation Settings')
+def get_settings(source=None):
+	settings = None
+	if source is not None:
+		parent = frappe.db.sql('''SELECT parent FROM `tabShipstation Store Map` WHERE source = %(source)s''', {"source": source}, as_dict=1)
+		if parent[0]:
+			settings = frappe.get_doc('Shipstation Settings', parent[0].parent)
+		
+	if settings is None:
+		default = frappe.db.get_value('Shipstation Settings', {"is_default": 1})
+		settings = frappe.get_doc('Shipstation Settings', default)
 	return settings
 	
 @frappe.whitelist(allow_guest=True)
