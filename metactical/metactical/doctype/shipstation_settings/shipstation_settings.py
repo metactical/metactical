@@ -11,7 +11,7 @@ class ShipstationSettings(Document):
 		#Check for default shipstation settings
 		default_settings = frappe.db.get_value('Shipstation Settings', {"is_default": 1})
 		if default_settings:
-			if self.get("is_default") == 1:
+			if self.get("is_default") == 1 and default_settings != self.name:
 				frappe.throw("Error: There is another settings entry marked as default. You can only have one default setting.")
 		else:
 			if self.get("is_default") != 1:
