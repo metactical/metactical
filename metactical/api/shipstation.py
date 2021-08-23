@@ -188,12 +188,15 @@ def order_json(order, is_cancelled, settings):
 	})
 	return data
 
-def get_settings(source=None):
+def get_settings(source=None, settingid=None):
 	settings = None
 	if source is not None:
 		parent = frappe.db.sql('''SELECT parent FROM `tabShipstation Store Map` WHERE source = %(source)s''', {"source": source}, as_dict=1)
 		if parent[0]:
 			settings = frappe.get_doc('Shipstation Settings', parent[0].parent)
+			
+	if settingid is not None:
+		settings = frappe.get_doc('Shipstation Settings', settingid)
 		
 	if settings is None:
 		default = frappe.db.get_value('Shipstation Settings', {"is_default": 1})
@@ -201,55 +204,58 @@ def get_settings(source=None):
 	return settings
 	
 @frappe.whitelist(allow_guest=True)
-def orders_shipped_webhook(resource_url='Test1', resource_type='Test2'):
-	frappe.set_user('Administrator')
-	#Log the request
-	new_req = frappe.get_doc({
-		"doctype": "Shipstation API Requests",
-		"start_date": resource_url,
-		"end_date": resource_type
-	})
-	
-	if resource_type == 'SHIP_NOTIFY':
-		settings = get_settings()
-		response = requests.get(resource_url,
-					auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))
-		#print(response.status_code)
-		#print(response.json())
-		new_req.update({
-			"result": json.dumps(response.json())
+def orders_shipped_webhook(settingid = None, resource_url='Test1', resource_type='Test2'):
+	if settingid is not None:
+		frappe.set_user('Administrator')
+		#Log the request
+		new_req = frappe.get_doc({
+			"doctype": "Shipstation API Requests",
+			"start_date": resource_url,
+			"end_date": resource_type,
+			"settingid": settingid
 		})
-		shipments = response.json()
-		weight_display = ''
-		size = ''
-		for shipment in shipments.get('shipments'):
-			weight = shipment.get('weight')
-			if weight_display != '':
-				weight_display =+ ' | '
-			weight_display += str(weight.get('value')) + ' ' + weight.get('units')
-			dimensions = shipment.get('dimensions')
-			if size != '':
-				size += ' | '
-			size += str(dimensions.get('length')) + 'l x ' + str(dimensions.get('width')) + 'w x ' + str(dimensions.get('height')) + 'h'
-			#For carrier mapping
-			transporter = ''
-			for row in settings.transporter_mapping:
-				if row.carrier_code == shipment.get('carrierCode'):
-					transporter = row.transporter
-			existing_delivery = frappe.db.get_value('Delivery Note', {'po_no': shipment.get('orderNumber'), 'docstatus': 0})
-			if existing_delivery:
-				delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
-				delivery_note.update({
-					'lr_date': shipment.get('shipDate'),
-					'lr_no': shipment.get('trackingNumber'),
-					'transporter': transporter,
-					'ais_shipment_cost': shipment.get('shipmentCost'),
-					'ais_package_weight': weight_display,
-					'ais_package_size': size
-				})
-				delivery_note.save()
-				delivery_note.submit()
-	new_req.insert(ignore_if_duplicate=True)
+		
+		if resource_type == 'SHIP_NOTIFY':
+			settings = get_settings(settingid=settingid)
+			#print(settings.api_key)
+			response = requests.get(resource_url,
+						auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))
+			#print(response.status_code)
+			#print(response.json())
+			new_req.update({
+				"result": json.dumps(response.json())
+			})
+			shipments = response.json()
+			weight_display = ''
+			size = ''
+			for shipment in shipments.get('shipments'):
+				weight = shipment.get('weight')
+				if weight_display != '':
+					weight_display =+ ' | '
+				weight_display += str(weight.get('value')) + ' ' + weight.get('units')
+				dimensions = shipment.get('dimensions')
+				if size != '':
+					size += ' | '
+				size += str(dimensions.get('length')) + 'l x ' + str(dimensions.get('width')) + 'w x ' + str(dimensions.get('height')) + 'h'
+				#For carrier mapping
+				transporter = ''
+				for row in settings.transporter_mapping:
+					if row.carrier_code == shipment.get('carrierCode'):
+						transporter = row.transporter
+				existing_delivery = frappe.db.get_value('Delivery Note', {'po_no': shipment.get('orderNumber'), 'docstatus': 0})
+				if existing_delivery:
+					delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
+					delivery_note.update({
+						'lr_date': shipment.get('shipDate'),
+						'lr_no': shipment.get('trackingNumber'),
+						'transporter': transporter,
+						'ais_shipment_cost': shipment.get('shipmentCost'),
+						'ais_package_weight': weight_display,
+						'ais_package_size': size
+					})
+					delivery_note.save()
+					delivery_note.submit()
+		new_req.insert(ignore_if_duplicate=True)
 	
 	
 @frappe.whitelist(allow_guest=True)
