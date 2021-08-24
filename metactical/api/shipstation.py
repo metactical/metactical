@@ -4,6 +4,7 @@ from werkzeug.wrappers import Response
 import requests
 from requests.auth import HTTPBasicAuth
 import json
+from urllib.parse import urlparse, parse_qs
 
 def get_orders(start_date, end_date):
 	orders = frappe.get_all('Sales Order', fields=['name', 'transaction_date', 'status', 'modified', 'currency', 'grand_total', 'customer', 
@@ -204,7 +205,13 @@ def get_settings(source=None, settingid=None):
 	return settings
 	
 @frappe.whitelist(allow_guest=True)
-def orders_shipped_webhook(settingid = None, resource_url='Test1', resource_type='Test2'):
+def orders_shipped_webhook():
+	url = urlparse(frappe.request.url)
+	params = parse_qs(url.query)
+	settingid = params.get("settingid")
+	data = json.loads(frappe.request.data)
+	resource_url = data.get("resource_url")
+	resource_type = data.get("resource_type")
 	if settingid is not None:
 		frappe.set_user('Administrator')
 		#Log the request
@@ -212,16 +219,12 @@ def orders_shipped_webhook(settingid = None, resource_url='Test1', resource_type
 			"doctype": "Shipstation API Requests",
 			"start_date": resource_url,
 			"end_date": resource_type,
-			"settingid": settingid
+			"settingid": settingid[0]
 		})
-		
 		if resource_type == 'SHIP_NOTIFY':
-			settings = get_settings(settingid=settingid)
-			#print(settings.api_key)
+			settings = get_settings(settingid=settingid[0])
 			response = requests.get(resource_url,
 						auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))
-			#print(response.status_code)
-			#print(response.json())
 			new_req.update({
 				"result": json.dumps(response.json())
 			})
