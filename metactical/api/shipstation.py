@@ -15,10 +15,14 @@ def get_orders(start_date, end_date):
 
 @frappe.whitelist(allow_guest=True)
 def test():
-	response = requests.get('https://ssapi.shipstation.com/stores',
-				auth=('0e5a20137d73413e930663cb0c6564da', 'e9924cf64d634f53af1d2c858ae76b3c'))	
+	'''response = requests.get('https://ssapi.shipstation.com/stores',
+				auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))'''
+	data = {"resource_url": "https://ssapi6.shipstation.com/shipments?batchId=190671332&includeShipmentItems=False", "resource_type": "SHIP_NOTIFY" }
+	response = requests.post('http://deverp.metactical.com/api/method/metactical.api.shipstation.orders_shipped_webhook?settingid=8f3a7e2cac',
+				json=data)				
 	print(response)
 	print(response.json())
+	#return frappe.db.get_value('Delivery Note', {"pick_list": 'STO-PICK-2021-00032', 'docstatus': 0})
 
 
 @frappe.whitelist(allow_guest=True)
@@ -30,9 +34,11 @@ def connect():
 	
 @frappe.whitelist()
 def create_shipstation_orders(order_no=None, is_cancelled=False):
-	#order_no = 'MAT-DN-2021-00030'
+	order_no = 'MAT-DN-2021-00039'
 	if order_no is not None:
 		order = frappe.get_doc('Delivery Note', order_no)
+		if order.get('is_return') == 1:
+			return
 		source = None
 		if order.get('source') is not None:
 			source = order.get('source')
@@ -42,8 +48,8 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 		response = requests.post('https://ssapi.shipstation.com/orders/createorder',
 					auth=(settings.api_key, settings.get_password('api_secret')),
 					json=data)
-		print(response.status_code)
-		print(response.json())
+		#print(response.status_code)
+		#print(response.json())
 		if response.status_code == 200:
 			sorder = response.json()
 			frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
@@ -82,13 +88,25 @@ def order_json(order, is_cancelled, settings):
 				taxes = taxes + float(charge.tax_amount_after_discount_amount)
 	
 	#For address
+	'''customer_address = {
+		'address_line1': None,
+		'address_line2': None,
+		'city': None,
+		'state': None,
+		'pincode': None,
+		'phone': None,
+		'email_id': None
+	}'''
+	customer_address = {}
+	customer_country = None
 	if order.customer_address and order.customer_address is not None:
 		customer_address = frappe.get_doc('Address', order.customer_address)
 		customer_country = frappe.get_value('Country', customer_address.country, "code")
 		customer_country = customer_country.upper()
 	
 	#Get shipping address, if none, use customer address
-	shipping_address = None
+	shipping_address = {}
+	shipping_country = None
 	if order.shipping_address_name and order.shipping_address_name is not None:
 		shipping_address = frappe.get_doc('Address', order.shipping_address_name)
 		shipping_country = frappe.get_value('Country', shipping_address.country, "code")
@@ -139,7 +157,7 @@ def order_json(order, is_cancelled, settings):
 		"shipByDate": "",
 		"orderStatus": orderStatus,
 		"customerUsername": order.customer,
-		"customerEmail": customer_address.email_id,
+		"customerEmail": customer_address.get('email_id'),
 		"billTo": {
 			"name": order.customer,
 			"company": '',
@@ -193,7 +211,7 @@ def get_settings(source=None, settingid=None):
 	settings = None
 	if source is not None:
 		parent = frappe.db.sql('''SELECT parent FROM `tabShipstation Store Map` WHERE source = %(source)s''', {"source": source}, as_dict=1)
-		if parent[0]:
+		if len(parent) > 0:
 			settings = frappe.get_doc('Shipstation Settings', parent[0].parent)
 			
 	if settingid is not None:
@@ -212,6 +230,10 @@ def orders_shipped_webhook():
 	data = json.loads(frappe.request.data)
 	resource_url = data.get("resource_url")
 	resource_type = data.get("resource_type")
+	#resource_url = "https://ssapi6.shipstation.com/shipments?batchId=190662564&includeShipmentItems=False"
+	#resource_type = "SHIP_NOTIFY"
+	#settingid = []
+	#settingid.append("a9faca509c")
 	if settingid is not None:
 		frappe.set_user('Administrator')
 		#Log the request
@@ -245,18 +267,21 @@ def orders_shipped_webhook():
 				for row in settings.transporter_mapping:
 					if row.carrier_code == shipment.get('carrierCode'):
 						transporter = row.transporter
-				existing_delivery = frappe.db.get_value('Delivery Note', {'po_no': shipment.get('orderNumber'), 'docstatus': 0})
+				pick_list = shipment.get('orderNumber')
+				shipDate = shipment.get('shipDate')
+				trackingNumber = shipment.get('trackingNumber')
+				shipmentCost = shipment.get('shipmentCost')
+				existing_delivery = frappe.db.get_value('Delivery Note', {'pick_list': pick_list})
 				if existing_delivery:
 					delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
 					delivery_note.update({
-						'lr_date': shipment.get('shipDate'),
-						'lr_no': shipment.get('trackingNumber'),
+						'lr_date': shipDate,
+						'lr_no': trackingNumber,
 						'transporter': transporter,
-						'ais_shipment_cost': shipment.get('shipmentCost'),
+						'ais_shipment_cost': shipmentCost,
 						'ais_package_weight': weight_display,
 						'ais_package_size': size
 					})
-					delivery_note.save()
 					delivery_note.submit()
 		new_req.insert(ignore_if_duplicate=True)
 	
