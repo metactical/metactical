@@ -8,6 +8,7 @@
   "naming_series",
   "start_date",
   "end_date",
+  "settingid",
   "result"
  ],
  "fields": [
@@ -33,9 +34,14 @@
    "label": "Series",
    "options": "SHIP-REQ-",
    "reqd": 1
+  },
+  {
+   "fieldname": "settingid",
+   "fieldtype": "Data",
+   "label": "Settings ID"
   }
  ],
- "modified": "2021-08-05 07:34:05.337170",
+ "modified": "2021-08-23 04:17:28.308832",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Shipstation API Requests",
