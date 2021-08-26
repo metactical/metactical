@@ -2,8 +2,8 @@
 var old_tax_template;
 var base_in_words;
 frappe.ui.form.on('Sales Order', {
-	refresh: function(frm){
-		console.log(frm);
+		refresh: function(frm){
+			console.log(frm);
 		//Clear update qty and rate button
 		/*if(frm.doc.docstatus === 1 && frm.doc.status !== 'Closed'
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
@@ -44,109 +44,11 @@ frappe.ui.form.on('Sales Order', {
 
 		dashboard_sales_order_doctype(frm, "Stock Entry");
 		
-		//For changing to drop ship
-		if(frm.doc.docstatus == 1 && (frm.doc.delivery_status == "Not Delivered" || frm.doc.delivery_status == "Partly Delivered")){
-			frm.add_custom_button(__('Change to Drop Ship'), () => frm.events.change_to_drop_ship(frm))
-		}
 	},
 
 	onload: function(frm){
 		old_tax_template = frm.doc.taxes_and_charges;
 		base_in_words = frm.doc.base_in_words;
-	},
-	
-	change_to_drop_ship: function(frm){
-		var fields = [
-			{
-				"fieldtype": "Data",
-				"fieldname": "docname",
-				"read_only": 1,
-				"hidden": 1,
-				"in_list_view": 0
-			},
-			{
-				"fieldtype": "Link",
-				"options": "Item",
-				"fieldname": "item_code",
-				"read_only": 1,
-				"columns": 2,
-				"label": __("Item Code"),
-				"in_list_view": 1
-			},
-			{
-				"fieldtype": "Data",
-				"fieldname": "item_name",
-				"read_only": 1,
-				"columns": 3,
-				"label": __("Item Name"),
-				"in_list_view": 1
-			},
-			{
-				"fieldtype": "Check",
-				"fieldname": "delivered_by_supplier",
-				"read_only": 0,
-				"columns": 1,
-				"label": __("Delivered By Supplier"),
-				"in_list_view": 1
-			},
-			{
-				"fieldtype": "Link",
-				"options": "Supplier",
-				"fieldname": "supplier",
-				"read_only": 0,
-				"columns": 3,
-				"label": __("Supplier"),
-				"in_list_view": 1
-			}
-		];
-		var data = [];
-		frm.doc.items.forEach(function(row){
-			if(row.delivered_by_supplier != 1 && row.delivered_qty == 0){
-				data.push({
-					"docname": row.name,
-					"item_code": row.item_code,
-					"item_name": row.item_name
-				})
-			}
-		});
-		var dialog = new frappe.ui.Dialog({
-			title: __("Update Drop Ship"),
-			fields: [
-				{
-					fieldname: "drop_ship_items",
-					fieldtype: "Table",
-					label: "Items",
-					cannot_add_rows: true,
-					in_place_edit: true,
-					reqd: 1,
-					data: data,
-					get_data: () => {
-						return data;
-					},
-					fields: fields
-				}
-			],
-			primary_action: function() {
-				const drop_ship_items = this.get_values()["drop_ship_items"];
-				frappe.call({
-					method: 'metactical.custom_scripts.sales_order.sales_order.update_drop_shipping',
-					freeze: true,
-					args: {
-						'items': drop_ship_items
-					},
-					callback: function() {
-						frm.reload_doc();
-					}
-				});
-				this.hide();
-				refresh_field("items");
-			},
-			primary_action_label: __('Update')
-		});
-		
-		
-		
-		dialog.show();
 	},
 	
 	create_pick_list_custom(frm) {
@@ -199,7 +101,6 @@ frappe.ui.form.on('Sales Order', {
 		)
 	},
 	
-	
 });
 frappe.ui.form.on("Sales Order Item", {
 	item_code: function(frm,cdt,cdn) {
@@ -221,22 +122,6 @@ frappe.ui.form.on("Sales Order Item", {
 				});
 		}
 	},
-	
-	delivered_by_supplier: function(frm, cdt, cdn){
-		if(frm.doc.docstatus == 1){
-			var row = locals[cdt][cdn];
-			return frm.call({
-					method: "metactical.custom_scripts.sales_order.sales_order.get_bin_details",
-					args:{
-						"item_code": row.item,
-						"sales_order": row.sales_order
-					},
-					callback: function(result){
-						console.log(result)
-					}
-				});
-		}
-	}
 });
 
 erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
