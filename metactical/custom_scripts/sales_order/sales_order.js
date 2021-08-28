@@ -2,8 +2,8 @@
 var old_tax_template;
 var base_in_words;
 frappe.ui.form.on('Sales Order', {
-		refresh: function(frm){
-			console.log(frm);
+	refresh: function(frm){
+		console.log(frm);
 		//Clear update qty and rate button
 		/*if(frm.doc.docstatus === 1 && frm.doc.status !== 'Closed'
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
@@ -69,7 +69,18 @@ frappe.ui.form.on('Sales Order', {
 			})
 		}
 		else{
-			frappe.msgprint(__('Warning: Insufficient Stock for Item <a href="/desk#Form/Item/{0}">{0}</a> for this order',[item_flag]))
+			frappe.confirm(
+				'Warning: Insufficient stock for Item ' + item_flag + '. Do you want to proceed anyway?',
+				function(){
+					frappe.model.open_mapped_doc({
+						method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
+						frm: cur_frm
+					})
+				},
+				function(){
+					window.close();
+				}
+			)
 		}
 	},
 
