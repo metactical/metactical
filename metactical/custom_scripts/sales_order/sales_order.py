@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import frappe
+import json
 #from metactical.api.shipstation import create_orders
 
 
@@ -38,3 +39,12 @@ def get_bin_details(item_code, warehouse):
 	is_stock = frappe.db.get_value("Item", {"name": item_code}, ["is_stock_item"])
 	ret.update({"is_stock_item": is_stock})
 	return ret
+	
+@frappe.whitelist()
+def update_drop_shipping(items):
+	data = json.loads(items)
+	for item in data:
+		if item.get("delivered_by_supplier") == 1:
+			frappe.db.set_value("Sales Order Item", item.get("docname"), "delivered_by_supplier", item.get("delivered_by_supplier"))
+			frappe.db.set_value("Sales Order Item", item.get("docname"), "supplier", item.get("supplier"))
+		
