@@ -34,7 +34,7 @@ def connect():
 	
 @frappe.whitelist()
 def create_shipstation_orders(order_no=None, is_cancelled=False):
-	order_no = 'MAT-DN-2021-00039'
+	#order_no = 'MAT-DN-2021-00026'
 	if order_no is not None:
 		order = frappe.get_doc('Delivery Note', order_no)
 		if order.get('is_return') == 1:
@@ -280,7 +280,8 @@ def orders_shipped_webhook():
 						'transporter': transporter,
 						'ais_shipment_cost': shipmentCost,
 						'ais_package_weight': weight_display,
-						'ais_package_size': size
+						'ais_package_size': size,
+						'ais_updated_by_shipstation': 1
 					})
 					delivery_note.submit()
 		new_req.insert(ignore_if_duplicate=True)
