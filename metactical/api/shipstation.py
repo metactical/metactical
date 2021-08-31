@@ -23,6 +23,9 @@ def test():
 	print(response)
 	print(response.json())
 	#return frappe.db.get_value('Delivery Note', {"pick_list": 'STO-PICK-2021-00032', 'docstatus': 0})
+	'''orders = frappe.get_all('Delivery Note', {'posting_date': '2021-08-27'})
+	for order in orders:
+		create_shipstation_orders(order.name)'''
 
 
 @frappe.whitelist(allow_guest=True)
@@ -34,7 +37,7 @@ def connect():
 	
 @frappe.whitelist()
 def create_shipstation_orders(order_no=None, is_cancelled=False):
-	#order_no = 'MAT-DN-2021-00026'
+	#order_no = 'MAT-DN-2021-00039'
 	if order_no is not None:
 		order = frappe.get_doc('Delivery Note', order_no)
 		if order.get('is_return') == 1:
@@ -230,7 +233,7 @@ def orders_shipped_webhook():
 	data = json.loads(frappe.request.data)
 	resource_url = data.get("resource_url")
 	resource_type = data.get("resource_type")
-	#resource_url = "https://ssapi6.shipstation.com/shipments?batchId=190662564&includeShipmentItems=False"
+	#resource_url = 'https://ssapi6.shipstation.com/shipments?batchId=191142513&includeShipmentItems=False'
 	#resource_type = "SHIP_NOTIFY"
 	#settingid = []
 	#settingid.append("a9faca509c")
