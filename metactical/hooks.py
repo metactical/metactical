@@ -105,7 +105,8 @@ doc_events = {
 	"Delivery Note": {
 		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
 		"on_trash": "metactical.custom_scripts.delivery_note.delivery_note.on_trash",
-		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel"
+		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel",
+		"on_submit": "metactical.custom_scripts.delivery_note.delivery_note.on_submit"
 	}
 }
 
