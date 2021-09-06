@@ -67,6 +67,7 @@ def execute(filters=None):
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
 		row["expected_pos"] = expected_pos
 		row["po_eta"] = get_last_purchase_orders(i.get("item_code"), i.get("supplier"))
+		
 		ordered_qty = get_open_po_qty(i.get("item_code"), i.get("supplier"))
 		row["ordered_qty"] = ordered_qty or 0.0
 		row["last_sold_date"] = get_date_last_sold(i.get("item_code"))
@@ -494,13 +495,13 @@ def get_purchase_orders(item,supplier):
 		draft_output = ""
 		for n in name:
 			if n[1]>0:
-				draft_output += n[0] + "("+str(n[1]) +"),"
+				draft_output += n[0] + "("+str(n[1]) +"), | "
 			#frappe.throw(frappe.as_json(draft_output))
 		# if qty > 0:
 		# 	frappe.throw(frappe.as_json(name[0][1]))
 		# 	output += name + "("+str(qty) +"),"
 		if not draft_output:
-			output += d[0]+" ("+str(d[1])+"), "	
+			output += d[0]+" ("+str(d[1])+"), | "	
 		else:
 			output += draft_output
 	return output
@@ -508,11 +509,12 @@ def get_purchase_orders(item,supplier):
 def get_last_purchase_orders(item,supplier):
 	output = ""
 	data = frappe.db.sql("""select p.name, c.qty-c.received_qty, p.eta_date from `tabPurchase Order` p inner join 
-		`tabPurchase Order Item` c on p.name = c.parent where p.docstatus=1 and c.item_code = %s
+		`tabPurchase Order Item` c on p.name = c.parent 
+		where p.docstatus=1 and c.item_code = %s
 		and c.received_qty < c.qty and p.status in ("To Receive and Bill", "To Receive")
-		 and p.supplier = %s order by p.eta_date desc limit 1""",(item, supplier))
+		 and p.supplier = %s """,(item, supplier))
 	for d in data:
-		output = d[0]+" ("+str(getdate(d[2]).strftime("%d-%b-%Y"))+")"
+		output += d[0]+" ("+str(getdate(d[2]).strftime("%d-%b-%Y"))+"), | "
 		# output = d[0]+" ("+str(d[1])+")"
 	return output
 
