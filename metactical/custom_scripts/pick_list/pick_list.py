@@ -20,6 +20,13 @@ def custom_before_save(self):
 	bstring = rv.getvalue()
 	self.barcode = bstring.decode('ISO-8859-1')
 	
+	# STO Barcode
+	sv = BytesIO()
+	_barcode.get('code128', self.name).write(sv)
+	stoBarcode = sv.getvalue()
+	self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
+
+
 	#Check if Sales Order has Balance Due or Credit Due
 	sales_orders = []
 	for item in self.locations:
