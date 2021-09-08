@@ -11,7 +11,7 @@ def on_trash(self, method):
 		delete_order(self.name)
 		
 def on_cancel(self, method):
-	super(DeliveryNote, self).on_cancel()
+	#super(DeliveryNote, self).on_cancel()
 
 	self.check_sales_order_on_hold_or_close("against_sales_order")
 	self.check_next_docstatus()
@@ -31,7 +31,7 @@ def on_cancel(self, method):
 	create_shipstation_orders(self.name, True)
 	
 def on_submit(self, method):
-	DeliveryNote.on_submit(self)
+	#DeliveryNote.on_submit(self)
 	
 	#If updated manually, delete on shipstation
 	if self.get('ais_updated_by_shipstation') != 1 and self.get('ais_shipstation_orderid') is not None:
