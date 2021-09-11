@@ -135,6 +135,11 @@ def get_data():
 					"name": "Suspended Invoice",
 					"description": _("Suspended Invoice.")
 				},
+				{
+					"type": "doctype",
+					"name": "Stock Entry User Permissions",
+					"description": _("Stock Entry User Permissions.")
+				}
 			]
 		},
 	]

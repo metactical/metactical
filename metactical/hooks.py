@@ -107,6 +107,9 @@ doc_events = {
 		"on_trash": "metactical.custom_scripts.delivery_note.delivery_note.on_trash",
 		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel",
 		"on_submit": "metactical.custom_scripts.delivery_note.delivery_note.on_submit"
+	},
+	"Stock Entry": {
+		"validate": "metactical.custom_scripts.stock_entry.stock_entry.validate"
 	}
 }
 
