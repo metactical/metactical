@@ -76,9 +76,6 @@ def get_permitted_source(doctype, txt, searchfield, start, page_len, filters):
 		else:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql('''SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0''')
-			'''all_warehouses = frappe.get_list('Warehouse', {"is_group": 0})
-			for row in all_warehouses:
-				warehouses.append([row.warehouse])'''
 	return warehouses
 	
 @frappe.whitelist()
@@ -90,12 +87,9 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 		if setting_exists:
 			settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
 			for row in settings.target_warehouse:
-				warehouses.append([row.name])
+				warehouses.append([row.warehouse])
 		else:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql('''SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0''')
-			'''all_warehouses = frappe.get_list('Warehouse', {"is_group": 0})
-			for row in all_warehouses:
-				warehouses.append([row.name])'''
 	return warehouses
 					
