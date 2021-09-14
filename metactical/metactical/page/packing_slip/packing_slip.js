@@ -160,7 +160,8 @@ function populate_current_item() {
 	if (item.item_code) {
 		$(".cur-item-barcode").html("Packing Now " + item.item_barcode);
 		$(".cur-item-scan-feedback").html(
-			"Scan this item to move next or <button class='btn btn-default btn-sm' onClick='addOneItem()'>click to add</button>"
+			"Scan this item to move next or <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button>"
+			+ " <button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>"
 		);
 		$(".cur-item-name").html(item.item_name);
 		$(".cur-item-code").html(item.item_code);
@@ -253,6 +254,22 @@ function addOneItem() {
 	}
 }
 
+function addMultiple(){
+	let cur_item = havenir.packing_slip.current_item;
+	frappe.prompt(
+		[{"fieldtype": "Int", "fieldname": "amount", "label": "Number of Items to Add", "reqd": 1}],
+		function(values){
+			if(values.amount > cur_item.qty){
+				frappe.throw("You can only add a maximum of " + cur_item.qty + " items");
+			}
+			else{
+				havenir.packing_slip.item_clicked = true;
+				havenir.packing_slip.calc_packing_items(cur_item.item_barcode[0], values.amount);
+			}
+		}
+	);
+}
+
 function selectItem(item) {
 	re_generate_current_item(item);
 }
@@ -335,7 +352,7 @@ havenir.packing_slip.fetch_dn_items = (from_refresh = false) => {
 	}
 };
 
-havenir.packing_slip.calc_packing_items = (barcode) => {
+havenir.packing_slip.calc_packing_items = (barcode, amount=1) => {
 	let packed_items = havenir.packing_slip.packed_items;
 	//let cur_item = havenir.packing_slip.current_item;
 	let pending_items = havenir.packing_slip.pending_items;
@@ -349,17 +366,20 @@ havenir.packing_slip.calc_packing_items = (barcode) => {
 	pending_items.forEach(function(cur_item){
 		if (cur_item.item_barcode.indexOf(barcode) != -1) {
 			havenir.packing_slip.current_item = cur_item;
-			cur_item.qty -= 1;
+			if(amount > cur_item.qty){
+				frappe.throw("You can only add a maximum of " + cur_item.qty + " items");
+			}
+			cur_item.qty -= amount;
 
 			let cur_packed_item = packed_items.filter(
 				(item) => item.item_code == cur_item.item_code
 			);
 
 			if (cur_packed_item.length > 0) {
-				cur_packed_item[0].qty += 1;
+				cur_packed_item[0].qty += amount;
 			} else {
 				cur_packed_item = $.extend(true, {}, cur_item);
-				cur_packed_item.qty = 1;
+				cur_packed_item.qty = amount;
 				cur_packed_item.item_barcode = barcode;
 				packed_items.push(cur_packed_item);
 			}
