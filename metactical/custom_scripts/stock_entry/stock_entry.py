@@ -70,12 +70,19 @@ def get_permitted_source(doctype, txt, searchfield, start, page_len, filters):
 	if user:
 		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
 		if setting_exists:
-			settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
+							AND parentfield='source_warehouse'""", 
+							{
+								'txt': "%%%s%%" % txt,
+								'parent': setting_exists
+							})
+			'''settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
 			for row in settings.source_warehouse:
-				warehouses.append([row.warehouse])
+				warehouses.append([row.warehouse])'''
 		else:
 			#Retrun all warehouses
-			warehouses = frappe.db.sql('''SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0''')
+			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
 	
 @frappe.whitelist()
@@ -85,11 +92,18 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 	if user:
 		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
 		if setting_exists:
-			settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
+							AND parentfield='target_warehouse'""", 
+							{
+								'txt': "%%%s%%" % txt,
+								'parent': setting_exists
+							})
+			'''settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
 			for row in settings.target_warehouse:
-				warehouses.append([row.warehouse])
+				warehouses.append([row.warehouse])'''
 		else:
 			#Retrun all warehouses
-			warehouses = frappe.db.sql('''SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0''')
+			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
 					
