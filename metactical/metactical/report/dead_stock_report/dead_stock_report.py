@@ -18,7 +18,7 @@ def execute(filters=None):
 	columns = get_column(filters,conditions)
 	data = []
 
-	master = get_master(conditions,filters)
+	master = get_master()
 	# details = get_details(conditions,filters)
 	combo_dict = {}
 	total = 0
@@ -295,15 +295,15 @@ def get_column(filters,conditions):
 	return columns
 
 
-def get_master(conditions="", filters={}):
+def get_master():
 	data = frappe.db.sql("""select  i.ifw_retailskusuffix, i.item_code, i.item_name, i.image,
 			i.asi_item_class, i.variant_of, i.ifw_discontinued, i.creation,
 			s.supplier, s.supplier_part_no, i.disabled, country_of_origin,customs_tariff_number,
 			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
 			ifw_po_notes
 			from `tabItem Supplier` s inner join `tabItem` i on i.name = s.parent
-			where 1 = 1 %s
-		"""%(conditions), filters, as_dict=1)
+			
+		""", as_dict=1)
 	return data
 
 def get_conditions(filters):
@@ -358,7 +358,6 @@ def get_qty(item, warehouse):
 	if data:
 		qty = data[0][0] or 0
 	return qty
-
 
 def get_tags(item):
 	output = ""

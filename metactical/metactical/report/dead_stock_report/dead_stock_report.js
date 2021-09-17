@@ -4,7 +4,7 @@
 
 frappe.query_reports["Dead Stock Report"] = {
 	"filters": [
-		{
+		/*{
 			"fieldname":"supplier",
 			"label": __("Supplier"),
 			"fieldtype": "MultiSelectList",
@@ -24,6 +24,6 @@ frappe.query_reports["Dead Stock Report"] = {
 			"fieldtype": "Select",
 			"options": ["20", "500", "1000", "5000", "10000", "All"],
 			"default": "20"
-		},
+		},*/
 	]
 };
