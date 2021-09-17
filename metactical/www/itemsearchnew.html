@@ -14,6 +14,23 @@
 	.dt-buttons{
 		padding-top: 5px;
 	}
+	#search_results tbody{
+		min-height: 300px !important;
+	}
+	tfoot input {
+        width: 100%;
+        padding: 2px;
+        box-sizing: border-box;
+    }
+    #search_results_filter{
+		display: none;
+	}
+	tfoot {
+		display: table-row-group;
+	}
+	.dataTables_scrollBody{
+		height: 450px;
+	}
 	</style>
 </head>
 <body>
@@ -60,6 +77,13 @@
 				</tr>
 			{% endfor %}
 		</tbody>
+		<tfoot>
+            <tr>
+				{% for column in columns %}
+					<th>{{column}}</th>
+				{% endfor %}
+            </tr>
+        </tfoot>
 	</table>
 	<div style="float: right; margin-top: -25px; margin-right: 10px; position: relative; z-index: 1000;"><a href="#" id="to_top">Back to Top</a></div>
 	</div>
@@ -156,9 +180,16 @@
 			
 			
 			//Datatables
+			// Setup - add a text input to each footer cell
+			$('#search_results tfoot th').each( function () {
+				var title = $(this).text();
+				$(this).html( '<input type="text" />' );
+			} );
+		 
+			
 			var datatable = $('#search_results').DataTable({
-				bFilter: false,
-				scrollY: '65vh',
+				//bFilter: false,
+				scrollY: '60vh',
 				scrollX: true,
 				scrollCollapse: true,
 				paging: false,
@@ -168,11 +199,29 @@
 				dom: 'frtipB',
 				buttons: [
 					'excel'
-				]
+				],
+				initComplete: function () {
+					/*var r = $('#search_results tfoot tr');
+					r.find('th').each(function(){
+						$(this).css('padding', 8);
+					});
+					
+					$('#search_results thead').append(r);*/
+					
+					// Apply the search
+					this.api().columns().every( function () {
+						var that = this;
+		 
+						$( 'input', this.footer() ).on( 'keyup change clear', function () {
+							if ( that.search() !== this.value ) {
+								that.search( this.value ).draw(true);
+							}
+						} );
+					} );
+				}
 			});
 			
 			$('#to_top').on('click', function(){
-				console.log(datatable);
 				datatable.draw(true);
 			});
 		});
