@@ -98,6 +98,7 @@ function create_new() {
 
 function refresh() {
 	console.log("From refresh");
+	$('input[data-fieldname="delivery_note"]').val("");
 	havenir.packing_slip.fetch_dn_items(true);
 }
 
@@ -115,6 +116,7 @@ function save_form() {
 		freeze: true,
 		btn: $(".primary-action"),
 		callback: (r) => {
+			console.log("Refresh");
 			refresh();
 		},
 		error: (r) => {
