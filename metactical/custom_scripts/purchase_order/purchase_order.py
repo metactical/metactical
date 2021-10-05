@@ -7,7 +7,7 @@ def shipping_address_query(doctype, txt, searchfield, start, page_len, filters):
 	link_name = filters.pop('link_name')
 	company = filters.pop('company')
 	return frappe.db.sql('''select
-			`tabAddress`.name, `tabAddress`.city, `tabAddress`.country
+			`tabAddress`.name
 		from
 			`tabAddress`, `tabDynamic Link`
 		where
