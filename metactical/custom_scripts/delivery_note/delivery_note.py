@@ -29,10 +29,3 @@ def on_cancel(self, method):
 	
 	#Cancel on shipstation
 	create_shipstation_orders(self.name, True)
-	
-def on_submit(self, method):
-	#DeliveryNote.on_submit(self)
-	
-	#If updated manually, delete on shipstation
-	if self.get('ais_updated_by_shipstation') != 1 and self.get('ais_shipstation_orderid') is not None:
-		delete_order(self.name)
