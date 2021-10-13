@@ -2,6 +2,7 @@ import frappe
 from lxml import etree
 from werkzeug.wrappers import Response
 import requests
+from requests import Request
 from requests.auth import HTTPBasicAuth
 import json
 from urllib.parse import urlparse, parse_qs
@@ -16,22 +17,20 @@ def get_orders(start_date, end_date):
 @frappe.whitelist(allow_guest=True)
 def test():
 	'''response = requests.get('https://ssapi.shipstation.com/stores',
-				auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))'''
+				auth=('', ''))
 	data = {"resource_url": "https://ssapi6.shipstation.com/shipments?batchId=190671332&includeShipmentItems=False", "resource_type": "SHIP_NOTIFY" }
 	response = requests.post('http://deverp.metactical.com/api/method/metactical.api.shipstation.orders_shipped_webhook?settingid=8f3a7e2cac',
 				json=data)				
 	print(response)
-	print(response.json())
-	#return frappe.db.get_value('Delivery Note', {"pick_list": 'STO-PICK-2021-00032', 'docstatus': 0})
-	'''orders = frappe.get_all('Delivery Note', {'posting_date': '2021-08-27'})
-	for order in orders:
-		create_shipstation_orders(order.name)'''
+	print(response.json())'''
+	frappe.request = Request('Post', "http://deverp.metactical.com/api/method/metactical.api.shipstation.orders_shipped_webhook?settingid")
+	return frappe.request
 
 
 @frappe.whitelist(allow_guest=True)
 def connect():
 	response = requests.get('https://ssapi.shipstation.com/orders',
-				auth=('42edf2c7a56e4289b0cb184dc040eb4b', 'f124798829b144f7a14752e67a1a7ec4'))	
+				auth=('', ''))	
 	print(response)
 	print(response.json())
 	
@@ -45,17 +44,29 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 		source = None
 		if order.get('source') is not None:
 			source = order.get('source')
-		settings = get_settings(source)
-	
-		data = order_json(order, is_cancelled, settings)
-		response = requests.post('https://ssapi.shipstation.com/orders/createorder',
-					auth=(settings.api_key, settings.get_password('api_secret')),
-					json=data)
-		#print(response.status_code)
-		#print(response.json())
-		if response.status_code == 200:
-			sorder = response.json()
-			frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
+		shipstation_settings = get_settings(source)
+		
+		#Determine already set orderIDs (from previous requests)
+		orderIds = []
+		for row in order.ais_shipstation_order_ids:
+			orderIds.append(row.settings_id)
+		
+		for settings in shipstation_settings:
+			data = order_json(order, is_cancelled, settings)
+			response = requests.post('https://ssapi.shipstation.com/orders/createorder',
+						auth=(settings.api_key, settings.get_password('api_secret')),
+						json=data)
+			if response.status_code == 200:
+				#To prevent adding orderIds multiple times
+				if settings.name not in orderIds: 
+					sorder = response.json()
+					#frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
+					order_table = frappe.new_doc('Shipstation Order ID', order, 'ais_shipstation_order_ids')
+					order_table.update({
+									'settings_id': settings.name,
+									'shipstation_order_id': sorder.get('orderId')
+								})
+					order_table.save()
 		
 	
 	
@@ -211,18 +222,24 @@ def order_json(order, is_cancelled, settings):
 	return data
 
 def get_settings(source=None, settingid=None):
-	settings = None
+	settings = []
 	if source is not None:
-		parent = frappe.db.sql('''SELECT parent FROM `tabShipstation Store Map` WHERE source = %(source)s''', {"source": source}, as_dict=1)
-		if len(parent) > 0:
-			settings = frappe.get_doc('Shipstation Settings', parent[0].parent)
+		parents = frappe.db.sql('''SELECT parent FROM `tabShipstation Store Map` WHERE source = %(source)s''', {"source": source}, as_dict=1)
+		if len(parents) > 0:
+			for parent in parents:
+				ret = frappe.get_doc('Shipstation Settings', parent.parent)
+				if ret.disabled != 1:
+					settings.append(ret)
 			
 	if settingid is not None:
-		settings = frappe.get_doc('Shipstation Settings', settingid)
+		ret = frappe.get_doc('Shipstation Settings', settingid)
+		settings.append(ret)
 		
-	if settings is None:
-		default = frappe.db.get_value('Shipstation Settings', {"is_default": 1})
-		settings = frappe.get_doc('Shipstation Settings', default)
+	if len(settings) == 0 and settingid is None:
+		default = frappe.db.get_value('Shipstation Settings', {"is_default": 1, "disabled": 0})
+		ret = frappe.get_doc('Shipstation Settings', default)
+		settings.append(ret)
+		
 	return settings
 	
 @frappe.whitelist(allow_guest=True)
@@ -233,10 +250,6 @@ def orders_shipped_webhook():
 	data = json.loads(frappe.request.data)
 	resource_url = data.get("resource_url")
 	resource_type = data.get("resource_type")
-	#resource_url = 'https://ssapi6.shipstation.com/shipments?batchId=191142513&includeShipmentItems=False'
-	#resource_type = "SHIP_NOTIFY"
-	#settingid = []
-	#settingid.append("a9faca509c")
 	if settingid is not None:
 		frappe.set_user('Administrator')
 		#Log the request
@@ -248,45 +261,58 @@ def orders_shipped_webhook():
 		})
 		if resource_type == 'SHIP_NOTIFY':
 			settings = get_settings(settingid=settingid[0])
-			response = requests.get(resource_url,
-						auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))
-			new_req.update({
-				"result": json.dumps(response.json())
-			})
-			shipments = response.json()
-			weight_display = ''
-			size = ''
-			for shipment in shipments.get('shipments'):
-				weight = shipment.get('weight')
-				if weight_display != '':
-					weight_display =+ ' | '
-				weight_display += str(weight.get('value')) + ' ' + weight.get('units')
-				dimensions = shipment.get('dimensions')
-				if size != '':
-					size += ' | '
-				size += str(dimensions.get('length')) + 'l x ' + str(dimensions.get('width')) + 'w x ' + str(dimensions.get('height')) + 'h'
-				#For carrier mapping
-				transporter = ''
-				for row in settings.transporter_mapping:
-					if row.carrier_code == shipment.get('carrierCode'):
-						transporter = row.transporter
-				pick_list = shipment.get('orderNumber')
-				shipDate = shipment.get('shipDate')
-				trackingNumber = shipment.get('trackingNumber')
-				shipmentCost = shipment.get('shipmentCost')
-				existing_delivery = frappe.db.get_value('Delivery Note', {'pick_list': pick_list})
-				if existing_delivery:
-					delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
-					delivery_note.update({
-						'lr_date': shipDate,
-						'lr_no': trackingNumber,
-						'transporter': transporter,
-						'ais_shipment_cost': shipmentCost,
-						'ais_package_weight': weight_display,
-						'ais_package_size': size,
-						'ais_updated_by_shipstation': 1
-					})
-					delivery_note.submit()
+			if len(settings) > 0:
+				response = requests.get(resource_url,
+							auth=(settings[0].api_key, settings[0].get_password('api_secret')))
+				new_req.update({
+					"result": json.dumps(response.json())
+				})
+				shipments = response.json()
+				weight_display = ''
+				size = ''
+				for shipment in shipments.get('shipments'):
+					weight = shipment.get('weight')
+					if weight_display != '':
+						weight_display =+ ' | '
+					weight_display += str(weight.get('value')) + ' ' + weight.get('units')
+					dimensions = shipment.get('dimensions')
+					if size != '':
+						size += ' | '
+					size += str(dimensions.get('length')) + 'l x ' + str(dimensions.get('width')) + 'w x ' + str(dimensions.get('height')) + 'h'
+					
+					#For carrier mapping
+					transporter = ''
+					for row in settings[0].transporter_mapping:
+						if row.carrier_code == shipment.get('carrierCode'):
+							transporter = row.transporter
+					pick_list = shipment.get('orderNumber')
+					shipDate = shipment.get('shipDate')
+					trackingNumber = shipment.get('trackingNumber')
+					shipmentCost = shipment.get('shipmentCost')
+					
+					#Update delivery note
+					existing_delivery = frappe.db.get_value('Delivery Note', {'pick_list': pick_list})
+					if existing_delivery:
+						delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
+						delivery_note.update({
+							'lr_date': shipDate,
+							'lr_no': trackingNumber,
+							'transporter': transporter,
+							'ais_shipment_cost': shipmentCost,
+							'ais_package_weight': weight_display,
+							'ais_package_size': size,
+							'ais_updated_by_shipstation': 1
+						})
+						delivery_note.submit()
+						
+						#Delete order from other shipstation accounts
+						for row in delivery_note.get('ais_shipstation_order_ids'):
+							if row.settings_id != settingid[0]:
+								shipstation_settings = frappe.get_doc('Shipstation Settings', row.settings_id)
+								if shipstation_settings.disabled != 1:
+									response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
+										auth=(shipstation_settings.api_key, shipstation_settings.get_password('api_secret')))
+						
 		new_req.insert(ignore_if_duplicate=True)
 	
 	
@@ -319,10 +345,9 @@ def get_shipment():
 			
 def delete_order(order_no):
 	#order_no = 'MAT-DN-2021-00030'
-	settings = get_settings()
-	orderId = frappe.db.get_value('Delivery Note', order_no, 'ais_shipstation_orderid')
-	if orderId is not None:
-		response = requests.delete('https://ssapi.shipstation.com/orders/' + orderId,
+	order = frappe.get_doc('Delivery Note', order_no)
+	for row in order.get('ais_shipstation_order_ids'):
+		settings = frappe.get_doc('Shipstation Settings', row.settings_id)
+		if settings.disabled == 0:
+			response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
 				auth=(settings.api_key, settings.get_password('api_secret')))
-	print(response.status_code)
-	print(response.json())

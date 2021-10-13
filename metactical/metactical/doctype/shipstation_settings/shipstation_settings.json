@@ -4,6 +4,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "disabled",
   "api_key",
   "api_secret",
   "is_default",
@@ -84,9 +85,15 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Default"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
   }
  ],
- "modified": "2021-08-23 03:14:08.225665",
+ "modified": "2021-10-11 23:26:10.553541",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Shipstation Settings",

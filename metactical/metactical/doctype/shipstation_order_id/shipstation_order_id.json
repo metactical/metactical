@@ -1,0 +1,38 @@
+{
+ "creation": "2021-09-21 17:04:53.057362",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "settings_id",
+  "shipstation_order_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "settings_id",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Settings ID",
+   "options": "Shipstation Settings",
+   "reqd": 1
+  },
+  {
+   "fieldname": "shipstation_order_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Shipstation Order ID",
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "modified": "2021-09-21 17:11:27.673196",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Shipstation Order ID",
+ "owner": "Administrator",
+ "permissions": [],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

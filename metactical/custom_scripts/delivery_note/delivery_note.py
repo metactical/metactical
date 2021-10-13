@@ -4,10 +4,11 @@ from erpnext.stock.doctype.delivery_note.delivery_note import DeliveryNote
 
 def on_update(self, method):
 	if self.docstatus == 0:
+		#For shipstation
 		create_shipstation_orders(self.name)
 	
 def on_trash(self, method):
-	if self.docstatus == 0 and self.ais_shipstation_orderid is not None:
+	if self.docstatus == 0 and self.ais_shipstation_order_ids is not None:
 		delete_order(self.name)
 		
 def on_cancel(self, method):
@@ -29,3 +30,10 @@ def on_cancel(self, method):
 	
 	#Cancel on shipstation
 	create_shipstation_orders(self.name, True)
+	
+'''def on_submit(self, method):
+	#DeliveryNote.on_submit(self)
+	
+	#If updated manually, delete on shipstation
+	if self.get('ais_updated_by_shipstation') != 1 and self.get('ais_shipstation_order_ids') is not None:
+		delete_order(self.name)'''
