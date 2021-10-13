@@ -1,0 +1,71 @@
+{
+	"shipments":[
+		{
+			"shipmentId":499031251,
+			"orderId":786524627,
+			"orderKey":"_Test Pick List",
+			"userId":"e7b312b6-0211-43d3-9f57-98bb9987b263",
+			"customerEmail":"malisa.aisenyi@gmail.com",
+			"orderNumber":"_Test Pick List",
+			"createDate":"2021-09-27T09:07:04.6670000",
+			"shipDate":"2021-09-27",
+			"shipmentCost":22.25,
+			"insuranceCost":0.0,
+			"trackingNumber":"7302361059843272",
+			"isReturnLabel":false,
+			"batchNumber":null,
+			"carrierCode":"canada_post",
+			"serviceCode":"expedited_parcel",
+			"packageCode":null,
+			"confirmation":null,
+			"warehouseId":81872,
+			"voided":false,
+			"voidDate":null,
+			"marketplaceNotified":false,
+			"notifyErrorMessage":null,
+			"shipTo":{
+				"name":"Aisenyi Malisa",
+				"company":"",
+				"street1":"102 minot drive ",
+				"street2":"",
+				"street3":null,
+				"city":"Regina",
+				"state":"SK",
+				"postalCode":"S4X1j4",
+				"country":"CA",
+				"phone":"3067371565",
+				"residential":null,
+				"addressVerified":null
+			},
+			"weight":{
+				"value":192.0,
+				"units":"ounces",
+				"WeightUnits":1
+			},
+			"dimensions":{
+				"units":"inches",
+				"length":30.0,
+				"width":10.0,
+				"height":10.0
+			},
+			"insuranceOptions":{
+				"provider":null,
+				"insureShipment":false,
+				"insuredValue":0.0
+			},
+			"advancedOptions":{
+				"billToParty":"4",
+				"billToAccount":null,
+				"billToPostalCode":null,
+				"billToCountryCode":null,
+				"storeId":410722
+			},
+			"shipmentItems":null,
+			"labelData":null,
+			"formData":null
+		}
+	],
+	"total":1,
+	"page":1,
+	"pages":1
+}
