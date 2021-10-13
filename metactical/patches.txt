@@ -1,2 +1,3 @@
 execute:frappe.db.sql("update `tabReport` set prepared_report = 1 where name in ('Accounts Receivable', 'Accounts Receivable Summary', 'Accounts Payable', 'Accounts Payable Summary')")
 execute:frappe.db.sql("update `tabPage` set module = 'Metactical' where name = 'packing-slip'")
+metactical.patches.copy_shipstation_orderids
