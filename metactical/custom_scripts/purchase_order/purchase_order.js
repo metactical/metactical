@@ -11,6 +11,16 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 					return erpnext.queries.company_address_query(me.frm.doc)
 			});
 		}
+		
+		//Remove address if it's new doc
+		if(this.frm.doc.__islocal == 1){
+			this.frm.set_value("shipping_address", '');
+		}
+	},
+	
+	supplier: function(doc, cdt, cdn){
+		//Remove address
+		this.frm.set_value("shipping_address", '');
 	}
 })
 // for backward compatibility: combine new and previous states
