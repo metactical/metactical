@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-	<link href="bootstrap.min.css" rel="stylesheet">
-	<link rel="stylesheet" type="text/css" href="datatables/datatables.min.css"/>
+	<link type="text/css" rel="stylesheet" href="/assets/css/frappe-web-b4.css">
+	<!--<link href="itemsearchnew/bootstrap.min.css" rel="stylesheet">-->
+	<link rel="stylesheet" type="text/css" href="itemsearchnew/datatables/datatables.min.css"/>
 	<style>	
 	.copy{
 		font-size: 10px;
@@ -38,18 +39,19 @@
 		<div class="bg-dark" id="navbarHeader">
 		  <div class="container">
 			<div class="form-row py-4">
-			  <div class="col-7">
+			  <div class="col-6">
 				<input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
 				  id="searchinput" value="">
 			  </div>
 			  <div class="col">
-				  <div style="float: left; width: 30%;">
+				  <div style="float: left;">
 					  <b id="item-title" style="font-size: 10px; color: #FFF; text-align: left !important;">Item Code</b><br>
 					  <input  class="copy form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" />
 					  <a class="copy" href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
 				  </div>
-				  <div style="float: left; width: 30%;" id="copy-barcode"></div>
-				  <div style="float: left; width: 30%;">
+				  <div style="float: left;" id="copy-barcode"></div>
+				  <div style="float:left;" id="print-bracode"></div>
+				  <div style="float: left; margin-left: 10px;">
 					  <button type="submit" onclick="searchItem()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
 				  </div>
 			  </div>
@@ -88,15 +90,14 @@
 	<div style="float: right; margin-top: -25px; margin-right: 10px; position: relative; z-index: 1000;"><a href="#" id="to_top">Back to Top</a></div>
 	</div>
 	
-	<script type="text/javascript" src="datatables/jQuery-3.3.1/jquery-3.3.1.min.js"></script>
-	<script type="text/javascript" src="datatables/DataTables-1.10.24/js/jquery.dataTables.min.js"></script>
-	<script type="text/javascript" src="datatables/dataTables.fixedColumns.min.js"></script>
-	<script type="text/javascript" src="datatables/dataTables.buttons.min.js"></script>
-	<script type="text/javascript" src="datatables/jszip.min.js"></script>
-	<!--<script type="text/javascript" src="datatables/pdfmake.min.js"></script>
-	<script type="text/javascript" src="datatables/vfs_fonts.js"></script>-->
-	<script type="text/javascript" src="datatables/buttons.html5.min.js"></script>
-	<!--<script type="text/javascript" src="datatables/buttons.print.min.js "></script>-->
+	<script type="text/javascript" src="itemsearchnew/datatables/jQuery-3.3.1/jquery-3.3.1.min.js"></script>
+	<script type="text/javascript" src="itemsearchnew/datatables/DataTables-1.10.24/js/jquery.dataTables.min.js"></script>
+	<script type="text/javascript" src="itemsearchnew/datatables/dataTables.fixedColumns.min.js"></script>
+	<script type="text/javascript" src="itemsearchnew/datatables/dataTables.buttons.min.js"></script>
+	<script type="text/javascript" src="itemsearchnew/datatables/jszip.min.js"></script>
+	<script type="text/javascript" src="itemsearchnew/datatables/buttons.html5.min.js"></script>
+	<script type="text/javascript" src="itemsearchnew/qz-tray.js "></script>
+	
 	<script type="text/javascript">
 		var input = document.getElementById("searchinput");
 
@@ -142,6 +143,26 @@
 			document.execCommand("copy");
 		}
 		
+		function print_barcode(barcode, item_code, item_name){
+			if(window.printer){
+				var config = qz.configs.create(printer);       // Create a default config for the found printer
+			   var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
+					'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
+					'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
+			   return qz.print(config, data);
+			}
+		}
+		
+		function print_with_price(barcode, item_code, item_name){
+			if(window.printer){
+				var config = qz.configs.create(printer);       // Create a default config for the found printer
+			   var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
+					'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
+					'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
+			   return qz.print(config, data);
+			}
+		}
+		
 		
 		$(document).ready(function() {
 			//Hide the item code input in header and item code and barcode copy buttons
@@ -165,9 +186,14 @@
 				if(barcode_html != 'None' && barcode_html != ''){
 					var barcodes = barcode_html.split('\n')
 					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
+					var barcode_print = ''
+					var item_code = this.cells[item_column].innerText;
+					var item_name = this.cells[1].innerText;
 					barcodes.forEach(function(barcode){
 						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
-								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a> <br>';
+								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a> '
+								+ '<a class="copy" href="#" style="color: red; margin-right: 30px;" '
+								+ 'onclick="print_barcode(' + barcode + ', \'' + item_code +'\', \'' + item_name + '\')">Print Barcode</a><br>';
 						barcode_copy = barcode_copy + html;
 					});
 					$('#copy-barcode').html(barcode_copy);
@@ -224,6 +250,13 @@
 			$('#to_top').on('click', function(){
 				datatable.draw(true);
 			});
+			
+			//For QZ tray
+			qz.websocket.connect().then(function() { 
+			   return qz.printers.find("zebra");              // Pass the printer name into the next Promise
+			}).then(function(printer) {
+			   window.printer = printer;
+			}).catch(function(e) { console.error(e); });
 		});
 	</script>
 </body>
