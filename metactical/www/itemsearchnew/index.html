@@ -157,7 +157,7 @@
 		function print_without_price(barcode, item_code, item_name){
 			var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
 				'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
-				'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
+				'^FO15,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
 			print_barcode(data);
 		}
 		
@@ -170,7 +170,7 @@
 						item_price = ret['price_list_rate'];
 						var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
 							'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
-							'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS',
+							'^FO15,95^BY2^BCN,40,,,,^FD' + barcode + '^FS',
 							'^FO20,165^A0,20^FB300,1,,C^FD$' + item_price + '^FS^XZ'];
 						print_barcode(data);
 					}
