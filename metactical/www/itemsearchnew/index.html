@@ -90,6 +90,16 @@
 	<div style="float: right; margin-top: -25px; margin-right: 10px; position: relative; z-index: 1000;"><a href="#" id="to_top">Back to Top</a></div>
 	</div>
 	
+	<script>
+		window.frappe = {};
+		frappe.ready_events = [];
+		frappe.ready = function(fn) {
+			frappe.ready_events.push(fn);
+		}
+		window.dev_server = {{ dev_server }};
+		window.socketio_port = {{ (frappe.socketio_port or 'null') }};
+    </script>
+	
 	<script type="text/javascript" src="itemsearchnew/datatables/jQuery-3.3.1/jquery-3.3.1.min.js"></script>
 	<script type="text/javascript" src="itemsearchnew/datatables/DataTables-1.10.24/js/jquery.dataTables.min.js"></script>
 	<script type="text/javascript" src="itemsearchnew/datatables/dataTables.fixedColumns.min.js"></script>
@@ -97,6 +107,7 @@
 	<script type="text/javascript" src="itemsearchnew/datatables/jszip.min.js"></script>
 	<script type="text/javascript" src="itemsearchnew/datatables/buttons.html5.min.js"></script>
 	<script type="text/javascript" src="itemsearchnew/qz-tray.js "></script>
+	<script type="text/javascript" src="/assets/js/frappe-web.min.js"></script>
 	
 	<script type="text/javascript">
 		var input = document.getElementById("searchinput");
@@ -143,23 +154,38 @@
 			document.execCommand("copy");
 		}
 		
-		function print_barcode(barcode, item_code, item_name){
-			if(window.printer){
-				var config = qz.configs.create(printer);       // Create a default config for the found printer
-			   var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
-					'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
-					'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
-			   return qz.print(config, data);
-			}
+		function print_without_price(barcode, item_code, item_name){
+			var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
+				'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
+				'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
+			print_barcode(data);
 		}
 		
 		function print_with_price(barcode, item_code, item_name){
+			var price_list = "{{ price_list }}";
+			var item_price = null;
+			if(price_list != "None"){
+				console.log({"Price List": price_list});
+				frappe.model.get_value('Item Price', {'item_code': item_code, 'price_list': price_list, 'selling': 1}, 'price_list_rate',
+					function(ret) {
+						item_price = ret['price_list_rate'];
+						var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
+							'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
+							'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS',
+							'^FO20,165^A0,20^FB300,1,,C^FD$' + item_price + '^FS^XZ'];
+						print_barcode(data);
+					}
+				);
+			}
+			else{
+				print_without_price(barcode, item_code, item_name);
+			}			
+		}
+		
+		function print_barcode(data){
 			if(window.printer){
 				var config = qz.configs.create(printer);       // Create a default config for the found printer
-			   var data = ['^XA^FO20,25^A0,20^FD' + item_code + '^FS',
-					'^FO20,47^A0,20^FB300,2,,^FD' + item_name + '^FS',
-					'^FO20,95^BY2^BCN,40,,,,^FD' + barcode + '^FS^XZ'];
-			   return qz.print(config, data);
+				return qz.print(config, data);
 			}
 		}
 		
@@ -193,7 +219,9 @@
 						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
 								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a> '
 								+ '<a class="copy" href="#" style="color: red; margin-right: 30px;" '
-								+ 'onclick="print_barcode(' + barcode + ', \'' + item_code +'\', \'' + item_name + '\')">Print Barcode</a><br>';
+								+ 'onclick="print_without_price(' + barcode + ', \'' + item_code +'\', \'' + item_name + '\')">Print Barcode</a>'
+								+ '<a class="copy" href="#" style="color: red; margin-right: 30px;" '
+								+ 'onclick="print_with_price(' + barcode + ', \'' + item_code +'\', \'' + item_name + '\')">Print With Price</a><br>';
 						barcode_copy = barcode_copy + html;
 					});
 					$('#copy-barcode').html(barcode_copy);
@@ -257,7 +285,27 @@
 			}).then(function(printer) {
 			   window.printer = printer;
 			}).catch(function(e) { console.error(e); });
+			
+			frappe.model.get_value('Company', {'name': 'International Camouflage Ltd'}, 'name',
+			  function(d) {
+				console.log(d)
+			  });
+			
+			/*frappe.call({
+				method: 'frappe.db.get_value',
+				args: {
+					'doctype': 'Company',
+					'filters': {'name': 'International Camouflage Ltd'},
+					'fieldname': ['name']
+				},
+				callback: function(ret){
+					console.log(ret);
+				}
+			});*/
+			//console.log(frappe.db.get_value('Company', 'International Camouflage Ltd', 'name'));
 		});
 	</script>
+	<!-- csrf_token -->
+	{%- block body_include %}{{ body_include or "" }}{% endblock -%}
 </body>
 </html>

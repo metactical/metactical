@@ -5,10 +5,24 @@ def get_context(context):
 	context.no_cache = True
 	search_text = frappe.request.args["searchtext"]
 	items = get_items(search_text, 0)
+	
+	if frappe.session.user:
+		context.price_list = get_price_list()
+	else:
+		context.price_list = None
+	
 	#total = get_total(search_text)
 	if "columns" in items and "data" in items:
 		context.columns = items["columns"]
 		context.data = items["data"]
+		
+
+def get_price_list():
+	query = frappe.db.sql("""SELECT price_list FROM `tabItem Search Print Price List` WHERE user=%(user)s""", {"user": frappe.session.user}, as_dict=1)
+	if query:
+		return query[0].price_list
+	else:
+		return None
 
 
 def get_total(search_value=""):
