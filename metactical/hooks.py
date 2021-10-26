@@ -16,7 +16,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/metactical/css/metactical.css"
-# app_include_js = "/assets/metactical/js/metactical.js"
+app_include_js = "/templates/pages/page.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -31,7 +31,8 @@ doctype_js = {
 	"Pick List": "custom_scripts/pick_list/pick_list.js",
 	"Stock Entry": "custom_scripts/stock_entry/stock_entry.js",
 	"Sales Invoice": "custom_scripts/sales_invoice/sales_invoice.js",
-	"Purchase Order": "custom_scripts/purchase_order/purchase_order.js"
+	"Purchase Order": "custom_scripts/purchase_order/purchase_order.js",
+	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -147,6 +148,11 @@ override_whitelisted_methods = {
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
 	"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate"
 }
+
+#override_doctype_class = {
+#    'PackingSlip': 'metactical.custom_scripts.packing_slip.packing_slip.CustomPackingSlip'
+#}
+
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -157,5 +163,9 @@ override_whitelisted_methods = {
 
 #Fixtures
 fixtures = ["Custom Field", "Property Setter", "Custom Script"]
+
+#For packing slip customizations
+from metactical.custom_scripts.packing_slip.packing_slip import customized_methods
+customized_methods()
 
 
