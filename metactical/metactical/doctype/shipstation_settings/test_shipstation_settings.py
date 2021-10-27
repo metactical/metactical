@@ -269,3 +269,57 @@ class TestShipstationSettings(unittest.TestCase):
 		self.assertEqual(delivery_note.ais_shipment_cost, 22.25)
 		self.assertEqual(delivery_note.ais_package_size, "30.0l x 10.0w x 10.0h")
 		self.assertEqual(delivery_note.ais_updated_by_shipstation, 1)
+		
+	
+	@patch('metactical.api.shipstation.requests')
+	def test_product_bundle(self, mock_request):
+		def handle_post(url, auth, json):
+			#Assert that the item in the json takes product bundle
+			has_bundle = False
+			for item in json.get('items'):
+				if item['sku'] == '_Test Item' and item['quantity']:
+					has_bundle = True
+			if not has_bundle:
+				raise RuntimeError("The order data does not contain product bundle item")
+				
+			response_mock = Mock()
+			response_mock.status_code = 200
+			response_mock.json.return_value = {'orderId': '_Test_orderId1'}
+			return response_mock
+				
+			
+		mock_request.post = Mock(side_effect=handle_post)
+		
+		test_item = frappe.get_doc({
+			"doctype": "Item",
+			"item_code": "_Test Item2",
+			"item_name": "_Test Item2",
+			"item_group": "_Test Item Group",
+			"stock_uom": "Nos",
+			"is_stock_item": 0
+		}).insert(ignore_if_duplicate=True)
+		
+		#Create bundled item
+		bundled_item = frappe.get_doc({
+			"doctype": "Product Bundle",
+			"new_item_code": "_Test Item2"
+		})
+		bundled_item.append("items", {
+			"item_code": "_Test Item",
+			"qty": 3,
+		})
+		bundled_item.insert(ignore_if_duplicate=True)
+		
+		
+		self.delivery_note.append('items', {
+			"item_code": "_Test Item2",
+			"item_name": "_Test Item2",
+			"qty": 1,
+			"uom": "Nos",
+			"warehouse": "_Test Warehouse - _TC"
+		})
+		self.delivery_note.save()
+		mock_request.post.assert_called()
+		
+		
+		
