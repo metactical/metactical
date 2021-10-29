@@ -101,6 +101,6 @@ def get_data(filters):
 		from `tabSales Invoice Item` c inner join `tabSales Invoice` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
 		where p.docstatus = 1 and p.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		order by c.ifw_location, p.posting_date
+		order by c.warehouse, p.posting_date
 		"""+ where, where_filter, as_dict=1)
 	return data
