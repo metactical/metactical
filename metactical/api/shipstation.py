@@ -201,12 +201,15 @@ def order_json(order, is_cancelled, settings):
 def get_settings(source=None, settingid=None):
 	settings = []
 	if source is not None:
-		parents = frappe.db.sql('''SELECT parent FROM `tabShipstation Store Map` WHERE source = %(source)s''', {"source": source}, as_dict=1)
+		parents = frappe.db.sql('''SELECT ssm.parent FROM `tabShipstation Store Map` AS ssm 
+					LEFT JOIN 
+						`tabShipstation Settings` AS ss ON ssm.parent = ss.name
+					WHERE 
+						ssm.source = %(source)s AND ss.disabled = 0''', {"source": source}, as_dict=1)
 		if len(parents) > 0:
 			for parent in parents:
 				ret = frappe.get_doc('Shipstation Settings', parent.parent)
-				if ret.disabled != 1:
-					settings.append(ret)
+				settings.append(ret)
 			
 	if settingid is not None:
 		ret = frappe.get_doc('Shipstation Settings', settingid)
