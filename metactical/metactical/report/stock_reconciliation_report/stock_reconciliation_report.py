@@ -100,6 +100,6 @@ def get_data(filters):
 		inner join `tabStock Reconciliation` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
 		where p.docstatus = 1 and p.posting_date BETWEEN %(from_date)s AND %(to_date)s
-		order by p.posting_date
+		order by c.warehouse
 		"""+ where, where_filter, as_dict=1)
 	return data
