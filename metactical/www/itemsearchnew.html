@@ -151,6 +151,7 @@
 			
 			//On row selection, display the item code in header with options to copy item code and barcode
 			$("table > tbody > tr").on("click", function() {
+				console.log(this.cells);
 				item_column = this.cells.length - 2;
 				barcode_column = this.cells.length - 4;
 				$("#item_code").val(this.cells[item_column].innerText);
@@ -160,6 +161,7 @@
 				
 				//For barcodes
 				var barcode_html = this.cells[barcode_column].innerText;
+				console.log(barcode_html)
 				if(barcode_html != 'None' && barcode_html != ''){
 					var barcodes = barcode_html.split('\n')
 					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
@@ -224,7 +226,5 @@
 			});
 		});
 	</script>
-	<!-- csrf_token -->
-	{%- block body_include %}{{ body_include or "" }}{% endblock -%}
 </body>
 </html>
