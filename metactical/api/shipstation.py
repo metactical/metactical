@@ -72,7 +72,7 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 	
 
 def order_json(order, is_cancelled, settings):
-	#order = frappe.get_doc('Delivery Note', order)
+	#order = frappe.get_doc('Delivery Note', order_no)
 	
 	#Order no is either pick list name or delivery note name
 	order_no = None
@@ -137,8 +137,31 @@ def order_json(order, is_cancelled, settings):
 			if order.source == store.source:
 				storeId = store.store_id
 		
-	items = get_items(order, shipping_settings, shipping_item)
-	
+	items = []
+	for item in order.items:
+		#Check if it is a shipping item
+		if shipping_settings == 'In Item Table' and item.item_code == shipping_item:
+			shipping_charges = item.amount
+		else:
+			row = {}
+			row.update({
+				"lineItemKey": item.name,
+				"sku": item.item_code,
+				"name": item.item_name,
+				"imageUrl": None,
+				"weight": None,
+				"quantity": int(item.qty),
+				"unitPrice": float(item.rate),
+				"taxAmount": None,
+				"shippingAmount": None,
+				"warehouseLocation": None,
+				"options": None,
+				"productId": None,
+				"fulfillmentSku": None,
+				"adjustment": False,
+				"upc": None
+			})
+			items.append(row)
 	data = {}
 	data.update({
 		"orderNumber": order_no,
@@ -221,58 +244,6 @@ def get_settings(source=None, settingid=None):
 		settings.append(ret)
 		
 	return settings
-	
-def get_items(doc, shipping_settings, shipping_item):
-	items = []
-	#Get bundled items
-	bundled_items = []
-	for item in doc.packed_items:
-		bundled_items.append(item.parent_item)
-		row = {}
-		row.update({
-			"lineItemKey": item.name,
-			"sku": item.item_code,
-			"name": item.item_name,
-			"imageUrl": None,
-			"weight": None,
-			"quantity": int(item.qty),
-			"unitPrice": 0,
-			"taxAmount": None,
-			"shippingAmount": None,
-			"warehouseLocation": None,
-			"options": None,
-			"productId": None,
-			"fulfillmentSku": None,
-			"adjustment": False,
-			"upc": None
-		})
-		items.append(row)
-	
-	for item in doc.items:
-		#Check if it is a shipping item
-		if shipping_settings == 'In Item Table' and item.item_code == shipping_item:
-			shipping_charges = item.amount
-		elif item.item_code not in bundled_items: #Make sure it's not a bundled item
-			row = {}
-			row.update({
-				"lineItemKey": item.name,
-				"sku": item.item_code,
-				"name": item.item_name,
-				"imageUrl": None,
-				"weight": None,
-				"quantity": int(item.qty),
-				"unitPrice": float(item.rate),
-				"taxAmount": None,
-				"shippingAmount": None,
-				"warehouseLocation": None,
-				"options": None,
-				"productId": None,
-				"fulfillmentSku": None,
-				"adjustment": False,
-				"upc": None
-			})
-			items.append(row)
-	return items
 	
 @frappe.whitelist(allow_guest=True)
 def orders_shipped_webhook():
