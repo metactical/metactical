@@ -60,8 +60,25 @@ def execute(filters=None):
 		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
 		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
 		row["wh_gor"] = get_qty(i.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
-
-		row["total_actual_qty"] = (row.get("wh_whs") or 0)+(row.get("wh_dtn") or 0)+(row.get("wh_queen") or 0)+(row.get("wh_amb") or 0)+(row.get("wh_mon") or 0)+(row.get("wh_vic") or 0)+(row.get("wh_edm") or 0)+(row.get("wh_gor") or 0)
+		
+		row["total_actual_qty"] = 0
+		
+		if row.get("wh_whs") > 0: 
+			row["total_actual_qty"] =+ row.get("wh_whs")
+		if row.get("wh_dtn") > 0:
+			row["total_actual_qty"] =+ row.get("wh_dtn")
+		if row.get("wh_queen") > 0:
+			row["total_actual_qty"] =+ row.get("wh_queen")
+		if row.get("wh_amb") > 0:
+			row["total_actual_qty"] =+ row.get("wh_amb")
+		if row.get("wh_mon") > 0:
+			row["total_actual_qty"] =+ row.get("wh_mon")
+		if row.get("wh_vic") > 0:
+			row["total_actual_qty"] =+ row.get("wh_vic")
+		if row.get("wh_edm") > 0:
+			row["total_actual_qty"] =+ row.get("wh_edm")
+		if row.get("wh_gor") > 0:
+			row["total_actual_qty"] =+ row.get("wh_gor")
 		row["material_request"] = get_open_material_request(i.get("item_code"))
 		row["tag"] = get_tags(i.get("item_code"))
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
@@ -460,11 +477,11 @@ def get_total_sold(item):
 
 def get_qty(item, warehouse):
 	qty = 0
-	data= frappe.db.sql("""select actual_qty-reserved_qty from `tabBin`
+	data= frappe.db.sql("""select actual_qty-reserved_qty AS qty from `tabBin`
 		where item_code = %s and warehouse=%s
-		""",(item,warehouse))
-	if data:
-		qty = data[0][0] or 0
+		""",(item,warehouse), as_dict=1)
+	if data and data[0]['qty'] > 0:
+		qty = data[0]['qty']
 	return qty
 
 def get_open_material_request(item):
