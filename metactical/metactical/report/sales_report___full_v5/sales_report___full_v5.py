@@ -64,21 +64,21 @@ def execute(filters=None):
 		row["total_actual_qty"] = 0
 		
 		if row.get("wh_whs") > 0: 
-			row["total_actual_qty"] =+ row.get("wh_whs")
+			row["total_actual_qty"] += row.get("wh_whs")
 		if row.get("wh_dtn") > 0:
-			row["total_actual_qty"] =+ row.get("wh_dtn")
+			row["total_actual_qty"] += row.get("wh_dtn")
 		if row.get("wh_queen") > 0:
-			row["total_actual_qty"] =+ row.get("wh_queen")
+			row["total_actual_qty"] += row.get("wh_queen")
 		if row.get("wh_amb") > 0:
-			row["total_actual_qty"] =+ row.get("wh_amb")
+			row["total_actual_qty"] += row.get("wh_amb")
 		if row.get("wh_mon") > 0:
-			row["total_actual_qty"] =+ row.get("wh_mon")
+			row["total_actual_qty"] += row.get("wh_mon")
 		if row.get("wh_vic") > 0:
-			row["total_actual_qty"] =+ row.get("wh_vic")
+			row["total_actual_qty"] += row.get("wh_vic")
 		if row.get("wh_edm") > 0:
-			row["total_actual_qty"] =+ row.get("wh_edm")
+			row["total_actual_qty"] += row.get("wh_edm")
 		if row.get("wh_gor") > 0:
-			row["total_actual_qty"] =+ row.get("wh_gor")
+			row["total_actual_qty"] += row.get("wh_gor")
 		row["material_request"] = get_open_material_request(i.get("item_code"))
 		row["tag"] = get_tags(i.get("item_code"))
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
