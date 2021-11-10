@@ -173,7 +173,7 @@
 		}
 		
 		//Print barcode with price
-		function print_barcode(barcode, retail_sku, item_name, item_code){
+		function print_with_price(barcode, retail_sku, item_name, item_code){
 			var price_list = "{{ price_list }}";
 			var item_price = null;
 			if(price_list != "None"){
@@ -189,13 +189,14 @@
 						mywindow.document.write('<center>$' + ret['price_list_rate'] + '</center></div></body></html>');
 						mywindow.document.close(); // necessary for IE >= 10
 						mywindow.focus(); // necessary for IE >= 10*/
-
 						mywindow.print();
 						mywindow.close();
-
 						return true;
 					}
 				);
+			}
+			else{
+				print_barcode(barcode, retail_sku, item_name);
 			}
 		}
 		
@@ -229,7 +230,7 @@
 						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
 								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 10px;">Copy</a> '
 								+ '<a class="copy" href="#" onclick="print_barcode(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\')" id="copy-btn" style="color: red; margin-right: 10px;">Print Barcode</a>'
-								+ '<a class="copy" href="#" onclick="print_barcode(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\', \'' + item_code + '\')" id="copy-btn" style="color: red; margin-right: 30px;">Print With Price</a> <br>';
+								+ '<a class="copy" href="#" onclick="print_with_price(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\', \'' + item_code + '\')" id="copy-btn" style="color: red; margin-right: 30px;">Print With Price</a> <br>';
 						barcode_copy = barcode_copy + html;
 					});
 					$('#copy-barcode').html(barcode_copy);
