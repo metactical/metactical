@@ -21,63 +21,15 @@ import shutil
 def custom_before_save(self):
 	if len(self.locations) > 0:
 		rv = BytesIO()
-		_barcode.get('code128', self.locations[0].sales_order).write(rv)
+		_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
 		bstring = rv.getvalue()
 		self.barcode = bstring.decode('ISO-8859-1')
 		
 		# STO Barcode
 		sv = BytesIO()
-		_barcode.get('code128', self.name).write(sv)
+		_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
 		stoBarcode = sv.getvalue()
 		self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
-		
-		#For test purposes from here
-		#Test decode utf
-		rv = BytesIO()
-		_barcode.get('code128', self.locations[0].sales_order).write(rv)
-		bstring = rv.getvalue()
-		self.ais_test_utf_barcode = bstring.decode('utf-8')
-		
-		#Test larger barcode
-		rv = BytesIO()
-		#SVGWriter.set_options(_barcode, options={"module_width":0.4})
-		_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
-		bstring = rv.getvalue()
-		self.ais_test_larger_barcode = bstring.decode('ISO-8859-1')
-		
-		#Test barcode png image
-		site = cstr(frappe.local.site)
-		code = self.locations[0].sales_order
-		name_tobe = code+".png"
-		check_file = Path(site+"/public/files/"+name_tobe)
-		if not check_file.is_file():
-			bar = _barcode.get('code128', str(code), writer=ImageWriter())
-			result = bar.save(code)
-			shutil.move(result, site+'/public/files')
-		self.ais_test_barcode_png_image = "/files/"+name_tobe
-		
-		#Test barcode svg image
-		site = cstr(frappe.local.site)
-		code = self.locations[0].sales_order
-		name_tobe = code+".svg"
-		check_file = Path(site+"/public/files/"+name_tobe)
-		if not check_file.is_file():
-			bar = _barcode.get('code128', str(code))
-			result = bar.save(code)
-			shutil.move(result, site+'/public/files')
-		self.ais_test_barcode_svg_image = "/files/"+name_tobe
-		
-		#Test larger png image
-		site = cstr(frappe.local.site)
-		code = self.locations[0].sales_order
-		name_tobe = code+"-larger.png"
-		check_file = Path(site+"/public/files/"+name_tobe)
-		if not check_file.is_file():
-			bar = _barcode.get('code128', str(code), writer=ImageWriter())
-			result = bar.save(code+"-larger", {"module_width":0.4})
-			shutil.move(result, site+'/public/files')
-		self.ais_test_barcode_larger_image = "/files/"+name_tobe
-
 
 	#Check if Sales Order has Balance Due or Credit Due
 	sales_orders = []

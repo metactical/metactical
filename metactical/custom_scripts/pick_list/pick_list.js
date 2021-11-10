@@ -20,7 +20,7 @@ frappe.ui.form.on('Pick List', {
 	},
 	
 	on_submit: function(frm){	
-		var new_url = window.location.origin + "/printview?doctype=Pick%20List&name=" + frm.doc.name + "&trigger_print=1&format=Pick%20List%204*6&no_letterhead=0&_lang=en"		
+		var new_url = window.location.origin + "/printview?doctype=Pick%20List&name=" + frm.doc.name + "&trigger_print=1&format=PickList%204x6%20-%20V2&no_letterhead=0&_lang=en"		
 		window.open(new_url)
 		
 	},
