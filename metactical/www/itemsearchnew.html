@@ -38,18 +38,18 @@
 		<div class="bg-dark" id="navbarHeader">
 		  <div class="container">
 			<div class="form-row py-4">
-			  <div class="col-7">
+			  <div class="col-6">
 				<input type="text" placeholder="Enter Barcode or SKU" class="form-control-plaintext white-text"
 				  id="searchinput" value="">
 			  </div>
-			  <div class="col">
+			  <div class="col-6">
 				  <div style="float: left; width: 30%;">
 					  <b id="item-title" style="font-size: 10px; color: #FFF; text-align: left !important;">Item Code</b><br>
 					  <input  class="copy form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" />
 					  <a class="copy" href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
 				  </div>
-				  <div style="float: left; width: 30%;" id="copy-barcode"></div>
-				  <div style="float: left; width: 30%;">
+				  <div style="float: left;" id="copy-barcode"></div>
+				  <div style="float: left;">
 					  <button type="submit" onclick="searchItem()" id="searchbutton" class="btn btn-primary mb-2">Search</button>
 				  </div>
 			  </div>
@@ -87,7 +87,16 @@
 	</table>
 	<div style="float: right; margin-top: -25px; margin-right: 10px; position: relative; z-index: 1000;"><a href="#" id="to_top">Back to Top</a></div>
 	</div>
-	
+	<div id="selected_barcode" style="display: none;"><svg id="barcode"></svg></div>
+	<script>
+		window.frappe = {};
+		frappe.ready_events = [];
+		frappe.ready = function(fn) {
+			frappe.ready_events.push(fn);
+		}
+		window.dev_server = {{ dev_server }};
+		window.socketio_port = {{ (frappe.socketio_port or 'null') }};
+    </script>
 	<script type="text/javascript" src="datatables/jQuery-3.3.1/jquery-3.3.1.min.js"></script>
 	<script type="text/javascript" src="datatables/DataTables-1.10.24/js/jquery.dataTables.min.js"></script>
 	<script type="text/javascript" src="datatables/dataTables.fixedColumns.min.js"></script>
@@ -97,6 +106,8 @@
 	<script type="text/javascript" src="datatables/vfs_fonts.js"></script>-->
 	<script type="text/javascript" src="datatables/buttons.html5.min.js"></script>
 	<!--<script type="text/javascript" src="datatables/buttons.print.min.js "></script>-->
+	<script type="text/javascript" src="JsBarcode.code128.min.js"></script>
+	<script type="text/javascript" src="/assets/js/frappe-web.min.js"></script>
 	<script type="text/javascript">
 		var input = document.getElementById("searchinput");
 
@@ -142,6 +153,52 @@
 			document.execCommand("copy");
 		}
 		
+		//Print the barcode
+		function print_barcode(barcode, retail_sku, item_name){
+			var mywindow = window.open('', 'PRINT');
+			mywindow.document.write('<html><head><title>' + document.title  + '</title>');
+			mywindow.document.write('</head><body style="font-size: 12px;"><div style="width: 250px">');
+			mywindow.document.write(retail_sku + '<br>' + item_name + '<br>');
+			JsBarcode("#barcode", barcode, {height: 40, fontsize: 12});
+			mywindow.document.write(document.getElementById('selected_barcode').innerHTML);
+			mywindow.document.write('</div></body></html>');
+
+			mywindow.document.close(); // necessary for IE >= 10
+			mywindow.focus(); // necessary for IE >= 10*/
+
+			mywindow.print();
+			mywindow.close();
+
+			return true;
+		}
+		
+		//Print barcode with price
+		function print_barcode(barcode, retail_sku, item_name, item_code){
+			var price_list = "{{ price_list }}";
+			var item_price = null;
+			if(price_list != "None"){
+				console.log({"Price List": price_list});
+				frappe.model.get_value('Item Price', {'item_code': item_code, 'price_list': price_list, 'selling': 1}, 'price_list_rate',
+					function(ret){
+						var mywindow = window.open('', 'PRINT');
+						mywindow.document.write('<html><head><title>' + document.title  + '</title>');
+						mywindow.document.write('</head><body style="font-size: 12px;"><div style="width: 250px">');
+						mywindow.document.write(retail_sku + '<br>' + item_name + '<br>');
+						JsBarcode("#barcode", barcode, {height: 40, fontsize: 12});
+						mywindow.document.write(document.getElementById('selected_barcode').innerHTML);
+						mywindow.document.write('<center>$' + ret['price_list_rate'] + '</center></div></body></html>');
+						mywindow.document.close(); // necessary for IE >= 10
+						mywindow.focus(); // necessary for IE >= 10*/
+
+						mywindow.print();
+						mywindow.close();
+
+						return true;
+					}
+				);
+			}
+		}
+		
 		
 		$(document).ready(function() {
 			//Hide the item code input in header and item code and barcode copy buttons
@@ -158,6 +215,9 @@
 				$("#item_code").show();
 				$("#copy-btn").show();
 				$("#item-title").show();
+				var retail_sku = this.cells[0].innerText;
+				var item_name = this.cells[1].innerText;
+				var item_code = this.cells[item_column].innerText;
 				
 				//For barcodes
 				var barcode_html = this.cells[barcode_column].innerText;
@@ -167,7 +227,9 @@
 					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
 					barcodes.forEach(function(barcode){
 						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
-								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a> <br>';
+								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 10px;">Copy</a> '
+								+ '<a class="copy" href="#" onclick="print_barcode(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\')" id="copy-btn" style="color: red; margin-right: 10px;">Print Barcode</a>'
+								+ '<a class="copy" href="#" onclick="print_barcode(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\', \'' + item_code + '\')" id="copy-btn" style="color: red; margin-right: 30px;">Print With Price</a> <br>';
 						barcode_copy = barcode_copy + html;
 					});
 					$('#copy-barcode').html(barcode_copy);
@@ -226,5 +288,7 @@
 			});
 		});
 	</script>
+		<!-- csrf_token -->
+	{%- block body_include %}{{ body_include or "" }}{% endblock -%}
 </body>
 </html>
