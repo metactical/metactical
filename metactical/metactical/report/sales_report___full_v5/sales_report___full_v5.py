@@ -79,7 +79,7 @@ def execute(filters=None):
 			row["total_actual_qty"] += row.get("wh_edm")
 		if row.get("wh_gor") > 0:
 			row["total_actual_qty"] += row.get("wh_gor")
-		row["material_request"] = get_open_material_request(i.get("item_code"))
+		row["material_request"], row['mr_status'] = get_open_material_request(i.get("item_code"))
 		row["tag"] = get_tags(i.get("item_code"))
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
 		row["expected_pos"] = expected_pos
@@ -344,6 +344,12 @@ def get_column(filters,conditions):
 				"width": 200,
 			},
 			{
+				"label": _("Material Request Status"),
+				"fieldname": "mr_status",
+				"fieldtype": "Data",
+				"width": 200,
+			},
+			{
 				"label": _("Expected PO Nos"),
 				"fieldname": "expected_pos",
 				"fieldtype": "Data",
@@ -485,12 +491,14 @@ def get_qty(item, warehouse):
 	return qty
 
 def get_open_material_request(item):
-	material_requests = ""
-	data = frappe.db.sql("""select p.name, c.qty from `tabMaterial Request` p inner join 
+	material_requests = ''
+	mr_status = ''
+	data = frappe.db.sql("""select p.name, c.qty, p.status from `tabMaterial Request` p inner join 
 		`tabMaterial Request Item` c on c.parent = p.name where p.docstatus=1 and c.item_code = %s""",(item))
 	for d in data:
-		material_requests += d[0]+" ("+str(d[1])+"), "
-	return material_requests
+		material_requests += d[0]+" ("+str(d[1])+")" if material_requests == '' else ", " + d[0]+" ("+str(d[1])+")"
+		mr_status += d[2] if mr_status == '' else ', ' + d[2]
+	return material_requests, mr_status
 
 def get_tags(item):
 	output = ""
