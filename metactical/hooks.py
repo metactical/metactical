@@ -145,7 +145,8 @@ scheduler_events = {
 override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
-	"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate"
+	"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate",
+	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note"
 }
 #
 # each overriding function accepts a `data` argument;

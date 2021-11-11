@@ -110,6 +110,8 @@ def on_submit(self, method):
 
 	delivery_note.pick_list = pick_list.name
 	delivery_note.customer = pick_list.customer if pick_list.customer else None
+	if pick_list.ais_source:
+		delivery_note.source = pick_list.ais_source
 	delivery_note.save()
 	
 	
@@ -148,7 +150,8 @@ def create_pick_list(source_name, target_doc=None):
 				'docstatus': ['=', 1]
 			},
 			'field_map': {
-				'sales_order': 'name'
+				'sales_order': 'name',
+				'source': 'ais_source'
 			}
 		},
 		'Sales Order Item': {
@@ -177,3 +180,69 @@ def save_cancel_reason(**args):
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
 	doc.db_set("pick_list_cancel_date", datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S"))
 	return 'Success'
+	
+@frappe.whitelist()
+def create_delivery_note(source_name, target_doc=None):
+	pick_list = frappe.get_doc('Pick List', source_name)
+	validate_item_locations(pick_list)
+
+	sales_orders = [d.sales_order for d in pick_list.locations if d.sales_order]
+	sales_orders = set(sales_orders)
+
+	delivery_note = None
+	for sales_order in sales_orders:
+		delivery_note = create_delivery_note_from_sales_order(sales_order,
+			delivery_note, skip_item_mapping=True)
+
+	# map rows without sales orders as well
+	if not delivery_note:
+		delivery_note = frappe.new_doc("Delivery Note")
+
+	item_table_mapper = {
+		'doctype': 'Delivery Note Item',
+		'field_map': {
+			'rate': 'rate',
+			'name': 'so_detail',
+			'parent': 'against_sales_order',
+		},
+		'condition': lambda doc: abs(doc.delivered_qty) < abs(doc.qty) and doc.delivered_by_supplier!=1
+	}
+
+	item_table_mapper_without_so = {
+		'doctype': 'Delivery Note Item',
+		'field_map': {
+			'rate': 'rate',
+			'name': 'name',
+			'parent': '',
+		}
+	}
+
+	for location in pick_list.locations:
+		if location.sales_order_item:
+			sales_order_item = frappe.get_cached_doc('Sales Order Item', {'name':location.sales_order_item})
+		else:
+			sales_order_item = None
+
+		source_doc, table_mapper = [sales_order_item, item_table_mapper] if sales_order_item \
+			else [location, item_table_mapper_without_so]
+
+		dn_item = map_child_doc(source_doc, delivery_note, table_mapper)
+
+		if dn_item:
+			dn_item.warehouse = location.warehouse
+			dn_item.qty = location.picked_qty
+			dn_item.batch_no = location.batch_no
+			dn_item.serial_no = location.serial_no
+
+			update_delivery_note_item(source_doc, dn_item, delivery_note)
+
+	set_delivery_note_missing_values(delivery_note)
+
+	delivery_note.pick_list = pick_list.name
+	delivery_note.customer = pick_list.customer if pick_list.customer else None
+	
+	#Get source from pick list if set
+	if pick_list.ais_source:
+		delivery_note.source = pick_list.ais_source
+
+	return delivery_note
