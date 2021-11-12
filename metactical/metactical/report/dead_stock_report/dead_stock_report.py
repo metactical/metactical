@@ -11,18 +11,13 @@ from dateutil.relativedelta import relativedelta
 from datetime import timedelta, datetime
 
 def execute(filters=None):
-	if not filters:
-		filters = {}
-
-	conditions = get_conditions(filters)
-	columns = get_column(filters,conditions)
 	data = []
-
-	master = get_master()
-	# details = get_details(conditions,filters)
+	columns = get_columns()
+	warehouses = get_warehouses()
+	masters = get_masters(warehouses)
 	combo_dict = {}
 	total = 0
-	for i in master:
+	for i in masters:
 		row = {}
 		row["ifw_retailskusuffix"] = i.get("ifw_retailskusuffix")
 		row["item_name"] = i.get("item_name")
@@ -31,8 +26,8 @@ def execute(filters=None):
 		
 
 		row["ifw_discontinued"] = int(i.get("ifw_discontinued"))
-		row["supplier_sku"] = i.get("supplier_part_no")		
-		row["supplier_name"] = i.get("supplier")
+		#row["supplier_sku"] = i.get("supplier_part_no")		
+		#row["supplier_name"] = i.get("supplier")
 		row["date_created"] = (i.get("creation")).strftime("%d-%b-%y")
 
 		row["asi_item_class"] = i.get("asi_item_class")
@@ -103,7 +98,7 @@ def execute(filters=None):
 
 	return columns, data
 
-def get_column(filters,conditions):
+def get_columns():
 	columns = [
 			{
 				"label": _("RetailSkuSuffix"),
@@ -295,15 +290,33 @@ def get_column(filters,conditions):
 	return columns
 
 
-def get_master():
-	data = frappe.db.sql("""select  i.ifw_retailskusuffix, i.item_code, i.item_name, i.image,
-			i.asi_item_class, i.variant_of, i.ifw_discontinued, i.creation,
-			s.supplier, s.supplier_part_no, i.disabled, country_of_origin,customs_tariff_number,
-			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
-			ifw_po_notes
-			from `tabItem Supplier` s inner join `tabItem` i on i.name = s.parent
-			
-		""", as_dict=1)
+def get_warehouses():
+	ret = []
+	warehouses = frappe.get_all('Warehouse', filters={"is_group": 0})
+	for warehouse in warehouses:
+		if "Active Stock" in warehouse.name:
+			ret.append(warehouse.name)
+	return ret
+	
+
+def get_masters(warehouses):
+	warehouse = '('
+	for w in warehouses:
+		warehouse += ", '" + w + "'" if warehouse != '(' else "'" + w + "'"
+	warehouse += ")"
+	data = frappe.db.sql("""SELECT 
+								b.item_code, i.ifw_retailskusuffix, i.item_name,
+								i.asi_item_class, i.variant_of, i.ifw_discontinued, i.creation,
+								i.disabled, country_of_origin,customs_tariff_number, ifw_po_notes,
+								ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
+								s.supplier, s.supplier_part_no
+							FROM
+								`tabBin` b
+							LEFT JOIN `tabItem` i ON b.item_code = i.name
+							LEFT JOIN `tabItem Supplier` s ON s.parent = i.name
+							WHERE
+								b.actual_qty > 0 AND b.warehouse in %(warehouses)s
+							GROUP BY item_code""", {"warehouses": warehouses} , as_dict=1)
 	return data
 
 def get_conditions(filters):
