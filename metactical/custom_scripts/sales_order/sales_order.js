@@ -46,7 +46,8 @@ frappe.ui.form.on('Sales Order', {
 		
 		//For changing to drop ship
 		if(frm.doc.docstatus == 1 && (frm.doc.delivery_status == "Not Delivered" || frm.doc.delivery_status == "Partly Delivered")){
-			frm.add_custom_button(__('Change to Drop Ship'), () => frm.events.change_to_drop_ship(frm))
+			frm.add_custom_button(__('To Drop Ship'), () => frm.events.change_to_drop_ship(frm), __('Change'));
+			frm.add_custom_button(__('Warehouse'), () => frm.events.change_warehouse(frm), __('Change'));
 		}
 	},
 
@@ -210,7 +211,87 @@ frappe.ui.form.on('Sales Order', {
 		)
 	},
 	
-	
+	change_warehouse: function(frm){
+		var fields = [
+			{
+				"fieldtype": "Data",
+				"fieldname": "docname",
+				"read_only": 1,
+				"hidden": 1,
+				"in_list_view": 0
+			},
+			{
+				"fieldtype": "Link",
+				"options": "Item",
+				"fieldname": "item_code",
+				"read_only": 1,
+				"columns": 2,
+				"label": __("Item Code"),
+				"in_list_view": 1
+			},
+			{
+				"fieldtype": "Data",
+				"fieldname": "item_name",
+				"read_only": 1,
+				"columns": 2,
+				"label": __("Item Name"),
+				"in_list_view": 1
+			},
+			{
+				"fieldtype": "Link",
+				"options": "Warehouse",
+				"fieldname": "warehouse",
+				"read_only": 0,
+				"columns": 3,
+				"label": __("Warehouse"),
+				"in_list_view": 1
+			}
+		];
+		var data = [];
+		frm.doc.items.forEach(function(row){
+			data.push({
+				"docname": row.name,
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"warehouse": row.warehouse
+			});
+		});
+		var dialog = new frappe.ui.Dialog({
+			title: __("Change Warehouse"),
+			fields: [
+				{
+					fieldname: "items",
+					fieldtype: "Table",
+					label: "Items",
+					cannot_add_rows: true,
+					in_place_edit: true,
+					reqd: 1,
+					data: data,
+					get_data: () => {
+						return data;
+					},
+					fields: fields
+				}
+			],
+			primary_action: function() {
+				const items = this.get_values()["items"];
+				frappe.call({
+					method: 'metactical.custom_scripts.sales_order.sales_order.change_warehouse',
+					freeze: true,
+					args: {
+						'items': items
+					},
+					callback: function() {
+						frm.reload_doc();
+					}
+				});
+				this.hide();
+				refresh_field("items");
+			},
+			primary_action_label: __('Update')
+		});
+		dialog.show();
+	}
 });
 frappe.ui.form.on("Sales Order Item", {
 	item_code: function(frm,cdt,cdn) {

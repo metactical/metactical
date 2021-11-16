@@ -47,4 +47,10 @@ def update_drop_shipping(items):
 		if item.get("delivered_by_supplier") == 1:
 			frappe.db.set_value("Sales Order Item", item.get("docname"), "delivered_by_supplier", item.get("delivered_by_supplier"))
 			frappe.db.set_value("Sales Order Item", item.get("docname"), "supplier", item.get("supplier"))
+			
+@frappe.whitelist()
+def change_warehouse(items):
+	data = json.loads(items)
+	for item in data:
+		frappe.db.set_value("Sales Order Item", item.get("docname"), "warehouse", item.get("warehouse"))
 		
