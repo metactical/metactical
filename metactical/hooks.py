@@ -162,7 +162,8 @@ fixtures = ["Custom Field", "Property Setter", "Custom Script"]
 #For using in print format
 jenv = {
 	"methods": [
-		"get_po_items:metactical.custom_scripts.purchase_order.purchase_order.get_po_items"
+		"get_po_items:metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
+		"get_pr_items:metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items"
 	]
 }
 
