@@ -31,7 +31,8 @@ doctype_js = {
 	"Pick List": "custom_scripts/pick_list/pick_list.js",
 	"Stock Entry": "custom_scripts/stock_entry/stock_entry.js",
 	"Sales Invoice": "custom_scripts/sales_invoice/sales_invoice.js",
-	"Purchase Order": "custom_scripts/purchase_order/purchase_order.js"
+	"Purchase Order": "custom_scripts/purchase_order/purchase_order.js",
+	"Material Request": "custom_scripts/material_request/material_request.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -110,6 +111,9 @@ doc_events = {
 	},
 	"Stock Entry": {
 		"validate": "metactical.custom_scripts.stock_entry.stock_entry.validate"
+	},
+	"Material Request": {
+		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
 	}
 }
 
