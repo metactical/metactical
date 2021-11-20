@@ -157,9 +157,11 @@
 		function print_barcode(barcode, retail_sku, item_name){
 			var mywindow = window.open('', 'PRINT');
 			mywindow.document.write('<html><head><title>' + document.title  + '</title>');
-			mywindow.document.write('</head><body style="font-size: 12px;"><div style="width: 250px">');
-			mywindow.document.write(retail_sku + '<br>' + item_name + '<br>');
-			JsBarcode("#barcode", barcode, {height: 40, fontSize: 12});
+			mywindow.document.write('</head><body style="font-size: 14px;"><div style="width: 250px;">');
+			mywindow.document.write(retail_sku + '<br>');
+			mywindow.document.write('<span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 35px;">');
+			mywindow.document.write(item_name + '</span>');
+			JsBarcode("#barcode", barcode, {height: 40, fontSize: 14, width: 1.8, marginLeft: 5, marginRight: 0, marginTop: 4});
 			mywindow.document.write(document.getElementById('selected_barcode').innerHTML);
 			mywindow.document.write('</div></body></html>');
 
@@ -182,9 +184,11 @@
 					function(ret){
 						var mywindow = window.open('', 'PRINT');
 						mywindow.document.write('<html><head><title>' + document.title  + '</title>');
-						mywindow.document.write('</head><body style="font-size: 12px;"><div style="width: 250px">');
-						mywindow.document.write(retail_sku + '<br>' + item_name + '<br>');
-						JsBarcode("#barcode", barcode, {height: 40, fontSize: 12});
+						mywindow.document.write('</head><body style="font-size: 14px;"><div style="width: 250px;">');
+						mywindow.document.write(retail_sku + '<br>');
+						mywindow.document.write('<span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 35px;">');
+						mywindow.document.write(item_name + '</span>');
+						JsBarcode("#barcode", barcode, {height: 40, fontSize: 14, width: 1.8, marginLeft: 5, marginRight: 0, marginTop: 4});
 						mywindow.document.write(document.getElementById('selected_barcode').innerHTML);
 						mywindow.document.write('<center>$' + ret['price_list_rate'] + '</center></div></body></html>');
 						mywindow.document.close(); // necessary for IE >= 10
