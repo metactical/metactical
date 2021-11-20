@@ -494,7 +494,8 @@ def get_open_material_request(item):
 	material_requests = ''
 	mr_status = ''
 	data = frappe.db.sql("""select p.name, c.qty, p.status from `tabMaterial Request` p inner join 
-		`tabMaterial Request Item` c on c.parent = p.name where p.docstatus=1 and c.item_code = %s""",(item))
+		`tabMaterial Request Item` c on c.parent = p.name where p.docstatus=1 and c.item_code = %s
+		and p.status IN ('Pending', 'Partially Ordered')""",(item))
 	for d in data:
 		material_requests += d[0]+" ("+str(d[1])+")" if material_requests == '' else ", " + d[0]+" ("+str(d[1])+")"
 		mr_status += d[2] if mr_status == '' else ', ' + d[2]
