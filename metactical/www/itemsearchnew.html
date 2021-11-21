@@ -110,6 +110,7 @@
 	<script type="text/javascript" src="/assets/js/frappe-web.min.js"></script>
 	<script type="text/javascript">
 		var input = document.getElementById("searchinput");
+		input.focus();
 
 		// Execute a function when the user releases a key on the keyboard
 		input.addEventListener("keyup", function (event) {
@@ -230,14 +231,15 @@
 				if(barcode_html != 'None' && barcode_html != ''){
 					var barcodes = barcode_html.split('\n')
 					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
-					barcodes.forEach(function(barcode){
+					if(barcodes.length > 0){
+						barcode = barcodes[0];
 						html = '<input  class="copy form-control-plaintext white-text" type="text" id="' + barcode + '" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="' + barcode + '" />'
 								+ '<a class="copy" href="#" onclick="copy_barcode(' + barcode + ')" id="copy-btn" style="color: red; margin-right: 10px;">Copy</a> '
 								+ '<a class="copy" href="#" onclick="print_barcode(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\')" id="copy-btn" style="color: red; margin-right: 10px;">Print Barcode</a>'
 								+ '<a class="copy" href="#" onclick="print_with_price(' + barcode + ', \'' + retail_sku + '\', \'' + item_name  + '\', \'' + item_code + '\')" id="copy-btn" style="color: red; margin-right: 30px;">Print With Price</a> <br>';
 						barcode_copy = barcode_copy + html;
-					});
-					$('#copy-barcode').html(barcode_copy);
+						$('#copy-barcode').html(barcode_copy);
+					}
 				}
 				else{
 					//Clear barcode html
