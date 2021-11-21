@@ -72,7 +72,7 @@ def get_items(search_value="", offset=0):
 		it1.ifw_retailskusuffix,
 		it1.ifw_location,
 		it1.variant_of,
-		GROUP_CONCAT(DISTINCT it1.barcode SEPARATOR '<br>') AS barcode,
+		GROUP_CONCAT(DISTINCT ib.barcode SEPARATOR '<br>') AS barcode,
 		ip.price_list_rate,
 		ip.currency,
 		ipg.price_list_rate AS gorilla_price,
@@ -107,6 +107,8 @@ def get_items(search_value="", offset=0):
 		LEFT JOIN
 			`tabItem Price` ipg
 			ON ipg.item_code = it1.item_code and ipg.price_list = "RET - Gorilla"
+		LEFT JOIN
+			`tabItem Barcode` ib ON ib.parent=it1.item_code 
 		WHERE
 			it1.disabled = 0
 			AND it1.has_variants = 0
