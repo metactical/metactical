@@ -1,6 +1,7 @@
 {
  "align_labels_right": 0,
  "creation": "2021-08-06 08:20:00.154739",
+ "css": "",
  "custom_format": 0,
  "default_print_language": "en",
  "disabled": 1,
@@ -12,7 +13,7 @@
  "html": "",
  "idx": 0,
  "line_breaks": 0,
- "modified": "2021-09-02 11:09:49.823709",
+ "modified": "2021-11-21 15:35:44.018252",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Rasca",
