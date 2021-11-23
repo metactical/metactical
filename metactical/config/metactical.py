@@ -99,6 +99,12 @@ def get_data():
 					"name": "Dead Stock Report",
 					"doctype": "Sales Invoice",
 				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Stock Summary - Custom",
+					"doctype": "Bin",
+				}
 			]
 		},
 		{
