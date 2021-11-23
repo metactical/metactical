@@ -1,6 +1,38 @@
 [
  {
   "default_value": null,
+  "doc_type": "Purchase Order",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "buying_price_list",
+  "modified": "2021-11-04 10:01:52.237612",
+  "name": "Purchase Order-buying_price_list-fetch_from",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "fetch_from",
+  "property_type": "Small Text",
+  "value": "supplier.default_price_list"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Order",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "currency",
+  "modified": "2021-11-04 10:03:45.654716",
+  "name": "Purchase Order-currency-fetch_from",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "fetch_from",
+  "property_type": "Small Text",
+  "value": "supplier.default_currency"
+ },
+ {
+  "default_value": null,
   "doc_type": "Sales Taxes and Charges",
   "docstatus": 0,
   "doctype": "Property Setter",
