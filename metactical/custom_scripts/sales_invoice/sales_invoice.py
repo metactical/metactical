@@ -91,3 +91,18 @@ def create_journal_entry(source_name, bank_cash, amount, purpose, target_doc=Non
 	update_accounts(source_doc, target_doc)
 	return target_doc
 		
+@frappe.whitelist()
+def si_mode_of_payment(name):
+	payment_mode = ''
+	mode = frappe.db.sql("""SELECT
+								pe.mode_of_payment
+							FROM
+								`tabPayment Entry Reference` per
+							LEFT JOIN
+								`tabPayment Entry` pe ON pe.name = per.parent
+							WHERE
+								per.reference_doctype = 'Sales Invoice' AND per.reference_name = %(name)s
+								AND pe.docstatus = 1""", {'name': name}, as_dict=1)
+	if len(mode) > 0:
+		payment_mode = mode[0].mode_of_payment
+	return payment_mode
