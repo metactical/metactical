@@ -39,6 +39,7 @@ class TestShipstationSettings(unittest.TestCase):
 		shipstation_settings.update({
 			"api_key": '_Test_98980898989898',
 			"api_secret": '98989898989898',
+			"shipstation_user": "malisa.aisenyi@gmail.com"
 		})
 		
 		#Map lead source
@@ -95,7 +96,8 @@ class TestShipstationSettings(unittest.TestCase):
 			"qty": 1,
 			"stock_uom": "_Test UOM",
 			"uom": "_Test UOM",
-			"conversion_factor": 1
+			"conversion_factor": 1,
+			"warehouse": "_Test Warehouse - _TC"
 		})
 		self.delivery_note = delivery_note.insert(ignore_permissions=True)
 		
@@ -157,6 +159,7 @@ class TestShipstationSettings(unittest.TestCase):
 		shipstation_settings.update({
 			"api_key": '_Test_98980898989890',
 			"api_secret": '98989898989898',
+			"shipstation_user": "Administrator"
 		})
 		
 		#Map lead source
