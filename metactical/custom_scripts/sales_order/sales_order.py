@@ -2,6 +2,9 @@ from __future__ import unicode_literals
 import frappe
 import json
 #from metactical.api.shipstation import create_orders
+import barcode as _barcode
+from barcode.writer import ImageWriter
+from io import BytesIO
 
 
 @frappe.whitelist()
@@ -54,3 +57,9 @@ def change_warehouse(items):
 	for item in data:
 		frappe.db.set_value("Sales Order Item", item.get("docname"), "warehouse", item.get("warehouse"))
 		
+@frappe.whitelist()
+def get_so_barcode(name):
+	rv = BytesIO()
+	_barcode.get('code128', name).write(rv, options={"write_text": False})
+	bstring = rv.getvalue()
+	return bstring.decode('ISO-8859-1')
