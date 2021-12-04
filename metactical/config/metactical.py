@@ -151,6 +151,11 @@ def get_data():
 					"type": "doctype",
 					"name": "Stock Entry User Permissions",
 					"description": _("Stock Entry User Permissions.")
+				},
+				{
+					"type": "doctype",
+					"name": "City Symbol",
+					"description": _("City Symbols")
 				}
 			]
 		},
