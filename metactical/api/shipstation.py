@@ -148,7 +148,7 @@ def order_json(order, is_cancelled, settings):
 				"lineItemKey": item.name,
 				"sku": item.item_code,
 				"name": item.item_name,
-				"imageUrl": None,
+				"imageUrl": item.get('image'),
 				"weight": None,
 				"quantity": int(item.qty),
 				"unitPrice": float(item.rate),
@@ -254,17 +254,17 @@ def orders_shipped_webhook():
 	resource_url = data.get("resource_url")
 	resource_type = data.get("resource_type")
 	if settingid is not None:
-		frappe.set_user('Administrator')
-		#Log the request
-		new_req = frappe.get_doc({
-			"doctype": "Shipstation API Requests",
-			"start_date": resource_url,
-			"end_date": resource_type,
-			"settingid": settingid[0]
-		})
-		if resource_type == 'SHIP_NOTIFY':
-			settings = get_settings(settingid=settingid[0])
-			if len(settings) > 0:
+		settings = get_settings(settingid=settingid[0])
+		if len(settings) > 0:
+			frappe.set_user(settings[0].shipstation_user)
+			#Log the request
+			new_req = frappe.get_doc({
+				"doctype": "Shipstation API Requests",
+				"start_date": resource_url,
+				"end_date": resource_type,
+				"settingid": settingid[0]
+			})
+			if resource_type == 'SHIP_NOTIFY':
 				response = requests.get(resource_url,
 							auth=(settings[0].api_key, settings[0].get_password('api_secret')))
 				new_req.update({
@@ -315,8 +315,8 @@ def orders_shipped_webhook():
 								if shipstation_settings.disabled != 1:
 									response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
 										auth=(shipstation_settings.api_key, shipstation_settings.get_password('api_secret')))
-						
-		new_req.insert(ignore_if_duplicate=True)
+							
+			new_req.insert(ignore_if_duplicate=True)
 	
 	
 @frappe.whitelist(allow_guest=True)
