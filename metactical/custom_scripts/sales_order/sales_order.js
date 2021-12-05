@@ -49,11 +49,16 @@ frappe.ui.form.on('Sales Order', {
 			frm.add_custom_button(__('To Drop Ship'), () => frm.events.change_to_drop_ship(frm), __('Change'));
 			frm.add_custom_button(__('Warehouse'), () => frm.events.change_warehouse(frm), __('Change'));
 		}
+		
+		cur_frm.fields_dict["section_break_48"].collapse(0);
 	},
 
 	onload: function(frm){
 		old_tax_template = frm.doc.taxes_and_charges;
 		base_in_words = frm.doc.base_in_words;
+		if(!frm.doc.delivery_date){
+			frm.set_value("delivery_date", new Date());
+		}
 	},
 	
 	change_to_drop_ship: function(frm){
@@ -291,6 +296,14 @@ frappe.ui.form.on('Sales Order', {
 			primary_action_label: __('Update')
 		});
 		dialog.show();
+	},
+	
+	currency: function(frm){
+		setTimeout(function(){
+			frappe.after_ajax(function(){
+				frm.fields_dict['currency_and_price_list'].collapse(0);
+			});
+		}, 1000);
 	}
 });
 frappe.ui.form.on("Sales Order Item", {
@@ -361,7 +374,21 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 				});
 		}
 	},
-
+	
+	customer: function(frm){
+		var me = this;
+		var args = {"company_address": ''}
+		get_party_details(this.frm, null, null, function() {
+			me.apply_price_list();
+			frappe.after_ajax(function(){
+				setTimeout(
+					function(){
+						cur_frm.fields_dict["contact_info"].collapse(0);
+						cur_frm.set_value("company_address", '');
+					}, 2000);
+			});
+		});
+	}
 });
 
 $.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
@@ -421,3 +448,114 @@ frappe.templates["dashboard_sales_order_doctype"] = ' \
     	<span class="text-muted small count"></span> \
     	<span class="open-notification hidden" title="{{ __("Open {0}", [__(doctype)])}}"></span> \
     	</div>';
+
+//Replace erpnext.utils.get_party_details
+var get_party_details = function(frm, method, args, callback) {
+	if (!method) {
+		method = "erpnext.accounts.party.get_party_details";
+	}
+
+	if (args) {
+		if (in_list(['Sales Invoice', 'Sales Order', 'Delivery Note'], frm.doc.doctype)) {
+			if (frm.doc.company_address && (!args.company_address)) {
+				args.company_address = '';
+			}
+		}
+
+		if (in_list(['Purchase Invoice', 'Purchase Order', 'Purchase Receipt'], frm.doc.doctype)) {
+			if (frm.doc.shipping_address && (!args.shipping_address)) {
+				args.shipping_address = frm.doc.shipping_address;
+			}
+		}
+	}
+
+	if (!args) {
+		if ((frm.doctype != "Purchase Order" && frm.doc.customer)
+			|| (frm.doc.party_name && in_list(['Quotation', 'Opportunity'], frm.doc.doctype))) {
+
+			let party_type = "Customer";
+			if (frm.doc.quotation_to && frm.doc.quotation_to === "Lead") {
+				party_type = "Lead";
+			}
+
+			args = {
+				party: frm.doc.customer || frm.doc.party_name,
+				party_type: party_type,
+				price_list: ''
+			};
+		} else if (frm.doc.supplier) {
+			args = {
+				party: frm.doc.supplier,
+				party_type: "Supplier",
+				bill_date: frm.doc.bill_date,
+				price_list: frm.doc.buying_price_list
+			};
+		}
+
+		if (in_list(['Sales Invoice', 'Sales Order', 'Delivery Note'], frm.doc.doctype)) {
+			if (!args) {
+				args = {
+					party: frm.doc.customer || frm.doc.party_name,
+					party_type: 'Customer'
+				}
+			}
+			if (frm.doc.company_address && (!args.company_address)) {
+				args.company_address = '';
+			}
+
+			if (frm.doc.shipping_address_name &&(!args.shipping_address_name)) {
+				args.shipping_address_name = frm.doc.shipping_address_name;
+			}
+		}
+
+		if (in_list(['Purchase Invoice', 'Purchase Order', 'Purchase Receipt'], frm.doc.doctype)) {
+			if (!args) {
+				args = {
+					party: frm.doc.supplier,
+					party_type: 'Supplier'
+				}
+			}
+
+			if (frm.doc.shipping_address && (!args.shipping_address)) {
+				args.shipping_address = frm.doc.shipping_address;
+			}
+		}
+
+		if (args) {
+			args.posting_date = frm.doc.posting_date || frm.doc.transaction_date;
+		}
+	}
+	if (!args || !args.party) return;
+
+	if (frappe.meta.get_docfield(frm.doc.doctype, "taxes")) {
+		if (!erpnext.utils.validate_mandatory(frm, "Posting / Transaction Date",
+			args.posting_date, args.party_type=="Customer" ? "customer": "supplier")) return;
+	}
+
+	if (!erpnext.utils.validate_mandatory(frm, "Company", frm.doc.company, args.party_type=="Customer" ? "customer": "supplier")) {
+		return;
+	}
+
+	args.currency = frm.doc.currency;
+	args.company = frm.doc.company;
+	args.doctype = frm.doc.doctype;
+	frappe.call({
+		method: method,
+		args: args,
+		callback: function(r) {
+			if (r.message) {
+				frm.supplier_tds = r.message.supplier_tds;
+				frm.updating_party_details = true;
+				frappe.run_serially([
+					() => frm.set_value(r.message),
+					() => {
+						frm.updating_party_details = false;
+						if (callback) callback();
+						frm.refresh();
+						erpnext.utils.add_item(frm);
+					}
+				]);
+			}
+		}
+	});
+}
