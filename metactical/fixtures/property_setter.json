@@ -3838,5 +3838,37 @@
   "property": "description",
   "property_type": "Text",
   "value": "PHONE FORMAT MUST BE: 123-456-7891"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Sales Order",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "more_info",
+  "modified": "2021-12-06 01:12:36.418009",
+  "name": "Sales Order-more_info-collapsible_depends_on",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "collapsible_depends_on",
+  "property_type": "Data",
+  "value": ""
+ },
+ {
+  "default_value": null,
+  "doc_type": "Sales Order",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "source",
+  "modified": "2021-12-06 01:12:36.624186",
+  "name": "Sales Order-source-reqd",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "reqd",
+  "property_type": "Check",
+  "value": "1"
  }
 ]
