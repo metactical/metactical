@@ -114,6 +114,12 @@ doc_events = {
 	},
 	"Material Request": {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
+	},
+	"Address": {
+		"validate": "metactical.custom_scripts.address.address.validate"
+	},
+	"Contact": {
+		"validate": "metactical.custom_scripts.contact.contact.validate"
 	}
 }
 
