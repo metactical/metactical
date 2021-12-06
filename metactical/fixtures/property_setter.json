@@ -3521,22 +3521,6 @@
  },
  {
   "default_value": null,
-  "doc_type": "Sales Order",
-  "docstatus": 0,
-  "doctype": "Property Setter",
-  "doctype_or_field": "DocField",
-  "field_name": "section_break_48",
-  "modified": "2021-12-05 11:45:06.903380",
-  "name": "Sales Order-section_break_48-collapsible_depends_on",
-  "parent": null,
-  "parentfield": null,
-  "parenttype": null,
-  "property": "collapsible_depends_on",
-  "property_type": "Data",
-  "value": "customer"
- },
- {
-  "default_value": null,
   "doc_type": "Customer",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -3870,5 +3854,21 @@
   "property": "reqd",
   "property_type": "Check",
   "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Sales Order",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "section_break_48",
+  "modified": "2021-12-06 02:46:21.472033",
+  "name": "Sales Order-section_break_48-collapsible_depends_on",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "collapsible_depends_on",
+  "property_type": "Data",
+  "value": ""
  }
 ]
