@@ -3806,5 +3806,37 @@
   "property": "in_standard_filter",
   "property_type": "Check",
   "value": "0"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Contact",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "phone_nos",
+  "modified": "2021-12-06 00:23:28.501344",
+  "name": "Contact-phone_nos-description",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "description",
+  "property_type": "Text",
+  "value": "PHONE FORMAT MUST BE: 123-456-7891"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Address",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "phone",
+  "modified": "2021-12-06 00:23:55.369513",
+  "name": "Address-phone-description",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "description",
+  "property_type": "Text",
+  "value": "PHONE FORMAT MUST BE: 123-456-7891"
  }
 ]
