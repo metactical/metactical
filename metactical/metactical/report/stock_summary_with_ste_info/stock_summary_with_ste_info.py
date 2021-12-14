@@ -160,6 +160,18 @@ def get_columns():
 			"fieldtype": "Int",
 			"label": _("Aging Days"),
 			"width": 100
+		},
+		{
+			"fieldname": "sal_warehouseshipdate",
+			"fieldtype": "Date",
+			"label": _("Warehouse Shipdate"),
+			"width": 100
+		},
+		{
+			"fieldname": "sal_trackinginfo",
+			"fieldtype": "Data",
+			"label": _("Tracking Info"),
+			"width": 150
 		}
 	]
 	return columns
