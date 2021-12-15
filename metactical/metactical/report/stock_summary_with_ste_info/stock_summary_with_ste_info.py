@@ -50,7 +50,9 @@ def get_ste_details(data):
 							ste.name AS ste_number,
 							user.full_name AS created_by,
 							details.s_warehouse AS from_warehouse,
-							details.qty
+							details.qty,
+							ste.sal_trackinginfo,
+							ste.sal_warehouseshipdate
 						FROM
 							`tabStock Entry` AS ste
 						LEFT JOIN 
