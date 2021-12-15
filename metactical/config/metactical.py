@@ -102,12 +102,6 @@ def get_data():
 				{
 					"type": "report",
 					"is_query_report": True,
-					"name": "Stock Summary - Custom",
-					"doctype": "Bin",
-				},
-				{
-					"type": "report",
-					"is_query_report": True,
 					"name": "Stock Summary With STE Info",
 					"doctype": "Stock Entry",
 				}
