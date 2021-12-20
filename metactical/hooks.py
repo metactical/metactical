@@ -120,6 +120,9 @@ doc_events = {
 	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
+	},
+	"Purchase Receipt": {
+		"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
 	}
 }
 
