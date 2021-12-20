@@ -1,5 +1,12 @@
 import frappe
 
+def validate(self, method):
+	if self.set_warehouse:
+		for item in self.items:
+			if item.warehouse != self.set_warehouse:
+				item.warehouse = self.set_warehouse
+			
+
 @frappe.whitelist()
 def get_pr_items(docname):
 	items = []

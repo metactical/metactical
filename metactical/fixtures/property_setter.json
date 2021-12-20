@@ -3998,5 +3998,53 @@
   "property": "in_standard_filter",
   "property_type": "Check",
   "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Receipt Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "net_amount",
+  "modified": "2021-12-20 02:51:50.014151",
+  "name": "Purchase Receipt Item-net_amount-in_list_view",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "in_list_view",
+  "property_type": "Check",
+  "value": "0"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Receipt Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "qty",
+  "modified": "2021-12-20 02:53:46.224011",
+  "name": "Purchase Receipt Item-qty-columns",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "columns",
+  "property_type": "Int",
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Receipt Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "rate",
+  "modified": "2021-12-20 02:53:46.282528",
+  "name": "Purchase Receipt Item-rate-columns",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "columns",
+  "property_type": "Int",
+  "value": "2"
  }
 ]
