@@ -25,6 +25,7 @@ def execute(filters=None):
 		row['rate'] = d.rate
 		row['uom'] = d.uom
 		row['ifw_location'] = d.ifw_location
+		row['lead_source'] = d.source
 
 		data.append(row)
 
@@ -79,6 +80,13 @@ def get_column():
 			"width": 120,
 			"options": "UOM",
 		},
+		{
+			"fieldname":"lead_source",
+			"label": "Lead Source",
+			"fieldtype": "Link",
+			"width": 120,
+			"options": "Lead Source",
+		}
 	]
 
 
@@ -86,7 +94,7 @@ def get_data(filters):
 	where_filter = {"from_date": filters.from_date, "to_date": filters.to_date}
 	where = ""
 	data = frappe.db.sql("""select c.item_code, c.item_name, c.qty, c.rate, c.uom, i.ifw_retailskusuffix, i.ifw_location,
-		p.name, p.posting_date
+		p.name, p.posting_date, p.source
 		from `tabSales Invoice Item` c inner join `tabSales Invoice` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
 		where p.docstatus = 1 and p.posting_date BETWEEN %(from_date)s AND %(to_date)s
