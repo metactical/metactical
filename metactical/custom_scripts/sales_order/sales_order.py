@@ -56,10 +56,3 @@ def change_warehouse(items):
 	data = json.loads(items)
 	for item in data:
 		frappe.db.set_value("Sales Order Item", item.get("docname"), "warehouse", item.get("warehouse"))
-		
-@frappe.whitelist()
-def get_so_barcode(name):
-	rv = BytesIO()
-	_barcode.get('code128', name).write(rv, options={"write_text": False})
-	bstring = rv.getvalue()
-	return bstring.decode('ISO-8859-1')

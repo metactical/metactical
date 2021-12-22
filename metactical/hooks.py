@@ -177,7 +177,7 @@ jenv = {
 	"methods": [
 		"get_po_items:metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"get_pr_items:metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
-		"get_so_barcode:metactical.custom_scripts.sales_order.sales_order.get_so_barcode",
+		"get_barcode:metactical.barcode_generator.get_barcode",
 		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment"
 	]
 }
