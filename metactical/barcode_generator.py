@@ -10,6 +10,7 @@ import barcode
 from pathlib import Path
 import pyqrcode
 from frappe.utils import cstr
+from io import BytesIO
 
 
 def generate(self, method):
@@ -28,3 +29,10 @@ def po_validate(self, method):
 		if d.sales_order:
 			self.customer_address = frappe.db.get_value("Sales Order", d.sales_order, "address_display")
 			break
+
+@frappe.whitelist()
+def get_barcode(name):
+	rv = BytesIO()
+	barcode.get('code128', name).write(rv, options={"write_text": False})
+	bstring = rv.getvalue()
+	return bstring.decode('ISO-8859-1')
