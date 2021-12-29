@@ -4046,5 +4046,21 @@
   "property": "columns",
   "property_type": "Int",
   "value": "2"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Receipt Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "purchase_order_item",
+  "modified": "2021-12-27 08:22:45.050901",
+  "name": "Purchase Receipt Item-purchase_order_item-hidden",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "hidden",
+  "property_type": "Check",
+  "value": "0"
  }
 ]
