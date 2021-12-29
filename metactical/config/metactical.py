@@ -150,6 +150,11 @@ def get_data():
 					"type": "doctype",
 					"name": "City Symbol",
 					"description": _("City Symbols")
+				},
+				{
+					"type": "doctype",
+					"name": "Cycle Count",
+					"description": _("Cycle Count")
 				}
 			]
 		},
