@@ -17,17 +17,18 @@ class CycleCount(Document):
 			doc.append("items", {
 				"item_code": row.item_code,
 				"warehouse": self.warehouse,
-				"qty": row.qty
+				"qty": row.qty,
+				"valuation_rate": row.valuation_rate
 			})
-		doc.save()
 		doc.submit()
 
 @frappe.whitelist()
 def get_expected_qty(item_code, warehouse):
-	expected = frappe.db.sql('''SELECT actual_qty FROM `tabBin` 
+	expected = frappe.db.sql('''SELECT actual_qty, valuation_rate FROM `tabBin` 
 								WHERE item_code = %(item_code)s AND warehouse = %(warehouse)s''', 
 								{"item_code": item_code, "warehouse": warehouse}, as_dict=1)
 	if expected and len(expected) > 0:
-		return expected[0].actual_qty
+		ret = {"actual_qty": expected[0].actual_qty, "valuation_rate": expected[0].valuation_rate}
+		return ret
 	else:
-		return 0
+		return {"actual_qty": 0, "valuation_rate": 0}

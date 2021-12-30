@@ -78,8 +78,10 @@ frappe.ui.form.on('Cycle Count Item', {
 				args: {"item_code": item_code, "warehouse": warehouse},
 				freeze: true,
 				callback: function(ret){
-					if(ret.message){
-						frappe.model.set_value(cdt, cdn, "expected_qty", ret.message);
+					console.log(ret);
+					if(typeof ret.message != undefined){
+						frappe.model.set_value(cdt, cdn, "expected_qty", ret.message.actual_qty);
+						frappe.model.set_value(cdt, cdn, "valuation_rate", ret.message.valuation_rate);
 					}
 				}
 			});
