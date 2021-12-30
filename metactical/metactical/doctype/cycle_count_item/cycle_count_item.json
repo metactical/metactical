@@ -8,7 +8,9 @@
   "retail_sku",
   "item_name",
   "qty",
+  "column_break_5",
   "expected_qty",
+  "valuation_rate",
   "ifw_location"
  ],
  "fields": [
@@ -43,6 +45,7 @@
    "reqd": 1
   },
   {
+   "default": "0",
    "fieldname": "expected_qty",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -53,10 +56,20 @@
    "fieldname": "ifw_location",
    "fieldtype": "Data",
    "label": "ifw_location"
+  },
+  {
+   "depends_on": "eval:doc.expected_qty === 0;",
+   "fieldname": "valuation_rate",
+   "fieldtype": "Currency",
+   "label": "Valuation Rate"
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
   }
  ],
  "istable": 1,
- "modified": "2021-12-28 11:00:03.008560",
+ "modified": "2021-12-30 04:11:47.470686",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Cycle Count Item",
