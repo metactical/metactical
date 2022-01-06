@@ -15,5 +15,5 @@ class PaymentCycle(Document):
 			frappe.throw("Error: The start date is not in the payment year" )
 		if self.is_new():
 			title = str(start_date.day) + ' ' + datetime.strftime(start_date, "%b") + ' - '\
-				+ str(end_date.day) + ' ' + datetime.strftime(start_date, "%b") + ' ' + str(end_date.year)
+				+ str(end_date.day) + ' ' + datetime.strftime(end_date, "%b") + ' ' + str(end_date.year)
 			self.cycle_name = title
