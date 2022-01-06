@@ -161,6 +161,11 @@ def get_data():
 					"type": "doctype",
 					"name": "Cycle Count",
 					"description": _("Cycle Count")
+				},
+				{
+					"type": "doctype",
+					"name": "Payment Cycle",
+					"description": _("Payment Cycle")
 				}
 			]
 		},
