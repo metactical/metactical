@@ -104,6 +104,12 @@ def get_data():
 					"is_query_report": True,
 					"name": "Stock Summary With STE Info",
 					"doctype": "Stock Entry",
+				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Roll Report",
+					"doctype": "Attendance",
 				}
 			]
 		},
