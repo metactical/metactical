@@ -81,13 +81,6 @@ def get_columns(filters):
 			"label": "IsStudent",
 			"options": "Yes/nNo",
 			"width": 100
-		},
-		{
-			"fieldtype": "Data",
-			"fieldname": "name",
-			"label": "Name",
-			"options": "Branch",
-			"width": 150
 		}
 	]
 	
