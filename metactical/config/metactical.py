@@ -104,6 +104,12 @@ def get_data():
 					"is_query_report": True,
 					"name": "Stock Summary With STE Info",
 					"doctype": "Stock Entry",
+				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Roll Report",
+					"doctype": "Attendance",
 				}
 			]
 		},
@@ -155,6 +161,11 @@ def get_data():
 					"type": "doctype",
 					"name": "Cycle Count",
 					"description": _("Cycle Count")
+				},
+				{
+					"type": "doctype",
+					"name": "Payment Cycle",
+					"description": _("Payment Cycle")
 				}
 			]
 		},
