@@ -9,19 +9,50 @@ def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
 	employees = get_employees()
-	attendances = get_attendances(employees, filters)
+	checkins = get_checkins(employees, filters)
 	for employee in employees:
-		total = 0
-		regular = 0
-		other = 0
-		for attendance in attendances:
-			if attendance.employee == employee.name and attendance.get('out_time') and attendance.get('in_time'):
-				timediff = (attendance.out_time - attendance.in_time).seconds / 3600
-				fieldname = datetime.strftime(attendance.attendance_date, "%Y-%m-%d")
-				total = total + timediff
-				employee.update({
-					fieldname: round(timediff, 2)
-				})
+		total = 0.00
+		regular = 0.00
+		other = 0.00
+		next_logtype = 'IN'
+		checkintime = None
+		fieldname = ''
+		# Do a checkin pair check. For every checkin there must be accompanying checkout.
+		# If a checkin followed by another checkin thene the previous checkin is ignored.
+		# If acheckout followed by another checkout then the second checkout is ignored
+		for checkin in checkins:
+			if checkin.employee == employee.name and checkin.log_type == next_logtype:
+				if next_logtype == 'OUT':
+					time = employee.get(fieldname, 0)
+					timediff = (checkin.time - checkintime).total_seconds() / 3600
+					current_time = time + timediff
+					total = total + timediff
+					employee.update({
+						fieldname: round(current_time, 2)
+					})
+				elif next_logtype == 'IN':
+					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
+					checkintime = checkin.time
+					next_logtype = 'OUT'
+			elif checkin.employee == employee.name and checkin.log_type != next_logtype:
+				if next_logtype == 'OUT':
+					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
+					checkintime = checkin.time
+					next_logtype = 'OUT'
+					
+		'''attendances = get_attendances(employees, filters)
+		for employee in employees:
+			total = 0.00
+			regular = 0.00
+			other = 0.00
+			for attendance in attendances:
+				if attendance.employee == employee.name and attendance.get('out_time') and attendance.get('in_time'):
+					timediff = (attendance.out_time - attendance.in_time).seconds / 3600
+					fieldname = datetime.strftime(attendance.attendance_date, "%Y-%m-%d")
+					total = total + timediff
+					employee.update({
+						fieldname: round(timediff, 2)
+					})'''
 		
 		if employee.get('isot') and employee.isot == 'Yes':
 			regular = total
@@ -90,15 +121,11 @@ def get_columns(filters):
 	diff = abs((end_date-start_date).days) + 1
 	current_date = start_date
 	for x in range(diff):
-		label = ''
-		if x in [0, 1, diff-1]:
-			label = datetime.strftime(current_date, "%a (%d-%b-%Y)")
-		else:
-			label = datetime.strftime(current_date, "%a")
 		columns.append({
-			"fieldtype": "float",
-			"label": label,
+			"fieldtype": "Float",
+			"label": datetime.strftime(current_date, "%a (%d-%b-%Y)"),
 			"width": 100,
+			"precision": 2,
 			"fieldname": datetime.strftime(current_date, "%Y-%m-%d")
 		})
 		current_date = current_date + timedelta(days=1)
@@ -107,18 +134,21 @@ def get_columns(filters):
 			"fieldtype": "Float",
 			"fieldname": "total",
 			"label": "Total",
+			"precision": 2,
 			"width": 100
 		},
 		{
 			"fieldtype": "Float",
 			"fieldname": "regular",
 			"label": "Regular",
+			"precision": 2,
 			"width": 100
 		},
 		{
 			"fieldtype": "Float",
 			"fieldname": "other",
 			"label": "Other",
+			"precision": 2,
 			"width": 100
 		},
 		{
@@ -152,6 +182,22 @@ def get_employees():
 					WHERE
 						status = 'Active'""", as_dict=1)
 	return query
+
+def get_checkins(employees, filters):
+	cycle = frappe.get_doc('Payment Cycle', filters.get('payment_cycle'))
+	start_date = cycle.start_date
+	end_date = cycle.end_date
+	checkins = frappe.db.sql("""
+								SELECT 
+									employee, log_type, time
+								FROM
+									`tabEmployee Checkin`
+								WHERE
+									time BETWEEN %(start_date)s AND %(end_date)s
+								ORDER BY
+									time ASC
+									""", {'start_date': start_date, 'end_date': end_date}, as_dict=1)
+	return checkins
 
 def get_attendances(employees, filters):
 	cycle = frappe.get_doc('Payment Cycle', filters.get('payment_cycle'))
