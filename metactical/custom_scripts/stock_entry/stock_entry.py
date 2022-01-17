@@ -5,6 +5,7 @@ from frappe import _
 from frappe.model.mapper import get_mapped_doc, map_child_doc
 from frappe.utils import flt
 from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
+from erpnext.stock.doctype.serial_no.serial_no import update_serial_nos_after_submit
 
 def validate(self, method):
 	user = frappe.session.user
@@ -25,6 +26,10 @@ def validate(self, method):
 				
 			if row.t_warehouse not in t_warehouses:
 				frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
+				
+
+def on_submit(self, method):
+	self.ais_submitted_date = frappe.utils.today()
 
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):

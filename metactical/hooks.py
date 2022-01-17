@@ -46,7 +46,7 @@ doctype_list_js = {
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "login"
+home_page = "login"
 
 # website user home page (by Role)
 # role_home_page = {
@@ -110,7 +110,8 @@ doc_events = {
 		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel"
 	},
 	"Stock Entry": {
-		"validate": "metactical.custom_scripts.stock_entry.stock_entry.validate"
+		"validate": "metactical.custom_scripts.stock_entry.stock_entry.validate",
+		"on_submit": "metactical.custom_scripts.stock_entry.stock_entry.on_submit"
 	},
 	"Material Request": {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
@@ -121,9 +122,9 @@ doc_events = {
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
-	"Purchase Receipt": {
-		"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
-	}
+	#"Purchase Receipt": {
+	#	"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
+	#}
 }
 
 # Scheduled Tasks
