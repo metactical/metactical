@@ -29,7 +29,7 @@ def validate(self, method):
 				
 
 def on_submit(self, method):
-	self.ais_submitted_date = frappe.utils.today()
+	frappe.db.set_value('Stock Entry', self.name, 'ais_submitted_date', frappe.utils.today())
 
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):
