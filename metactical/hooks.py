@@ -32,7 +32,8 @@ doctype_js = {
 	"Stock Entry": "custom_scripts/stock_entry/stock_entry.js",
 	"Sales Invoice": "custom_scripts/sales_invoice/sales_invoice.js",
 	"Purchase Order": "custom_scripts/purchase_order/purchase_order.js",
-	"Material Request": "custom_scripts/material_request/material_request.js"
+	"Material Request": "custom_scripts/material_request/material_request.js",
+	"Payment Entry": "custom_scripts/payment_entry/payment_entry.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -160,7 +161,8 @@ override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
 	"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate",
-	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note"
+	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
+	"erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry": "metactical.custom_scripts.payment_entry.payment_entry.get_payment_entry"
 }
 #
 # each overriding function accepts a `data` argument;
