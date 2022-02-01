@@ -1,4 +1,10 @@
 import frappe
+from erpnext.controllers.buying_controller import BuyingController
+from six import string_types
+from frappe.model.mapper import get_mapped_doc
+from frappe import msgprint, _
+from frappe.utils import cstr, flt, getdate, new_line_sep, nowdate, add_days
+from erpnext.accounts.party import get_party_details
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
@@ -39,3 +45,96 @@ def get_po_items(docname):
 						'qty': i.qty + item.qty
 					})
 	return items
+	
+@frappe.whitelist()
+def make_purchase_order_based_on_supplier(source_name, target_doc=None):
+	if target_doc:
+		if isinstance(target_doc, string_types):
+			import json
+			target_doc = frappe.get_doc(json.loads(target_doc))
+		target_doc.set("items", [])
+
+	material_requests, supplier_items = get_material_requests_based_on_supplier(source_name)
+
+	def postprocess(source, target_doc):
+		target_doc.supplier = source_name
+		if getdate(target_doc.schedule_date) < getdate(nowdate()):
+			target_doc.schedule_date = None
+		target_doc.set("items", [d for d in target_doc.get("items")
+			if d.get("item_code") in supplier_items and d.get("qty") > 0])
+
+		set_missing_values(source, target_doc)
+
+	for mr in material_requests:
+		target_doc = get_mapped_doc("Material Request", mr, 	{
+			"Material Request": {
+				"doctype": "Purchase Order",
+			},
+			"Material Request Item": {
+				"doctype": "Purchase Order Item",
+				"field_map": [
+					["name", "material_request_item"],
+					["parent", "material_request"],
+					["uom", "stock_uom"],
+					["uom", "uom"]
+				],
+				"postprocess": update_item,
+				"condition": lambda doc: doc.ordered_qty < doc.qty
+			}
+		}, target_doc, postprocess)
+
+	return target_doc
+
+def get_material_requests_based_on_supplier(supplier):
+	supplier_items = [d.parent for d in frappe.db.get_all("Item Default",
+		{"default_supplier": supplier}, 'parent')]
+	if not supplier_items:
+		frappe.throw(_("{0} is not the default supplier for any items.".format(supplier)))
+
+	material_requests = frappe.db.sql_list("""select distinct mr.name
+		from `tabMaterial Request` mr, `tabMaterial Request Item` mr_item
+		where mr.name = mr_item.parent
+			and mr_item.item_code in (%s)
+			and mr.material_request_type = 'Purchase'
+			and mr.per_ordered < 99.99
+			and mr.docstatus = 1
+			and mr.status != 'Stopped'
+		order by mr_item.item_code ASC""" % ', '.join(['%s']*len(supplier_items)),
+		tuple(supplier_items))
+
+	return material_requests, supplier_items
+	
+def set_missing_values(source, target_doc, for_validate=False):
+	if target_doc.doctype == "Purchase Order" and getdate(target_doc.schedule_date) <  getdate(nowdate()):
+		target_doc.schedule_date = None
+	super(BuyingController, target_doc).set_missing_values(for_validate)
+
+	target_doc.set_supplier_from_item_default()
+	target_doc.set_price_list_currency("Buying")
+
+	# set contact and address details for supplier, if they are not mentioned
+	if getattr(target_doc, "supplier", None):
+		target_doc.update_if_missing(get_party_details(target_doc.supplier, party_type="Supplier", ignore_permissions=target_doc.flags.ignore_permissions,
+		doctype=target_doc.doctype, company=target_doc.company, party_address=target_doc.supplier_address, shipping_address=target_doc.get('shipping_address')))
+	target_doc.run_method("calculate_taxes_and_totals")
+	
+'''def set_missing_values(target_doc, for_validate=False):
+		super(BuyingController, target_doc).set_missing_values(for_validate)
+
+		target_doc.set_supplier_from_item_default()
+		target_doc.set_price_list_currency("Buying")
+
+		# set contact and address details for supplier, if they are not mentioned
+		if getattr(target_doc, "supplier", None):
+			target_doc.update_if_missing(get_party_details(target_doc.supplier, party_type="Supplier", ignore_permissions=target_doc.flags.ignore_permissions,
+			doctype=target_doc.doctype, company=target_doc.company, party_address=target_doc.supplier_address, shipping_address=target_doc.get('shipping_address')))
+
+		#self.set_missing_item_details(for_validate)
+		return target_doc'''
+		
+def update_item(obj, target, source_parent):
+	target.conversion_factor = obj.conversion_factor
+	target.qty = flt(flt(obj.stock_qty) - flt(obj.ordered_qty))/ target.conversion_factor
+	target.stock_qty = (target.qty * target.conversion_factor)
+	if getdate(target.schedule_date) < getdate(nowdate()):
+		target.schedule_date = None
