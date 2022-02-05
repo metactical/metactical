@@ -112,6 +112,25 @@ def get_columns(filters):
 			"label": "IsStudent",
 			"options": "Yes/nNo",
 			"width": 100
+		},		
+		{
+			"fieldtype": "Date",
+			"fieldname": "sin_expiry",
+			"label": "SIN Expiry",
+			"width": 100
+		},	
+		{
+			"fieldtype": "Select",
+			"fieldname": "is_salary",
+			"label": "IsSalary",
+			"options": "Yes/nNo",
+			"width": 100
+		},
+		{
+			"fieldtype": "Data",
+			"fieldname": "adpno",
+			"label": "ADP No",
+			"width": 100
 		}
 	]
 	
@@ -174,6 +193,9 @@ def get_employees():
 						ais_akno AS akno,
 						ais_isot AS isot,
 						ais_isstudent AS isstudent,
+						ais_sin_expiry AS sin_expiry,
+						ais_issalary AS is_salary,
+						ais_adp_no AS adpno,
 						employee_name,
 						cell_number AS mobile,
 						personal_email						
