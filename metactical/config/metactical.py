@@ -109,7 +109,7 @@ def get_data():
 					"type": "report",
 					"is_query_report": True,
 					"name": "Roll Report",
-					"doctype": "Attendance",
+					"doctype": "Payment Cycle",
 				}
 			]
 		},
