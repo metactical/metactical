@@ -10,15 +10,19 @@
 			<ul class="nav navbar-nav" id="navbar-breadcrumbs">
 			</ul>
 		</div>
-		<div class="navbar-center ellipsis" style="display: none;"></div>
-
+		<div class="navbar-center ellipsis" style="width: 25%;">
+			<ul style="float: right;">
+				<li class="hidden-xs">
+					<button id="checkin_btn" class="btn btn-primary btn-sm primary-action" style="margin-top: 5px; display: none;">Checkin</button>
+				</li>
+				<li class="visible-xs">
+					<a class="navbar-search-button" href="#" data-toggle="modal" data-target="#search-modal"><i class="octicon octicon-search"></i></a>
+				</li>
+			</ul>
+		</div>
+		
+		
 		<ul class="nav navbar-nav navbar-right">
-			<li class="hidden-xs">
-				<button id="checkin_btn" class="btn btn-primary btn-sm primary-action" style="margin-top: 5px; display: none;">Checkin</button>
-			</li>
-			<li class="visible-xs">
-				<a class="navbar-search-button" href="#" data-toggle="modal" data-target="#search-modal"><i class="octicon octicon-search"></i></a>
-			</li>
 			<li class="dropdown dropdown-navbar-user dropdown-mobile">
 				<a class="dropdown-toggle" data-toggle="dropdown" href="#"
 					onclick="return false;">
@@ -88,7 +92,6 @@
 				</ul>
 			</li>
 		</ul>
-
 		<div id="search-modal" class="modal fade" role="dialog">
 			<div class="modal-dialog" style="height: 50px;">
 				<div class="modal-content">
