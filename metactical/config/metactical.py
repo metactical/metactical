@@ -110,6 +110,12 @@ def get_data():
 					"is_query_report": True,
 					"name": "Roll Report",
 					"doctype": "Payment Cycle",
+				},
+				{
+					"type": "report",
+					"is_query_report": True,
+					"name": "Roll report - Monthly",
+					"doctype": "Employee Checkin",
 				}
 			]
 		},
