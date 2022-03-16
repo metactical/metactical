@@ -2273,22 +2273,6 @@
  },
  {
   "default_value": null,
-  "doc_type": "Stock Entry",
-  "docstatus": 0,
-  "doctype": "Property Setter",
-  "doctype_or_field": "DocType",
-  "field_name": null,
-  "modified": "2021-01-30 16:31:17.862638",
-  "name": "Stock Entry-default_print_format",
-  "parent": null,
-  "parentfield": null,
-  "parenttype": null,
-  "property": "default_print_format",
-  "property_type": "Data",
-  "value": "Stock Entry Barcode"
- },
- {
-  "default_value": null,
   "doc_type": "Customer",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -4209,22 +4193,6 @@
  },
  {
   "default_value": null,
-  "doc_type": "Pick List",
-  "docstatus": 0,
-  "doctype": "Property Setter",
-  "doctype_or_field": "DocType",
-  "field_name": null,
-  "modified": "2022-03-09 06:06:51.734190",
-  "name": "Pick List-default_print_format",
-  "parent": null,
-  "parentfield": null,
-  "parenttype": null,
-  "property": "default_print_format",
-  "property_type": "Data",
-  "value": "PickList 4x6 - V3"
- },
- {
-  "default_value": null,
   "doc_type": "Purchase Order",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -4238,5 +4206,37 @@
   "property": "default_print_format",
   "property_type": "Data",
   "value": "Custom Purchase Order V6"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Pick List",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "modified": "2022-03-16 08:43:50.092542",
+  "name": "Pick List-default_print_format",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "default_print_format",
+  "property_type": "Data",
+  "value": "PickList 4x6 - V2"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Stock Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "modified": "2022-03-16 08:44:10.035763",
+  "name": "Stock Entry-default_print_format",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "default_print_format",
+  "property_type": "Data",
+  "value": "Stock Entry Barcode V3"
  }
 ]
