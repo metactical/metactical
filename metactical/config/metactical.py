@@ -116,6 +116,13 @@ def get_data():
 					"is_query_report": True,
 					"name": "Roll report - Monthly",
 					"doctype": "Employee Checkin",
+				},
+				{
+					"type": "report",
+					"name": "Sales Report - Full V6",
+					"doctype": "Sales Invoice",
+					"is_query_report": True,
+					
 				}
 			]
 		},
