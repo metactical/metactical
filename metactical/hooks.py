@@ -88,6 +88,7 @@ home_page = "login"
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -104,7 +105,8 @@ doc_events = {
 		"on_cancel": "metactical.custom_scripts.pick_list.pick_list.on_cancel",
 	},
 	"Sales Invoice": {
-		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save"
+		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save",
+		"before_cancel": "metactical.custom_scripts.sales_invoice.sales_invoice.before_cancel"
 	},
 	"Delivery Note": {
 		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
