@@ -4238,5 +4238,37 @@
   "property": "default_print_format",
   "property_type": "Data",
   "value": "Stock Entry Barcode V3"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Payment Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "paid_amount",
+  "modified": "2022-03-23 14:03:42.492982",
+  "name": "Payment Entry-paid_amount-in_list_view",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "in_list_view",
+  "property_type": "Check",
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Payment Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "mode_of_payment",
+  "modified": "2022-03-23 14:17:03.544347",
+  "name": "Payment Entry-mode_of_payment-reqd",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "reqd",
+  "property_type": "Check",
+  "value": "1"
  }
 ]
