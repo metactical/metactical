@@ -79,6 +79,7 @@ frappe.ui.toolbar.Toolbar = Class.extend({
 					if(ret.message){
 						$('#checkin_btn').html(ret.message['next_log']);
 						$('#checkin_btn').show();
+						frappe.set_route('query-report/Employee Roll Report');
 					}
 				}
 			});
