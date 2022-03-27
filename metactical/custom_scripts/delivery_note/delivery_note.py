@@ -1,6 +1,7 @@
 import frappe
 from metactical.api.shipstation import create_shipstation_orders, delete_order
 from erpnext.stock.doctype.delivery_note.delivery_note import DeliveryNote
+from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 def on_update(self, method):
 	if self.docstatus == 0:
@@ -31,9 +32,28 @@ def on_cancel(self, method):
 	#Cancel on shipstation
 	create_shipstation_orders(self.name, True)
 	
-'''def on_submit(self, method):
-	#DeliveryNote.on_submit(self)
+def on_submit(self, method):
+	#check if delivery note doesn't have a sales invoice
+	if self.per_billed == 100:
+		return
 	
-	#If updated manually, delete on shipstation
-	if self.get('ais_updated_by_shipstation') != 1 and self.get('ais_shipstation_order_ids') is not None:
-		delete_order(self.name)'''
+	for row in self.items:
+		if row.against_sales_order and row.against_sales_invoice is None:
+			sales_order = frappe.get_doc('Sales Order', row.against_sales_order)
+			
+			#check sales order is fully delivered and not billed
+			if sales_order.per_billed != 0 or sales_order.per_delivered != 100:
+				break
+			
+			#check sales order is fully paid
+			if sales_order.grand_total != sales_order.advance_paid:
+				break
+			user = frappe.db.get_single_value('Metactical Settings', 'si_automation_user')
+			sales_invoice = frappe.new_doc('Sales Invoice')
+			sales_invoice = make_sales_invoice(row.against_sales_order, sales_invoice)
+			sales_invoice.update({"ais_automated_creation": 1})
+			
+			#Get payment entry with Sales Order and add it to advance paid
+			sales_invoice.set_advances()
+			sales_invoice.submit()
+			

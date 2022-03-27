@@ -179,6 +179,11 @@ def get_data():
 					"type": "doctype",
 					"name": "Payment Cycle",
 					"description": _("Payment Cycle")
+				},
+				{
+					"type": "doctype",
+					"name": "Metactical Settings",
+					"description": _("Metactical Settings")
 				}
 			]
 		},
