@@ -101,6 +101,24 @@
 		"frappe_public/js/frappe/ui/chart.js",
 		"frappe_public/js/frappe/barcode_scanner/index.js"
 	],
+	"js/form.min.js": [
+		"public/js/frappe/form/templates/print_layout.html",
+		"frappe_public/js/frappe/form/templates/users_in_sidebar.html",
+		"frappe_public/js/frappe/form/templates/set_sharing.html",
+		"frappe_public/js/frappe/form/templates/form_sidebar.html",
+		"frappe_public/js/frappe/form/templates/form_dashboard.html",
+		"frappe_public/js/frappe/form/templates/form_document_flow.html",
+		"frappe_public/js/frappe/form/templates/form_links.html",
+		"frappe_public/js/frappe/form/templates/report_links.html",
+		"frappe_public/js/frappe/form/templates/attachment.html",
+		"frappe_public/js/frappe/form/templates/form_footer.html",
+		"frappe_public/js/frappe/form/templates/timeline.html",
+		"frappe_public/js/frappe/form/templates/timeline_item.html",
+		"frappe_public/js/frappe/form/controls/control.js",
+		"frappe_public/js/frappe/views/formview.js",
+		"frappe_public/js/frappe/form/form.js",
+		"frappe_public/js/frappe/meta_tag.js"
+	],
 	"js/erpnext.min.js": [
 		"erpnext_public/js/conf.js",
 		"erpnext_public/js/utils.js",
