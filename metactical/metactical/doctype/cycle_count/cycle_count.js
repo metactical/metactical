@@ -2,6 +2,15 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Cycle Count', {
+	onload: function(frm){
+		frm.set_query('warehouse', function(){
+			return {
+				query: "metactical.metactical.doctype.cycle_count.cycle_count.get_permitted_warehouses",
+				filters: {'user': frappe.session.user}
+			};
+		})
+	},
+	
 	scan_barcode: function(frm) {
 		let scan_barcode_field = frm.fields_dict["scan_barcode"];
 

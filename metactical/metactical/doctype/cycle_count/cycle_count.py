@@ -32,3 +32,22 @@ def get_expected_qty(item_code, warehouse):
 		return ret
 	else:
 		return {"actual_qty": 0, "valuation_rate": 0}
+		
+@frappe.whitelist()
+def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters):
+	user = filters.get("user")
+	warehouses = []
+	if user:
+		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		if setting_exists:
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
+							AND parentfield='cycle_count_warehouse'""", 
+							{
+								'txt': "%%%s%%" % txt,
+								'parent': setting_exists
+							})
+		else:
+			#Retrun all warehouses
+			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
+	return warehouses

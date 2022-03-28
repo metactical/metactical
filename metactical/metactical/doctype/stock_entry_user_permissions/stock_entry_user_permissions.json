@@ -8,7 +8,8 @@
   "user",
   "user_name",
   "source_warehouse",
-  "target_warehouse"
+  "target_warehouse",
+  "cycle_count_warehouse"
  ],
  "fields": [
   {
@@ -40,9 +41,15 @@
    "fieldtype": "Data",
    "label": "User Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "cycle_count_warehouse",
+   "fieldtype": "Table",
+   "label": "Permitted Cycle Count Warehouse",
+   "options": "User Permitted Warehouse"
   }
  ],
- "modified": "2021-09-07 01:43:09.215060",
+ "modified": "2022-03-28 08:45:20.661936",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Stock Entry User Permissions",
