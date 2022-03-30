@@ -10,7 +10,7 @@ def execute(filters=None):
 	columns, data = [], []
 	columns = [
 		{
-			"fieldtype": "Date",
+			"fieldtype": "Data",
 			"fieldname": "date",
 			"label": "Date",
 			"width": 150
@@ -52,13 +52,13 @@ def execute(filters=None):
 				data.append(row)
 				row = {}
 			elif next_logtype == 'IN':
-				row['date'] = datetime.strftime(checkin.time, "%Y-%m-%d")
+				row['date'] = datetime.strftime(checkin.time, "%d-%b-%Y")
 				row['login'] = datetime.strftime(checkin.time, "%H:%M")
 				row['login_t'] = checkin.time
 				next_logtype = 'OUT'
 		elif checkin.log_type != next_logtype:
 			if next_logtype == 'OUT':
-				row['date'] = datetime.strftime(checkin.time, "%Y-%m-%d")
+				row['date'] = datetime.strftime(checkin.time, "%d-%b-%Y")
 				row['login'] = datetime.strftime(checkin.time, "%H:%M")
 				row['login_t'] = checkin.time
 				next_logtype = 'OUT'
