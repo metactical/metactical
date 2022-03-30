@@ -122,7 +122,12 @@ def get_data():
 					"name": "Sales Report - Full V6",
 					"doctype": "Sales Invoice",
 					"is_query_report": True,
-					
+				},
+				{
+					"type": "report",
+					"name": "Employee Roll Report",
+					"doctype": "Employee Checkin",
+					"is_query_report": True,
 				}
 			]
 		},
