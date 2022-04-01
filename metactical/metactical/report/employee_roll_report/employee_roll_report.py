@@ -50,6 +50,7 @@ def execute(filters=None):
 				timediff = (checkin.time - row['login_t']).total_seconds() / 3600
 				row['total_hours'] = timediff
 				data.append(row)
+				next_logtype = 'IN'
 				row = {}
 			elif next_logtype == 'IN':
 				row['date'] = datetime.strftime(checkin.time, "%d-%b-%Y")
