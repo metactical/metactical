@@ -48,7 +48,6 @@ def on_submit(self, method):
 			#check sales order is fully paid
 			if sales_order.grand_total != sales_order.advance_paid:
 				break
-			user = frappe.db.get_single_value('Metactical Settings', 'si_automation_user')
 			sales_invoice = frappe.new_doc('Sales Invoice')
 			sales_invoice = make_sales_invoice(row.against_sales_order, sales_invoice)
 			sales_invoice.update({"ais_automated_creation": 1})
