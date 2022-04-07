@@ -30,6 +30,7 @@ def execute(filters=None):
 					employee.update({
 						fieldname: round(current_time, 2)
 					})
+					next_logtype = 'IN'
 				elif next_logtype == 'IN':
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
 					checkintime = checkin.time
