@@ -209,7 +209,7 @@ def get_employees():
 def get_checkins(employees, filters):
 	cycle = frappe.get_doc('Payment Cycle', filters.get('payment_cycle'))
 	start_date = cycle.start_date
-	end_date = cycle.end_date
+	end_date = cycle.end_date  + timedelta(days=1)
 	checkins = frappe.db.sql("""
 								SELECT 
 									employee, log_type, time
