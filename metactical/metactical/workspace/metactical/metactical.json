@@ -122,7 +122,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " POS Discount Report",
    "link_to": "POS Discount Report",
    "link_type": "Report",
@@ -131,7 +131,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Stock Reconciliation Report",
    "link_to": "Stock Reconciliation Report",
    "link_type": "Report",
@@ -140,7 +140,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Item-Wise Sales Invoice Report",
    "link_to": "Item-Wise Sales Invoice Report",
    "link_type": "Report",
@@ -149,7 +149,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Sales Report - Full V3",
    "link_to": "Sales Report - Full V3",
    "link_type": "Report",
@@ -158,7 +158,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Sales Report - Full V4",
    "link_to": "Sales Report - Full V4",
    "link_type": "Report",
@@ -167,7 +167,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Sales Report - Full V5",
    "link_to": "Sales Report - Full V5",
    "link_type": "Report",
@@ -176,7 +176,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Sales Report RASUSA - Full V1",
    "link_to": "Sales Report RASUSA - Full V1",
    "link_type": "Report",
@@ -185,7 +185,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Payments Status",
    "link_to": "Payments Status",
    "link_type": "Report",
@@ -194,7 +194,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Ready to Ship - Orders",
    "link_to": "Ready to Ship - Orders",
    "link_type": "Report",
@@ -203,7 +203,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Pick List Status",
    "link_to": "Pick List Status",
    "link_type": "Report",
@@ -212,7 +212,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Sales Report - Stores",
    "link_to": "Sales Report - Stores",
    "link_type": "Report",
@@ -221,7 +221,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Open Purchase Orders",
    "link_to": "Open Purchase Orders",
    "link_type": "Report",
@@ -230,7 +230,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Supplier Status Report",
    "link_to": "Supplier Status Report",
    "link_type": "Report",
@@ -239,7 +239,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Dead Stock Report",
    "link_to": "Dead Stock Report",
    "link_type": "Report",
@@ -248,7 +248,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Stock Summary With STE Info",
    "link_to": "Stock Summary With STE Info",
    "link_type": "Report",
@@ -257,7 +257,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Roll Report",
    "link_to": "Roll Report",
    "link_type": "Report",
@@ -266,7 +266,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Roll Report - Monthly",
    "link_to": "Roll report - Monthly",
    "link_type": "Report",
@@ -275,7 +275,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Sales Report - Full V6",
    "link_to": "Sales Report - Full V6",
    "link_type": "Report",
@@ -284,7 +284,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": " Employee Roll Report",
    "link_to": "Employee Roll Report",
    "link_type": "Report",
@@ -292,7 +292,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-04-16 17:01:50.105136",
+ "modified": "2022-04-20 11:00:08.131561",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
