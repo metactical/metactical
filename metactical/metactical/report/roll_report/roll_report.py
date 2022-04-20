@@ -225,7 +225,7 @@ def get_checkins(employees, filters):
 def get_attendances(employees, filters):
 	cycle = frappe.get_doc('Payment Cycle', filters.get('payment_cycle'))
 	start_date = cycle.start_date
-	end_date = cycle.end_date
+	end_date = cycle.end_date + timedelta(days=1)
 	result = []
 	for employee in employees:
 		attendances = frappe.db.sql('''SELECT
