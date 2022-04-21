@@ -59,6 +59,7 @@ def on_submit(self, method):
 	for sales_order in sales_orders:
 		delivery_note = create_delivery_note_from_sales_order(sales_order,
 			delivery_note, skip_item_mapping=True)
+		delivery_note.update({'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule')})
 		#Add pick list submitted date in sales order
 		sales_doc = frappe.get_doc("Sales Order", sales_order)
 		sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
