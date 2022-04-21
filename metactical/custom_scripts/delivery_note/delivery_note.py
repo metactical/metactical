@@ -49,8 +49,10 @@ def on_submit(self, method):
 			if sales_order.grand_total != sales_order.advance_paid:
 				break
 			sales_invoice = frappe.new_doc('Sales Invoice')
+			sales_invoice.update({'ignore_pricing_rule': sales_order.ignore_pricing_rule})
 			sales_invoice = make_sales_invoice(row.against_sales_order, sales_invoice)
 			sales_invoice.update({"ais_automated_creation": 1})
+			
 			
 			#Get payment entry with Sales Order and add it to advance paid
 			sales_invoice.set_advances()
