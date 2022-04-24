@@ -2,6 +2,9 @@
 // For license information, please see license.txt
 /* eslint-disable */
 
+var today = new Date();
+var to_date = today.toISOString().split('T')[0];
+
 frappe.query_reports["Sales Report - Stores"] = {
 	"filters": [
 		{
@@ -17,6 +20,7 @@ frappe.query_reports["Sales Report - Stores"] = {
 			"fieldtype": "Date",
 			"label": __("To Date"),
 			"reqd" : 1,
+			"default": to_date
 		},
 		{
 			"fieldname":"item_code",
