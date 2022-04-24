@@ -177,7 +177,7 @@ override_whitelisted_methods = {
 #}
 
 #Fixtures
-fixtures = ["Custom Field", "Property Setter", "Custom Script"]
+fixtures = ["Custom Field", "Property Setter"]
 
 #For using in print format
 jenv = {
