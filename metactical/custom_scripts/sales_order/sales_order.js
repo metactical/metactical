@@ -388,6 +388,29 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 					}, 2000);
 			});
 		});
+	},
+	
+	close_sales_order: function(){
+		var me = this;
+		//Pop up to enter reason for closing
+		frappe.prompt([
+				{'fieldname': 'close_reason', 'fieldtype': 'Small Text', 'label': 'Enter Reason', 'reqd': 1}
+			],
+			function(values){
+				frappe.call({
+					'method': 'metactical.custom_scripts.sales_order.sales_order.save_close_reason',
+					'args': {
+						'docname': cur_frm.docname,
+						'close_reason': values.close_reason
+					},
+					'callback': function(r){
+						me.frm.cscript.update_status("Close", "Closed")
+					}
+				});
+			},
+			'Please enter the reason for closing the Sales Order.',
+			'Close'
+		)
 	}
 });
 

@@ -56,3 +56,10 @@ def change_warehouse(items):
 	data = json.loads(items)
 	for item in data:
 		frappe.db.set_value("Sales Order Item", item.get("docname"), "warehouse", item.get("warehouse"))
+		
+@frappe.whitelist()
+def save_close_reason(**args):
+	args = frappe._dict(args)
+	doc = frappe.get_doc("Sales Order", args.docname)
+	doc.db_set("ais_close_reason", args.close_reason, notify=True)
+	return 'Success'
