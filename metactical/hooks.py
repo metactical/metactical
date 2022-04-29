@@ -177,13 +177,7 @@ override_whitelisted_methods = {
 #}
 
 #Fixtures
-fixtures = [
-	{
-		"dt": "Custom Field",
-		"filters": [["dt", "!=", "Sales Invoice"]]
-	}, 
-	"Property Setter"
-]
+fixtures = ["Custom Field", "Property Setter"]
 
 #For using in print format
 jenv = {
