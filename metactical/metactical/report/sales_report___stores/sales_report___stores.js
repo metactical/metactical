@@ -19,7 +19,6 @@ frappe.query_reports["Sales Report - Stores"] = {
 			"fieldname": "to_date",
 			"fieldtype": "Date",
 			"label": __("To Date"),
-			"reqd" : 1,
 			"default": to_date
 		},
 		{
