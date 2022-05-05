@@ -481,7 +481,6 @@ def get_date_last_received(item, supplier):
 
 def get_date_last_sold(item):
 	rdate = None
-	odate = None
 	date = None
 	data= frappe.db.sql("""select max(posting_date) from `tabSales Invoice` p inner join 
 		`tabSales Invoice Item` c on p.name = c.parent where c.item_code = %s and p.docstatus = 1
@@ -491,8 +490,9 @@ def get_date_last_sold(item):
 	if date:
 		date = getdate(date)
 		rdate = date.strftime("%d-%b-%Y")
-		odate = date.strftime("%Y-%M-%d")
-	return rdate, odate
+	else:
+		date = getdate('1930-01-01')
+	return rdate, date
 
 def get_total_sold(item):
 	data= frappe.db.sql("""select p.posting_date, c.qty from `tabSales Invoice` p inner join 
