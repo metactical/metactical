@@ -9,6 +9,7 @@ from collections import defaultdict
 from frappe.utils import getdate, nowdate
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta, datetime
+from operator import itemgetter
 
 def execute(filters=None):
 	if not filters:
@@ -89,7 +90,7 @@ def execute(filters=None):
 		
 		ordered_qty = get_open_po_qty(i.get("item_code"), i.get("supplier"))
 		row["ordered_qty"] = ordered_qty or 0.0
-		row["last_sold_date"] = get_date_last_sold(i.get("item_code"))
+		row["last_sold_date"], row['olast_sold_date'] = get_date_last_sold(i.get("item_code"))
 		sales_data = get_total_sold(i.get("item_code"))
 		row["previous_year_sale"] = 0
 		row["total"] = 0
@@ -137,6 +138,7 @@ def execute(filters=None):
 					if posting_date >= sold_last_ten_days:
 						row["sold_last_ten_days"] += qty
 		data.append(row)
+	data = sorted(data, key=itemgetter("olast_sold_date"), reverse=True)
 
 	return columns, data
 
@@ -221,14 +223,14 @@ def get_column(filters,conditions):
 				"width": 100,
 			},
 			{
-				"label": _("POReorderQty"),
-				"fieldname": "ais_poreorderqty",
+				"label": _("POReorderLevel"),
+				"fieldname": "ais_poreorderlevel",
 				"fieldtype": "Int",
 				"width": 100,
 			},
 			{
-				"label": _("POReorderLevel"),
-				"fieldname": "ais_poreorderlevel",
+				"label": _("POReorderQty"),
+				"fieldname": "ais_poreorderqty",
 				"fieldtype": "Int",
 				"width": 100,
 			},
@@ -478,6 +480,8 @@ def get_date_last_received(item, supplier):
 	return date
 
 def get_date_last_sold(item):
+	rdate = None
+	odate = None
 	date = None
 	data= frappe.db.sql("""select max(posting_date) from `tabSales Invoice` p inner join 
 		`tabSales Invoice Item` c on p.name = c.parent where c.item_code = %s and p.docstatus = 1
@@ -486,8 +490,9 @@ def get_date_last_sold(item):
 		date = data[0][0]
 	if date:
 		date = getdate(date)
-		date = date.strftime("%d-%b-%Y")
-	return date
+		rdate = date.strftime("%d-%b-%Y")
+		odate = date.strftime("%Y-%M-%d")
+	return rdate, odate
 
 def get_total_sold(item):
 	data= frappe.db.sql("""select p.posting_date, c.qty from `tabSales Invoice` p inner join 
