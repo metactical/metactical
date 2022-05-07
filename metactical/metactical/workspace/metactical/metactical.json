@@ -290,9 +290,18 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report - Full V7",
+   "link_to": "Sales Report - Full V7",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2022-04-20 11:00:08.131561",
+ "modified": "2022-05-06 07:07:37.333570",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
