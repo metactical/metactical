@@ -299,9 +299,18 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Buying - Auto Create PO Values",
+   "link_to": "Buying - Auto Create PO Values",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2022-05-06 07:07:37.333570",
+ "modified": "2022-05-08 10:14:55.262217",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
