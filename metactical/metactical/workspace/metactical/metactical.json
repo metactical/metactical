@@ -115,6 +115,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Packing Page",
+   "link_to": "packing-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Reports",
    "link_type": "DocType",
    "onboard": 0,
@@ -302,7 +311,7 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Buying - Auto Create PO Values",
    "link_to": "Buying - Auto Create PO Values",
    "link_type": "Report",
@@ -310,7 +319,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-05-08 10:14:55.262217",
+ "modified": "2022-05-10 11:36:34.783354",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
