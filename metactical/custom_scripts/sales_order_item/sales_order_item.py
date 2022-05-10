@@ -19,6 +19,7 @@ from six import text_type
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import get_accounting_dimensions
 from erpnext.stock.get_item_details import get_item_warehouse, _get_item_tax_template, get_item_tax_map
 from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
+from erpnext.controllers.accounts_controller import set_order_defaults
 
 def validate_and_delete_children(parent, data):
 	deleted_children = []
