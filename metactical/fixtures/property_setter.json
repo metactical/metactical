@@ -4979,5 +4979,22 @@
   "property_type": "Text",
   "row_name": null,
   "value": "STO-PICK-.YYYY.-"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Sales Order",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "modified": "2022-05-10 15:22:19.027034",
+  "name": "Sales Order-main-links_order",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "links_order",
+  "property_type": "Small Text",
+  "row_name": null,
+  "value": "[\"b5d6a8f72a\"]"
  }
 ]
