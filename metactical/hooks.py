@@ -177,7 +177,7 @@ override_whitelisted_methods = {
 #}
 
 #Fixtures
-fixtures = ["Custom Field", "Property Setter", "DocType Link"]
+fixtures = ["Custom Field", "Property Setter", "DocType Link", "List View Settings"]
 
 #For using in print format
 jenv = {

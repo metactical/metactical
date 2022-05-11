@@ -1,0 +1,58 @@
+[
+ {
+  "disable_auto_refresh": 0,
+  "disable_count": 0,
+  "disable_sidebar_stats": 0,
+  "docstatus": 0,
+  "doctype": "List View Settings",
+  "fields": "[{\"fieldname\":\"name\",\"label\":\"Name\"},{\"fieldname\":\"status_field\",\"label\":\"Status\"},{\"fieldname\":\"posting_date\",\"label\":\"Posting Date\"},{\"fieldname\":\"to_warehouse\",\"label\":\"Default Target Warehouse\"},{\"fieldname\":\"ais_courier_name\",\"label\":\"Courier Name\"},{\"fieldname\":\"sal_trackinginfo\",\"label\":\"sal_trackinginfo\"},{\"fieldname\":\"sal_warehouseshipdate\",\"label\":\"sal_warehouseshipdate\"}]",
+  "modified": "2022-04-24 11:17:52.737928",
+  "name": "Stock Entry",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "total_fields": "9"
+ },
+ {
+  "disable_auto_refresh": 0,
+  "disable_count": 0,
+  "disable_sidebar_stats": 0,
+  "docstatus": 0,
+  "doctype": "List View Settings",
+  "fields": "[{\"fieldname\":\"customer_name\",\"label\":\"Customer Name\"},{\"fieldname\":\"status_field\",\"label\":\"Status\"},{\"fieldname\":\"po_no\",\"label\":\"Customer's Purchase Order - Website Order No\"},{\"fieldname\":\"po_date\",\"label\":\"Customer's Purchase Order Date\"},{\"fieldname\":\"grand_total\",\"label\":\"Grand Total\"},{\"fieldname\":\"status\",\"label\":\"Status\"},{\"fieldname\":\"pick_list_submitted_date\",\"label\":\"Pick List Submitted date\"}]",
+  "modified": "2022-05-11 08:55:19.978772",
+  "name": "Sales Order",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "total_fields": "10"
+ },
+ {
+  "disable_auto_refresh": 0,
+  "disable_count": 0,
+  "disable_sidebar_stats": 0,
+  "docstatus": 0,
+  "doctype": "List View Settings",
+  "fields": "[{\"fieldname\":\"title\",\"label\":\"Title\"},{\"fieldname\":\"status_field\",\"label\":\"Status\"},{\"fieldname\":\"grand_total\",\"label\":\"Grand Total\"},{\"fieldname\":\"per_installed\",\"label\":\"% Installed\"}]",
+  "modified": "2022-05-11 09:02:04.834353",
+  "name": "Delivery Note",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "total_fields": "10"
+ },
+ {
+  "disable_auto_refresh": 0,
+  "disable_count": 0,
+  "disable_sidebar_stats": 0,
+  "docstatus": 0,
+  "doctype": "List View Settings",
+  "fields": "[{\"fieldname\":\"supplier_name\",\"label\":\"Supplier Name\"},{\"fieldname\":\"status_field\",\"label\":\"Status\"},{\"fieldname\":\"transaction_date\",\"label\":\"Date\"},{\"fieldname\":\"grand_total\",\"label\":\"Grand Total\"},{\"fieldname\":\"per_billed\",\"label\":\"% Billed\"},{\"fieldname\":\"per_received\",\"label\":\"% Received\"}]",
+  "modified": "2022-05-11 09:03:22.359091",
+  "name": "Purchase Order",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "total_fields": "10"
+ }
+]
