@@ -24,7 +24,7 @@ frappe.ui.form.on('Cycle Count', {
 
 		if(frm.doc.scan_barcode) {
 			frappe.call({
-				method: "erpnext.selling.page.point_of_sale.point_of_sale.search_serial_or_batch_or_barcode_number",
+				method: "erpnext.selling.page.point_of_sale.point_of_sale.search_for_serial_or_batch_or_barcode_number",
 				args: { search_value: frm.doc.scan_barcode }
 			}).then(r => {
 				const data = r && r.message;
