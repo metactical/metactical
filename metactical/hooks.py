@@ -105,8 +105,7 @@ doc_events = {
 		"on_cancel": "metactical.custom_scripts.pick_list.pick_list.on_cancel",
 	},
 	"Sales Invoice": {
-		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save",
-		"before_cancel": "metactical.custom_scripts.sales_invoice.sales_invoice.before_cancel"
+		"before_save": "metactical.custom_scripts.sales_invoice.sales_invoice.before_save"
 	},
 	"Delivery Note": {
 		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
@@ -130,6 +129,14 @@ doc_events = {
 	#"Purchase Receipt": {
 	#	"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
 	#}
+}
+
+# DocType Class
+# ---------------
+# Override standard doctype classes
+
+override_doctype_class = {
+	"Sales Invoice": "metactical.custom_scripts.sales_invoice.sales_invoice.CustomSalesInvoice"
 }
 
 # Scheduled Tasks

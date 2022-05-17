@@ -8,67 +8,27 @@ from erpnext.setup.doctype.company.company import update_company_current_month_s
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import unlink_inter_company_doc
 from erpnext.healthcare.utils import manage_invoice_submit_cancel
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
+from erpnext.controllers.accounts_controller import AccountsController
 
-def before_cancel(self, method):
-	# Add function to overide default on cancel function because this version of
-	# Frappe doesnt have class override feature
-	SalesInvoice.on_cancel = on_cancel
+class CustomSalesInvoice(SalesInvoice):
+	def on_cancel(self):
+		AccountsController.on_cancel = accounts_on_cancel
+		super(CustomSalesInvoice, self).on_cancel()
 
-def on_cancel(self):
-	#From accounts controller
+def accounts_on_cancel(self):
 	if self.doctype in ["Sales Invoice", "Purchase Invoice"]:
-		if frappe.db.get_single_value('Accounts Settings', 'unlink_payment_on_cancellation_of_invoice'):
+		if frappe.db.get_single_value("Accounts Settings", "unlink_payment_on_cancellation_of_invoice"):
 			unlink_ref_doc_from_payment_entries(self)
 
-	elif self.doctype in ["Sales Order", "Purchase Order"]:
-		if frappe.db.get_single_value('Accounts Settings', 'unlink_advance_payment_on_cancelation_of_order'):
-			unlink_ref_doc_from_payment_entries(self)
+		elif self.doctype in ["Sales Order", "Purchase Order"]:
+			if frappe.db.get_single_value(
+				"Accounts Settings", "unlink_advance_payment_on_cancelation_of_order"
+			):
+				unlink_ref_doc_from_payment_entries(self)
+
+			if self.doctype == "Sales Order":
+				self.unlink_ref_doc_from_po()
 	
-	#Frome Sales Invoice
-	self.check_sales_order_on_hold_or_close("sales_order")
-
-	if self.is_return and not self.update_billed_amount_in_sales_order:
-		# NOTE status updating bypassed for is_return
-		self.status_updater = []
-
-	self.update_status_updater_args()
-	self.update_prevdoc_status()
-	self.update_billing_status_in_dn()
-
-	if not self.is_return:
-		self.update_billing_status_for_zero_amount_refdoc("Delivery Note")
-		self.update_billing_status_for_zero_amount_refdoc("Sales Order")
-		self.update_serial_no(in_cancel=True)
-
-	self.validate_c_form_on_cancel()
-
-	# Updating stock ledger should always be called after updating prevdoc status,
-	# because updating reserved qty in bin depends upon updated delivered qty in SO
-	if self.update_stock == 1:
-		self.update_stock_ledger()
-
-	self.make_gl_entries_on_cancel()
-	frappe.db.set(self, 'status', 'Cancelled')
-
-	if frappe.db.get_single_value('Selling Settings', 'sales_update_frequency') == "Each Transaction":
-		update_company_current_month_sales(self.company)
-		self.update_project()
-	if not self.is_return and self.loyalty_program:
-		self.delete_loyalty_point_entry()
-	elif self.is_return and self.return_against and self.loyalty_program:
-		against_si_doc = frappe.get_doc("Sales Invoice", self.return_against)
-		against_si_doc.delete_loyalty_point_entry()
-		against_si_doc.make_loyalty_point_entry()
-
-	unlink_inter_company_doc(self.doctype, self.name, self.inter_company_invoice_reference)
-
-	# Healthcare Service Invoice.
-	domain_settings = frappe.get_doc('Domain Settings')
-	active_domains = [d.domain for d in domain_settings.active_domains]
-
-	if "Healthcare" in active_domains:
-		manage_invoice_submit_cancel(self, "on_cancel")
-			
 
 def unlink_ref_doc_from_payment_entries(ref_doc):	
 	#Check for sales order
@@ -83,7 +43,7 @@ def unlink_ref_doc_from_payment_entries(ref_doc):
 	
 	remove_ref_doc_link_from_jv(ref_doc.doctype, ref_doc.name, multiple_orders, ref_doc.items[0].sales_order)
 	remove_ref_doc_link_from_pe(ref_doc.doctype, ref_doc.name, multiple_orders, ref_doc.items[0].sales_order)
-	
+
 	if multiple_orders == False:
 		frappe.db.sql("""update `tabGL Entry`
 			set against_voucher_type='Sales Order', against_voucher=%s,
@@ -102,8 +62,9 @@ def unlink_ref_doc_from_payment_entries(ref_doc):
 	if ref_doc.doctype in ("Sales Invoice", "Purchase Invoice"):
 		ref_doc.set("advances", [])
 
-		frappe.db.sql("""delete from `tab{0} Advance` where parent = %s"""
-			.format(ref_doc.doctype), ref_doc.name)
+		frappe.db.sql(
+			"""delete from `tab{0} Advance` where parent = %s""".format(ref_doc.doctype), ref_doc.name
+		)
 
 def remove_ref_doc_link_from_jv(ref_type, ref_no, multiple_orders, sales_order=None):
 	linked_jv = frappe.db.sql_list("""select parent from `tabJournal Entry Account`
@@ -142,27 +103,48 @@ def remove_ref_doc_link_from_pe(ref_type, ref_no, multiple_orders, sales_order=N
 
 			frappe.msgprint(_("Payment Entries {0} are re-linked to Sales Order {1}".format("\n".join(linked_pe), sales_order)))
 	else:
-		linked_pe = frappe.db.sql_list("""select parent from `tabPayment Entry Reference`
-			where reference_doctype=%s and reference_name=%s and docstatus < 2""", (ref_type, ref_no))
+		linked_pe = frappe.db.sql_list(
+			"""select parent from `tabPayment Entry Reference`
+			where reference_doctype=%s and reference_name=%s and docstatus < 2""",
+			(ref_type, ref_no),
+		)
 
 		if linked_pe:
-			frappe.db.sql("""update `tabPayment Entry Reference`
+			frappe.db.sql(
+				"""update `tabPayment Entry Reference`
 				set allocated_amount=0, modified=%s, modified_by=%s
 				where reference_doctype=%s and reference_name=%s
-				and docstatus < 2""", (now(), frappe.session.user, ref_type, ref_no))
+				and docstatus < 2""",
+				(now(), frappe.session.user, ref_type, ref_no),
+			)
 
 			for pe in linked_pe:
-				pe_doc = frappe.get_doc("Payment Entry", pe)
-				pe_doc.set_total_allocated_amount()
-				pe_doc.set_unallocated_amount()
-				pe_doc.clear_unallocated_reference_document_rows()
+				try:
+					pe_doc = frappe.get_doc("Payment Entry", pe)
+					pe_doc.set_amounts()
+					pe_doc.clear_unallocated_reference_document_rows()
+					pe_doc.validate_payment_type_with_outstanding()
+				except Exception as e:
+					msg = _("There were issues unlinking payment entry {0}.").format(pe_doc.name)
+					msg += "<br>"
+					msg += _("Please cancel payment entry manually first")
+					frappe.throw(msg, exc=PaymentEntryUnlinkError, title=_("Payment Unlink Error"))
 
-				frappe.db.sql("""update `tabPayment Entry` set total_allocated_amount=%s,
+				frappe.db.sql(
+					"""update `tabPayment Entry` set total_allocated_amount=%s,
 					base_total_allocated_amount=%s, unallocated_amount=%s, modified=%s, modified_by=%s
-					where name=%s""", (pe_doc.total_allocated_amount, pe_doc.base_total_allocated_amount,
-						pe_doc.unallocated_amount, now(), frappe.session.user, pe))
+					where name=%s""",
+					(
+						pe_doc.total_allocated_amount,
+						pe_doc.base_total_allocated_amount,
+						pe_doc.unallocated_amount,
+						now(),
+						frappe.session.user,
+						pe,
+					),
+				)
 
-			frappe.msgprint(_("Payment Entries {0} are un-linked".format("\n".join(linked_pe))))
+			frappe.msgprint(_("Payment Entries {0} are un-linked").format("\n".join(linked_pe)))
 
 def before_save(self, method):
 	rv = BytesIO()
