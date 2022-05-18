@@ -156,7 +156,6 @@ def get_open_material_request(item):
 def create_po(**args):
 	args = frappe._dict(args)
 	supplier = args.supplier
-	frappe.msgprint(supplier)
 	if supplier is None or supplier=='':
 		return
 	doc = frappe.new_doc("Purchase Order")
