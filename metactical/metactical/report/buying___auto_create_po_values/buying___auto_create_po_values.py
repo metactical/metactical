@@ -158,12 +158,13 @@ def create_po(**args):
 	supplier = args.supplier
 	if supplier is None or supplier=='':
 		return
+	price_list = frappe.db.get_value('Supplier', supplier, 'default_price_list')
 	doc = frappe.new_doc("Purchase Order")
 	doc.update({
-		"supplier": supplier
+		"supplier": supplier,
+		"buying_price_list": price_list
 	})
 	items, suppliers = get_data(supplier)
-	price_list = frappe.db.get_value('Supplier', supplier, 'default_price_list')
 	for item in items:
 		if item.get("qty_to_order", 0) > 0:
 			if item["mr_total_qty"] > 0:
