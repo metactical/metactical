@@ -27,6 +27,12 @@ def execute(filters=None):
 			"label": "Total BO Amount",
 			"fieldtype": "Currency",
 			"width": 150
+		},
+		{
+			"fieldname": "create_po",
+			"label": "",
+			"fieldtype": "Data",
+			"width": 150
 		}
 	]
 	return columns, data
@@ -42,18 +48,24 @@ def organise_data(data, suppliers):
 				row["total_po_amount"] += r.get("qty_to_order")
 				row["total_bo_amount"] += r.get("total_price", 0)
 		if row["total_po_amount"] > 0:
+			row["create_po"] = '<button onClick="create_po(\'' + row['supplier'] + '\')">Create PO</button>'
 			rdata.append(row)
 	return rdata
 
-def get_data():
+def get_data(supplier=None):
+	where = ''
+	where_filter = {}
 	suppliers = []
+	if supplier is not None:
+		where = "WHERE tis.supplier = %(supplier)s"
+		where_filter = {"supplier": supplier}
 	items = frappe.db.sql("""SELECT 
 								tis.supplier, item.item_code, item.ais_poreorderqty, item.ais_poreorderlevel
 							FROM
 								`tabItem Supplier` AS tis
 							LEFT JOIN
 								`tabItem` AS item ON tis.parent = item.name
-							""", as_dict=1)
+							""" + where, where_filter, as_dict=1)
 	for item in items:
 		if item.supplier not in suppliers:
 			suppliers.append(item.supplier)
@@ -83,7 +95,7 @@ def get_data():
 		if item.get("wh_gor") > 0:
 			item["total_actual_qty"] += item.get("wh_gor")
 		#For Quantity to order
-		item['mr_total_qty'] = get_open_material_request(item.get("item_code")) or 0
+		item['material_requests'], item['mr_total_qty'] = get_open_material_request(item.get("item_code"))
 		item['ordered_qty'] = get_open_po_qty(item.get("item_code"), item.get("supplier")) or 0
 		if item.get("total_actual_qty", 0) <= item.get("ais_poreorderlevel", 0):
 			item["qty_to_order"] = item.get("ais_poreorderqty", 0)
@@ -92,7 +104,7 @@ def get_data():
 		if item["qty_to_order"] < 0:
 			item["qty_to_order"] = 0
 		if item["qty_to_order"] > 0:
-			item["item_price"] = get_price(item.get("item_price"), item.get("supplier"))
+			item["item_price"] = get_price(item.get("item_code"), item.get("supplier"))
 			item["total_price"] = item["item_price"] * item["qty_to_order"]
 	return items, suppliers
 			
@@ -126,7 +138,7 @@ def get_qty(item, warehouse):
 def get_open_material_request(item):
 	total_qty = 0
 	data = frappe.db.sql("""SELECT 
-								SUM(mri.qty) AS total_qty
+								mr.name as parent, mri.name as mritem, mri.qty
 							FROM 
 								`tabMaterial Request Item` AS mri
 							LEFT JOIN
@@ -136,5 +148,39 @@ def get_open_material_request(item):
 								AND mr.status IN ('Pending', 'Partially Ordered')""", 
 							{"item": item}, as_dict=1)
 	if len(data) > 0:
-		total_qty = data[0].total_qty
-	return total_qty
+		for row in data:
+			total_qty += row.qty
+	return data, total_qty
+	
+@frappe.whitelist()
+def create_po(**args):
+	args = frappe._dict(args)
+	supplier = args.supplier
+	frappe.msgprint(supplier)
+	if supplier is None or supplier=='':
+		return
+	doc = frappe.new_doc("Purchase Order")
+	doc.update({
+		"supplier": supplier
+	})
+	items, suppliers = get_data(supplier)
+	price_list = frappe.db.get_value('Supplier', supplier, 'default_price_list')
+	for item in items:
+		if item.get("qty_to_order", 0) > 0:
+			if item["mr_total_qty"] > 0:
+				for mr in item["material_requests"]:
+					doc.append("items", {
+						"item_code": item["item_code"],
+						"qty": mr["qty"],
+						"rate": item["item_price"],
+						"material_request": mr["parent"],
+						"material_request_item": mr["mritem"]
+					})
+			item['to_order'] = item['qty_to_order'] - item['mr_total_qty']
+			if item['to_order'] > 0:
+				doc.append("items", {
+					"item_code": item["item_code"],
+					"qty": item["to_order"]
+				})
+	doc.save()
+	return doc
