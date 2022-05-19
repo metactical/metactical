@@ -12,16 +12,19 @@ def execute(filters=None):
 			"fieldname": "sales_order",
 			"fieldtype": "Link",
 			"options": "Sales Order",
+			"width": 150
 		},
 		{
 			"label": "Customer Purchase Order Number",
 			"fieldname": "po_no",
 			"fieldtype": "Data",
+			"width": 150
 		},
 		{
 			"label": "Date",
 			"fieldname": "transaction_date",
-			"fieldtype": "Date"
+			"fieldtype": "Date",
+			"width": 150
 		},
 		{
 			"label": "Pick List Printed",
@@ -30,35 +33,45 @@ def execute(filters=None):
 			"width": 150
 		},
 		{
-			"label": "Warehouse",
+			"label": "AvailableToShipFrom",
 			"fieldname": "warehouse",
 			"fieldtype": "Link",
-			"options": "Warehouse"
+			"options": "Warehouse",
+			"width": 150
 		},
 		{
 			"label": "Status",
 			"fieldname": "STATUS",
-			"fieldtype": "Data"
+			"fieldtype": "Data",
+			"width": 150
 		},
 		{
 			"label": "Tag",
 			"fieldname": "tag",
-			"fieldtype": "Data"
+			"fieldtype": "Data",
+			"width": 150
 		},
 		{
 			"label": "Source",
 			"fieldname": "source",
 			"fieldtype": "Link",
-			"options": "Lead Source"
+			"options": "Lead Source",
+			"width": 150
 		},
 		{
 			"label": "Customer",
 			"fieldname": "customer",
 			"fieldtype": "Link",
 			"options": "Customer",
+			"width": 150
 		}
 	]
 	
+	data = get_data(filters)
+	return columns, data
+	
+def get_data(filters):
+	data = []
 	where = ''
 	where_filter = {}
 	
@@ -75,25 +88,41 @@ def execute(filters=None):
 								so.name AS sales_order,
 								so.po_no,
 								so.transaction_date,
-								so.set_warehouse AS warehouse,
 								so.STATUS,
-								(select GROUP_CONCAT(tag SEPARATOR ', ') from `tabTag Link` tl where tl.parent = soi.parent) as tag,
+								(select GROUP_CONCAT(tag SEPARATOR ', ') from `tabTag Link` tl where tl.parent = so.name) as tag,
 								so.source,
 								so.customer
 							FROM
-								`tabSales Order Item` soi
-								LEFT JOIN `tabBin` bin ON soi.item_code = bin.item_code
-								LEFT JOIN `tabSales Order` so ON soi.parent = so.NAME
+								`tabSales Order` so
 							WHERE
-								( bin.actual_qty ) > 0 
-								AND ( so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft") '''
-								+ where +
-							'''
-							GROUP BY
-								soi.parent
-					''', where_filter, as_dict=1)
-	data = get_print_date(query)
-	return columns, data
+								so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft"'''
+								+ where, where_filter, as_dict=1)
+	init_data = get_print_date(query)
+	warehouses = ['R01-Gor-Active Stock - ICL', 'R02-Edm-Active Stock - ICL', 'R03-Vic-Active Stock - ICL', 
+					'R04-Mon-Active Stock - ICL', 'R05-DTN-Active Stock - ICL', 'R06-AMB-Active Stock',
+					'R07-Queen-Active Stock - ICL', 'US01-ShipCalm-Active Stock - ICL', 'W01-WHS-Active Stock - ICL']
+	for row in init_data:
+		for warehouse in warehouses:
+			is_available = check_availability(row.sales_order, warehouse)
+			if is_available:
+				row.update({"warehouse": warehouse})
+				data.append(row.copy())
+	return data
+	
+def check_availability(sales_order, warehouse):
+	items = frappe.db.sql('''
+							SELECT 
+								item_code, qty 
+							FROM 
+								`tabSales Order Item` soi 
+							WHERE soi.parent=%(sales_order)s''', {'sales_order': sales_order}, as_dict=1)
+	for item in items:
+		bin_qty = frappe.db.get_value('Bin', {'warehouse': warehouse, 'item_code': item.item_code}, 'actual_qty')
+		if bin_qty is None:
+			return False
+		elif bin_qty < item.qty:
+			return False
+	return True
 
 def get_print_date(data):
 	for row in data:
