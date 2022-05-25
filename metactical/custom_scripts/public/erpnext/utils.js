@@ -2,11 +2,11 @@ frappe.provide("erpnext");
 frappe.provide("erpnext.utils");
 erpnext.utils.update_child_items = function(opts) {
 	const frm = opts.frm;
-	for(let row in frm.doc.items){
+	/*for(let row in frm.doc.items){
 		if(frm.doc.items[row].picked_qty > 0){
 			frappe.throw('A pick list has already been created for this Order. Please cancel it first.');
 		}
-	}
+	}*/
 	const cannot_add_row = (typeof opts.cannot_add_row === 'undefined') ? true : opts.cannot_add_row;
 	const child_docname = (typeof opts.cannot_add_row === 'undefined') ? "items" : opts.child_docname;
 	const child_meta = frappe.get_meta(`${frm.doc.doctype} Item`);
@@ -123,6 +123,23 @@ erpnext.utils.update_child_items = function(opts) {
 			},
 		],
 		primary_action: function() {
+			//Add existing items in Sales orders
+			if(frm.doc.doctype == 'Sales Order'){
+				frm.doc[opts.child_docname].forEach(d => {
+					this.fields_dict.trans_items.df.data.push({
+						"docname": d.name,
+						"name": d.name,
+						"item_code": d.item_code,
+						"delivery_date": d.delivery_date,
+						"schedule_date": d.schedule_date,
+						"conversion_factor": d.conversion_factor,
+						"qty": d.qty,
+						"rate": d.rate,
+						"uom": d.uom
+					});
+					this.data = dialog.fields_dict.trans_items.df.data;
+				});
+			}
 			const trans_items = this.get_values()["trans_items"].filter((item) => !!item.item_code);
 			frappe.call({
 				method: 'erpnext.controllers.accounts_controller.update_child_qty_rate',
@@ -144,19 +161,21 @@ erpnext.utils.update_child_items = function(opts) {
 	});
 
 	frm.doc[opts.child_docname].forEach(d => {
-		dialog.fields_dict.trans_items.df.data.push({
-			"docname": d.name,
-			"name": d.name,
-			"item_code": d.item_code,
-			"delivery_date": d.delivery_date,
-			"schedule_date": d.schedule_date,
-			"conversion_factor": d.conversion_factor,
-			"qty": d.qty,
-			"rate": d.rate,
-			"uom": d.uom
-		});
-		this.data = dialog.fields_dict.trans_items.df.data;
-		dialog.fields_dict.trans_items.grid.refresh();
+		if(frm.doc.doctype == 'Sales Order' && d.picked_qty == 0){
+			dialog.fields_dict.trans_items.df.data.push({
+				"docname": d.name,
+				"name": d.name,
+				"item_code": d.item_code,
+				"delivery_date": d.delivery_date,
+				"schedule_date": d.schedule_date,
+				"conversion_factor": d.conversion_factor,
+				"qty": d.qty,
+				"rate": d.rate,
+				"uom": d.uom
+			});
+			this.data = dialog.fields_dict.trans_items.df.data;
+			dialog.fields_dict.trans_items.grid.refresh();
+		}
 	})
 	dialog.show();
 }
