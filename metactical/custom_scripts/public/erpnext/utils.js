@@ -123,17 +123,10 @@ erpnext.utils.update_child_items = function(opts) {
 			},
 		],
 		primary_action: function() {
-			//Add existing items in Sales orders
+			//Add already picked items in Sales orders
 			if(frm.doc.doctype == 'Sales Order'){
-				var edited_items = this.get_values()["trans_items"]
-				console.log({"edited_items": edited_items});
-				var exclude = []
-				edited_items.forEach(row=>{
-					exclude.push(row.item_code);
-				});
-				console.log({"exclude": exclude});
 				frm.doc[opts.child_docname].forEach(d => {
-					if(exclude.includes(d.item_code) == false){
+					if(d.picked_qty > 0){
 						this.fields_dict.trans_items.df.data.push({
 							"docname": d.name,
 							"name": d.name,
