@@ -125,19 +125,28 @@ erpnext.utils.update_child_items = function(opts) {
 		primary_action: function() {
 			//Add existing items in Sales orders
 			if(frm.doc.doctype == 'Sales Order'){
+				var edited_items = this.get_values()["trans_items"]
+				console.log({"edited_items": edited_items});
+				var exclude = []
+				edited_items.forEach(row=>{
+					exclude.push(row.item_code);
+				});
+				console.log({"exclude": exclude});
 				frm.doc[opts.child_docname].forEach(d => {
-					this.fields_dict.trans_items.df.data.push({
-						"docname": d.name,
-						"name": d.name,
-						"item_code": d.item_code,
-						"delivery_date": d.delivery_date,
-						"schedule_date": d.schedule_date,
-						"conversion_factor": d.conversion_factor,
-						"qty": d.qty,
-						"rate": d.rate,
-						"uom": d.uom
-					});
-					this.data = dialog.fields_dict.trans_items.df.data;
+					if(exclude.includes(d.item_code) == false){
+						this.fields_dict.trans_items.df.data.push({
+							"docname": d.name,
+							"name": d.name,
+							"item_code": d.item_code,
+							"delivery_date": d.delivery_date,
+							"schedule_date": d.schedule_date,
+							"conversion_factor": d.conversion_factor,
+							"qty": d.qty,
+							"rate": d.rate,
+							"uom": d.uom
+						});
+						this.data = dialog.fields_dict.trans_items.df.data;
+					}
 				});
 			}
 			const trans_items = this.get_values()["trans_items"].filter((item) => !!item.item_code);
