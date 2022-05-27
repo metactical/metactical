@@ -19,7 +19,7 @@ def execute(filters=None):
 		{
 			"fieldname": "total_po_amount",
 			"label": "Total PO Amount",
-			"fieldtype": "Float",
+			"fieldtype": "Currency",
 			"width": 150
 		},
 		{
@@ -45,8 +45,8 @@ def organise_data(data, suppliers):
 		row = {"supplier": supplier, "total_po_amount": 0, "total_bo_amount": 0}
 		for r in data: 
 			if r.get("supplier") == supplier and r.get("qty_to_order") > 0:
-				row["total_po_amount"] += r.get("qty_to_order")
-				row["total_bo_amount"] += r.get("total_price", 0)
+				row["total_po_amount"] += r.get("total_price", 0)
+				row["total_bo_amount"] += r.get("bo_amount", 0)
 		if row["total_po_amount"] > 0:
 			row["create_po"] = '<button onClick="create_po(\'' + row['supplier'] + '\')">Create PO</button>'
 			rdata.append(row)
@@ -96,6 +96,8 @@ def get_data(supplier=None):
 			item["total_actual_qty"] += item.get("wh_gor")
 		#For Quantity to order
 		item['material_requests'], item['mr_total_qty'] = get_open_material_request(item.get("item_code"))
+		item["item_price"] = get_price(item.get("item_code"), item.get("supplier"))
+		item['bo_amount'] = item.get("mr_total_qty", 0) * item.get("item_price", 0)
 		item['ordered_qty'] = get_open_po_qty(item.get("item_code"), item.get("supplier")) or 0
 		if item.get("total_actual_qty", 0) <= item.get("ais_poreorderlevel", 0):
 			item["qty_to_order"] = item.get("ais_poreorderqty", 0)
@@ -104,7 +106,6 @@ def get_data(supplier=None):
 		if item["qty_to_order"] < 0:
 			item["qty_to_order"] = 0
 		if item["qty_to_order"] > 0:
-			item["item_price"] = get_price(item.get("item_code"), item.get("supplier"))
 			item["total_price"] = item["item_price"] * item["qty_to_order"]
 	return items, suppliers
 			
