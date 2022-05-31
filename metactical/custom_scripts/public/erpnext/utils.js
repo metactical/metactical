@@ -178,6 +178,21 @@ erpnext.utils.update_child_items = function(opts) {
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
 		}
+		else if(frm.doc.doctype != 'Sales Order'){
+			dialog.fields_dict.trans_items.df.data.push({
+				"docname": d.name,
+				"name": d.name,
+				"item_code": d.item_code,
+				"delivery_date": d.delivery_date,
+				"schedule_date": d.schedule_date,
+				"conversion_factor": d.conversion_factor,
+				"qty": d.qty,
+				"rate": d.rate,
+				"uom": d.uom
+			});
+			this.data = dialog.fields_dict.trans_items.df.data;
+			dialog.fields_dict.trans_items.grid.refresh();
+		}
 	})
 	dialog.show();
 }
