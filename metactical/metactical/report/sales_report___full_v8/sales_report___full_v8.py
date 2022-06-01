@@ -43,6 +43,7 @@ def execute(filters=None):
 		row["supplier_sku"] = i.get("supplier_part_no")
 		
 		row["supplier_name"] = i.get("supplier")
+		row["sqoh"] = i.get("ifw_supplier_qoh")
 		
 		row["barcode"] = frappe.db.get_value("Item Barcode", {"parent": i.get("item_code")}, "barcode")
 
@@ -334,6 +335,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Link",
 				"options": "Supplier",
 				"width": 200,
+			},
+			{
+				"label": _("SQOH"),
+				"fieldname": "sqoh",
+				"fieldtype": "Float",
+				"width": 100,
 			}
 		]
 		
@@ -500,7 +507,7 @@ def get_master(conditions="", filters={}):
 			i.asi_item_class,
 			s.supplier, s.supplier_part_no, i.disabled, country_of_origin,customs_tariff_number,
 			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
-			ifw_po_notes, ais_poreorderqty, ais_poreorderlevel
+			ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, s.ifw_supplier_qoh
 			from `tabItem Supplier` s inner join `tabItem` i on i.name = s.parent
 			where 1 = 1 %s
 		"""%(conditions), filters, as_dict=1)
