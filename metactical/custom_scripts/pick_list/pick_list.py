@@ -17,6 +17,40 @@ from pytz import timezone
 from pathlib import Path
 import shutil
 
+class CustomPickList(PickList):
+	def update_so(self, so_item, picked_qty, item_code):
+		so_doc = frappe.get_doc(
+			"Sales Order", frappe.db.get_value("Sales Order Item", so_item, "parent")
+		)
+		already_picked, actual_qty, returned_qty = frappe.db.get_value(
+			"Sales Order Item", so_item, ["picked_qty", "qty", "returned_qty"]
+		)
+		
+		if returned_qty is None:
+			returned_qty = 0
+		
+		if self.docstatus == 1:
+			if (((already_picked + picked_qty - returned_qty) / actual_qty) * 100) > (
+				100 + flt(frappe.db.get_single_value("Stock Settings", "over_delivery_receipt_allowance"))
+			):
+				frappe.throw(
+					"You are picking more than required quantity for "
+					+ item_code
+					+ ". Check if there is any other pick list created for "
+					+ so_doc.name
+				)
+
+		frappe.db.set_value("Sales Order Item", so_item, "picked_qty", already_picked + picked_qty)
+
+		total_picked_qty = 0
+		total_so_qty = 0
+		for item in so_doc.get("items"):
+			total_picked_qty += flt(item.picked_qty)
+			total_so_qty += flt(item.stock_qty)
+		total_picked_qty = total_picked_qty + picked_qty
+		per_picked = total_picked_qty / total_so_qty * 100
+
+		so_doc.db_set("per_picked", flt(per_picked), update_modified=False)
 
 def custom_before_save(self):
 	if len(self.locations) > 0:
