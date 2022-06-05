@@ -304,7 +304,8 @@ def orders_shipped_webhook():
 							'ais_shipment_cost': shipmentCost,
 							'ais_package_weight': weight_display,
 							'ais_package_size': size,
-							'ais_updated_by_shipstation': 1
+							'ais_updated_by_shipstation': 1,
+							'ignore_pricing_rule': 1
 						})
 						delivery_note.submit()
 						
