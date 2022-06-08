@@ -214,7 +214,7 @@ def get_checkins(employees, filters):
 								FROM
 									`tabEmployee Checkin`
 								WHERE
-									time BETWEEN %(start_date)s AND %(end_date)s
+									cast(time as date) BETWEEN %(start_date)s AND %(end_date)s
 								ORDER BY
 									time ASC
 									""", {'start_date': start_date, 'end_date': end_date}, as_dict=1)
