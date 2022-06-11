@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2022-06-10 13:23:40.196926",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "retail_sku",
+  "item_name",
+  "qty",
+  "column_break_5",
+  "expected_qty",
+  "valuation_rate",
+  "ifw_location"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "ERP SKU",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fetch_from": "item_code.ifw_retailskusuffix",
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Retail SKU",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "expected_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Expected Qty",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.expected_qty === 0;",
+   "fieldname": "valuation_rate",
+   "fieldtype": "Currency",
+   "label": "Valuation Rate"
+  },
+  {
+   "fetch_from": "item_code.ifw_location",
+   "fieldname": "ifw_location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "ifw_location"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2022-06-11 08:06:13.693962",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Cycle Count V2 Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

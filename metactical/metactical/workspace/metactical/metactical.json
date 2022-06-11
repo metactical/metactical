@@ -124,6 +124,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Cycle Count V2",
+   "link_to": "Cycle Count V2",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Reports",
    "link_type": "DocType",
    "onboard": 0,
@@ -328,7 +337,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-05-24 02:48:40.356849",
+ "modified": "2022-06-11 10:00:18.265120",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
