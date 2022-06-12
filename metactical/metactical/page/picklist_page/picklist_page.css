@@ -1,0 +1,169 @@
+.alt-color {
+	color: #1ad1ff;
+}
+
+.div-summary {
+	display: flex; 
+	background-color: #FFF;
+	margin: 15px;
+	padding-top: 15px;
+	padding-bottom: 15px;
+}
+
+.options-btn {
+	background-color: #FFF; 
+	height: 50px; 
+	padding-top: 15px;
+	margin-bottom: 10px;
+}
+
+.options-btn:hover {
+	background: #eee;
+	cursor: pointer;
+}
+
+.item-div {
+	margin: 20px;
+	padding: 0;
+}
+
+.img-div{
+	width: 25%;
+	float: left;
+}
+ 
+.item-ul {
+	list-style-type: none;
+	margin:0;
+	padding: 0;
+}
+ 
+.item-h3 {
+	font: bold 20px/1.5 Helvetica, Verdana, sans-serif;
+	margin: 0; 
+	padding: 0;
+}
+ 
+.item-li .item-img {
+	float: left;
+	margin: 0 15px 0 0;
+	padding: 0;
+}
+ 
+.item-li .item-p {
+	font: 200 15px/1.5 Georgia, Times New Roman, serif;
+	margin: 0; 
+	padding: 0;
+}
+ 
+.item-li {
+	padding: 10px;
+	overflow: auto;
+	background-color: #FFF;
+	padding-left: 0;
+	margin-bottom: 5px;
+}
+ 
+.item-li:hover {
+	background: #eee;
+	cursor: pointer;
+	margin: 0;
+	margin-bottom: 5px;
+}
+
+.item-p {
+	float: left;
+	margin-left: 5px !important;
+	width: 65%;
+}
+
+.item-to-pick {
+	float: left; 
+	text-align: center; 
+	margin: 5px;
+}
+
+.item-aval {
+	float: right;
+	font-size: 14px;
+	color: green;
+}
+
+.pick-head {
+	font-weight: bold; 
+	font-size: 10px; 
+	color: grey;
+}
+
+.pick-qty {
+	font-weight: bold;
+}
+
+/*a {
+	color: #1ad1ff;
+}*/
+
+.item-code {
+	font-weight: bold;
+}
+
+.item-name {
+	font-weight: bold;
+	color: #696969;
+}
+
+.item-location {
+	font-weight: bold;
+}
+
+.list-top-nav {
+	display: none;
+}
+
+.order-list-div {
+	height: 50px; 
+	background-color: #FFF; 
+	padding: 5px;
+	margin-bottom: 10px;
+}
+	
+@media only screen and (max-width: 992px) {
+	/* For tablets and under */
+	#picked-items-div {
+		display: none;
+	}
+	
+	.list-top-nav {
+		display: block;
+		padding: 10px;
+	}
+
+	.list-top-nav li{
+		display: inline-block;
+		width: 32%;
+	}
+	
+	.items-header {
+		display: none;
+	}
+}
+
+@media only screen and (max-width: 768px) {
+	.item-aval-label {
+		display: none;
+	}
+	
+	.item-p {
+		width: 60%;
+	}
+	
+	.item-aval {
+		float: right;
+		font-size: 10px;
+		color: green;
+	}
+	
+	.item-picked {
+		width: 55% !important;
+	}
+}
