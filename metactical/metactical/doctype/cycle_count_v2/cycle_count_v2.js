@@ -9,18 +9,39 @@ frappe.ui.form.on('Cycle Count V2', {
 				filters: {'user': frappe.session.user}
 			};
 		})
+		console.log(frm);
 	},
 	
-	get_items: function(frm){
+	onload_post_render: function(frm){
+		frm.fields_dict.scan_barcode.$wrapper.on('keypress', function(event){
+			if(event.keyCode == 13)
+			{
+				$("[data-fieldname=scan_barcode]").focus()
+				cur_frm.events.scanned_barcode(cur_frm);
+			}
+		});
+		
+		frm.$wrapper.on('keypress', function(event){
+			if(event.keyCode == 13)
+			{
+				return false;
+			}
+		});
+		
+		frm.fields_dict.get_items.$wrapper.on('click', function(event){
+			frm.events.get_items_event(cur_frm);
+		});
+	},
+	
+	get_items_event: function(frm){
 		frappe.call({
 			method: "metactical.metactical.doctype.cycle_count_v2.cycle_count_v2.get_items",
 			args: {
 				'warehouse': frm.doc.warehouse,
-				'ifw_location': frm.doc.ifw_location
+				'ifw_location': frm.doc.ifw_location.replace(/\s/g,'')
 			},
 			freeze: true,
 			callback: function(ret){
-				console.log(ret);
 				if(typeof ret.message != undefined){
 					frm.doc.items = [];
 					for(let row in ret.message){
@@ -35,7 +56,7 @@ frappe.ui.form.on('Cycle Count V2', {
 		})
 	},
 	
-	scan_barcode: function(frm) {
+	scanned_barcode: function(frm) {
 		let scan_barcode_field = frm.fields_dict["scan_barcode"];
 
 		let show_description = function(idx, exist = null) {
