@@ -87,33 +87,39 @@ def get_pick_lists(warehouse):
 										`tabPick List` AS pl ON pl.name = pli.parent
 									WHERE
 										pl.docstatus = 0 AND pli.warehouse = %(warehouse)s
+										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
 									ORDER BY is_rush DESC, pl.date DESC""", {"warehouse": warehouse}, as_dict=1)
 	return pick_lists
 
 @frappe.whitelist()
-def get_items(pick_list, warehouse):
-	items = frappe.db.sql("""SELECT
-									pli.name, pli.parent, pli.item_code, pli.item_name, item.image,
-									pli.ifw_location AS location, pli.qty, bin.actual_qty
-								FROM
-									`tabPick List Item` AS pli
-								LEFT JOIN
-									`tabItem` AS item ON item.item_code = pli.item_code
-								LEFT JOIN
-									`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
-								WHERE
-									pli.parent = %(pick_list)s
-								ORDER BY pli.ifw_location
-								""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
-	for item in items:
-		barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
-						WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
-		item.update({
-			"barcodes": [row.barcode for row in barcodes]
-		})
-	doc = {"name": items[0].parent, "items": items}
-	return doc	
+def get_items(pick_list, warehouse, user):
+	is_being_picked = frappe.db.get_value('Pick List', pick_list, 'ais_picked_by')
+	if is_being_picked is None or is_being_picked == '':
+		items = frappe.db.sql("""SELECT
+										pli.name, pli.parent, pli.item_code, pli.item_name, item.image,
+										pli.ifw_location AS location, pli.qty, bin.actual_qty
+									FROM
+										`tabPick List Item` AS pli
+									LEFT JOIN
+										`tabItem` AS item ON item.item_code = pli.item_code
+									LEFT JOIN
+										`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
+									WHERE
+										pli.parent = %(pick_list)s
+									ORDER BY pli.ifw_location
+									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
+		for item in items:
+			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
+							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
+			item.update({
+				"barcodes": [row.barcode for row in barcodes]
+			})
+		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
+		doc = {"name": items[0].parent, "items": items}
+		return doc
+	else:
+		return 'Already Picked'
 	
 @frappe.whitelist()
 def get_order(warehouse, sales_order=None):
@@ -193,4 +199,8 @@ def submit_pick_list(docname, items):
 						"picked_qty": item.picked_qty
 					})
 	doc.submit()
-	return "Pick List Submitted"	
+	return "Pick List Submitted"
+	
+@frappe.whitelist()
+def close_pick_list(pick_list):
+	frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', '')

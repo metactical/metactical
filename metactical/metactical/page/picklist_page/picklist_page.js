@@ -1,7 +1,7 @@
 frappe.provide('metactical.pick_list');
 
 frappe.pages['picklist-page'].on_page_load = function(wrapper) {
-	new PicklistPage(wrapper)
+	new PicklistPage(wrapper);
 }
 
 class PicklistPage{
@@ -10,13 +10,30 @@ class PicklistPage{
 	}
 	
 	make_page(wrapper){
+		var me = this;
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
 			title: 'Electronic Picklist',
 			single_column: true
 		});
 		this.wrapper = $(wrapper).find(".page-content");
-		this.load_home();		
+		if(frappe.socketio.open_picks == undefined){
+			frappe.socketio.open_picks = [];
+		}
+		this.load_home();
+		
+		//Remove picked by
+		$(document).on('page-change', function() {
+			if(metactical.pick_list.current_pick != undefined){
+				me.close_pick_list(metactical.pick_list.current_pick);
+			}
+		});
+		
+		window.onbeforeunload = function(){
+			if(metactical.pick_list.current_pick != undefined){
+				me.close_pick_list(metactical.pick_list.current_pick);
+			}
+		}
 	}
 	
 	load_home(){
@@ -79,13 +96,12 @@ class PicklistPage{
 				"warehouse": metactical.pick_list.selected_warehouse
 			},
 			"callback": function(ret){
-				console.log(ret);
 				me.$summary.ready_to_ship.html(ret.message.ready_to_ship);
 				me.$summary.ready_to_pick.html(ret.message.items_to_pick);
 				me.$summary.rush_orders.html(ret.message.rush_orders);
 				me.$summary.same_address.html(ret.message.same_address);
 			}
-		})
+		});
 	}
 	
 	list_orders(){
@@ -97,7 +113,6 @@ class PicklistPage{
 			},
 			"freeze": true,
 			"callback": function(ret){
-				console.log(ret);
 				me.wrapper.html(frappe.render_template('orders_list', {"pick_lists": ret.message}));
 				me.orders = me.wrapper.find('.orders-container');
 				me.orders.on('click', '.order-list-div', function(){
@@ -108,54 +123,79 @@ class PicklistPage{
 				me.wrapper.find('.back-to-home').on('click', function(){
 					me.load_home();
 				});
+				me.wrapper.find('.refresh-orders').on('click', function(){
+					me.list_orders();
+				});
 			}
 		});
 	}
 	
 	list_items(pick_list){
 		const me = this;
-		var selected_warehouse = me.$selected_warehouse.text();
-		metactical.pick_list.picked_items = [];
-		metactical.pick_list.items_to_pick = [];
-		frappe.call({
-			"method": "metactical.metactical.page.picklist_page.picklist_page.get_items",
-			"freeze": true,
-			"args": {
-				"warehouse": selected_warehouse,
-				"pick_list": pick_list
-			},
-			"callback": function(ret){
-				console.log({'ret': ret});
-				if(ret.message == 'None'){
-					console.log('No orders');
+		var open_pick = frappe.socketio.open_docs.filter((pick) => pick.doctype == pick.docname == pick_list);
+		if(open_pick.length == 0){
+			frappe.socketio.doc_open('Pick List', pick_list);
+			frappe.socketio.open_docs.push({doctype: 'Pick List', docname: pick_list});
+			frappe.socketio.open_picks.push(pick_list)
+			var selected_warehouse = me.$selected_warehouse.text();
+			metactical.pick_list.picked_items = [];
+			metactical.pick_list.items_to_pick = [];
+			metactical.pick_list.current_pick = pick_list;
+			frappe.call({
+				"method": "metactical.metactical.page.picklist_page.picklist_page.get_items",
+				"freeze": true,
+				"args": {
+					"warehouse": selected_warehouse,
+					"pick_list": pick_list,
+					"user": frappe.session.user
+				},
+				"callback": function(ret){
+					if(ret.message == 'None'){
+						console.log('No orders');
+					}
+					else if(ret.message == 'Already Picked'){
+							frappe.msgprint({
+								title: 'Already, being picked',
+								message: 'This order is already beeing picked. Please choose another one',
+								primary_action: {
+									label: 'Reload List',
+									action: function(values){
+										me.list_orders();
+										this.hide();
+									}
+								}
+						});
+					}
+					else{
+						me.wrapper.html(frappe.render_template('items_list',
+							{"pick_list_name": ret.message.name}));
+						metactical.pick_list.items_to_pick = ret.message.items;
+						me.item_barcode = frappe.ui.form.make_control({
+							parent: $('.item-barcode'),
+							df: {
+								fieldname: "item_barcode",
+								fieldtype: "Data",
+								placeholder: "Item Barcode"
+							},
+							render_input: true
+						});
+						me.load_picked();
+						me.load_to_pick();
+						me.create_listeners();
+						me.item_barcode.set_focus();
+					}
 				}
-				else{
-					me.wrapper.html(frappe.render_template('items_list',
-						{"pick_list_name": ret.message.name}));
-					metactical.pick_list.items_to_pick = ret.message.items;
-					me.item_barcode = frappe.ui.form.make_control({
-						parent: $('.item-barcode'),
-						df: {
-							fieldname: "item_barcode",
-							fieldtype: "Data",
-							placeholder: "Item Barcode"
-						},
-						render_input: true
-					});
-					me.load_picked();
-					me.load_to_pick();
-					me.create_listeners();
-					me.item_barcode.set_focus();
-				}
-			}
-		});
+			});
+		}
+		else{
+			frappe.alert('The Pick List is already beeing picked by somebody else. Please chhose another one.');
+		}
 	}
 	
 	load_to_pick(){
 		const me = this;
 		var items = metactical.pick_list.items_to_pick;
 		var items_template = frappe.render_template('items_to_pick', {"items": items})
-		console.log({"items_template": items_template});
 		if(strip(items_template) == ""){
 			this.wrapper.find('.to-pick-ul').html(frappe.render_template('submit_button'));
 			this.wrapper.find('.submit-pick').on('click', function(){
@@ -174,7 +214,9 @@ class PicklistPage{
 		this.submit_partial = this.wrapper.find('.submit-items-btn');
 		
 		this.$back_to_list.on('click', function(){
-			me.list_orders();
+			me.close_pick_list(metactical.pick_list.current_pick).then(() => {
+				me.list_orders();
+			});
 		});
 		this.$load_picked.on('click', function(){
 			$('#pick-list-items-div').hide();
@@ -202,7 +244,6 @@ class PicklistPage{
 		for(let row in metactical.pick_list.items_to_pick){
 			var item = metactical.pick_list.items_to_pick[row];
 			if(item.item_code == picked_item.item_code){
-				console.log({"item": item, "picked": picked_item});
 				var to_pick = item.qty - 1;
 				var pick_qty = new frappe.ui.Dialog({
 					'fields': [
@@ -313,7 +354,6 @@ class PicklistPage{
 					}
 					if(barcode_found){
 						me.item_barcode.set_value("");
-						console.log({"barcode": value});
 					}else{
 						frappe.utils.play_sound("error");
 						frappe.show_alert({
@@ -340,14 +380,12 @@ class PicklistPage{
 		for(var i in metactical.pick_list.items_to_pick){
 			var item = metactical.pick_list.items_to_pick[i];
 			var item_exists = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
-			console.log({"item_exists": item_exists});
 			if(item_exists.length == 0){
 				let new_item = $.extend(true, {}, item);
 				new_item.picked_qty = 0;
 				metactical.pick_list.picked_items.push(new_item);
 			}
 		}
-		console.log({"picked": metactical.pick_list.picked_items});
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.submit_pick_list",
 			"freeze": true,
@@ -362,9 +400,20 @@ class PicklistPage{
 				});
 				metactical.pick_list.picked_items = [];
 				metactical.pick_list.to_pick = [];
+				metactical.pick_list.current_pick = '';
 				me.list_orders();
 			}
 		});
 	}
 	
+	close_pick_list(pick_list){
+		//Remove the user from unsubmitted pick list
+		return frappe.call({
+			method: "metactical.metactical.page.picklist_page.picklist_page.close_pick_list",
+			freeze: true,
+			args: {
+				"pick_list": pick_list
+			}
+		});
+	}
 }
