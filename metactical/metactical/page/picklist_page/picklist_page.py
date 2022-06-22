@@ -88,7 +88,7 @@ def get_pick_lists(warehouse):
 									WHERE
 										pl.docstatus = 0 AND pli.warehouse = %(warehouse)s
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
-									ORDER BY is_rush DESC""", {"warehouse": warehouse}, as_dict=1)
+									ORDER BY is_rush DESC, pl.date DESC""", {"warehouse": warehouse}, as_dict=1)
 	return pick_lists
 
 @frappe.whitelist()
