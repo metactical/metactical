@@ -1,65 +1,14 @@
 <div class="row">
-	<div class="col-md-12"><center><h5>SAL-ORD-2022-20029</h5></center></div>
+	<div class="col-md-12"><center><h5 id="#order_no">{{pick_list_name}}</h5></center></div>
 	<div class="col-lg-6 col-md-12 col-sm-12 col-xs-12" id="pick-list-items-div">
 		<h4 class="items-header"><center>Items to Pick</center></h4>
+		<div class="item-barcode"></div>
 		<ul class="list-top-nav col-md-12">
-			<li><b><a href="#" class="alt-color" id="back-to-home">Back</a></b></li>
+			<li><b><a href="#" class="alt-color" id="back-to-list">Back</a></b></li>
 			<li><center><b>Items to Pick</b></center></li>
 			<li style="text-align: right;"><a class="alt-color" href="#" id="picked-items-btn"><b>Picked Items</b></a></li>
 		</ul>
-		<ul class="item-ul">
-			<li class="item-li">
-				<p class="item-to-pick">
-					<span class="pick-head">PICK</span><br>
-					<span class="pick-qty">1</span><br>
-				</p>
-				<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-				<!--<h3 class="item-h3">Headline</h3>-->
-				<p class="item-p">
-					<span class="item-aval">
-						<span class="item-aval-label">On Hand: </span>
-						12
-					</span>
-					<span class="item-location">Bin: 03-AC-04-01</span><br>
-					<span class="item-code">CND1335126-1</span><br>
-					<span class="item-name">PVC Whiskey Tango Foxtrot Patch - 1 Pcs - Graphite</span>
-				</p>
-			</li>
-			<li class="item-li">
-				<p class="item-to-pick">
-					<span class="pick-head">PICK</span><br>
-					<span class="pick-qty">1</span><br>
-				</p>
-				<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-				<!--<h3 class="item-h3">Headline</h3>-->
-				<p class="item-p">
-					<span class="item-aval">
-						<span class="item-aval-label">On Hand: </span>
-						12
-					</span>
-					<span class="item-location">Bin: 30-AA-01-05</span><br>
-					<span class="item-code">CND1158102-2</span><br>
-					<span class="item-name">Hydration Carrier with Bladder - Black</span>
-				</p>
-			</li>
-			<li class="item-li">
-				<p class="item-to-pick">
-					<span class="pick-head">PICK</span><br>
-					<span class="pick-qty">1</span><br>
-				</p>
-				<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-				<!--<h3 class="item-h3">Headline</h3>-->
-				<p class="item-p">
-					<span class="item-aval">
-						<span class="item-aval-label">On Hand: </span>
-						12
-					</span>
-					<span class="item-location">Bin: 03-AF-02-01</span><br>
-					<span class="item-code">CND1190102-1</span><br>
-					<span class="item-name">Roll - Up Utility Pouch - Black</span>
-				</p>
-			</li>
-		</ul>
+		<ul class="item-ul to-pick-ul"></ul>
 	</div>
 	<div class="col-lg-6 col-md-12 col-sm-12 col-xs-12" id="picked-items-div">
 		<h4 class="items-header"><center>Picked Items</center></h4>
@@ -67,43 +16,6 @@
 			<li><b><a class="alt-color" href="#" id="back-to-pick">Back</a></b></li>
 			<li><center><b>Picked Items</b></center></li>
 		</ul>
-		<ul class="item-ul">
-			<li class="item-li">
-				<p class="item-to-pick">
-					<span class="pick-head">PICKED</span><br>
-					<span class="pick-qty">1</span><br>
-				</p>
-				<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-				<!--<h3 class="item-h3">Headline</h3>-->
-				<p class="item-p item-picked">
-					<span class="item-code">Item Code</span><br>
-					<span class="item-name">Item Name</span>
-				</p>
-			</li>
-			<li class="item-li">
-				<p class="item-to-pick">
-					<span class="pick-head">PICKED</span><br>
-					<span class="pick-qty">1</span><br>
-				</p>
-				<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-				<!--<h3 class="item-h3">Headline</h3>-->
-				<p class="item-p item-picked">
-					<span class="item-code">Item Code</span><br>
-					<span class="item-name">Item Name</span><br>
-				</p>
-			</li>
-			<li class="item-li">
-				<p class="item-to-pick">
-					<span class="pick-head">PICKED</span><br>
-					<span class="pick-qty">1</span><br>
-				</p>
-				<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-				<!--<h3 class="item-h3">Headline</h3>-->
-				<p class="item-p item-picked">
-					<span class="item-code">Item Code</span><br>
-					<span class="item-name">Item Name</span><br>
-				</p>
-			</li>
-		</ul>
+		<ul class="item-ul picked-ul"></ul>
 	</div>
 </div>

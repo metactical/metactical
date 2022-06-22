@@ -1,42 +1,15 @@
-<ul class="list-top-nav">
-	<li><b><a href="#" id="back-to-home">Back</a></b></li>
-	<li><center><b>Picked Items</b></center></li>
-</ul>
-<ul class="col-md-12 item-ul">
-    <li class="item-li">
+{% for item in items %}
+	<li class="item-li">
 		<p class="item-to-pick">
 			<span class="pick-head">PICKED</span><br>
-			<span class="pick-qty">1</span><br>
+			<span class="pick-qty">{{item.picked_qty}}</span><br>
 		</p>
-		<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-		<!--<h3 class="item-h3">Headline</h3>-->
-		<p class="item-p">
-			<span class="item-code">Item Code</span><br>
-			<span class="item-name">Item Name</span>
+		<div class="img-div">
+			<img class="item-img" src="{{item.image}}" />
+		</div>
+		<p class="item-p item-picked">
+			<span class="item-code">{{item.item_code}}</span><br>
+			<span class="item-name">{{item.item_name}}</span>
 		</p>
-    </li>
-    <li class="item-li">
-		<p class="item-to-pick">
-			<span class="pick-head">PICKED</span><br>
-			<span class="pick-qty">1</span><br>
-		</p>
-		<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-		<!--<h3 class="item-h3">Headline</h3>-->
-		<p class="item-p">
-			<span class="item-code">Item Code</span><br>
-			<span class="item-name">Item Name</span><br>
-		</p>
-    </li>
-    <li class="item-li">
-		<p class="item-to-pick">
-			<span class="pick-head">PICKED</span><br>
-			<span class="pick-qty">1</span><br>
-		</p>
-		<div class="img-div"><img class="item-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Shaqi_jrvej.jpg/1200px-Shaqi_jrvej.jpg" /></div>
-		<!--<h3 class="item-h3">Headline</h3>-->
-		<p class="item-p">
-			<span class="item-code">Item Code</span><br>
-			<span class="item-name">Item Name</span><br>
-		</p>
-    </li>
-</ul>
+	</li>
+{% endfor %}

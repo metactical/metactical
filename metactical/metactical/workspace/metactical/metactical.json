@@ -133,6 +133,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Pick List Settings",
+   "link_to": "Pick List Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Pick List Page",
    "link_to": "picklist-page",
    "link_type": "Page",
@@ -346,7 +355,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-06-11 10:18:52.689304",
+ "modified": "2022-06-14 08:41:56.346303",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

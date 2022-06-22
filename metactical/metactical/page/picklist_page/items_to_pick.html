@@ -1,0 +1,21 @@
+{% for row in items %}
+	{% if row.qty > 0 %}
+		<li class="item-li" data-item-code="{{row.item_code}}">
+			<p class="item-to-pick">
+				<span class="pick-head">PICK</span><br>
+				<span class="pick-qty">{{row.qty}}</span><br>
+			</p>
+			<div class="img-div"><img class="item-img" src="{{row.image}}" /></div>
+			<!--<h3 class="item-h3">Headline</h3>-->
+			<p class="item-p">
+				<span class="item-aval">
+					<span class="item-aval-label">On Hand: </span>
+					{{row.actual_qty}}
+				</span>
+				<span class="item-location">Bin: {{row.location}}</span><br>
+				<span class="item-code">{{row.item_code}}</span><br>
+				<span class="item-name">{{row.item_name}}</span>
+			</p>
+		</li>
+	{% endif %}
+{% endfor %}
