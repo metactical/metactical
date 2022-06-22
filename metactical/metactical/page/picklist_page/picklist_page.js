@@ -119,6 +119,7 @@ class PicklistPage{
 		metactical.pick_list.items_to_pick = [];
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_items",
+			"freeze": true,
 			"args": {
 				"warehouse": selected_warehouse,
 				"pick_list": pick_list
