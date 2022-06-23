@@ -210,6 +210,7 @@ class PicklistPage{
 		for(let row in metactical.pick_list.items_to_pick){
 			var item = metactical.pick_list.items_to_pick[row];
 			if(item.item_code == picked_item.item_code){
+				console.log({"item": item, "picked": picked_item});
 				var to_pick = item.qty - 1;
 				var pick_qty = new frappe.ui.Dialog({
 					'fields': [
@@ -265,6 +266,7 @@ class PicklistPage{
 				to_pick_field.on('change', function(){
 					items_remaining.html(item.qty - parseFloat(to_pick_field.val()));
 				});
+				break;
 			}
 		}
 	}
