@@ -171,6 +171,7 @@ class PicklistPage{
 		this.$back_to_list = this.wrapper.find('#back-to-list');
 		this.$load_picked = this.wrapper.find('#picked-items-btn');
 		this.$back_to_pick = this.wrapper.find('#back-to-pick');
+		this.submit_partial = this.wrapper.find('#submit-items-btn');
 		
 		this.$back_to_list.on('click', function(){
 			me.list_orders();
@@ -182,6 +183,14 @@ class PicklistPage{
 		this.$back_to_pick.on('click', function(){
 			$('#pick-list-items-div').show();
 			$('#picked-items-div').hide();
+		});
+		this.submit_partial.on('click', function(){
+			if(metactical.pick_list.picked_items.length > 0){
+				me.submit_pick_list();
+			}
+			else{
+				frappe.show_alert('No items have been picked');
+			}
 		});
 	}
 	
@@ -197,26 +206,67 @@ class PicklistPage{
 	}
 	
 	trigger_picked(picked_item){
+		const me = this;
 		for(let row in metactical.pick_list.items_to_pick){
 			var item = metactical.pick_list.items_to_pick[row];
 			if(item.item_code == picked_item.item_code){
-				let existing_item = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
-				if(existing_item.length > 0){
-					console.log(existing_item);
-					existing_item[0].picked_qty += 1;
-				}
-				else{
-					var new_item = $.extend(true, {}, item);
-					new_item.picked_qty = 1;
-					metactical.pick_list.picked_items.push(new_item);					
-				}
-				item.qty = item.qty - 1;
+				var to_pick = item.qty - 1;
+				var pick_qty = new frappe.ui.Dialog({
+					'fields': [
+						{"fieldtype": "HTML", "fieldname": "ht"}
+					],
+					'primary_action_label': 'Add',
+					'secondary_action_label': 'Cancel',
+					'primary_action': function(){
+						let existing_item = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
+						let to_pick_f = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
+						if(parseFloat(to_pick_f.val()) > (item.qty)){
+							frappe.throw("Error: You've picked more items than required");
+						}
+						else if(parseFloat(to_pick_f.val()) <= 0){
+							frappe.throw("Error: You haven't picked any items");
+						}
+						else{
+							if(existing_item.length > 0){
+								existing_item[0].picked_qty += parseFloat(to_pick_f.val());
+							}
+							else{
+								var new_item = $.extend(true, {}, item);
+								new_item.picked_qty = parseFloat(to_pick_f.val());
+								metactical.pick_list.picked_items.push(new_item);					
+							}
+							item.qty = item.qty - parseFloat(to_pick_f.val());
+							me.load_to_pick();
+							me.load_picked();
+							pick_qty.hide();
+							me.item_barcode.set_focus();
+						}
+					},
+					'secondary_action': function(){
+						pick_qty.hide();
+					}
+				});
+				pick_qty.fields_dict.ht.$wrapper.html(frappe.render_template('picked_qty', {'to_pick': to_pick}));
+				pick_qty.show();
+				
+				//Add listeners for add substract fields
+				let add_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-add');
+				let sub_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-sub');
+				let to_pick_field = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
+				let items_remaining = pick_qty.fields_dict.ht.$wrapper.find('.items-remaining');
+				add_btn.on('click', function(){
+					to_pick_field.val(parseFloat(to_pick_field.val()) + 1);
+					items_remaining.html(parseFloat(items_remaining.text()) - 1);				
+				});
+				sub_btn.on('click', function(){
+					to_pick_field.val(parseFloat(to_pick_field.val()) - 1);
+					items_remaining.html(parseFloat(items_remaining.text()) + 1);				
+				});
+				to_pick_field.on('change', function(){
+					items_remaining.html(item.qty - parseFloat(to_pick_field.val()));
+				});
 			}
 		}
-		console.log(metactical.pick_list.items_to_pick);
-		this.load_to_pick();
-		this.load_picked();
-		this.item_barcode.set_focus();
 	}
 	
 	create_listeners(){
@@ -275,7 +325,6 @@ class PicklistPage{
 				"items": metactical.pick_list.picked_items,
 			},
 			"callback": function(ret){
-				console.log({"submit_callback": ret});
 				frappe.show_alert({
 					message: __('Pick List Submitted'),
 					indicator: 'green'
