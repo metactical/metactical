@@ -105,7 +105,7 @@ class PicklistPage{
 					var pick_list = unescape(order.attr('data-pick-list'));
 					me.list_items(pick_list);
 				})
-				me.wrapper.find('#back-to-home').on('click', function(){
+				me.wrapper.find('.back-to-home').on('click', function(){
 					me.load_home();
 				});
 			}
@@ -168,10 +168,10 @@ class PicklistPage{
 		}
 		
 		//this.wrapper.find('#picked-items-div').hide();
-		this.$back_to_list = this.wrapper.find('#back-to-list');
+		this.$back_to_list = this.wrapper.find('.back-to-list');
 		this.$load_picked = this.wrapper.find('#picked-items-btn');
 		this.$back_to_pick = this.wrapper.find('#back-to-pick');
-		this.submit_partial = this.wrapper.find('#submit-items-btn');
+		this.submit_partial = this.wrapper.find('.submit-items-btn');
 		
 		this.$back_to_list.on('click', function(){
 			me.list_orders();

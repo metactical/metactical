@@ -125,6 +125,16 @@
 	width: 32%;
 }
 
+.list-top-nav-desk {
+	display: block;
+	padding: 10px;
+}
+
+.list-top-nav-desk li{
+	display: inline-block;
+	width: 32%;
+}
+
 .order-list-div {
 	background-color: #FFF; 
 	padding: 5px;
@@ -210,7 +220,10 @@
 	/*.item-barcode{
 		display: none;
 	}*/
-
+	
+	.list-top-nav-desk{
+		display: none;
+	}
 }
 
 @media only screen and (max-width: 768px) {
