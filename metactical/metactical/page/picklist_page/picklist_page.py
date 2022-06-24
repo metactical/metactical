@@ -186,8 +186,11 @@ def submit_pick_list(docname, items):
 		item = frappe._dict(item)
 		for row in doc.locations:
 			if item.name == row.name:
-				row.update({
-					"picked_qty": item.picked_qty
-				})
+				if item.picked_qty == 0:
+					doc.remove(row)
+				else:
+					row.update({
+						"picked_qty": item.picked_qty
+					})
 	doc.submit()
 	return "Pick List Submitted"	

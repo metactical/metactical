@@ -1,15 +1,17 @@
 {% for item in items %}
-	<li class="item-li">
-		<p class="item-to-pick">
-			<span class="pick-head">PICKED</span><br>
-			<span class="pick-qty">{{item.picked_qty}}</span><br>
-		</p>
-		<div class="img-div">
-			<img class="item-img" src="{{item.image}}" />
-		</div>
-		<p class="item-p item-picked">
-			<span class="item-code">{{item.item_code}}</span><br>
-			<span class="item-name">{{item.item_name}}</span>
-		</p>
-	</li>
+	{% if item.picked_qty > 0 %}
+		<li class="item-li" data-item-code="{{item.item_code}}">
+			<p class="item-to-pick">
+				<span class="pick-head">PICKED</span><br>
+				<span class="pick-qty">{{item.picked_qty}}</span><br>
+			</p>
+			<div class="img-div">
+				<img class="item-img" src="{{item.image}}" />
+			</div>
+			<p class="item-p item-picked">
+				<span class="item-code">{{item.item_code}}</span><br>
+				<span class="item-name">{{item.item_name}}</span>
+			</p>
+		</li>
+	{% endif %}
 {% endfor %}

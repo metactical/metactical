@@ -184,14 +184,6 @@ class PicklistPage{
 			$('#pick-list-items-div').show();
 			$('#picked-items-div').hide();
 		});
-		this.submit_partial.on('click', function(){
-			if(metactical.pick_list.picked_items.length > 0){
-				me.submit_pick_list();
-			}
-			else{
-				frappe.show_alert('No items have been picked');
-			}
-		});
 	}
 	
 	load_picked(){
@@ -283,6 +275,23 @@ class PicklistPage{
 			}
 			me.trigger_picked(picked);
 		});
+		this.picked.on('click', '.item-li', function(){
+			var cur_item = $(this);
+			var item_code = unescape(cur_item.attr('data-item-code'));
+			for(let i in metactical.pick_list.items_to_pick){
+				let item = metactical.pick_list.items_to_pick[i];
+				if(item.item_code == item_code){
+					item.qty = parseFloat(item.qty) + 1;
+				}
+				break;
+			}
+			let picked = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item_code);
+			if(picked.length > 0){
+				picked[0].picked_qty -= 1;
+			}
+			me.load_to_pick();
+			me.load_picked();
+		});
 		this.item_barcode.$wrapper.on('keypress', function(){
 			if(event.keyCode == 13){
 				let value = me.item_barcode.get_value();
@@ -315,10 +324,30 @@ class PicklistPage{
 				}
 			}
 		});
+		this.submit_partial.on('click', function(){
+			if(metactical.pick_list.picked_items.length > 0){
+				me.submit_pick_list();
+			}
+			else{
+				frappe.show_alert('No items have been picked');
+			}
+		});
 	}
 	
 	submit_pick_list(){
 		const me = this;
+		//Make the non-picked items zero
+		for(var i in metactical.pick_list.items_to_pick){
+			var item = metactical.pick_list.items_to_pick[i];
+			var item_exists = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
+			console.log({"item_exists": item_exists});
+			if(item_exists.length == 0){
+				let new_item = $.extend(true, {}, item);
+				new_item.picked_qty = 0;
+				metactical.pick_list.picked_items.push(new_item);
+			}
+		}
+		console.log({"picked": metactical.pick_list.picked_items});
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.submit_pick_list",
 			"freeze": true,
