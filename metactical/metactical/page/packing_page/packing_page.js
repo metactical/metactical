@@ -400,9 +400,11 @@ havenir.packing_slip.calc_packing_items = (barcode, amount=1) => {
 		}
 	});
 	
-	frappe.show_alert({
+	frappe.utils.play_sound("error");
+	frappe.msgprint("Wrong Barcode");
+	/*frappe.show_alert({
 		message: __("Wrong Barcode"),
 		indicator: "red"
-	});
+	});*/
 	
 };
