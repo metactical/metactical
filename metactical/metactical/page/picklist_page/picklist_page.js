@@ -1,7 +1,7 @@
 frappe.provide('metactical.pick_list');
 
 frappe.pages['picklist-page'].on_page_load = function(wrapper) {
-	new PicklistPage(wrapper);
+	frappe.pick_list = new PicklistPage(wrapper);
 }
 
 class PicklistPage{
@@ -17,9 +17,6 @@ class PicklistPage{
 			single_column: true
 		});
 		this.wrapper = $(wrapper).find(".page-content");
-		if(frappe.socketio.open_picks == undefined){
-			frappe.socketio.open_picks = [];
-		}
 		this.load_home();
 		
 		//Remove picked by
@@ -31,7 +28,10 @@ class PicklistPage{
 		
 		window.onbeforeunload = function(){
 			if(metactical.pick_list.current_pick != undefined){
-				me.close_pick_list(metactical.pick_list.current_pick);
+				me.close_pick_list(metactical.pick_list.current_pick).then(()=>{
+					//Just so it waits
+					setTimeout(1000);
+				});
 			}
 		}
 	}
@@ -132,64 +132,55 @@ class PicklistPage{
 	
 	list_items(pick_list){
 		const me = this;
-		var open_pick = frappe.socketio.open_docs.filter((pick) => pick.doctype == pick.docname == pick_list);
-		if(open_pick.length == 0){
-			frappe.socketio.doc_open('Pick List', pick_list);
-			frappe.socketio.open_docs.push({doctype: 'Pick List', docname: pick_list});
-			frappe.socketio.open_picks.push(pick_list)
-			var selected_warehouse = me.$selected_warehouse.text();
-			metactical.pick_list.picked_items = [];
-			metactical.pick_list.items_to_pick = [];
-			metactical.pick_list.current_pick = pick_list;
-			frappe.call({
-				"method": "metactical.metactical.page.picklist_page.picklist_page.get_items",
-				"freeze": true,
-				"args": {
-					"warehouse": selected_warehouse,
-					"pick_list": pick_list,
-					"user": frappe.session.user
-				},
-				"callback": function(ret){
-					if(ret.message == 'None'){
-						console.log('No orders');
-					}
-					else if(ret.message == 'Already Picked'){
-							frappe.msgprint({
-								title: 'Already, being picked',
-								message: 'This order is already beeing picked. Please choose another one',
-								primary_action: {
-									label: 'Reload List',
-									action: function(values){
-										me.list_orders();
-										this.hide();
-									}
-								}
-						});
-					}
-					else{
-						me.wrapper.html(frappe.render_template('items_list',
-							{"pick_list_name": ret.message.name}));
-						metactical.pick_list.items_to_pick = ret.message.items;
-						me.item_barcode = frappe.ui.form.make_control({
-							parent: $('.item-barcode'),
-							df: {
-								fieldname: "item_barcode",
-								fieldtype: "Data",
-								placeholder: "Item Barcode"
-							},
-							render_input: true
-						});
-						me.load_picked();
-						me.load_to_pick();
-						me.create_listeners();
-						me.item_barcode.set_focus();
-					}
+		var selected_warehouse = me.$selected_warehouse.text();
+		metactical.pick_list.picked_items = [];
+		metactical.pick_list.items_to_pick = [];
+		metactical.pick_list.current_pick = pick_list;
+		frappe.call({
+			"method": "metactical.metactical.page.picklist_page.picklist_page.get_items",
+			"freeze": true,
+			"args": {
+				"warehouse": selected_warehouse,
+				"pick_list": pick_list,
+				"user": frappe.session.user
+			},
+			"callback": function(ret){
+				if(ret.message == 'None'){
+					console.log('No orders');
 				}
-			});
-		}
-		else{
-			frappe.alert('The Pick List is already beeing picked by somebody else. Please chhose another one.');
-		}
+				else if(ret.message == 'Already Picked'){
+						frappe.msgprint({
+							title: 'Already, being picked',
+							message: 'This order is already beeing picked. Please choose another one',
+							primary_action: {
+								label: 'Reload List',
+								action: function(values){
+									me.list_orders();
+									this.hide();
+								}
+							}
+					});
+				}
+				else{
+					me.wrapper.html(frappe.render_template('items_list',
+						{"pick_list_name": ret.message.name}));
+					metactical.pick_list.items_to_pick = ret.message.items;
+					me.item_barcode = frappe.ui.form.make_control({
+						parent: $('.item-barcode'),
+						df: {
+							fieldname: "item_barcode",
+							fieldtype: "Data",
+							placeholder: "Item Barcode"
+						},
+						render_input: true
+					});
+					me.load_picked();
+					me.load_to_pick();
+					me.create_listeners();
+					me.item_barcode.set_focus();
+				}
+			}
+		});
 	}
 	
 	load_to_pick(){
@@ -239,69 +230,81 @@ class PicklistPage{
 		}
 	}
 	
-	trigger_picked(picked_item){
+	trigger_picked(picked_item, from_barcode=false){
 		const me = this;
 		for(let row in metactical.pick_list.items_to_pick){
 			var item = metactical.pick_list.items_to_pick[row];
 			if(item.item_code == picked_item.item_code){
-				var to_pick = item.qty - 1;
-				var pick_qty = new frappe.ui.Dialog({
-					'fields': [
-						{"fieldtype": "HTML", "fieldname": "ht"}
-					],
-					'primary_action_label': 'Add',
-					'secondary_action_label': 'Cancel',
-					'primary_action': function(){
-						let existing_item = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
-						let to_pick_f = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
-						if(parseFloat(to_pick_f.val()) > (item.qty)){
-							frappe.throw("Error: You've picked more items than required");
-						}
-						else if(parseFloat(to_pick_f.val()) <= 0){
-							frappe.throw("Error: You haven't picked any items");
-						}
-						else{
-							if(existing_item.length > 0){
-								existing_item[0].picked_qty += parseFloat(to_pick_f.val());
+				if(from_barcode){
+					me.pick_item(item, 1);
+					break;
+				}
+				else{
+					var to_pick = item.qty - 1;
+					var pick_qty = new frappe.ui.Dialog({
+						'fields': [
+							{"fieldtype": "HTML", "fieldname": "ht"}
+						],
+						'primary_action_label': 'Add',
+						'secondary_action_label': 'Cancel',
+						'primary_action': function(){
+							let to_pick_f = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
+							if(parseFloat(to_pick_f.val()) > (item.qty)){
+								frappe.throw("Error: You've picked more items than required");
+							}
+							else if(parseFloat(to_pick_f.val()) <= 0){
+								frappe.throw("Error: You haven't picked any items");
 							}
 							else{
-								var new_item = $.extend(true, {}, item);
-								new_item.picked_qty = parseFloat(to_pick_f.val());
-								metactical.pick_list.picked_items.push(new_item);					
+								me.pick_item(item, to_pick_f.val());
+								pick_qty.hide();
 							}
-							item.qty = item.qty - parseFloat(to_pick_f.val());
-							me.load_to_pick();
-							me.load_picked();
+						},
+						'secondary_action': function(){
 							pick_qty.hide();
-							me.item_barcode.set_focus();
 						}
-					},
-					'secondary_action': function(){
-						pick_qty.hide();
-					}
-				});
-				pick_qty.fields_dict.ht.$wrapper.html(frappe.render_template('picked_qty', {'to_pick': to_pick}));
-				pick_qty.show();
-				
-				//Add listeners for add substract fields
-				let add_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-add');
-				let sub_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-sub');
-				let to_pick_field = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
-				let items_remaining = pick_qty.fields_dict.ht.$wrapper.find('.items-remaining');
-				add_btn.on('click', function(){
-					to_pick_field.val(parseFloat(to_pick_field.val()) + 1);
-					items_remaining.html(parseFloat(items_remaining.text()) - 1);				
-				});
-				sub_btn.on('click', function(){
-					to_pick_field.val(parseFloat(to_pick_field.val()) - 1);
-					items_remaining.html(parseFloat(items_remaining.text()) + 1);				
-				});
-				to_pick_field.on('change', function(){
-					items_remaining.html(item.qty - parseFloat(to_pick_field.val()));
-				});
-				break;
+					});
+					pick_qty.fields_dict.ht.$wrapper.html(frappe.render_template('picked_qty', {'to_pick': to_pick}));
+					pick_qty.show();
+					
+					//Add listeners for add substract fields
+					let add_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-add');
+					let sub_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-sub');
+					let to_pick_field = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
+					let items_remaining = pick_qty.fields_dict.ht.$wrapper.find('.items-remaining');
+					add_btn.on('click', function(){
+						to_pick_field.val(parseFloat(to_pick_field.val()) + 1);
+						items_remaining.html(parseFloat(items_remaining.text()) - 1);				
+					});
+					sub_btn.on('click', function(){
+						to_pick_field.val(parseFloat(to_pick_field.val()) - 1);
+						items_remaining.html(parseFloat(items_remaining.text()) + 1);				
+					});
+					to_pick_field.on('change', function(){
+						items_remaining.html(item.qty - parseFloat(to_pick_field.val()));
+					});
+					break;
+				}
 			}
 		}
+	}
+	
+	pick_item(item, qty){
+		var me = this;
+		let existing_item = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
+		let to_pick_item = metactical.pick_list.items_to_pick.filter((itm) => itm.item_code == item.item_code);
+		if(existing_item.length > 0){
+			existing_item[0].picked_qty += parseFloat(qty);
+		}
+		else{
+			var new_item = $.extend(true, {}, item);
+			new_item.picked_qty = parseFloat(qty);
+			metactical.pick_list.picked_items.push(new_item);					
+		}
+		to_pick_item[0].qty = to_pick_item[0].qty - parseFloat(qty);
+		me.load_to_pick();
+		me.load_picked();
+		me.item_barcode.set_focus();
 	}
 	
 	create_listeners(){
@@ -348,13 +351,14 @@ class PicklistPage{
 									"item_code": to_pick[i].item_code,
 									"picked_qty": 1
 								}
-								me.trigger_picked(picked);
+								me.trigger_picked(picked, true);
 							}
 						}
 					}
 					if(barcode_found){
 						me.item_barcode.set_value("");
 					}else{
+						me.item_barcode.set_value("");
 						frappe.utils.play_sound("error");
 						frappe.show_alert({
 							message: __("No items found. Scan barcode again."),

@@ -98,7 +98,7 @@ def get_items(pick_list, warehouse, user):
 	if is_being_picked is None or is_being_picked == '':
 		items = frappe.db.sql("""SELECT
 										pli.name, pli.parent, pli.item_code, pli.item_name, item.image,
-										pli.ifw_location AS location, pli.qty, bin.actual_qty
+										pli.ifw_location AS locations, pli.qty, bin.actual_qty
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
@@ -112,8 +112,12 @@ def get_items(pick_list, warehouse, user):
 		for item in items:
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
+			locations = []
+			if item.get('locations', '') != '':
+				locations = item.get('locations').split("|")
 			item.update({
-				"barcodes": [row.barcode for row in barcodes]
+				"barcodes": [row.barcode for row in barcodes],
+				"locations": [location.strip() for location in locations]
 			})
 		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
 		doc = {"name": items[0].parent, "items": items}
