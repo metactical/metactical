@@ -23,12 +23,19 @@ frappe.ui.form.on('Cycle Count', {
 		}
 
 		if(frm.doc.scan_barcode) {
+			scan_barcode_field.set_new_description(__(''));
 			frappe.call({
 				method: "erpnext.selling.page.point_of_sale.point_of_sale.search_for_serial_or_batch_or_barcode_number",
 				args: { search_value: frm.doc.scan_barcode }
 			}).then(r => {
 				const data = r && r.message;
 				if (!data || Object.keys(data).length === 0) {
+					frappe.utils.play_sound("error");
+					scan_barcode_field.set_value('');
+					frappe.show_alert({
+						message: __("Cannot find Item with this barcode"),
+						indicator: 'orange'
+					});
 					scan_barcode_field.set_new_description(__('Cannot find Item with this barcode'));
 					return;
 				}
@@ -69,6 +76,7 @@ frappe.ui.form.on('Cycle Count', {
 					}
 				});*/
 
+				frappe.utils.play_sound("alert");
 				scan_barcode_field.set_value('');
 				refresh_field("items");
 			});

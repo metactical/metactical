@@ -13,7 +13,7 @@ frappe.ui.form.on('Cycle Count V2', {
 	},
 	
 	onload_post_render: function(frm){
-		frm.fields_dict.scan_barcode.$wrapper.on('keypress', function(event){
+		/*frm.fields_dict.scan_barcode.$wrapper.on('keypress', function(event){
 			if(event.keyCode == 13)
 			{
 				$("[data-fieldname=scan_barcode]").focus()
@@ -26,7 +26,7 @@ frappe.ui.form.on('Cycle Count V2', {
 			{
 				return false;
 			}
-		});
+		});*/
 		
 		frm.fields_dict.get_items.$wrapper.on('click', function(event){
 			frm.events.get_items_event(cur_frm);
@@ -56,7 +56,7 @@ frappe.ui.form.on('Cycle Count V2', {
 		})
 	},
 	
-	scanned_barcode: function(frm) {
+	scan_barcode: function(frm) {
 		let scan_barcode_field = frm.fields_dict["scan_barcode"];
 
 		let show_description = function(idx, exist = null) {
@@ -68,12 +68,19 @@ frappe.ui.form.on('Cycle Count V2', {
 		}
 
 		if(frm.doc.scan_barcode) {
+			scan_barcode_field.set_new_description(__(''));
 			frappe.call({
 				method: "erpnext.selling.page.point_of_sale.point_of_sale.search_for_serial_or_batch_or_barcode_number",
 				args: { search_value: frm.doc.scan_barcode }
 			}).then(r => {
 				const data = r && r.message;
 				if (!data || Object.keys(data).length === 0) {
+					frappe.utils.play_sound("error");
+					scan_barcode_field.set_value('');
+					frappe.show_alert({
+						message: __("Cannot find Item with this barcode"),
+						indicator: 'orange'
+					});
 					scan_barcode_field.set_new_description(__('Cannot find Item with this barcode'));
 					return;
 				}
@@ -115,6 +122,7 @@ frappe.ui.form.on('Cycle Count V2', {
 					}
 				});*/
 
+				frappe.utils.play_sound("alert");
 				scan_barcode_field.set_value('');
 				refresh_field("items");
 			});
