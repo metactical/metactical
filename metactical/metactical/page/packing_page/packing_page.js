@@ -371,6 +371,7 @@ havenir.packing_slip.calc_packing_items = (barcode, amount=1) => {
 			if(amount > cur_item.qty){
 				frappe.throw("You can only add a maximum of " + cur_item.qty + " items");
 			}
+			frappe.utils.play_sound("alert");
 			cur_item.qty -= amount;
 
 			let cur_packed_item = packed_items.filter(
