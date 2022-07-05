@@ -37,8 +37,7 @@
    "fieldname": "items",
    "fieldtype": "Table",
    "label": "Items",
-   "options": "Cycle Count V2 Item",
-   "reqd": 1
+   "options": "Cycle Count V2 Item"
   },
   {
    "fieldname": "amended_from",
@@ -71,7 +70,7 @@
    "link_fieldname": "ais_cycle_count_v2"
   }
  ],
- "modified": "2022-06-11 09:56:29.361584",
+ "modified": "2022-07-05 07:32:32.329905",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Cycle Count V2",
