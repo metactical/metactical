@@ -1,4 +1,5 @@
 {
+ "actions": [],
  "autoname": "field:user",
  "creation": "2021-09-07 01:24:13.045728",
  "doctype": "DocType",
@@ -7,6 +8,7 @@
  "field_order": [
   "user",
   "user_name",
+  "add_to_transit",
   "source_warehouse",
   "target_warehouse",
   "cycle_count_warehouse"
@@ -45,11 +47,18 @@
   {
    "fieldname": "cycle_count_warehouse",
    "fieldtype": "Table",
-   "label": "Permitted Cycle Count Warehouse",
+   "label": "Permitted Stock Reconcile Warehouse",
    "options": "User Permitted Warehouse"
+  },
+  {
+   "default": "0",
+   "fieldname": "add_to_transit",
+   "fieldtype": "Check",
+   "label": "\"Add to transit\" marked by default"
   }
  ],
- "modified": "2022-03-28 08:45:20.661936",
+ "links": [],
+ "modified": "2022-07-06 15:50:51.979973",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Stock Entry User Permissions",
