@@ -197,6 +197,12 @@
 .submit-pick a:hover{
   transform: translateZ(-25px) rotateX(-90deg);
 }
+
+.pl-barcode{
+	width: 100%; 
+	padding-left: 15px; 
+	padding-right: 15px;
+}
 	
 @media only screen and (max-width: 992px) {
 	/* For tablets and under */

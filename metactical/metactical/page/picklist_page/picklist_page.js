@@ -104,16 +104,28 @@ class PicklistPage{
 		});
 	}
 	
-	list_orders(){
+	list_orders(filter=''){
 		const me = this;
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
-				"warehouse": metactical.pick_list.selected_warehouse
+				"warehouse": metactical.pick_list.selected_warehouse,
+				"filters": filter
 			},
 			"freeze": true,
 			"callback": function(ret){
 				me.wrapper.html(frappe.render_template('orders_list', {"pick_lists": ret.message}));
+				me.pl_barcode = frappe.ui.form.make_control({
+					parent: $('.pl-barcode'),
+					df: {
+						fieldname: 'pl_barcode',
+						fieldtype: 'Data',
+						placeholder: 'Search Pick List'
+					},
+					render_input: true
+				});
+				me.pl_barcode.set_value(filter);
+				me.pl_barcode.set_focus();
 				me.orders = me.wrapper.find('.orders-container');
 				me.orders.on('click', '.order-list-div', function(){
 					var order = $(this);
@@ -125,6 +137,18 @@ class PicklistPage{
 				});
 				me.wrapper.find('.refresh-orders').on('click', function(){
 					me.list_orders();
+				});
+				me.wrapper.find('.pl-barcode').on('keypress', function(){
+					if(event.keyCode == 13){
+						var barcode = $('input[data-fieldname="pl_barcode"]').val();
+						me.list_orders(filter=barcode);
+					}
+				});
+				me.wrapper.find('.pl-barcode').on('focusout', function(){
+					var barcode = $('input[data-fieldname="pl_barcode"]').val();
+					if(barcode != ''){
+						me.list_orders(filter=barcode);
+					}
 				});
 			}
 		});
