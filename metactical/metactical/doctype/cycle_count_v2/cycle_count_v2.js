@@ -26,34 +26,36 @@ frappe.ui.form.on('Cycle Count V2', {
 			{
 				return false;
 			}
-		});*/
+		});
 		
 		frm.fields_dict.get_items.$wrapper.on('click', function(event){
 			frm.events.get_items_event(cur_frm);
-		});
+		});*/
 	},
 	
-	get_items_event: function(frm){
-		frappe.call({
-			method: "metactical.metactical.doctype.cycle_count_v2.cycle_count_v2.get_items",
-			args: {
-				'warehouse': frm.doc.warehouse,
-				'ifw_location': frm.doc.ifw_location.replace(/\s/g,'')
-			},
-			freeze: true,
-			callback: function(ret){
-				if(typeof ret.message != undefined){
-					frm.doc.items = [];
-					for(let row in ret.message){
-						var child = cur_frm.add_child("items");
-						child.item_code = ret.message[row].item_code;
-						child.expected_qty = ret.message[row].actual_qty;
-						child.valuation_rate = ret.message[row].valuation_rate;
+	get_items: function(frm){
+		if(!frm.doc.items){
+			frappe.call({
+				method: "metactical.metactical.doctype.cycle_count_v2.cycle_count_v2.get_items",
+				args: {
+					'warehouse': frm.doc.warehouse,
+					'ifw_location': frm.doc.ifw_location.replace(/\s/g,'')
+				},
+				freeze: true,
+				callback: function(ret){
+					if(typeof ret.message != undefined){
+						frm.doc.items = [];
+						for(let row in ret.message){
+							var child = cur_frm.add_child("items");
+							child.item_code = ret.message[row].item_code;
+							child.expected_qty = ret.message[row].actual_qty;
+							child.valuation_rate = ret.message[row].valuation_rate;
+						}
+						cur_frm.refresh_fields('items');
 					}
-					cur_frm.refresh_fields('items');
 				}
-			}
-		})
+			});
+		}
 	},
 	
 	scan_barcode: function(frm) {

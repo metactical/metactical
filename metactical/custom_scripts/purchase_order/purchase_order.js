@@ -14,7 +14,10 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 		
 		//Remove address if it's new doc
 		if(this.frm.doc.__islocal == 1){
-			this.frm.set_value("shipping_address", '');
+			setTimeout(() => {
+				this.frm.set_value("shipping_address", '');
+				this.frm.set_value("billing_address", "");
+			}, 1000)
 		}
 	},
 	
