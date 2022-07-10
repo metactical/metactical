@@ -91,7 +91,7 @@ def get_items(search_value="", offset=0):
 			it.disabled,
 			it.has_variants,
 			it.is_sales_item,
-			tis.ifw_supplier_qoh AS sqoh
+			CEILING(tis.ifw_supplier_qoh) AS sqoh
 			FROM
 				`tabItem` it
 			LEFT JOIN
