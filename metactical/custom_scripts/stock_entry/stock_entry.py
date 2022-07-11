@@ -7,6 +7,7 @@ from frappe.utils import flt
 from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 from erpnext.stock.doctype.serial_no.serial_no import update_serial_nos_after_submit
 
+
 def validate(self, method):
 	user = frappe.session.user
 	setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
@@ -111,4 +112,8 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
+	
+@frappe.whitelist()
+def get_default_transit(user):
+	return frappe.db.get_value('Stock Entry User Permissions', user, 'add_to_transit')
 					
