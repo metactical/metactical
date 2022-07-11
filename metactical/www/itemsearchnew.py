@@ -2,12 +2,13 @@ import frappe
 from frappe import _
 import frappe.sessions
 from frappe.utils import cint, sanitize_html, strip_html
+from datetime import datetime
 
 
 def get_context(context):		
-	'''if (frappe.session.user == "Guest" or
+	if (frappe.session.user == "Guest" or
 		frappe.db.get_value("User", frappe.session.user, "user_type")=="Website User"):
-		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)'''
+		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)
 		
 	context.no_cache = True
 	search_text = frappe.request.args["searchtext"]
@@ -24,6 +25,24 @@ def get_context(context):
 		context.columns = items["columns"]
 		context.data = items["data"]
 		
+def get_last_reconciled(item_code, warehouse):
+	ret = '<span class="last-reconciled">Last Reconciled: '
+	query = frappe.db.sql("""SELECT
+								sri.warehouse, sr.posting_date AS date
+							FROM
+								`tabStock Reconciliation Item` AS sri
+							LEFT JOIN
+								`tabStock Reconciliation` AS sr ON sr.name = sri.parent
+							WHERE
+								sri.item_code = %(item_code)s AND sri.warehouse = %(warehouse)s
+							ORDER BY sr.posting_date DESC LIMIT 1""", 
+							{"item_code": item_code, "warehouse": warehouse}, as_dict=1)
+	if len(query) > 0:
+		ret += datetime.strftime(query[0].date, '%m-%d-%Y')
+	else:
+		ret += 'Never'
+	ret += '</span>'
+	return ret
 
 def get_price_list():
 	query = frappe.db.sql("""SELECT price_list FROM `tabItem Search Print Price List` WHERE user=%(user)s""", {"user": frappe.session.user}, as_dict=1)
@@ -192,7 +211,12 @@ def get_items(search_value="", offset=0):
 				warehouse_qty = 0.0
 				if item_code in warehouse_wise_items[warehouse]:
 					warehouse_qty = warehouse_wise_items[warehouse][item_code]
-				item_row.append(int(warehouse_qty))
+				#Get last reconciled
+				last_reconciled = get_last_reconciled(item_code, warehouse)
+				item_row.append(str(int(warehouse_qty)) + last_reconciled)
+				
+			#Get last reconciled
+			#item_row.insert(0, get_last_reconciled(item_code, warehouses))
 
 			item_row.extend([barcode, ifw_location, item_code, variant_of])
 			table_data.append(item_row)

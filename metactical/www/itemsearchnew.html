@@ -36,6 +36,31 @@
 		border-width: 1px;
 		color: #FFF;
 	}
+	.popup {
+		position:absolute;
+		top:10px;
+		left:0px;
+		height:30px;
+		background:#ccc;
+		display:none;
+	}
+
+	table tr td .last-reconciled {
+	  visibility: hidden;
+	  width: 200px;
+	  background-color: #FFF;
+	  /* color of the tooltip text */
+	  text-align: center;
+	  border-radius: 6px;
+	  padding: 5px 0;
+	  position: absolute;
+	  z-index: 1;
+	}
+
+	td:hover .last-reconciled {
+	  visibility: visible;
+	}
+	
 	</style>
 </head>
 <body>
@@ -185,7 +210,6 @@
 			var price_list = "{{ price_list }}";
 			var item_price = null;
 			if(price_list != "None"){
-				console.log({"Price List": price_list});
 				frappe.model.get_value('Item Price', {'item_code': item_code, 'price_list': price_list, 'selling': 1}, 'price_list_rate',
 					function(ret){
 						var mywindow = window.open('', 'PRINT');
@@ -218,8 +242,8 @@
 			$("#item-title").hide();
 			
 			//On row selection, display the item code in header with options to copy item code and barcode
-			$("table > tbody > tr").on("click", function() {
-				console.log(this.cells);
+			$("table > tbody > tr").on("click", function(e) {
+				e.preventDefault();
 				item_column = this.cells.length - 2;
 				barcode_column = this.cells.length - 4;
 				$("#item_code").val(this.cells[item_column].innerText);
@@ -232,7 +256,6 @@
 				
 				//For barcodes
 				var barcode_html = this.cells[barcode_column].innerText;
-				console.log(barcode_html)
 				if(barcode_html != 'None' && barcode_html != ''){
 					var barcodes = barcode_html.split('\n')
 					var barcode_copy = '<b style="font-size: 10px; color: #FFF; text-align: left !important;">Barcodes</b><br>';
@@ -251,7 +274,6 @@
 					$('#copy-barcode').html('');
 				}
 			});
-			
 			
 			//Datatables
 			// Setup - add a text input to each footer cell
