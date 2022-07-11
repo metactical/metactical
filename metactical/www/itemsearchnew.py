@@ -25,23 +25,31 @@ def get_context(context):
 		context.columns = items["columns"]
 		context.data = items["data"]
 		
-def get_last_reconciled(item_code, warehouse):
-	ret = '<span class="last-reconciled">Last Reconciled: '
+def get_last_reconciled(item_code, warehouses):
+	ret = {}
+	warehouse_filter = ''
+	first = True
+	for warehouse in warehouses:
+		if not first:
+			warehouse_filter += ", "
+		warehouse_filter += "'" + warehouse + "'"
+		first = False
 	query = frappe.db.sql("""SELECT
-								sri.warehouse, sr.posting_date AS date
+								sri.item_code, sri.warehouse, MAX(sr.posting_date) AS date
 							FROM
 								`tabStock Reconciliation Item` AS sri
 							LEFT JOIN
 								`tabStock Reconciliation` AS sr ON sr.name = sri.parent
 							WHERE
-								sri.item_code = %(item_code)s AND sri.warehouse = %(warehouse)s
-							ORDER BY sr.posting_date DESC LIMIT 1""", 
-							{"item_code": item_code, "warehouse": warehouse}, as_dict=1)
+								sri.item_code = '{item_code}' AND sri.warehouse IN ({warehouses})
+								AND sr.docstatus = 1
+							GROUP BY sri.item_code, sri.warehouse
+							ORDER BY sr.posting_date""".format(item_code=item_code, warehouses=warehouse_filter), 
+							as_dict=1)
 	if len(query) > 0:
-		ret += datetime.strftime(query[0].date, '%m-%d-%Y')
-	else:
-		ret += 'Never'
-	ret += '</span>'
+		for row in query:
+			if ret.get(row.warehouse) is None:
+				ret[row.warehouse] = datetime.strftime(row.date, '%m-%d-%Y')
 	return ret
 
 def get_price_list():
@@ -185,7 +193,6 @@ def get_items(search_value="", offset=0):
 			bin_dict[b.get("item_code")] = b.get("actual_qty")
 
 		warehouses = warehouse_wise_items.keys()
-		print(warehouses_to_display)
 		for warehouse in warehouses:
 			if warehouse not in warehouses_to_display:
 				continue
@@ -207,16 +214,21 @@ def get_items(search_value="", offset=0):
 			sqoh = item.sqoh
 
 			item_row.extend([retail_skusuffix, item_name, item_price, gorilla_price, sqoh])
+			
+			#Get last reconcile
+			last_reconcile = get_last_reconciled(item_code, warehouses_to_display.keys())
 			for warehouse in warehouses:
 				warehouse_qty = 0.0
 				if item_code in warehouse_wise_items[warehouse]:
 					warehouse_qty = warehouse_wise_items[warehouse][item_code]
 				#Get last reconciled
-				last_reconciled = get_last_reconciled(item_code, warehouse)
-				item_row.append(str(int(warehouse_qty)) + last_reconciled)
-				
-			#Get last reconciled
-			#item_row.insert(0, get_last_reconciled(item_code, warehouses))
+				last_reconcile_html = '<span class="last-reconciled">Last Reconciled: '
+				if last_reconcile.get(warehouse) is not None:
+					last_reconcile_html += last_reconcile.get(warehouse)
+				else:
+					last_reconcile_html += 'Never'
+				last_reconcile_html += '</span>'
+				item_row.append(str(int(warehouse_qty)) + last_reconcile_html)
 
 			item_row.extend([barcode, ifw_location, item_code, variant_of])
 			table_data.append(item_row)
