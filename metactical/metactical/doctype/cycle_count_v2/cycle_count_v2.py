@@ -10,16 +10,18 @@ class CycleCountV2(Document):
 		doc = frappe.new_doc("Stock Reconciliation");
 		doc.update({
 			"purpose": "Stock Reconciliation",
-			"ais_cycle_count_v2": self.name
+			"ais_cycle_count": self.name
 		})
 		for row in self.items:
-			doc.append("items", {
-				"item_code": row.item_code,
-				"warehouse": self.warehouse,
-				"qty": row.qty,
-				"valuation_rate": row.valuation_rate
-			})
-		doc.submit()
+			if row.qty != row.expected_qty:
+				doc.append("items", {
+					"item_code": row.item_code,
+					"warehouse": self.warehouse,
+					"qty": row.qty,
+					"valuation_rate": row.valuation_rate
+				})
+		if hasattr(doc, "items"):
+			doc.submit()
 		
 @frappe.whitelist()
 def get_expected_qty(item_code, warehouse):
