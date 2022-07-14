@@ -6,9 +6,9 @@ from datetime import datetime
 
 
 def get_context(context):		
-	if (frappe.session.user == "Guest" or
+	'''if (frappe.session.user == "Guest" or
 		frappe.db.get_value("User", frappe.session.user, "user_type")=="Website User"):
-		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)
+		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)'''
 		
 	context.no_cache = True
 	search_text = frappe.request.args["searchtext"]
