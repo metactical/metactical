@@ -57,7 +57,7 @@ def get_last_reconciled(item_codes, warehouses):
 		for row in query:
 			if ret.get(row.item_code) is None:
 				ret[row.item_code] = {} 
-			ret[row.item_code][row.warehouse] = datetime.strftime(row.date, '%m-%d-%Y')
+			ret[row.item_code][row.warehouse] = datetime.strftime(row.date, '%d-%b-%Y')
 	return ret
 
 def get_price_list():
@@ -231,7 +231,7 @@ def get_items(search_value="", offset=0):
 				if item_code in warehouse_wise_items[warehouse]:
 					warehouse_qty = warehouse_wise_items[warehouse][item_code]
 				#Get last reconciled
-				last_reconcile_html = '<span class="last-reconciled">Last Reconciled: '
+				last_reconcile_html = '<span class="last-reconciled">Last Reconciled: <br>'
 				if last_reconciled.get(item_code, {}).get(warehouse) is not None:
 					last_reconcile_html += last_reconciled[item_code][warehouse]
 				else:
