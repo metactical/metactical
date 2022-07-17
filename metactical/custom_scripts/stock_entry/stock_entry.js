@@ -1,3 +1,18 @@
+frappe.ui.form.on('Stock Entry', {
+	refresh: function(frm){
+		if (frm.doc.docstatus === 1) {
+			if (!frm.doc.add_to_transit && frm.doc.purpose=='Material Transfer' && frm.doc.per_transferred < 100) {
+				frm.add_custom_button('Move Stock', function() {
+					frappe.model.open_mapped_doc({
+						method: "erpnext.stock.doctype.stock_entry.stock_entry.make_stock_in_entry",
+						frm: frm
+					})
+				});
+			}
+		}
+	}
+})
+
 erpnext.stock.StockEntry = erpnext.stock.StockEntry.extend({
 	onload: function(frm){
 		var me = this;
