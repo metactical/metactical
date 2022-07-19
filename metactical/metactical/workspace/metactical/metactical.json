@@ -353,9 +353,18 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "STE Draft Report",
+   "link_to": "STE Draft Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2022-06-14 08:41:56.346303",
+ "modified": "2022-07-19 07:26:44.630429",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
