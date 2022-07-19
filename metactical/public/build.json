@@ -126,6 +126,7 @@
 		"erpnext_public/js/payment/payments.js",
 		"erpnext_public/js/controllers/taxes_and_totals.js",
 		"erpnext_public/js/controllers/transaction.js",
+		"custom_scripts/public/erpnext/transaction.js",
 		"erpnext_public/js/templates/item_selector.html",
 		"erpnext_public/js/templates/employees_to_mark_attendance.html",
 		"erpnext_public/js/utils/item_selector.js",
