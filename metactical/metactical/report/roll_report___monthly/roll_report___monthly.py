@@ -7,6 +7,13 @@ from datetime import datetime, timedelta
 
 def execute(filters=None):
 	columns, data = [], []
+	#Check filters. Start date = Monday & End date = Sunday
+	start_day = datetime.strptime(filters.get('start_date'), '%Y-%m-%d').weekday()
+	end_day = datetime.strptime(filters.get('end_date'), '%Y-%m-%d').weekday()
+	if start_day != 0 and end_day != 6:
+		frappe.throw('Error: Start date should be on a Monday and End Date on a Sunday for \
+					proper time calculation')
+	
 	columns = get_columns(filters)
 	employees = get_employees()
 	checkins = get_checkins(employees, filters)
@@ -14,6 +21,8 @@ def execute(filters=None):
 		total = 0.00
 		regular = 0.00
 		other = 0.00
+		weekly_total = 0.00
+		previous_day = 0 #For making weeklly calculations
 		next_logtype = 'IN'
 		checkintime = None
 		fieldname = ''
@@ -26,11 +35,28 @@ def execute(filters=None):
 					time = employee.get(fieldname, 0)
 					timediff = (checkin.time - checkintime).total_seconds() / 3600
 					current_time = time + timediff
-					total = total + timediff
 					employee.update({
 						fieldname: round(current_time, 2)
 					})
 					next_logtype = 'IN'
+					
+					# Check day of the week. If less then previous day 
+					# then means the start of a new week therefore 
+					# do weekly calculations
+					total = total + timediff
+					tday = datetime.strptime(fieldname, '%Y-%m-%d').weekday()
+					if tday < previous_day:
+						if employee.get('isstudent') and employee.isstudent == 'Yes':
+							if weekly_total > 20:
+								regular += 20
+								other = other + (weekly_total - 20)
+							else:
+								regular += weekly_total
+						weekly_total = timediff
+					else:
+						weekly_total += timediff
+						previous_day = tday
+					
 				elif next_logtype == 'IN':
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
 					checkintime = checkin.time
@@ -40,20 +66,6 @@ def execute(filters=None):
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
 					checkintime = checkin.time
 					next_logtype = 'OUT'
-					
-		'''attendances = get_attendances(employees, filters)
-		for employee in employees:
-			total = 0.00
-			regular = 0.00
-			other = 0.00
-			for attendance in attendances:
-				if attendance.employee == employee.name and attendance.get('out_time') and attendance.get('in_time'):
-					timediff = (attendance.out_time - attendance.in_time).seconds / 3600
-					fieldname = datetime.strftime(attendance.attendance_date, "%Y-%m-%d")
-					total = total + timediff
-					employee.update({
-						fieldname: round(timediff, 2)
-					})'''
 		
 		if employee.get('isot') and employee.isot == 'Yes':
 			regular = total
@@ -63,13 +75,15 @@ def execute(filters=None):
 				other = total - 80
 			else:
 				regular = total
-				
+		
+		#Do weekly calculation for the last week	
 		if employee.get('isstudent') and employee.isstudent == 'Yes':
-			if total > 20:
-				regular = 20
-				other = total - 20
+			if weekly_total > 20:
+				regular += 20
+				other = other + (weekly_total - 20)
 			else:
-				regular = total
+				regular += weekly_total
+				
 		employee.update({
 			"total": round(total, 2),
 			"regular": round(regular, 2),
