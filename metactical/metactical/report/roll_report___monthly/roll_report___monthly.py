@@ -21,6 +21,7 @@ def execute(filters=None):
 		total = 0.00
 		regular = 0.00
 		other = 0.00
+		overtime = 0.00
 		weekly_total = 0.00
 		previous_day = 0 #For making weeklly calculations
 		next_logtype = 'IN'
@@ -52,11 +53,34 @@ def execute(filters=None):
 								other = other + (weekly_total - 20)
 							else:
 								regular += weekly_total
+						
+						if employee.get('isot') and employee.isot == 'Yes':
+							#Weekly overtime
+							if weekly_total > 40:
+								overtime = overtime + (weekly_total - 40)
+							#Overtime for that day
+							if timediff > 8:
+								overtime = overtime + (timediff - 8)
+						
+						#Reset weekly total
 						weekly_total = timediff
 					else:
 						weekly_total += timediff
-						previous_day = tday
+						if employee.get('isot') and employee.isot == 'Yes':
+							if timediff > 8:
+								overtime = overtime + (timediff - 8)
 					
+					'''#For overtime
+					if employee.get('isot') and employee.isot == 'Yes':
+						#Weekly overtime
+						if tday < previous_day:
+							if weekly_total > 40:
+								overtime = overtime + (weekly_total - 40)
+							weekly_total = timediff
+						else:
+							weekly_total += timediff'''
+						
+					previous_day = tday					
 				elif next_logtype == 'IN':
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
 					checkintime = checkin.time
@@ -67,14 +91,14 @@ def execute(filters=None):
 					checkintime = checkin.time
 					next_logtype = 'OUT'
 		
-		if employee.get('isot') and employee.isot == 'Yes':
+		'''if employee.get('isot') and employee.isot == 'Yes':
 			regular = total
 		elif employee.get('isot') and employee.isot == 'No':
 			if total > 80:
 				regular = 80
 				other = total - 80
 			else:
-				regular = total
+				regular = total'''
 		
 		#Do weekly calculation for the last week	
 		if employee.get('isstudent') and employee.isstudent == 'Yes':
@@ -84,10 +108,16 @@ def execute(filters=None):
 			else:
 				regular += weekly_total
 				
+		if employee.get('isot') and employee.isot == 'Yes':
+			if weekly_total > 40:
+				overtime = overtime + (weekly_total - 40)
+			regular = total - overtime
+				
 		employee.update({
 			"total": round(total, 2),
 			"regular": round(regular, 2),
-			"other": round(other, 2)
+			"other": round(other, 2),
+			"overtime": round(overtime, 2)
 		})
 		data.append(employee)
 				
@@ -174,6 +204,13 @@ def get_columns(filters):
 			"fieldtype": "Float",
 			"fieldname": "regular",
 			"label": "Regular",
+			"precision": 2,
+			"width": 100
+		},
+		{
+			"fieldtype": "Float",
+			"fieldname": "overtime",
+			"label": "OT",
 			"precision": 2,
 			"width": 100
 		},
