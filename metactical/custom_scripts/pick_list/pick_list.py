@@ -206,6 +206,9 @@ def create_pick_list(source_name, target_doc=None):
 
 	doc.purpose = 'Delivery'
 	PickList.before_save = custom_before_save
+	is_reprint = frappe.db.exists('Pick List Item', {'sales_order': source_name, 'docstatus': 2})
+	if is_reprint:
+		doc.reprinted = 1
 
 	#doc.set_item_locations()
 
