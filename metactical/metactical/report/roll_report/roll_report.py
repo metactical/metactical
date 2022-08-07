@@ -70,6 +70,12 @@ def execute(filters=None):
 				other = total - 20
 			else:
 				regular = total
+				
+		if employee.get("isotherfile") == "Yes":
+			regular = 0
+			other = 0
+			overtime = 0
+				
 		employee.update({
 			"total": round(total, 2),
 			"regular": round(regular, 2),
@@ -99,6 +105,13 @@ def get_columns(filters):
 			"fieldname": "employee_name",
 			"label": "Name",
 			"width": 150
+		},
+		{
+			"fieldtype": "Select",
+			"fieldname": "isotherfile",
+			"label": "IsOtherFile",
+			"options": "Yes/nNo",
+			"width": 100
 		},
 		{
 			"fieldtype": "Select",
@@ -182,6 +195,12 @@ def get_columns(filters):
 			"fieldname": "personal_email",
 			"label": "Personal Email",
 			"width": 150
+		},
+		{
+			"fieldtype": "Small Text",
+			"fieldname": "customnotes",
+			"label": "CustomNotes",
+			"width": 150
 		}
 	]
 	columns.extend(extra_fields)
@@ -199,7 +218,9 @@ def get_employees():
 						ais_adp_no AS adpno,
 						employee_name,
 						cell_number AS mobile,
-						personal_email						
+						personal_email,
+						ais_isotherfile AS isotherfile,
+						ais_customnotes AS customnotes					
 					FROM
 						`tabEmployee`
 					WHERE
