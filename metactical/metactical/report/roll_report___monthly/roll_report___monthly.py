@@ -68,18 +68,7 @@ def execute(filters=None):
 						weekly_total += timediff
 						if employee.get('isot') and employee.isot == 'Yes':
 							if timediff > 8:
-								overtime = overtime + (timediff - 8)
-					
-					'''#For overtime
-					if employee.get('isot') and employee.isot == 'Yes':
-						#Weekly overtime
-						if tday < previous_day:
-							if weekly_total > 40:
-								overtime = overtime + (weekly_total - 40)
-							weekly_total = timediff
-						else:
-							weekly_total += timediff'''
-						
+								overtime = overtime + (timediff - 8)						
 					previous_day = tday					
 				elif next_logtype == 'IN':
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
@@ -90,15 +79,6 @@ def execute(filters=None):
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
 					checkintime = checkin.time
 					next_logtype = 'OUT'
-		
-		'''if employee.get('isot') and employee.isot == 'Yes':
-			regular = total
-		elif employee.get('isot') and employee.isot == 'No':
-			if total > 80:
-				regular = 80
-				other = total - 80
-			else:
-				regular = total'''
 		
 		#Do weekly calculation for the last week	
 		if employee.get('isstudent') and employee.isstudent == 'Yes':
@@ -112,6 +92,11 @@ def execute(filters=None):
 			if weekly_total > 40:
 				overtime = overtime + (weekly_total - 40)
 			regular = total - overtime
+			
+		if employee.get("isotherfile") == "Yes":
+			regular = 0
+			other = 0
+			overtime = 0
 				
 		employee.update({
 			"total": round(total, 2),
@@ -143,6 +128,13 @@ def get_columns(filters):
 			"fieldname": "employee_name",
 			"label": "Name",
 			"width": 150
+		},
+		{
+			"fieldtype": "Select",
+			"fieldname": "isotherfile",
+			"label": "IsOtherFile",
+			"options": "Yes/nNo",
+			"width": 100
 		},
 		{
 			"fieldtype": "Select",
@@ -232,6 +224,12 @@ def get_columns(filters):
 			"fieldname": "personal_email",
 			"label": "Personal Email",
 			"width": 150
+		},
+		{
+			"fieldtype": "Small Text",
+			"fieldname": "customnotes",
+			"label": "CustomNotes",
+			"width": 150
 		}
 	]
 	columns.extend(extra_fields)
@@ -249,7 +247,9 @@ def get_employees():
 						ais_adp_no AS adpno,
 						employee_name,
 						cell_number AS mobile,
-						personal_email						
+						personal_email,
+						ais_isotherfile AS isotherfile,
+						ais_customnotes AS customnotes					
 					FROM
 						`tabEmployee`
 					WHERE
