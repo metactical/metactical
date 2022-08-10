@@ -23,9 +23,59 @@ def test():
 				json=data)				
 	print(response)
 	print(response.json())'''
-	frappe.request = Request('Post', "http://deverp.metactical.com/api/method/metactical.api.shipstation.orders_shipped_webhook?settingid")
-	return frappe.request
-
+	
+@frappe.whitelist()
+def sync_shipping_status():
+	settings = get_settings()
+	response = requests.get('https://ssapi.shipstation.com/shipments?shipDateStart=2022-08-10',
+				auth=(settings[0].api_key, settings[0].get_password('api_secret')))
+	shipments = response.json()
+	for shipment in shipments.get('shipments'):
+		exists = frappe.db.exists('Delivery Note',  {'pick_list': shipment.get('orderKey'), 'docstatus': 0})
+		if exists:
+			weight_display = ''
+			size = ''
+			weight = shipment.get('weight')
+			if weight_display != '':
+				weight_display =+ ' | '
+			weight_display += str(weight.get('value')) + ' ' + weight.get('units')
+			dimensions = shipment.get('dimensions')
+			if size != '':
+				size += ' | '
+			size += str(dimensions.get('length')) + 'l x ' + str(dimensions.get('width')) + 'w x ' + str(dimensions.get('height')) + 'h'
+			
+			#For carrier mapping
+			transporter = ''
+			for row in settings[0].transporter_mapping:
+				if row.carrier_code == shipment.get('carrierCode'):
+					transporter = row.transporter
+			pick_list = shipment.get('orderNumber')
+			shipDate = shipment.get('shipDate')
+			trackingNumber = shipment.get('trackingNumber')
+			shipmentCost = shipment.get('shipmentCost')
+			
+			#Update delivery note
+			existing_delivery = frappe.db.get_value('Delivery Note', {'pick_list': pick_list})
+			delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
+			delivery_note.update({
+				'lr_date': shipDate,
+				'lr_no': trackingNumber,
+				'transporter': transporter,
+				'ais_shipment_cost': shipmentCost,
+				'ais_package_weight': weight_display,
+				'ais_package_size': size,
+				'ais_updated_by_shipstation': 1,
+				'ignore_pricing_rule': 1
+			})
+			delivery_note.submit()
+				
+			#Delete order from other shipstation accounts
+			'''for row in delivery_note.get('ais_shipstation_order_ids'):
+				if row.settings_id != settingid[0]:
+					shipstation_settings = frappe.get_doc('Shipstation Settings', row.settings_id)
+					if shipstation_settings.disabled != 1:
+						response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
+							auth=(shipstation_settings.api_key, shipstation_settings.get_password('api_secret')))'''
 
 @frappe.whitelist(allow_guest=True)
 def connect():

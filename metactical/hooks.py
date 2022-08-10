@@ -151,9 +151,9 @@ scheduler_events = {
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
-# 	"hourly": [
-# 		"metactical.tasks.hourly"
-# 	],
+	"hourly": [
+		"metactical.api.shipstation.sync_shipping_status"
+	],
 # 	"weekly": [
 # 		"metactical.tasks.weekly"
 # 	]
