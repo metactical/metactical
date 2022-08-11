@@ -30,6 +30,7 @@ def sync_shipping_status():
 	response = requests.get('https://ssapi.shipstation.com/shipments?shipDateStart=2022-08-07',
 				auth=(settings[0].api_key, settings[0].get_password('api_secret')))
 	shipments = response.json()
+	frappe.set_user(settings[0].shipstation_user)
 	for shipment in shipments.get('shipments'):
 		exists = frappe.db.exists('Delivery Note',  {'pick_list': shipment.get('orderKey'), 'docstatus': 0})
 		if exists:
