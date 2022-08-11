@@ -27,7 +27,7 @@ def test():
 @frappe.whitelist()
 def sync_shipping_status():
 	settings = get_settings()
-	response = requests.get('https://ssapi.shipstation.com/shipments?shipDateStart=2022-08-10',
+	response = requests.get('https://ssapi.shipstation.com/shipments?shipDateStart=2022-08-07',
 				auth=(settings[0].api_key, settings[0].get_password('api_secret')))
 	shipments = response.json()
 	for shipment in shipments.get('shipments'):
