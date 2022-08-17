@@ -56,9 +56,11 @@ erpnext.TransactionController = erpnext.TransactionController.extend({
 				'secondary_action': function(){
 					scanned_dialog.hide();
 				},
-				'secondary_action_label': 'Cancel'
+				'secondary_action_label': 'Cancel',
+				'no_submit_on_enter': true
 			});
-			scanned_dialog.fields_dict.barcode.input.onchange = function(){
+			
+			scanned_dialog.barcode_scanned = function(){
 				if(scanned_dialog.get_values()['barcode'] == '' || scanned_dialog.get_values()['barcode'] == null){
 					return
 				}
@@ -101,6 +103,13 @@ erpnext.TransactionController = erpnext.TransactionController.extend({
 					}
 				});
 			}
+						
+			scanned_dialog.fields_dict.barcode.input.onkeypress = function(event){
+				if(event.keyCode == 13)
+				{
+					scanned_dialog.barcode_scanned();
+				}
+			};
 			scanned_dialog.show();
 		}
 	}
