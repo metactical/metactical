@@ -14,7 +14,7 @@ frappe.ui.form.on('Sales Order', {
 		setTimeout(() => {
 			
 			frm.remove_custom_button("Pick List", 'Create'); 
-			frm.add_custom_button(__('Pick List'), () => frm.events.create_pick_list_custom(), __("Create"));
+			frm.add_custom_button(__('Pick List'), () => frm.events.create_pick_list_custom(frm), __("Create"));
 			frm.remove_custom_button("Work Order", 'Create');
 			frm.remove_custom_button("Request for Raw Materials", 'Create'); 
 			frm.remove_custom_button("Project", 'Create'); 
@@ -155,40 +155,63 @@ frappe.ui.form.on('Sales Order', {
 		dialog.show();
 	},
 	
-	create_pick_list_custom(frm) {
+	create_pick_list_custom: function(frm) {
 		// confirm item availability
 		var items = cur_frm.doc.items
 		var flag = 0;
-		var item_flag = ""
+		var item_flag = "";
+		var proceed = true;
 		items.forEach(function(row){
 			if (row.ais_is_stock_item == 1 && (row.actual_qty - (row.qty + row.sal_reserved_qty)) < 0) {
 				flag = 1;
 				item_flag = row.item_code;
+				proceed = false;
 			}
 		});
-		if (flag != 1) {
-			frappe.model.open_mapped_doc({
-				method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
-				frm: cur_frm
-			})
-		}
-		else{
+		if (flag == 1) {
 			frappe.confirm(
 				'Warning: Insufficient stock for Item ' + item_flag + '. Do you want to proceed anyway?',
 				function(){
-					frappe.model.open_mapped_doc({
-						method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
-						frm: cur_frm
-					})
+					frm.events.open_pick_list(frm);
+					window.close();
 				},
 				function(){
+					proceed = false;
 					window.close();
 				}
 			)
 		}
+		
+		if(frm.doc.ifw_signifyd_guaranteedisposition != 'APPROVED'){
+			proceed = false;
+			frappe.confirm(
+				'Warning: The order has not been approved by Signiyd. Do you want to proceed anyway?',
+				function(){
+					if(flag != 1){ //Check that there is sufficient stock first
+						frm.events.open_pick_list(frm);
+					}
+					window.close();
+				},
+				function(){
+					proceed = false;
+					window.close();
+				}
+			);
+		}
+		
+		if(proceed){
+			frm.events.open_pick_list(frm);
+		}
+	},
+	
+	open_pick_list: function(frm) {
+		frappe.model.open_mapped_doc({
+			method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
+			frm: cur_frm
+		});
 	},
 
-	create_material_transfer_custom() {
+	create_material_transfer_custom: function() {
 		frappe.model.open_mapped_doc({
 			method: "metactical.custom_scripts.stock_entry.stock_entry.create_stock_entry",
 			frm: cur_frm
