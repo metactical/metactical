@@ -199,7 +199,13 @@
 }
 
 .pl-barcode{
-	width: 100%; 
+	width: 50%; 
+	padding-left: 15px; 
+	padding-right: 15px;
+}
+
+.pl-source{
+	width: 50%; 
 	padding-left: 15px; 
 	padding-right: 15px;
 }
@@ -230,6 +236,18 @@
 	.list-top-nav-desk{
 		display: none;
 	}
+	
+	.pl-barcode{
+		width: 50%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
+
+	.pl-source{
+		width: 50%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
 }
 
 @media only screen and (max-width: 768px) {
@@ -253,5 +271,17 @@
 	
 	.submit-container{
 		width: 75%;
+	}
+	
+	.pl-barcode{
+		width: 100%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
+
+	.pl-source{
+		width: 100%; 
+		padding-left: 15px; 
+		padding-right: 15px;
 	}
 }

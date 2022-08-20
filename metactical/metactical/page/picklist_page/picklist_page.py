@@ -13,11 +13,16 @@ def get_defaults(user):
 	return default_settings
 
 @frappe.whitelist()
-def load_summary(warehouse):
+def load_summary(warehouse, source):
 	to_ship = 0
 	to_pick = 0
 	rush = 0
 	same = 0
+	where = ''
+	where_filter = {"warehouse": warehouse}
+	if source != "All":
+		where = " AND pl.ais_source = %(source)s "
+		where_filter.update({"source": source})
 	ready_to_ship = frappe.db.sql("""SELECT 
 							count(DISTINCT pli.parent) AS orders
 						FROM 
@@ -25,8 +30,8 @@ def load_summary(warehouse):
 						LEFT JOIN
 							`tabPick List` AS pl ON pl.name = pli.parent
 						WHERE
-							pli.warehouse = %(warehouse)s AND pl.docstatus = 0""", 
-					{"warehouse": warehouse}, as_dict=1)
+							pli.warehouse = %(warehouse)s AND pl.docstatus = 0""" + where, 
+					where_filter, as_dict=1)
 	items_to_pick = frappe.db.sql("""SELECT
 										SUM(pli.qty) AS to_pick
 									FROM
@@ -34,8 +39,8 @@ def load_summary(warehouse):
 									LEFT JOIN
 										`tabPick List` AS pl ON pl.name = pli.parent
 									WHERE
-										pli.warehouse = %(warehouse)s AND pl.docstatus = 0""", 
-					{"warehouse": warehouse}, as_dict=1)
+										pli.warehouse = %(warehouse)s AND pl.docstatus = 0""" + where, 
+					where_filter, as_dict=1)
 	rush_orders = frappe.db.sql("""SELECT
 							count(DISTINCT pli.parent) AS orders
 						FROM
@@ -44,7 +49,7 @@ def load_summary(warehouse):
 							`tabPick List` AS pl ON pli.parent = pl.name
 						WHERE
 							pli.warehouse = %(warehouse)s AND pl.is_rush = 1 AND pl.docstatus = 0
-							""", {"warehouse": warehouse}, as_dict=1)
+							""" + where, where_filter, as_dict=1)
 	same_address = frappe.db.sql("""SELECT SUM(occurences) AS orders
 							FROM
 								(
@@ -56,13 +61,13 @@ def load_summary(warehouse):
 										`tabPick List` AS pl ON pli.parent = pl.name
 									WHERE
 										pli.warehouse = %(warehouse)s AND pl.customer IS NOT NULL 
-										AND pl.docstatus = 0
+										AND pl.docstatus = 0 """ + where + """
 									GROUP BY
 										pl.customer
 									HAVING
 										COUNT(pl.customer) > 1
  								) t
-							""", {"warehouse": warehouse}, as_dict=1)
+							""", where_filter, as_dict=1)
 							
 	if len(ready_to_ship) > 0:
 		to_ship = ready_to_ship[0].orders
@@ -78,10 +83,12 @@ def load_summary(warehouse):
 	return {'ready_to_ship': to_ship, 'items_to_pick': to_pick, 'rush_orders': rush, 'same_address': same}
 	
 @frappe.whitelist()
-def get_pick_lists(warehouse, filters):
+def get_pick_lists(warehouse, filters, source):
 	where = ''
 	if filters != "":
 		where = " AND pl.name LIKE '%{where_f}%'".format(where_f = filters)
+	if source != "All":
+		where = " AND pl.ais_source = '{source}'".format(source = source)
 	pick_lists = frappe.db.sql("""SELECT
 										pl.name, pl.customer, pl.is_rush, pli.sales_order
 									FROM
