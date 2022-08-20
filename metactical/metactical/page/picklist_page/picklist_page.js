@@ -42,11 +42,13 @@ class PicklistPage{
 		this.$single_order_button = this.wrapper.find("#single_order_button");
 		this.$list_orders_btn = this.wrapper.find('#list_orders_button');
 		this.$selected_warehouse = this.wrapper.find('#selected_warehouse');
+		this.$selected_source = this.wrapper.find('#selected_source');
 		this.$user_name = this.wrapper.find('#user_name');
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
 			me.$selected_warehouse.html(ret.message.default_warehouse);
 			metactical.pick_list.selected_warehouse = ret.message.default_warehouse;
+			metactical.pick_list.selected_source = me.$selected_source.html();
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -61,6 +63,9 @@ class PicklistPage{
 		});
 		this.$selected_warehouse.on('click', function(){
 			me.change_warehouse()
+		});
+		this.$selected_source.on('click', function(){
+			me.change_source()
 		});
 	}
 	
@@ -82,6 +87,20 @@ class PicklistPage{
 		)
 	}
 	
+	change_source() {
+		var me = this;
+		frappe.prompt(
+			[{"fieldtype": "Link", "fieldname": "source", "options": "Lead Source", "label": 'Source'}],
+			function(values){
+				me.$selected_source.html(values.source);
+				metactical.pick_list.selected_source = values.source
+				me.load_summary();
+			},
+			'Change Warehouse',
+			'Change' 
+		)
+	}
+	
 	load_summary(){
 		var me = this;
 		this.$summary = {};
@@ -93,7 +112,8 @@ class PicklistPage{
 			"method": "metactical.metactical.page.picklist_page.picklist_page.load_summary",
 			"freeze": true,
 			"args": {
-				"warehouse": metactical.pick_list.selected_warehouse
+				"warehouse": metactical.pick_list.selected_warehouse,
+				"source": metactical.pick_list.selected_source
 			},
 			"callback": function(ret){
 				me.$summary.ready_to_ship.html(ret.message.ready_to_ship);
@@ -110,10 +130,15 @@ class PicklistPage{
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
 				"warehouse": metactical.pick_list.selected_warehouse,
-				"filters": filter
+				"filters": filter,
+				"source": metactical.pick_list.selected_source
 			},
 			"freeze": true,
 			"callback": function(ret){
+				let selected_source = 'Source';
+				if(metactical.pick_list.selected_source != "All"){
+					selected_source = metactical.pick_list.selected_source;
+				}
 				me.wrapper.html(frappe.render_template('orders_list', {"pick_lists": ret.message}));
 				me.pl_barcode = frappe.ui.form.make_control({
 					parent: $('.pl-barcode'),
@@ -124,8 +149,29 @@ class PicklistPage{
 					},
 					render_input: true
 				});
+				me.pl_source = frappe.ui.form.make_control({
+					parent: $('.pl-source'),
+					df: {
+						fieldname: 'source',
+						fieldtype: 'Link',
+						options: 'Lead Source',
+						placeholder: selected_source,
+						change: function(){
+							console.log("Source called");
+							let source = me.pl_source.get_value();
+							if(source != ""){
+								metactical.pick_list.selected_source = source;
+								me.list_orders();
+							}
+						}
+					},
+					render_input: true
+				});
 				me.pl_barcode.set_value(filter);
 				me.pl_barcode.set_focus();
+				/*if(metactical.pick_list.selected_source != "All"){
+					me.pl_source.set_value(metactical.pick_list.selected_source);
+				}*/
 				me.orders = me.wrapper.find('.orders-container');
 				me.orders.on('click', '.order-list-div', function(){
 					var order = $(this);
@@ -149,6 +195,9 @@ class PicklistPage{
 					if(barcode != ''){
 						me.list_orders(filter=barcode);
 					}
+				});
+				me.wrapper.find('.pl-source').on('change', function(){
+					
 				});
 			}
 		});
