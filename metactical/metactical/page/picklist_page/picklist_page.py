@@ -125,7 +125,7 @@ def get_items(pick_list, warehouse, user):
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
 			locations = []
-			if item.get('locations', '') != '':
+			if item.get('locations') not in [None, ""]:
 				locations = item.get('locations').split("|")
 			item.update({
 				"barcodes": [row.barcode for row in barcodes],
