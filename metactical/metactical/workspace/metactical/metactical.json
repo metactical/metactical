@@ -380,9 +380,27 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report - USA",
+   "link_to": "Sales Report - USA",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Full Time Log Report",
+   "link_to": "Full Time Log",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2022-08-08 10:17:18.123242",
+ "modified": "2022-08-24 17:49:35.060904",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
