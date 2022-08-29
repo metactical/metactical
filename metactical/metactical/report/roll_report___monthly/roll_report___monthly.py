@@ -23,6 +23,8 @@ def execute(filters=None):
 		other = 0.00
 		overtime = 0.00
 		weekly_total = 0.00
+		daily_overtime = 0.00
+		weekly_overtime = 0.00
 		previous_day = 0 #For making weeklly calculations
 		next_logtype = 'IN'
 		checkintime = None
@@ -53,22 +55,37 @@ def execute(filters=None):
 								other = other + (weekly_total - 20)
 							else:
 								regular += weekly_total
-						
+						# OT calculated if weekly total is over 44 hours for ON 
+						# once weekly hours is over 40 hours for QC
+						# once weekly hours is over 40 hours for QC
 						if employee.get('isot') and employee.isot == 'Yes':
 							#Weekly overtime
-							if weekly_total > 40:
+							if employee.get('state') == 'ON' and weekly_total > 44:
+								overtime = overtime + (weekly_total - 44)
+							elif employee.get('state') == 'QC' and weekly_total > 40:
 								overtime = overtime + (weekly_total - 40)
-							#Overtime for that day
-							if timediff > 8:
-								overtime = overtime + (timediff - 8)
+							elif employee.get('state') == 'BC':
+								if weekly_total > 40:
+									weekly_overtime = weekly_total - 40
+								#Overtime for that day
+								if timediff > 8:
+									daily_overtime = daily_overtime + (timediff - 8)
+								#If daily overtime is greater than weekly then overtime = daily overtime
+								if daily_overtime > weekly_overtime:
+									overtime += daily_overtime
+								else:
+									overtime += weekly_overtime
 						
 						#Reset weekly total
 						weekly_total = timediff
+						weekly_overtime = 0
+						daily_overtime = 0
 					else:
 						weekly_total += timediff
-						if employee.get('isot') and employee.isot == 'Yes':
+						#Calculate daily overtime
+						if employee.get('isot') == 'Yes' and employee.get('state') == 'BC':
 							if timediff > 8:
-								overtime = overtime + (timediff - 8)						
+								daily_overtime = daily_overtime + (timediff - 8)						
 					previous_day = tday					
 				elif next_logtype == 'IN':
 					fieldname = datetime.strftime(checkin.time, "%Y-%m-%d")
@@ -89,8 +106,21 @@ def execute(filters=None):
 				regular += weekly_total
 				
 		if employee.get('isot') and employee.isot == 'Yes':
-			if weekly_total > 40:
+			if employee.get('state') == 'ON' and weekly_total > 44:
+				overtime = overtime + (weekly_total - 44)
+			elif employee.get('state') == 'QC' and weekly_total > 40:
 				overtime = overtime + (weekly_total - 40)
+			elif employee.get('state') == 'BC':
+				if weekly_total > 40:
+					weekly_overtime = weekly_total - 40
+				#Overtime for that day
+				if timediff > 8:
+					daily_overtime = daily_overtime + (timediff - 8)
+				#If daily overtime is greater than weekly then overtime = daily overtime
+				if daily_overtime > weekly_overtime:
+					overtime += daily_overtime
+				else:
+					overtime += weekly_overtime
 			regular = total - overtime
 			
 		if employee.get("isotherfile") == "Yes":
@@ -104,7 +134,10 @@ def execute(filters=None):
 			"other": round(other, 2),
 			"overtime": round(overtime, 2)
 		})
-		data.append(employee)
+		
+		#Only add employee if total no of hours > 0
+		if total > 0:
+			data.append(employee)
 				
 	return columns, data
 	
@@ -162,12 +195,6 @@ def get_columns(filters):
 			"label": "IsSalary",
 			"options": "Yes/nNo",
 			"width": 100
-		},
-		{
-			"fieldtype": "Data",
-			"fieldname": "adpno",
-			"label": "ADP No",
-			"width": 100
 		}
 	]
 	
@@ -209,7 +236,7 @@ def get_columns(filters):
 		{
 			"fieldtype": "Float",
 			"fieldname": "other",
-			"label": "Other",
+			"label": "GoogleSheet",
 			"precision": 2,
 			"width": 100
 		},
@@ -226,10 +253,22 @@ def get_columns(filters):
 			"width": 150
 		},
 		{
+			"fieldtype": "Data",
+			"fieldname": "state",
+			"label": "Province",
+			"width": 80
+		},
+		{
 			"fieldtype": "Small Text",
 			"fieldname": "customnotes",
 			"label": "CustomNotes",
 			"width": 150
+		},
+		{
+			"fieldtype": "Data",
+			"fieldname": "adpno",
+			"label": "ADP No",
+			"width": 100
 		}
 	]
 	columns.extend(extra_fields)
@@ -249,11 +288,11 @@ def get_employees():
 						cell_number AS mobile,
 						personal_email,
 						ais_isotherfile AS isotherfile,
-						ais_customnotes AS customnotes					
+						ais_customnotes AS customnotes,
+						ais_state AS state				
 					FROM
 						`tabEmployee`
-					WHERE
-						status = 'Active'""", as_dict=1)
+				""", as_dict=1)
 	return query
 
 def get_checkins(employees, filters):
