@@ -25,6 +25,7 @@ def execute(filters=None):
 		weekly_total = 0.00
 		daily_overtime = 0.00
 		weekly_overtime = 0.00
+		student_bonus = 0.00
 		previous_day = 0 #For making weeklly calculations
 		next_logtype = 'IN'
 		checkintime = None
@@ -50,9 +51,9 @@ def execute(filters=None):
 					tday = datetime.strptime(fieldname, '%Y-%m-%d').weekday()
 					if tday < previous_day:
 						if employee.get('isstudent') and employee.isstudent == 'Yes':
-							if weekly_total > 20:
-								regular += 20
-								other = other + (weekly_total - 20)
+							if weekly_total > 40:
+								regular += 40
+								student_bonus = student_bonus + (weekly_total - 40)
 							else:
 								regular += weekly_total
 						# OT calculated if weekly total is over 44 hours for ON 
@@ -99,9 +100,9 @@ def execute(filters=None):
 		
 		#Do weekly calculation for the last week	
 		if employee.get('isstudent') and employee.isstudent == 'Yes':
-			if weekly_total > 20:
-				regular += 20
-				other = other + (weekly_total - 20)
+			if weekly_total > 40:
+				regular += 40
+				student_bonus = student_bonus + (weekly_total - 40)
 			else:
 				regular += weekly_total
 				
@@ -132,7 +133,8 @@ def execute(filters=None):
 			"total": round(total, 2),
 			"regular": round(regular, 2),
 			"other": round(other, 2),
-			"overtime": round(overtime, 2)
+			"overtime": round(overtime, 2),
+			"student_bonus": round(student_bonus, 2)
 		})
 		
 		#Only add employee if total no of hours > 0
@@ -223,6 +225,13 @@ def get_columns(filters):
 			"fieldtype": "Float",
 			"fieldname": "regular",
 			"label": "Regular",
+			"precision": 2,
+			"width": 100
+		},
+		{
+			"fieldtype": "Float",
+			"fieldname": "student_bonus",
+			"label": "Student Bonus",
 			"precision": 2,
 			"width": 100
 		},
