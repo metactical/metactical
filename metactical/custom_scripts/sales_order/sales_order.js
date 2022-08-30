@@ -185,7 +185,7 @@ frappe.ui.form.on('Sales Order', {
 		if(frm.doc.ifw_signifyd_guaranteedisposition != 'APPROVED'){
 			proceed = false;
 			frappe.confirm(
-				'Warning: The order has not been approved by Signiyd. Do you want to proceed anyway?',
+				'Warning: The order has not been approved by SignifyD. Do you want to proceed anyway?',
 				function(){
 					if(flag != 1){ //Check that there is sufficient stock first
 						frm.events.open_pick_list(frm);
