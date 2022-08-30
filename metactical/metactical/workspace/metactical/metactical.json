@@ -384,7 +384,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Sales Report - USA",
+   "label": "Sales Report USA - V1",
    "link_to": "Sales Report - USA",
    "link_type": "Report",
    "onboard": 0,
@@ -400,7 +400,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-08-24 17:49:35.060904",
+ "modified": "2022-08-30 06:38:37.217408",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

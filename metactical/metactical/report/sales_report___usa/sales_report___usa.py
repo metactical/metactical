@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Frappe Technologies Pvt. Ltd. and contributors
+# Copyright (c) 2022, Techlift Technologies and contributors
 # For license information, please see license.txt
 
 from __future__ import unicode_literals
@@ -56,34 +56,13 @@ def execute(filters=None):
 		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
 		row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("supplier"))
 		
-		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
-		row["wh_dtn"] = get_qty(i.get("item_code"), "R05-DTN-Active Stock - ICL") or 0
-		row["wh_queen"] = get_qty(i.get("item_code"), "R07-Queen-Active Stock - ICL") or 0
-		row["wh_amb"] = get_qty(i.get("item_code"), "R06-AMB-Active Stock - ICL") or 0
-		row["wh_mon"] = get_qty(i.get("item_code"), "R04-Mon-Active Stock - ICL") or 0
-		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
-		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
-		row["wh_gor"] = get_qty(i.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
+		row["wh_us"] = get_qty(i.get("item_code"), "US02-Houston - Active Stock - ICL") or 0
 		
 		row["total_actual_qty"] = 0
 		
-		if row.get("wh_whs") > 0: 
-			row["total_actual_qty"] += row.get("wh_whs")
-		if row.get("wh_dtn") > 0:
-			row["total_actual_qty"] += row.get("wh_dtn")
-		if row.get("wh_queen") > 0:
-			row["total_actual_qty"] += row.get("wh_queen")
-		if row.get("wh_amb") > 0:
-			row["total_actual_qty"] += row.get("wh_amb")
-		if row.get("wh_mon") > 0:
-			row["total_actual_qty"] += row.get("wh_mon")
-		if row.get("wh_vic") > 0:
-			row["total_actual_qty"] += row.get("wh_vic")
-		if row.get("wh_edm") > 0:
-			row["total_actual_qty"] += row.get("wh_edm")
-		if row.get("wh_gor") > 0:
-			row["total_actual_qty"] += row.get("wh_gor")
-		warehouse = None if filters.get('reference_warehouse') == 'Total QOH' else filters.get('reference_warehouse')
+		if row.get("wh_us") > 0: 
+			row["total_actual_qty"] += row.get("wh_us")
+		warehouse = 'US02-Houston - Active Stock - ICL'
 		row["material_request"], row['mr_status'], row['mr_total_qty'] = get_open_material_request(i.get("item_code"), warehouse)
 		row["tag"] = get_tags(i.get("item_code"))
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
@@ -156,14 +135,7 @@ def get_reference_warehouse(filters):
 	warehouse = filters.get('reference_warehouse')
 	warehouse_map = {
 		"Total QOH": "total_actual_qty",
-		"W01-WHS-Active Stock - ICL": "wh_whs",
-		"R05-DTN-Active Stock - ICL": "wh_dtn",
-		"R07-Queen-Active Stock - ICL": "wh_queen",
-		"R06-AMB-Active Stock - ICL": "wh_amb",
-		"R04-Mon-Active Stock - ICL": "wh_mon",
-		"R03-Vic-Active Stock - ICL": "wh_vic",
-		"R02-Edm-Active Stock - ICL": "wh_edm",
-		"R01-Gor-Active Stock - ICL": "wh_gor"
+		"US02-Houston - Active Stock - ICL": "wh_us"
 	}
 	return warehouse_map.get(warehouse)
 
@@ -222,12 +194,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Data",
 				"width": 200,
 			},
-			{
-				"label": _("Duty rate"),
-				"fieldname": "ifw_duty_rate",
-				"fieldtype": "Int",
-				"width": 100,
-			},
+			#{
+			#	"label": _("Duty rate"),
+			#	"fieldname": "ifw_duty_rate",
+			#	"fieldtype": "Int",
+			#	"width": 100,
+			#},
 			{
 				"label": _("Discontinued"),
 				"fieldname": "ifw_discontinued",
@@ -247,12 +219,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Data",
 				"width": 100,
 			},
-			{
-				"label": _("Item Notes2"),
-				"fieldname": "ifw_item_notes2",
-				"fieldtype": "Data",
-				"width": 100,
-			},
+			#{
+			#	"label": _("Item Notes2"),
+			#	"fieldname": "ifw_item_notes2",
+			#	"fieldtype": "Data",
+			#	"width": 100,
+			#},
 			{
 				"label": _("PONotes"),
 				"fieldname": "ifw_po_notes",
@@ -278,13 +250,13 @@ def get_column(filters,conditions):
 				"options": "Country",
 				"width": 100,
 			},
-			{
-				"label": _("HS Code"),
-				"fieldname": "customs_tariff_number",
-				"fieldtype": "Link",
-				"options": "Customs Tariff Number",
-				"width": 100,
-			},
+			#{
+			#	"label": _("HS Code"),
+			#	"fieldname": "customs_tariff_number",
+			#	"fieldtype": "Link",
+			#	"options": "Customs Tariff Number",
+			#	"width": 100,
+			#},
 
 			{
 				"label": _("Tags"),
@@ -292,12 +264,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Data",
 				"width": 100,
 			},
-			{
-				"label": _("Rate"),
-				"fieldname": "rate",
-				"fieldtype": "Currency",
-				"width": 100,
-			},
+			#{
+			#	"label": _("Rate"),
+			#	"fieldname": "rate",
+			#	"fieldtype": "Currency",
+			#	"width": 100,
+			#},
 			# {
 			# 	"label": _("Discointinued"),
 			# 	"fieldname": "item_discontinued",
@@ -329,138 +301,80 @@ def get_column(filters,conditions):
 				"fieldtype": "Data",
 				"width": 100,
 			},
-			{
-				"label": _("Supplier Name"),
-				"fieldname": "supplier_name",
-				"fieldtype": "Link",
-				"options": "Supplier",
-				"width": 200,
-			},
+			#{
+			#	"label": _("Supplier Name"),
+			#	"fieldname": "supplier_name",
+			#	"fieldtype": "Link",
+			#	"options": "Supplier",
+			#	"width": 200,
+			#},
 			{
 				"label": _("SQOH"),
 				"fieldname": "sqoh",
 				"fieldtype": "Float",
 				"width": 100,
+			},
+			{
+				"label": _("US02-Houston - Active Stock - ICL"),
+				"fieldname": "wh_us",
+				"fieldtype": "Int",
+				"width": 200,
+			},
+			#{
+			#	"label": _("TotalQOH"),
+			#	"fieldname": "total_actual_qty",
+			#	"fieldtype": "Int",
+			#	"width": 140,
+			#},
+			{
+				"label": _("Material Request"),
+				"fieldname": "material_request",
+				"fieldtype": "Data",
+				"width": 200,
+			},
+			{
+				"label": _("Material Request Status"),
+				"fieldname": "mr_status",
+				"fieldtype": "Data",
+				"width": 200,
+			},
+			{
+				"label": _("Expected PO Nos"),
+				"fieldname": "expected_pos",
+				"fieldtype": "Data",
+				"width": 240,
+			},
+			{
+				"label": _("ETA date PO"),
+				"fieldname": "po_eta",
+				"fieldtype": "Data",
+				"width": 200,
+			},
+			{
+				"label": _("OrderedQty"),
+				"fieldname": "ordered_qty",
+				"fieldtype": "Int",
+				"width": 120,
+			},
+			{
+				"label": _("PreviousYSale"),
+				"fieldname": "previous_year_sale",
+				"fieldtype": "Int",
+				"width": 140,
+			},
+			{
+				"label": _("CurrentYearSales"),
+				"fieldname": "total",
+				"fieldtype": "Int",
+				"width": 140,
+			},
+			{
+				"label": _("TotalSold12Months"),
+				"fieldname": "last_twelve_months",
+				"fieldtype": "Int",
+				"width": 140,
 			}
 		]
-		
-	if filters.get('reference_warehouse') != 'Total QOH':
-		columns.append(
-			{
-				"label": _(filters.get("reference_warehouse")),
-				"fieldname": get_reference_warehouse(filters),
-				"fieldtype": "Int",
-				"width": 200
-			}
-		)
-	else:
-		columns.extend([
-			{
-				"label": _("W01-WHS-Active Stock - ICL"),
-				"fieldname": "wh_whs",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R05-DTN-Active Stock - ICL"),
-				"fieldname": "wh_dtn",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R07-Queen-Active Stock - ICL"),
-				"fieldname": "wh_queen",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R06-AMB-Active Stock - ICL"),
-				"fieldname": "wh_amb",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R04-Mon-Active Stock - ICL"),
-				"fieldname": "wh_mon",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R03-Vic-Active Stock - ICL"),
-				"fieldname": "wh_vic",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R02-Edm-Active Stock - ICL"),
-				"fieldname": "wh_edm",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R01-Gor-Active Stock - ICL"),
-				"fieldname": "wh_gor",
-				"fieldtype": "Int",
-				"width": 200,
-			}
-		])
-		
-	columns.extend([
-		{
-			"label": _("TotalQOH"),
-			"fieldname": "total_actual_qty",
-			"fieldtype": "Int",
-			"width": 140,
-		},
-		{
-			"label": _("Material Request"),
-			"fieldname": "material_request",
-			"fieldtype": "Data",
-			"width": 200,
-		},
-		{
-			"label": _("Material Request Status"),
-			"fieldname": "mr_status",
-			"fieldtype": "Data",
-			"width": 200,
-		},
-		{
-			"label": _("Expected PO Nos"),
-			"fieldname": "expected_pos",
-			"fieldtype": "Data",
-			"width": 240,
-		},
-		{
-			"label": _("ETA date PO"),
-			"fieldname": "po_eta",
-			"fieldtype": "Data",
-			"width": 200,
-		},
-		{
-			"label": _("OrderedQty"),
-			"fieldname": "ordered_qty",
-			"fieldtype": "Int",
-			"width": 120,
-		},
-		{
-			"label": _("PreviousYSale"),
-			"fieldname": "previous_year_sale",
-			"fieldtype": "Int",
-			"width": 140,
-		},
-		{
-			"label": _("CurrentYearSales"),
-			"fieldname": "total",
-			"fieldtype": "Int",
-			"width": 140,
-		},
-		{
-			"label": _("TotalSold12Months"),
-			"fieldname": "last_twelve_months",
-			"fieldtype": "Int",
-			"width": 140,
-		}
-	])
 	today = getdate(nowdate())
 	last_month = getdate(str(datetime(today.year-1, today.month,1)))
 	while last_month <= today:
@@ -493,12 +407,13 @@ def get_column(filters,conditions):
             "width": 140,
             "default": False,
         },
-        {
-            "label": _("DateLastSold"),
-            "fieldname": "last_sold_date",
-            "fieldtype": "Data",
-            "width": 100,
-	}])
+        #{
+        #   "label": _("DateLastSold"),
+        #    "fieldname": "last_sold_date",
+        #    "fieldtype": "Data",
+        #    "width": 100,
+		#}
+	])
 	return columns
 
 
@@ -529,14 +444,9 @@ def get_conditions(filters):
 
 def get_date_last_received(item, supplier):
 	date = None
-	data= frappe.db.sql("""select 
-							max(transaction_date) 
-						from `tabPurchase Order` p 
-						inner join 
-							`tabPurchase Order Item` c on p.name = c.parent 
-						where 
-							c.item_code = %s and p.supplier=%s and p.docstatus = 1
-							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+	data= frappe.db.sql("""select max(transaction_date) from `tabPurchase Order` p inner join 
+		`tabPurchase Order Item` c on p.name = c.parent where c.item_code = %s and p.supplier=%s and p.docstatus = 1
+		AND c.warehouse = 'US02-Houston - Active Stock'
 		""",(item,supplier))
 	if data:
 		date = data[0][0]
@@ -548,17 +458,16 @@ def get_date_last_received(item, supplier):
 def get_date_last_sold(item):
 	rdate = None
 	date = None
-	data= frappe.db.sql("""select 
-							max(posting_date) 
-						from 
-							`tabSales Invoice` p 
-						inner join 
-							`tabSales Invoice Item` c on p.name = c.parent 
-						left join
+	data= frappe.db.sql("""select max(posting_date) 
+							from 
+								`tabSales Invoice` p 
+							inner join
+								`tabSales Invoice Item` c on p.name = c.parent
+							left join
 								`tabAddress` address on address.name = p.customer_address
-						where 
-							c.item_code = %s and p.docstatus = 1
-							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+							where 
+								c.item_code = %s and p.docstatus = 1
+								AND address.country = 'United States'
 		""",(item))
 	if data:
 		date = data[0][0]
@@ -570,22 +479,26 @@ def get_date_last_sold(item):
 	return rdate, date
 
 def get_total_sold(item):
-	data= frappe.db.sql("""select 
-							p.posting_date, c.qty 
-						from 
-							`tabSales Invoice` p 
-						inner join
-							`tabSales Invoice Item` c on p.name = c.parent 
-						where 
-							c.item_code = %s and p.docstatus = 1
-							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+	data= frappe.db.sql("""select p.posting_date, c.qty 
+							from 
+								`tabSales Invoice` p 
+							inner join 
+								`tabSales Invoice Item` c on p.name = c.parent 
+							left join
+								`tabAddress` address on address.name = p.customer_address
+							where 
+								c.item_code = %s and p.docstatus = 1
+								AND address.country = 'United States'
 		""",(item), as_dict=1)
 	return data
 
 def get_qty(item, warehouse):
 	qty = 0
-	data= frappe.db.sql("""select actual_qty-reserved_qty AS qty from `tabBin`
-		where item_code = %s and warehouse=%s
+	data= frappe.db.sql("""select actual_qty-reserved_qty AS qty 
+							from 
+								`tabBin`
+							where 
+								item_code = %s and warehouse=%s
 		""",(item,warehouse), as_dict=1)
 	if data and data[0]['qty'] > 0:
 		qty = data[0]['qty']
@@ -598,9 +511,16 @@ def get_open_material_request(item, warehouse=None):
 	where = ''
 	if warehouse is not None:
 		where = " AND warehouse = '{}'".format(warehouse)
-	data = frappe.db.sql("""select p.name, c.qty, p.status from `tabMaterial Request` p inner join 
-		`tabMaterial Request Item` c on c.parent = p.name where p.docstatus=1 and c.item_code = %s
-		and p.status IN ('Pending', 'Partially Ordered')""" + where,(item))
+	else:
+		where = " AND warehouse = 'US02-Houston - Active Stock'"
+	data = frappe.db.sql("""select p.name, c.qty, p.status 
+							from 
+								`tabMaterial Request` p 
+							inner join 
+								`tabMaterial Request Item` c on c.parent = p.name
+							where 
+								p.docstatus=1 and c.item_code = %s
+								and p.status IN ('Pending', 'Partially Ordered')""" + where,(item))
 	for d in data:
 		material_requests += d[0]+" ("+str(d[1])+")" if material_requests == '' else ", " + d[0]+" ("+str(d[1])+")"
 		mr_status += d[2] if mr_status == '' else ', ' + d[2]
@@ -621,12 +541,12 @@ def get_purchase_orders(item,supplier):
 							from 
 								`tabPurchase Order` p 
 							inner join 
-								`tabPurchase Order Item` c on p.name = c.parent 
+								`tabPurchase Order Item` c on p.name = c.parent
 							where 
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and p.status in ("To Receive and Bill", "To Receive")
-								and p.supplier = %s and c.warehouse <> 'US02-Houston - Active Stock - ICL'""",
-						(item, supplier))
+								and p.supplier = %s and 
+								c.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, supplier))
 	for d in data:
 		name = get_pr_draft(item, d[0])
 		qty = get_pr_qty(item, d[0])
@@ -654,9 +574,9 @@ def get_last_purchase_orders(item,supplier):
 								`tabPurchase Order Item` c on p.name = c.parent 
 							where 
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
-								and p.status in ("To Receive and Bill", "To Receive") and
-								p.supplier = %s and c.warehouse <> 'US02-Houston - Active Stock - ICL'""",
-				(item, supplier))
+								and p.status in ("To Receive and Bill", "To Receive")
+								and p.supplier = %s and 
+								c.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, supplier))
 	for d in data:
 		output += d[0]+" ("+str(getdate(d[2]).strftime("%d-%b-%Y"))+"), | "
 		# output = d[0]+" ("+str(d[1])+")"
@@ -669,10 +589,11 @@ def get_pr_draft( item, po_name):
 							from 
 								`tabPurchase Receipt` pr 
 							inner join 
-								`tabPurchase Receipt Item` ri on  pr.name = ri.parent	
+								`tabPurchase Receipt Item` ri on  pr.name = ri.parent
 							where 
-								pr.docstatus=0 and ri.item_code = %s and pr.purchase_order = %s
-								and ri.warehouse <> 'US02-Houston - Active Stock - ICL'""",(item, po_name))
+								pr.docstatus=0 and ri.item_code = %s
+								and pr.purchase_order = %s and 
+								ri.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, po_name))
 	for d in data:
 		output += d[0]+" ("+str(d[1])+"), "	
 	return data
@@ -686,8 +607,9 @@ def get_pr_qty( item, po_name):
 							inner join 
 								`tabPurchase Receipt Item` ri on  pr.name = ri.parent
 							where 
-								pr.docstatus=0 and ri.item_code = %s and pr.purchase_order = %s
-								and ri.warehouse <> 'US02-Houston - Active Stock - ICL'""",(item, po_name))
+								pr.docstatus=0 and ri.item_code = %s
+								and pr.purchase_order = %s
+								and ri.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, po_name))
 	for d in data:
 		qty = d[0]
 	return qty
@@ -697,18 +619,10 @@ def get_open_po_qty(item,supplier, warehouse=None):
 	if warehouse is not None:
 		where = " AND c.warehouse = '{}'".format(warehouse)
 	output = ""
-	data = frappe.db.sql("""select 
-								SUM(c.qty) - SUM(c.received_qty) 
-							from 
-								`tabPurchase Order` p 
-							inner join 
-								`tabPurchase Order Item` c on p.name = c.parent 
-							where 
-								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
-								and  p.status in ("To Receive and Bill", "To Receive")
-								and p.supplier = %s
-								and c.warehouse = 'US02-Houston - Active Stock - ICL'""" + where, 
-						(item, supplier))
+	data = frappe.db.sql("""select SUM(c.qty) - SUM(c.received_qty) from `tabPurchase Order` p inner join 
+		`tabPurchase Order Item` c on p.name = c.parent where p.docstatus=1 and c.item_code = %s
+		and c.received_qty < c.qty and  p.status in ("To Receive and Bill", "To Receive")
+		 and p.supplier = %s""" + where, (item, supplier))
 	if data:
 		return data[0][0]
 	return 0
