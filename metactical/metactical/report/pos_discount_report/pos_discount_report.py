@@ -37,6 +37,7 @@ def execute(filters=None):
 						row['discount_percentage'] = rate_discount * 100
 						row['uom'] = d.uom
 						row['ifw_location'] = d.ifw_location
+						row['ifw_notes'] = d.ifw_notes
 
 						data.append(row)
 
@@ -88,6 +89,12 @@ def get_column():
 			"fieldtype": "Percent",
 			'width': 120
 		},
+		{
+			"fieldname":"ifw_notes",
+			"label": "ifw_notes",
+			"fieldtype": "Text",
+			'width': 150
+		}
 	]
 
 
@@ -97,7 +104,7 @@ def get_data(filters):
 
 	data = frappe.db.sql("""select c.item_code, c.item_name, c.qty, c.price_list_rate, c.rate, c.discount_percentage,
 		c.uom, c.ifw_retailskusuffix, c.ifw_location, c.warehouse,
-		p.name, p.posting_date, p.selling_price_list, i.variant_of
+		p.name, p.posting_date, p.selling_price_list, i.variant_of, p.ifw_notes
 		from `tabSales Invoice Item` c inner join `tabSales Invoice` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
 		where p.docstatus = 1 and p.posting_date BETWEEN %(from_date)s AND %(to_date)s
