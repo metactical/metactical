@@ -6,7 +6,8 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "default_settings"
+  "default_settings",
+  "shipping_items"
  ],
  "fields": [
   {
@@ -14,12 +15,18 @@
    "fieldtype": "Table",
    "label": "Default Settings",
    "options": "Pick List Settings Default"
+  },
+  {
+   "fieldname": "shipping_items",
+   "fieldtype": "Table",
+   "label": "Shipping Items",
+   "options": "Pick List Shipping Item"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2022-06-14 08:37:46.914046",
+ "modified": "2022-08-30 16:26:50.027983",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pick List Settings",

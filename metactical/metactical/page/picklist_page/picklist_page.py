@@ -107,6 +107,15 @@ def get_pick_lists(warehouse, filters, source):
 @frappe.whitelist()
 def get_items(pick_list, warehouse, user):
 	is_being_picked = frappe.db.get_value('Pick List', pick_list, 'ais_picked_by')
+	shipped_items = frappe.db.sql("""SELECT item FROM `tabPick List Shipping Item`""", as_dict=1)
+	not_include = "("
+	i = 0
+	for row in shipped_items:
+		i = i+1
+		not_include += "'" + row.item + "'"
+		if len(shipped_items) != i:
+			not_include += ","
+	not_include += ")"
 	if is_being_picked is None or is_being_picked == '':
 		items = frappe.db.sql("""SELECT
 										pli.name, pli.parent, pli.item_code, pli.item_name, item.image,
@@ -118,9 +127,9 @@ def get_items(pick_list, warehouse, user):
 									LEFT JOIN
 										`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
 									WHERE
-										pli.parent = %(pick_list)s
+										pli.parent = %(pick_list)s AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
-									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
+									""", {"warehouse": warehouse, "pick_list": pick_list, "not_include": not_include}, as_dict=1)
 		for item in items:
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
@@ -207,6 +216,8 @@ def submit_pick_list(docname, items):
 	for item in items:
 		item = frappe._dict(item)
 		for row in doc.locations:
+			# Because all items are initialized with picked qty =1 
+			# No need to take into consideration shipping items
 			if item.name == row.name:
 				if item.picked_qty == 0:
 					doc.remove(row)
@@ -220,3 +231,7 @@ def submit_pick_list(docname, items):
 @frappe.whitelist()
 def close_pick_list(pick_list):
 	frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', '')
+	
+#@frappe.whitelist()
+#def get_totes(warehouse):
+#	query = frappe.db.sql("""SE""")
