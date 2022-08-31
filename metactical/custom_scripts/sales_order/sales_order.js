@@ -173,11 +173,9 @@ frappe.ui.form.on('Sales Order', {
 				'Warning: Insufficient stock for Item ' + item_flag + '. Do you want to proceed anyway?',
 				function(){
 					frm.events.open_pick_list(frm);
-					window.close();
 				},
 				function(){
 					proceed = false;
-					window.close();
 				}
 			)
 		}
@@ -190,11 +188,9 @@ frappe.ui.form.on('Sales Order', {
 					if(flag != 1){ //Check that there is sufficient stock first
 						frm.events.open_pick_list(frm);
 					}
-					window.close();
 				},
 				function(){
 					proceed = false;
-					window.close();
 				}
 			);
 		}
