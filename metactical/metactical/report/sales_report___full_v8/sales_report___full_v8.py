@@ -707,7 +707,7 @@ def get_open_po_qty(item,supplier, warehouse=None):
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and  p.status in ("To Receive and Bill", "To Receive")
 								and p.supplier = %s
-								and c.warehouse = 'US02-Houston - Active Stock - ICL'""" + where, 
+								and c.warehouse <> 'US02-Houston - Active Stock - ICL'""" + where, 
 						(item, supplier))
 	if data:
 		return data[0][0]
