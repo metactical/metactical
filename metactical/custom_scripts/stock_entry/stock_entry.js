@@ -75,6 +75,11 @@ erpnext.stock.StockEntry = erpnext.stock.StockEntry.extend({
 				}
 			});
 		}
+	},
+	
+	ais_scan_to_confirm: function(){
+		let transaction_controller= new erpnext.TransactionController({frm:this.frm});
+		transaction_controller.ais_scan_to_confirm();
 	}
 });
 $.extend(cur_frm.cscript, new erpnext.stock.StockEntry({frm: cur_frm}));
