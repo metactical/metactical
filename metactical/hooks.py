@@ -139,7 +139,8 @@ doc_events = {
 override_doctype_class = {
 	"Sales Invoice": "metactical.custom_scripts.sales_invoice.sales_invoice.CustomSalesInvoice",
 	"Pick List": "metactical.custom_scripts.pick_list.pick_list.CustomPickList",
-	"Quotation": "metactical.custom_scripts.quotation.quotation.CustomQuotation"
+	"Quotation": "metactical.custom_scripts.quotation.quotation.CustomQuotation",
+	"Sales Order": "metactical.custom_scripts.sales_order.sales_order.SalesOrderCustom"
 }
 
 # Scheduled Tasks

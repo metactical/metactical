@@ -326,26 +326,6 @@ frappe.ui.form.on('Sales Order', {
 	}
 });
 frappe.ui.form.on("Sales Order Item", {
-	item_code: function(frm,cdt,cdn) {
-		var row = locals[cdt][cdn];
-		if (row.item_code && row.warehouse) {
-			return frm.call({
-					method: "metactical.custom_scripts.sales_order.sales_order.get_bin_details",
-					child: row,
-					args: {
-						item_code: row.item_code,
-						warehouse: row.warehouse,
-					},
-					callback:function(r){
-						row.sal_reserved_qty =  r.message['reserved_qty'];
-						row.ais_is_stock_item = r.message["is_stock_item"]
-						refresh_field("sal_reserved_qty", cdn, "items");
-						refresh_field("ais_is_stock_item", cdn, "items");
-					}
-				});
-		}
-	},
-	
 	delivered_by_supplier: function(frm, cdt, cdn){
 		if(frm.doc.docstatus == 1){
 			var row = locals[cdt][cdn];
