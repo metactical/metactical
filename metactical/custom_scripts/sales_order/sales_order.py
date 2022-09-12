@@ -10,6 +10,23 @@ from frappe.utils import add_days, cint, cstr, flt, get_link_to_form, getdate, n
 from erpnext.stock.doctype.item.item import get_item_defaults
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from frappe.model.utils import get_fetch_values
+from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
+
+class SalesOrderCustom(SalesOrder):
+	def validate(self):
+		super(SalesOrderCustom, self).validate()
+		if self.docstatus == 0:
+			self.pull_reserved_qty()
+			
+	def pull_reserved_qty(self):
+		for row in self.items:
+			#Check if bin exists
+			exists = frappe.db.exists('Bin', {'item_code': row.item_code, 'warehouse': row.warehouse})
+			if exists:
+				reserved_qty = frappe.db.get_value('Bin', {'item_code': row.item_code, 
+					'warehouse': row.warehouse}, 'reserved_qty')
+				row.update({'sal_reserved_qty': reserved_qty})
+			
 
 @frappe.whitelist()
 def save_cancel_reason(**args):
