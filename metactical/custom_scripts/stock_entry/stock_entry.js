@@ -21,6 +21,15 @@ frappe.ui.form.on('Stock Entry', {
 				}
 			}
 		}
+	},
+	
+	onload_post_render: function(frm){
+		frm.$wrapper.on('keypress', function(event){
+			if(event.keyCode == 13)
+			{
+				return false;
+			}
+		});
 	}
 })
 
