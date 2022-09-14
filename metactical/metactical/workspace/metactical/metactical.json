@@ -142,6 +142,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Pick List Totes",
+   "link_to": "Picklist Tote",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Pick List Page",
    "link_to": "picklist-page",
    "link_type": "Page",
@@ -400,7 +409,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-08-30 06:38:37.217408",
+ "modified": "2022-09-14 08:16:36.567304",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
