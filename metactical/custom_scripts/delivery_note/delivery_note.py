@@ -57,4 +57,3 @@ def on_submit(self, method):
 			#Get payment entry with Sales Order and add it to advance paid
 			sales_invoice.set_advances()
 			sales_invoice.submit()
-			

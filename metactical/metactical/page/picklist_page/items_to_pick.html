@@ -1,6 +1,10 @@
 {% for row in items %}
 	{% if row.qty > 0 %}
-		<li class="item-li" data-item-code="{{row.item_code}}">
+		<li class="item-li" data-item-code="{{row.item_code}}" data-pick-list="{{row.pick_list}}" 
+			{% if row.tote %}
+				data-tote="{{row.tote}}"
+			{% endif %}
+			>
 			<p class="item-to-pick">
 				<span class="pick-head">PICK</span><br>
 				<span class="pick-qty">{{row.qty}}</span><br>
@@ -22,6 +26,9 @@
 				</span><br>
 				<span style="width: 100%; display: inline-block; clear: both;" class="item-code">{{row.item_code}}</span><br>
 				<span style="clear: both;" class="item-name">{{row.item_name}}</span>
+				{% if row.tote %}
+					<br><span style="float: left;">Tote: {{row.tote}}</span>
+				{% endif %}
 			</p>
 		</li>
 	{% endif %}

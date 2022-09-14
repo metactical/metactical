@@ -209,6 +209,102 @@
 	padding-left: 15px; 
 	padding-right: 15px;
 }
+
+.tote-check{
+	margin-left: 15px;
+}
+
+.tote-barcode {
+	display: block;
+}
+
+.tote-list-div {
+	background-color: #FFF; 
+	padding: 5px;
+	margin-bottom: 10px;
+}
+
+.start-picking-btn{
+  position: relative;
+  display: inline-flex;
+  width: 180px;
+  height: 55px;
+  margin: 0 15px;
+  perspective: 1000px;
+}
+
+.start-picking-btn a{
+  font-size: 19px;
+  letter-spacing: 1px;
+  transform-style: preserve-3d;
+  transform: translateZ(-25px);
+  transition: transform .25s;
+  font-family: 'Montserrat', sans-serif;
+  
+}
+.start-picking-btn a:before,
+.start-picking-btn a:after{
+  position: absolute;
+  content: "Start Picking";
+  height: 55px;
+  width: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 5px solid #1ad1ff;
+  box-sizing: border-box;
+  border-radius: 5px;
+}
+.start-picking-btn a:before{
+  color: #fff;
+  background: #1ad1ff;
+  transform: rotateY(0deg) translateZ(25px);
+}
+.start-picking-btn a:after{
+  color: #000;
+  transform: rotateX(90deg) translateZ(25px);
+}
+.start-picking-btn a:hover{
+  transform: translateZ(-25px) rotateX(-90deg);
+}
+.tote-no{
+	font-size: large;
+}
+.totes-list-div {
+	background-color: #FFF; 
+	padding: 5px;
+	margin-bottom: 10px;
+}
+.tote-barcode{
+	width: 100%;
+	padding-left: 15px; 
+	padding-right: 15px;
+}
+
+.pl-list-div {
+	background-color: #FFF; 
+	padding: 5px;
+	margin-bottom: 10px;
+	float: left;
+}
+
+.pl-check-div{
+	width: 20px; 
+	float: left; 
+	margin-right: 15px;
+}
+
+.pl-multi-barcode{
+	width: 50%; 
+	padding-left: 15px; 
+	padding-right: 15px;
+}
+
+.pl-multi-source{
+	width: 50%; 
+	padding-left: 15px; 
+	padding-right: 15px;
+}
 	
 @media only screen and (max-width: 992px) {
 	/* For tablets and under */
@@ -248,6 +344,18 @@
 		padding-left: 15px; 
 		padding-right: 15px;
 	}
+	
+	.pl-multi-barcode{
+		width: 50%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
+
+	.pl-multi-source{
+		width: 50%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
 }
 
 @media only screen and (max-width: 768px) {
@@ -280,6 +388,18 @@
 	}
 
 	.pl-source{
+		width: 100%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
+	
+	.pl-multi-barcode{
+		width: 100%; 
+		padding-left: 15px; 
+		padding-right: 15px;
+	}
+
+	.pl-multi-source{
 		width: 100%; 
 		padding-left: 15px; 
 		padding-right: 15px;

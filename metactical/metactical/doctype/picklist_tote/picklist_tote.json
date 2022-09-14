@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:tote_number",
+ "creation": "2022-08-30 12:33:26.512380",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tote_number",
+  "warehouse",
+  "current_delivery_note",
+  "tote_items",
+  "used_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "tote_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tote Number",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_preview": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tote_items",
+   "fieldtype": "Table",
+   "label": "Tote Items",
+   "options": "Picklist Tote Item"
+  },
+  {
+   "fieldname": "used_by",
+   "fieldtype": "Link",
+   "label": "Currently Used By",
+   "options": "User"
+  },
+  {
+   "fieldname": "current_delivery_note",
+   "fieldtype": "Link",
+   "in_preview": 1,
+   "label": "Current Delivery Note",
+   "options": "Delivery Note"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2022-09-14 01:31:58.798493",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Picklist Tote",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "tote_number,current_delivery_note,warehouse",
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

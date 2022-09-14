@@ -105,7 +105,7 @@ def get_pick_lists(warehouse, filters, source):
 	return pick_lists
 
 @frappe.whitelist()
-def get_items(pick_list, warehouse, user):
+def get_items(pick_list, warehouse, user, tote):
 	is_being_picked = frappe.db.get_value('Pick List', pick_list, 'ais_picked_by')
 	shipped_items = frappe.db.sql("""SELECT item FROM `tabPick List Shipping Item`""", as_dict=1)
 	not_include = "("
@@ -118,7 +118,7 @@ def get_items(pick_list, warehouse, user):
 	not_include += ")"
 	if is_being_picked is None or is_being_picked == '':
 		items = frappe.db.sql("""SELECT
-										pli.name, pli.parent, pli.item_code, pli.item_name, item.image,
+										pli.name, pli.parent AS pick_list, pli.item_code, pli.item_name, item.image,
 										pli.ifw_location AS locations, pli.qty, bin.actual_qty
 									FROM
 										`tabPick List Item` AS pli
@@ -138,10 +138,11 @@ def get_items(pick_list, warehouse, user):
 				locations = item.get('locations').split("|")
 			item.update({
 				"barcodes": [row.barcode for row in barcodes],
-				"locations": [location.strip() for location in locations]
+				"locations": [location.strip() for location in locations],
+				"tote": tote
 			})
 		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
-		doc = {"name": items[0].parent, "items": items}
+		doc = {"name": items[0].pick_list, "items": items}
 		return doc
 	else:
 		return 'Already Picked'
@@ -210,28 +211,138 @@ def get_order(warehouse, sales_order=None):
 				return 'None'
 
 @frappe.whitelist()
-def submit_pick_list(docname, items):
+def submit_pick_list(items):
 	items = json.loads(items)
-	doc = frappe.get_doc('Pick List', docname)
+	pick_lists = []
+	totes = []
+	delivery_notes = {}
 	for item in items:
 		item = frappe._dict(item)
-		for row in doc.locations:
-			# Because all items are initialized with picked qty =1 
-			# No need to take into consideration shipping items
-			if item.name == row.name:
-				if item.picked_qty == 0:
-					doc.remove(row)
-				else:
-					row.update({
-						"picked_qty": item.picked_qty
-					})
-	doc.submit()
+		if item.pick_list not in pick_lists:
+			pick_lists.append(item.pick_list)
+		if item.get('tote') is not None and item.get('tote') not in totes:
+			totes.append(item.tote)
+	for pick_list in pick_lists:
+		doc = frappe.get_doc('Pick List', pick_list)
+		for item in items:
+			item = frappe._dict(item)
+			if item.pick_list == pick_list:
+				for row in doc.locations:
+					# Because all items are initialized with picked qty =1 
+					# No need to take into consideration shipping items
+					if item.name == row.name:
+						if item.picked_qty == 0:
+							doc.remove(row)
+						else:
+							row.update({
+								"picked_qty": item.picked_qty
+							})
+		doc.submit()
+		#Get associated delivery note
+		delivery_note = frappe.db.get_value('Delivery Note', {'pick_list': pick_list}, 'name')
+		delivery_notes.update({pick_list: delivery_note})
+	#Add to totes
+	for tote in totes:
+		doc = frappe.get_doc('Picklist Tote', tote)
+		for item in items:
+			item = frappe._dict(item)
+			if item.tote == tote:
+				doc.append('tote_items', {
+					"item": item.item_code,
+					"pick_list": item.pick_list,
+					"pick_list_item": item.name,
+					"qty": item.picked_qty
+				})
+		doc.update({"current_delivery_note": delivery_notes[doc.tote_items[0].pick_list]})
+		doc.save()			
 	return "Pick List Submitted"
 	
 @frappe.whitelist()
 def close_pick_list(pick_list):
 	frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', '')
 	
-#@frappe.whitelist()
-#def get_totes(warehouse):
-#	query = frappe.db.sql("""SE""")
+@frappe.whitelist()
+def clear_totes_picklist(totes, pick_lists):
+	totes = json.loads(totes)
+	pick_lists = json.loads(pick_lists)
+	
+	#Clear totes
+	where_t = ""
+	for tote in totes:
+		where_t += ",'{}'".format(tote)
+	where_t = where_t[1:]
+	frappe.db.sql("""UPDATE `tabPicklist Tote` SET used_by = '' WHERE name IN ({})""".format(where_t))
+	
+	#Clear pick lists
+	where_p = ""
+	for pick_list in pick_lists:
+		where_p += ",'{}'".format(pick_list)
+	where_p = where_p[1:]
+	frappe.db.sql("""UPDATE `tabPick List` SET ais_picked_by='' WHERE name IN ({})""".format(where_p))		
+	
+@frappe.whitelist()
+def get_totes(warehouse):
+	query = frappe.db.sql("""SELECT
+								tote_number
+							FROM 
+								`tabPicklist Tote`
+							WHERE
+								warehouse = %(warehouse)s AND (used_by IS NULL OR used_by = '')
+								AND name NOT IN (SELECT DISTINCT parent FROM `tabPicklist Tote Item`)""", 
+			{"warehouse": warehouse}, as_dict=1)
+	totes = []
+	for tote in query:
+		if tote.tote_number is not None:
+			totes.append(tote.tote_number)
+	return totes
+	
+@frappe.whitelist()
+def get_tote_items(warehouse, pick_lists, user, totes):
+	totes = json.loads(totes)
+	pick_lists = json.loads(pick_lists)
+	pls_list = []
+	where_pick = "("
+	i = 0
+	for pl in pick_lists:
+		pls_list.append(pl)
+		if i > 0:
+			where_pick += ','
+		where_pick += "'" + pl + "'"
+		i = i+1
+	where_pick += ")"
+	items = frappe.db.sql("""SELECT 
+								pli.name, pli.item_code, pli.item_name, item.image,
+								pli.ifw_location AS locations, pli.qty, bin.actual_qty,
+								pli.parent AS pick_list
+							FROM
+								`tabPick List Item` AS pli
+							LEFT JOIN
+								`tabItem` AS item ON item.name = pli.item_code
+							LEFT JOIN
+								`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
+							WHERE
+								pli.parent in """ + where_pick + """ 
+							ORDER BY
+								pli.ifw_location""",
+						{"warehouse": warehouse}, as_dict=1)
+	#SEt the pick list to being picked
+	query = frappe.db.sql("""UPDATE `tabPick List` SET ais_picked_by = %(user)s WHERE name in """ + where_pick, {"user": user})
+	for item in items:
+		barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
+						WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
+		locations = []
+		if item.get('locations') not in [None, ""]:
+			locations = item.get('locations').split("|")
+		item.update({
+			"barcodes": [row.barcode for row in barcodes],
+			"locations": [location.strip() for location in locations]
+		})
+		
+	#Set the totes to being used
+	where_t = ''
+	for tote in totes:
+		where_t += ",'" + tote + "'"
+	where_t = where_t[1:]
+	query = """UPDATE `tabPicklist Tote` SET used_by=%(user)s WHERE name IN (""" + where_t + """)"""
+	frappe.db.sql(query, {"user": user})
+	return {"pick_lists": pls_list, "items": items}

@@ -140,7 +140,8 @@ override_doctype_class = {
 	"Sales Invoice": "metactical.custom_scripts.sales_invoice.sales_invoice.CustomSalesInvoice",
 	"Pick List": "metactical.custom_scripts.pick_list.pick_list.CustomPickList",
 	"Quotation": "metactical.custom_scripts.quotation.quotation.CustomQuotation",
-	"Sales Order": "metactical.custom_scripts.sales_order.sales_order.SalesOrderCustom"
+	"Sales Order": "metactical.custom_scripts.sales_order.sales_order.SalesOrderCustom",
+	"Packing Slip": "metactical.custom_scripts.packing_slip.packing_slip.CustomPackingSlip"
 }
 
 # Scheduled Tasks

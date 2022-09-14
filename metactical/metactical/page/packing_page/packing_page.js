@@ -47,9 +47,12 @@ class PackingPage {
 				delivery_note: 0,
 			})
 		);
+		
+		//Hide the tote select until warehouse is selected
+		$('.picklist-tote-wrapper').hide();
 
 		// delivery note control
-		frappe.ui.form.make_control({
+		let delivery_note_field = frappe.ui.form.make_control({
 			parent: $(".delivery-note-wrapper"),
 			df: {
 				label: "Delivery Note",
@@ -87,17 +90,65 @@ class PackingPage {
 			},
 			render_input: true,
 		});
+		
+		let selected_warehouse = frappe.ui.form.make_control({
+			parent: $('.warehouse-wrapper'),
+			df: {
+				label: 'Warehouse',
+				fieldtype: 'Link',
+				fieldname: 'selected_warehouse',
+				options: 'Warehouse',
+				change(){
+					$('.picklist-tote-wrapper').show();
+				}
+			},
+			render_input: true
+		});
+		
+		let tote_barcode_field = frappe.ui.form.make_control({
+			parent: $('.picklist-tote-wrapper'),
+			df: {
+				label: "Tote Barcode",
+				fieldname: "tote_barcode",
+				fieldtype: "Link",
+				options: "Picklist Tote",
+				get_query: function(){
+					return {
+						filters: [
+							["warehouse", "=", selected_warehouse.get_value()],
+							["current_delivery_note", "is", "set"]
+						]
+					}
+				},
+				change: function(){
+					frappe.call({
+						method: "metactical.metactical.page.packing_page.packing_page.get_delivery_from_tote",
+						args: {
+							tote: tote_barcode_field.get_value()
+						},
+						freeze: true,
+						callback: function(ret){
+							console.log({'Delivery Note': ret.message});
+							delivery_note_field.set_value(ret.message);
+						}
+					});
+				}
+			},
+			render_input:true
+		});
 	}
 }
 
 
 function create_new() {
+	$('input[data-fieldname="tote_barcode"]').val("");
 	$('input[data-fieldname="delivery_note"]').val("");
 	havenir.packing_slip.fetch_dn_items(true);
 }
 
 function refresh() {
 	console.log("From refresh");
+	$('input[data-fieldname="tote_barcode"]').val("");
 	$('input[data-fieldname="delivery_note"]').val("");
 	havenir.packing_slip.fetch_dn_items(true);
 }
