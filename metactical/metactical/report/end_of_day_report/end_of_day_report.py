@@ -145,21 +145,21 @@ def get_columns():
 			"precision": 2
 		},
 		{
-			"fieldtype": "Float",
+			"fieldtype": "Currency",
 			"fieldname": "sys_amount",
 			"label": "Sys",
 			"width": 150,
 			"precision": 2
 		},
 		{
-			"fieldtype": "Float",
+			"fieldtype": "Currency",
 			"fieldname": "actl",
 			"label": "ACTL",
 			"width": 150,
 			"precision": 2
 		},
 		{
-			"fieldtype": "Float",
+			"fieldtype": "Currency",
 			"fieldname": "diff",
 			"label": "DIFF",
 			"width": 150,
@@ -177,7 +177,7 @@ def get_columns():
 			"width": 150
 		},
 		{
-			"fieldtype": "Float",
+			"fieldtype": "Currency",
 			"fieldname": "gttl",
 			"width": 150,
 			"precision": 2
