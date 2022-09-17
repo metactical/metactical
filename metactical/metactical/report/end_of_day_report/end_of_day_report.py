@@ -15,7 +15,8 @@ def execute(filters=None):
 	data = get_data(today)
 	return columns, data
 
-def get_data(date):
+def get_data(today):
+	#today = date.today().strftime('%Y-%m-%d')
 	raw_data = frappe.db.sql("""
 								SELECT
 									invoice.pos_profile,
@@ -23,10 +24,8 @@ def get_data(date):
 										WHEN pos.mode_of_payment IS NOT NULL THEN pos.mode_of_payment
 										WHEN pe.mode_of_payment IS NOT NULL THEN pe.mode_of_payment
 									END AS mode_of_payment,
-									CASE
-										WHEN pos.amount IS NOT NULL THEN SUM(pos.amount)
-										WHEN payment.allocated_amount IS NOT NULL THEN SUM(payment.allocated_amount) 
-									END AS sys_amount
+									IFNULL(SUM(pos.amount), 0) AS pos_sys_amount,
+									IFNULL(SUM(payment.allocated_amount), 0) AS invoice_sys_amount
 								FROM
 									`tabSales Invoice` as invoice
 								LEFT JOIN
@@ -39,9 +38,10 @@ def get_data(date):
 								LEFT JOIN
 									`tabPayment Entry` AS pe ON payment.parent = pe.name
 								WHERE
-									invoice.status = 'Paid' AND invoice.posting_date = %(posting_date)s
+									invoice.status = 'Paid' AND 
+									(invoice.posting_date = %(posting_date)s OR pe.posting_date = %(posting_date)s)
 								GROUP BY
-									invoice.pos_profile, mode_of_payment""", {'posting_date': date}, as_dict=1)
+									invoice.pos_profile, mode_of_payment""", {'posting_date': today}, as_dict=1)
 	profiles = {
 		'Downtown Operators': 'DTN', 
 		'Edmodns Operators': 'EDM', 
@@ -75,8 +75,8 @@ def get_data(date):
 			mode_row = {"local": value, "mode": mode}
 			for row in raw_data:
 				if row.local == value and row.mode == mode:
-					mode_row['sys_amount'] = row.sys_amount
-					ttl += row.sys_amount
+					mode_row['sys_amount'] = row.pos_sys_amount + row.invoice_sys_amount
+					ttl += row.pos_sys_amount + row.invoice_sys_amount
 					break
 			profile_row.append(mode_row)
 		
@@ -86,8 +86,8 @@ def get_data(date):
 		cash_row = {"local": value, "mode": "CSH"}
 		for row in raw_data:
 			if row.local == value and row.mode_of_payment == 'Cash':
-				cash_row["sys_amount"] = row.sys_amount
-				cash = row.sys_amount
+				cash_row["sys_amount"] = row.pos_sys_amount + row.invoice_sys_amount
+				cash = row.pos_sys_amount + row.invoice_sys_amount
 				break
 		profile_row.append(cash_row)
 		
@@ -109,16 +109,16 @@ def get_data(date):
 		mode_row = {"local": 'WHS', "mode": mode}
 		for row in raw_data:
 			if row.local == 'WHS' and row.mode == mode:
-				mode_row['sys_amount'] = row.sys_amount
-				ttl += row.sys_amount
+				mode_row['sys_amount'] = row.pos_sys_amount + row.invoice_sys_amount
+				ttl += row.pos_sys_amount + row.invoice_sys_amount
 		whs_row.append(mode_row)
 	#Add totals row
 	whs_row.append({"local": 'WHS', "mode": 'TTL', "sys_amount": ttl})
 	#Add cash row
 	for row in raw_data:
 		if row.local == 'WHS' and row.mode_of_payment == 'Cash':
-			whs_row.append({"local": 'WHS', "mode": "CSH", "sys_amount": row.sys_amount})
-			cash = row.sys_amount
+			whs_row.append({"local": 'WHS', "mode": "CSH", "sys_amount": row.pos_sys_amount + row.invoice_sys_amount})
+			cash = row.pos_sys_amount + row.invoice_sys_amount
 			break
 	whs_row.append({"local": 'WHS', "mode": "AITTL", "sys_amount": ttl + cash})
 	whs_row[0].update({
