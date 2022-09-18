@@ -66,7 +66,8 @@ erpnext.stock.StockEntry = erpnext.stock.StockEntry.extend({
 			});
 		});
 		
-		if(this.frm.doc.__islocal == 1){
+		if(this.frm.doc.__islocal == 1 && !this.frm.doc.outgoing_stock_entry){
+			console.log("In here");
 			frappe.call({
 				method: "metactical.custom_scripts.stock_entry.stock_entry.get_default_transit",
 				args: {
