@@ -2,7 +2,10 @@
 # For license information, please see license.txt
 
 import frappe
-from datetime import date
+from datetime import date, datetime
+from frappe.email.doctype.auto_email_report.auto_email_report import send_now
+import pytz
+from pytz import timezone
 
 def execute(filters=None):
 	columns, data = [], []
@@ -17,13 +20,42 @@ def execute(filters=None):
 
 def get_data(today):
 	#today = date.today().strftime('%Y-%m-%d')
+	#today = '2022-09-17'
 	raw_data = frappe.db.sql("""
 								SELECT
 									invoice.pos_profile,
-									CASE
-										WHEN pos.mode_of_payment IS NOT NULL THEN pos.mode_of_payment
-										WHEN pe.mode_of_payment IS NOT NULL THEN pe.mode_of_payment
-									END AS mode_of_payment,
+									pos.mode_of_payment AS mode_of_payment,
+									SUM(pos.amount) AS sys_amount
+								FROM
+									`tabSales Invoice` as invoice
+								LEFT JOIN
+									`tabSales Invoice Payment` AS pos ON pos.parent = invoice.name
+								WHERE
+									invoice.posting_date = %(posting_date)s AND invoice.status = 'Paid'
+									AND invoice.is_pos = 1
+								GROUP BY
+									invoice.pos_profile, mode_of_payment""", {'posting_date': today}, as_dict=1)
+	data_pe = frappe.db.sql("""
+								SELECT
+									'WHS' AS pos_profile,
+									pe.mode_of_payment AS mode_of_payment,
+									SUM(payment.allocated_amount) AS sys_amount
+								FROM
+									`tabPayment Entry Reference` AS payment
+								LEFT JOIN
+									`tabSales Invoice` as invoice ON payment.reference_name = invoice.name
+								LEFT JOIN
+									`tabPayment Entry` AS pe ON payment.parent = pe.name
+								WHERE
+									pe.posting_date = %(posting_date)s AND invoice.status = 'Paid' AND invoice.is_pos = 0
+								GROUP BY
+									mode_of_payment""", {'posting_date': today}, as_dict=1)
+	raw_data.extend(data_pe)
+	'''data_pos = frappe.db.sql("""
+								SELECT
+									invoice.pos_profile,
+									pos.mode_of_payment AS pos_mode_of_payment,
+									pe.mode_of_payment AS pe_mode_of_payment,
 									IFNULL(SUM(pos.amount), 0) AS pos_sys_amount,
 									IFNULL(SUM(payment.allocated_amount), 0) AS invoice_sys_amount
 								FROM
@@ -41,7 +73,7 @@ def get_data(today):
 									invoice.status = 'Paid' AND 
 									(invoice.posting_date = %(posting_date)s OR pe.posting_date = %(posting_date)s)
 								GROUP BY
-									invoice.pos_profile, mode_of_payment""", {'posting_date': today}, as_dict=1)
+									invoice.pos_profile, mode_of_payment""", {'posting_date': today}, as_dict=1)'''
 	profiles = {
 		'Downtown Operators': 'DTN', 
 		'Edmodns Operators': 'EDM', 
@@ -50,16 +82,17 @@ def get_data(today):
 		'Montreal Operators': 'MON',
 		'Gorilla Operators': 'GOR'}
 	mop = {
-		'VISA': 'Vis',
+		'Visa': 'Vis',
 		'Master Card': 'MC',
 		'Amex': 'Amx',
 		'Debit Card': 'DC'
 	}
 	for row in raw_data:
-		if row.pos_profile is None or profiles.get(row.pos_profile) is None:
+		if row.pos_profile is None or row.pos_profile == 'WHS' or profiles.get(row.pos_profile) is None:
 			row.local = 'WHS'
 		else:
 			row.local = profiles.get(row.pos_profile)
+			 
 		if row.mode_of_payment is None or mop.get(row.mode_of_payment) is None:
 			row.mode = 'Other'
 		else:
@@ -75,9 +108,8 @@ def get_data(today):
 			mode_row = {"local": value, "mode": mode}
 			for row in raw_data:
 				if row.local == value and row.mode == mode:
-					mode_row['sys_amount'] = row.pos_sys_amount + row.invoice_sys_amount
-					ttl += row.pos_sys_amount + row.invoice_sys_amount
-					break
+					mode_row['sys_amount'] = mode_row.get('sys_amount', 0) + row.sys_amount
+					ttl += row.sys_amount
 			profile_row.append(mode_row)
 		
 		#Add totals row
@@ -86,9 +118,8 @@ def get_data(today):
 		cash_row = {"local": value, "mode": "CSH"}
 		for row in raw_data:
 			if row.local == value and row.mode_of_payment == 'Cash':
-				cash_row["sys_amount"] = row.pos_sys_amount + row.invoice_sys_amount
-				cash = row.pos_sys_amount + row.invoice_sys_amount
-				break
+				cash_row["sys_amount"] = cash_row.get('sys_amount', 0) + row.sys_amount
+				cash += row.sys_amount
 		profile_row.append(cash_row)
 		
 		#Add AITTL
@@ -109,17 +140,18 @@ def get_data(today):
 		mode_row = {"local": 'WHS', "mode": mode}
 		for row in raw_data:
 			if row.local == 'WHS' and row.mode == mode:
-				mode_row['sys_amount'] = row.pos_sys_amount + row.invoice_sys_amount
-				ttl += row.pos_sys_amount + row.invoice_sys_amount
+				mode_row['sys_amount'] = mode_row.get('sys_amount', 0) + row.sys_amount
+				ttl += row.sys_amount
 		whs_row.append(mode_row)
 	#Add totals row
 	whs_row.append({"local": 'WHS', "mode": 'TTL', "sys_amount": ttl})
 	#Add cash row
+	cash_row = {"local": 'WHS', "mode": "CSH"}
 	for row in raw_data:
 		if row.local == 'WHS' and row.mode_of_payment == 'Cash':
-			whs_row.append({"local": 'WHS', "mode": "CSH", "sys_amount": row.pos_sys_amount + row.invoice_sys_amount})
-			cash = row.pos_sys_amount + row.invoice_sys_amount
-			break
+			cash_row["sys_amount"] = cash_row.get('sys_amount', 0) + row.sys_amount
+			cash += row.sys_amount
+	whs_row.append(cash_row)
 	whs_row.append({"local": 'WHS', "mode": "AITTL", "sys_amount": ttl + cash})
 	whs_row[0].update({
 		'gttl_label': 'SYS',
@@ -184,3 +216,11 @@ def get_columns():
 		}
 	]
 	return columns
+
+def send_report():
+	vancouver = timezone('America/Vancouver')
+	#return datetime.now().strftime("%H:%M")
+	return datetime.utcnow().astimezone(vancouver).strftime("%H:%M")
+	"""exists = frappe.db.exists('Auto Email Report', 'End of Day Report')
+	if exists:
+		send_now("End of Day Report")"""
