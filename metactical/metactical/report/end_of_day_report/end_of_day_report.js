@@ -10,6 +10,13 @@ frappe.query_reports["End of Day Report"] = {
 			label: 'Date',
 			reqd: 1,
 			default: today
+		},
+		{
+			fieldname: 'end_date',
+			fieldtype: 'Date',
+			label: 'End Date',
+			default: today,
+			hidden: 1
 		}
 	]
 };
