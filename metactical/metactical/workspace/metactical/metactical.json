@@ -17,6 +17,32 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Employee Onboarding",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Sign Up Invitation",
+   "link_to": "Employee Sign Up Invitation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Employee Self Sign Up",
+   "link_to": "Employee Sign Up",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Metactical Item",
    "link_type": "DocType",
    "onboard": 0,
@@ -418,7 +444,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-09-15 04:22:45.805455",
+ "modified": "2022-09-29 05:59:37.685816",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

@@ -1,0 +1,260 @@
+{
+ "actions": [],
+ "autoname": "ESIGN.###",
+ "creation": "2022-09-26 10:23:22.385762",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "first_name",
+  "last_name",
+  "personal_email",
+  "gender",
+  "column_break_3",
+  "date_of_birth",
+  "hire_date",
+  "section_address",
+  "address1",
+  "address2",
+  "city",
+  "state",
+  "column_break_11",
+  "zip_code",
+  "country",
+  "inteli_phone_no",
+  "phone_no",
+  "bank_information",
+  "bank_institution_no",
+  "bank_transit_no",
+  "bank_account_no",
+  "extra_information",
+  "sin_no",
+  "is_student",
+  "sin_expiry_date",
+  "column_break_22",
+  "comments",
+  "internal_information",
+  "company_email",
+  "role_profile_name",
+  "roles_html",
+  "roles",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "First Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Last Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Employee Sign Up",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "address1",
+   "fieldtype": "Data",
+   "label": "Address Line 1",
+   "reqd": 1
+  },
+  {
+   "fieldname": "address2",
+   "fieldtype": "Data",
+   "label": "Address Line 2"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City",
+   "reqd": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "Province/State",
+   "reqd": 1
+  },
+  {
+   "fieldname": "zip_code",
+   "fieldtype": "Data",
+   "label": "Postal Code/ Zip Code"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sin_no",
+   "fieldtype": "Data",
+   "label": "SIN No"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_student",
+   "fieldtype": "Check",
+   "label": "Are you an International Student?"
+  },
+  {
+   "depends_on": "eval:doc.is_student==1",
+   "fieldname": "sin_expiry_date",
+   "fieldtype": "Date",
+   "label": "SIN Expiry Date"
+  },
+  {
+   "fieldname": "date_of_birth",
+   "fieldtype": "Date",
+   "label": "Date of Birth",
+   "reqd": 1
+  },
+  {
+   "fieldname": "hire_date",
+   "fieldtype": "Date",
+   "label": "Hire Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "personal_email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Personal Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bank_institution_no",
+   "fieldtype": "Int",
+   "label": "Bank Institution No.",
+   "length": 3
+  },
+  {
+   "fieldname": "bank_transit_no",
+   "fieldtype": "Int",
+   "label": "Bank Transit No.",
+   "length": 5
+  },
+  {
+   "fieldname": "bank_account_no",
+   "fieldtype": "Data",
+   "label": "Bank Account No."
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Comments/Notes"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_address",
+   "fieldtype": "Section Break",
+   "label": "Address"
+  },
+  {
+   "fieldname": "column_break_11",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bank_information",
+   "fieldtype": "Section Break",
+   "label": "Bank Information"
+  },
+  {
+   "fieldname": "extra_information",
+   "fieldtype": "Section Break",
+   "label": "Extra Information"
+  },
+  {
+   "fieldname": "column_break_22",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "internal_information",
+   "fieldtype": "Section Break",
+   "label": "Internal Information"
+  },
+  {
+   "fieldname": "roles_html",
+   "fieldtype": "HTML",
+   "label": "Roles"
+  },
+  {
+   "fieldname": "role_profile_name",
+   "fieldtype": "Link",
+   "label": "Role Profile",
+   "options": "Role Profile"
+  },
+  {
+   "fieldname": "roles",
+   "fieldtype": "Table",
+   "label": "User Roles",
+   "options": "Employee Role"
+  },
+  {
+   "fieldname": "company_email",
+   "fieldtype": "Data",
+   "label": "Company Email Address",
+   "options": "Email"
+  },
+  {
+   "fieldname": "phone_no",
+   "fieldtype": "Data",
+   "label": "Phone No",
+   "reqd": 1
+  },
+  {
+   "fieldname": "gender",
+   "fieldtype": "Link",
+   "label": "Gender",
+   "options": "Gender",
+   "reqd": 1
+  },
+  {
+   "fieldname": "inteli_phone_no",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Inteli Phone No"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2022-10-01 05:56:41.513299",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Employee Sign Up",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
