@@ -265,6 +265,9 @@ class PicklistPage{
 			this.wrapper.find('.submit-pick').on('click', function(){
 				me.submit_pick_list();
 			});
+			this.wrapper.find('.submit-pick-link').on('click', function(event){
+				event.preventDefault();
+			});
 		}
 		else{
 			//this.wrapper.find('.to-pick-ul').html(frappe.render_template('submit_button'));
@@ -345,11 +348,13 @@ class PicklistPage{
 					let sub_btn = pick_qty.fields_dict.ht.$wrapper.find('.pick-sub');
 					let to_pick_field = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
 					let items_remaining = pick_qty.fields_dict.ht.$wrapper.find('.items-remaining');
-					add_btn.on('click', function(){
+					add_btn.on('click', function(event){
+						event.preventDefault();
 						to_pick_field.val(parseFloat(to_pick_field.val()) + 1);
 						items_remaining.html(parseFloat(items_remaining.text()) - 1);				
 					});
 					sub_btn.on('click', function(){
+						event.preventDefault();
 						to_pick_field.val(parseFloat(to_pick_field.val()) - 1);
 						items_remaining.html(parseFloat(items_remaining.text()) + 1);				
 					});
@@ -441,7 +446,8 @@ class PicklistPage{
 				}
 			}
 		});
-		this.submit_partial.on('click', function(){
+		this.submit_partial.on('click', function(event){
+			event.preventDefault();
 			if(metactical.pick_list.picked_items.length > 0){
 				me.submit_pick_list();
 			}
@@ -471,6 +477,7 @@ class PicklistPage{
 				"items": metactical.pick_list.picked_items,
 			},
 			"callback": function(ret){
+				console.log({"ret": ret});
 				frappe.show_alert({
 					message: __('Pick List Submitted'),
 					indicator: 'green'
