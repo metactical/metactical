@@ -15,8 +15,7 @@ from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 class SalesOrderCustom(SalesOrder):
 	def validate(self):
 		super(SalesOrderCustom, self).validate()
-		if self.docstatus == 0:
-			self.pull_reserved_qty()
+		self.pull_reserved_qty()
 			
 	def pull_reserved_qty(self):
 		for row in self.items:
