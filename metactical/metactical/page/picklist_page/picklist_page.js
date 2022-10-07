@@ -621,8 +621,12 @@ class PicklistPage{
 		var items_template = frappe.render_template('items_to_pick', {"items": items})
 		if(strip(items_template) == ""){
 			this.wrapper.find('.to-pick-ul').html(frappe.render_template('submit_button'));
-			this.wrapper.find('.submit-pick').on('click', function(){
+			this.wrapper.find('.submit-pick').on('click', function(event){
+				event.preventDefault();
 				me.submit_pick_list();
+			});
+			this.wrapper.find('.submit-pick-link').on('click', function(event){
+				event.preventDefault();
 			});
 		}
 		else{
@@ -720,11 +724,13 @@ class PicklistPage{
 					let to_pick_field = pick_qty.fields_dict.ht.$wrapper.find('.to_pick');
 					let items_remaining = pick_qty.fields_dict.ht.$wrapper.find('.items-remaining');
 					let tote_barcode = pick_qty.fields_dict.ht.$wrapper.find('.tote-barcode');
-					add_btn.on('click', function(){
+					add_btn.on('click', function(event){
+						event.preventDefault();
 						to_pick_field.val(parseFloat(to_pick_field.val()) + 1);
 						items_remaining.html(parseFloat(items_remaining.text()) - 1);				
 					});
 					sub_btn.on('click', function(){
+						event.preventDefault();
 						to_pick_field.val(parseFloat(to_pick_field.val()) - 1);
 						items_remaining.html(parseFloat(items_remaining.text()) + 1);				
 					});
@@ -845,7 +851,8 @@ class PicklistPage{
 				}
 			}
 		});
-		this.submit_partial.on('click', function(){
+		this.submit_partial.on('click', function(event){
+			event.preventDefault();
 			if(metactical.pick_list.picked_items.length > 0){
 				me.submit_pick_list();
 			}
