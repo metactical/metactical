@@ -56,13 +56,13 @@ def execute(filters=None):
 		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
 		row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("supplier"))
 		
-		row["wh_us"] = get_qty(i.get("item_code"), "US02-Houston - Active Stock - ICL") or 0
+		row["wh_us"] = get_qty(i.get("item_code"), "01A-ActiveStock - CUS") or 0
 		
 		row["total_actual_qty"] = 0
 		
 		if row.get("wh_us") > 0: 
 			row["total_actual_qty"] += row.get("wh_us")
-		warehouse = 'US02-Houston - Active Stock - ICL'
+		warehouse = '01A-ActiveStock - CUS'
 		row["material_request"], row['mr_status'], row['mr_total_qty'] = get_open_material_request(i.get("item_code"), warehouse)
 		row["tag"] = get_tags(i.get("item_code"))
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
@@ -135,7 +135,7 @@ def get_reference_warehouse(filters):
 	warehouse = filters.get('reference_warehouse')
 	warehouse_map = {
 		"Total QOH": "total_actual_qty",
-		"US02-Houston - Active Stock - ICL": "wh_us"
+		"01A-ActiveStock - CUS": "wh_us"
 	}
 	return warehouse_map.get(warehouse)
 
@@ -315,7 +315,7 @@ def get_column(filters,conditions):
 				"width": 100,
 			},
 			{
-				"label": _("US02-Houston - Active Stock - ICL"),
+				"label": _("01A-ActiveStock - CUS"),
 				"fieldname": "wh_us",
 				"fieldtype": "Int",
 				"width": 200,
@@ -446,7 +446,7 @@ def get_date_last_received(item, supplier):
 	date = None
 	data= frappe.db.sql("""select max(transaction_date) from `tabPurchase Order` p inner join 
 		`tabPurchase Order Item` c on p.name = c.parent where c.item_code = %s and p.supplier=%s and p.docstatus = 1
-		AND c.warehouse = 'US02-Houston - Active Stock'
+		AND c.warehouse = '01A-ActiveStock - CUS'
 		""",(item,supplier))
 	if data:
 		date = data[0][0]
@@ -512,7 +512,7 @@ def get_open_material_request(item, warehouse=None):
 	if warehouse is not None:
 		where = " AND warehouse = '{}'".format(warehouse)
 	else:
-		where = " AND warehouse = 'US02-Houston - Active Stock'"
+		where = " AND warehouse = '01A-ActiveStock - CUS'"
 	data = frappe.db.sql("""select p.name, c.qty, p.status 
 							from 
 								`tabMaterial Request` p 
@@ -546,7 +546,7 @@ def get_purchase_orders(item,supplier):
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and p.status in ("To Receive and Bill", "To Receive")
 								and p.supplier = %s and 
-								c.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, supplier))
+								c.warehouse = '01A-ActiveStock - CUS'""",(item, supplier))
 	for d in data:
 		name = get_pr_draft(item, d[0])
 		qty = get_pr_qty(item, d[0])
@@ -576,7 +576,7 @@ def get_last_purchase_orders(item,supplier):
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and p.status in ("To Receive and Bill", "To Receive")
 								and p.supplier = %s and 
-								c.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, supplier))
+								c.warehouse = '01A-ActiveStock - CUS'""",(item, supplier))
 	for d in data:
 		output += d[0]+" ("+str(getdate(d[2]).strftime("%d-%b-%Y"))+"), | "
 		# output = d[0]+" ("+str(d[1])+")"
@@ -593,7 +593,7 @@ def get_pr_draft( item, po_name):
 							where 
 								pr.docstatus=0 and ri.item_code = %s
 								and pr.purchase_order = %s and 
-								ri.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, po_name))
+								ri.warehouse = '01A-ActiveStock - CUS'""",(item, po_name))
 	for d in data:
 		output += d[0]+" ("+str(d[1])+"), "	
 	return data
@@ -609,7 +609,7 @@ def get_pr_qty( item, po_name):
 							where 
 								pr.docstatus=0 and ri.item_code = %s
 								and pr.purchase_order = %s
-								and ri.warehouse = 'US02-Houston - Active Stock - ICL'""",(item, po_name))
+								and ri.warehouse = '01A-ActiveStock - CUS'""",(item, po_name))
 	for d in data:
 		qty = d[0]
 	return qty
