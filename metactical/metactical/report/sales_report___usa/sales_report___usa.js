@@ -8,8 +8,8 @@ frappe.query_reports["Sales Report - USA"] = {
 			"fieldname": "reference_warehouse",
 			"fieldtype": "Select",
 			"label": "Reference Warehouse",
-			"options": "US02-Houston - Active Stock - ICL",
-			"default": "US02-Houston - Active Stock - ICL",
+			"options": "01A-ActiveStock - CUS",
+			"default": "01A-ActiveStock - CUS",
 			"reqd": 1
 		},
 		{
