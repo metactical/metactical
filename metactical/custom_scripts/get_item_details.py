@@ -34,7 +34,7 @@ from erpnext.stock.get_item_details import update_stock, set_valuation_rate, pro
 	get_default_income_account, get_default_expense_account, get_default_discount_account, get_default_deferred_account, get_default_cost_center, \
 	get_default_supplier, get_price_list_rate, insert_item_price, get_item_price, get_price_list_rate_for, check_packing_list, \
 	validate_conversion_rate, get_party_item_code, get_pos_profile_item_details, get_pos_profile, get_serial_nos_by_fifo, get_serial_no_batchwise, \
-	get_conversion_factor, get_projected_qty, get_bin_details, get_company_total_stock, get_serial_no_details, get_bin_details_and_serial_nos, \
+	get_conversion_factor, get_projected_qty, get_company_total_stock, get_serial_no_details, get_bin_details_and_serial_nos, \
 	get_batch_qty_and_serial_no, get_batch_qty, apply_price_list, apply_price_list_on_item, get_price_list_currency_and_exchange_rate, \
 	get_default_bom, get_valuation_rate, get_gross_profit, get_serial_no, update_party_blanket_order, get_blanket_order_details, \
 	get_so_reservation_for_item, get_reserved_qty_for_so
@@ -353,3 +353,17 @@ def update_barcode_value(out):
 	# If item has one barcode then update the value of the barcode field
 	if barcode_data and len(barcode_data.get(out.item_code)) > 0:
 		out["barcode"] = barcode_data.get(out.item_code)[0]
+		
+@frappe.whitelist()
+def get_bin_details(item_code, warehouse, company=None):
+	bin_details = frappe.db.get_value(
+		"Bin",
+		{"item_code": item_code, "warehouse": warehouse},
+		["projected_qty", "actual_qty", "reserved_qty"],
+		as_dict=True,
+		cache=True,
+	) or {"projected_qty": 0, "actual_qty": 0, "reserved_qty": 0}
+	bin_details['sal_reserved_qty'] = bin_details['reserved_qty']
+	if company:
+		bin_details["company_total_stock"] = get_company_total_stock(item_code, company)
+	return bin_details

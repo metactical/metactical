@@ -96,6 +96,8 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 		if order.get('source') is not None:
 			source = order.get('source')
 		shipstation_settings = get_settings(source)
+		if len(shipstation_settings) == 0:
+			return
 		
 		#Determine already set orderIDs (from previous requests)
 		orderIds = []
@@ -291,8 +293,9 @@ def get_settings(source=None, settingid=None):
 		
 	if len(settings) == 0 and settingid is None:
 		default = frappe.db.get_value('Shipstation Settings', {"is_default": 1, "disabled": 0})
-		ret = frappe.get_doc('Shipstation Settings', default)
-		settings.append(ret)
+		if default:
+			ret = frappe.get_doc('Shipstation Settings', default)
+			settings.append(ret)
 		
 	return settings
 	
