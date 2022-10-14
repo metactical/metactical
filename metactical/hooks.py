@@ -142,7 +142,11 @@ override_doctype_class = {
 	"Sales Invoice": "metactical.custom_scripts.sales_invoice.sales_invoice.CustomSalesInvoice",
 	"Pick List": "metactical.custom_scripts.pick_list.pick_list.CustomPickList",
 	"Quotation": "metactical.custom_scripts.quotation.quotation.CustomQuotation",
-	"Sales Order": "metactical.custom_scripts.sales_order.sales_order.SalesOrderCustom"
+	"Sales Order": "metactical.custom_scripts.sales_order.sales_order.SalesOrderCustom",
+	"Stock Reconciliation": "metactical.custom_scripts.stock_reconciliation.stock_reconciliation.CustomStockReconciliation",
+	"Purchase Order": "metactical.custom_scripts.purchase_order.purchase_order.CustomPurchaseOrder",
+	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
+	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice"
 }
 
 # Scheduled Tasks

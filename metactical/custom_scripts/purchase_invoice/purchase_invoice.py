@@ -1,9 +1,9 @@
 import frappe
-from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
+from erpnext.accounts.doctype.purchase_invoice.purchase_invoice import PurchaseInvoice
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
 from frappe import _, msgprint, is_whitelisted
 
-class CustomPurchaseReceipt(PurchaseReceipt):
+class CustomPurchaseInvoice(PurchaseInvoice):
 	def submit(self):
 		if len(self.items) > 100:
 			msgprint(
@@ -33,26 +33,3 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		self.lock()
 		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 			action=action, **kwargs)
-
-def validate(self, method):
-	if self.set_warehouse:
-		for item in self.items:
-			if item.warehouse != self.set_warehouse:
-				item.warehouse = self.set_warehouse
-			
-@frappe.whitelist()
-def get_pr_items(docname):
-	items = []
-	added_items = []
-	doc = frappe.get_doc('Purchase Receipt', docname)
-	for item in doc.items:
-		if item.item_code not in added_items:
-			items.append(item)
-			added_items.append(item.item_code)
-		else:
-			for i in items:
-				if i.item_code == item.item_code:
-					i.update({
-						'qty': i.qty + item.qty
-					})
-	return items

@@ -5,6 +5,40 @@ from frappe.model.mapper import get_mapped_doc
 from frappe import msgprint, _
 from frappe.utils import cstr, flt, getdate, new_line_sep, nowdate, add_days
 from erpnext.accounts.party import get_party_details
+from erpnext.buying.doctype.purchase_order.purchase_order import PurchaseOrder
+from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
+from frappe import _, msgprint, is_whitelisted
+
+class CustomPurchaseOrder(PurchaseOrder):
+	def submit(self):
+		if len(self.items) > 100:
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this Stock Reconciliation and revert to the Draft stage"
+				)
+			)
+			self.queue_action("submit", timeout=2000)
+		else:
+			self._submit()
+	
+	def queue_action(self, action, **kwargs):
+		"""Run an action in background. If the action has an inner function,
+		like _submit for submit, it will call that instead"""
+		# call _submit instead of submit, so you can override submit to call
+		# run_delayed based on some action
+		# See: Stock Reconciliation
+		from frappe.utils.background_jobs import enqueue
+
+		if hasattr(self, '_' + action):
+			action = '_' + action
+
+		if file_lock.lock_exists(self.get_signature()):
+			frappe.throw(_('This document is currently queued for execution. Please try again'),
+				title=_('Document Queued'))
+
+		self.lock()
+		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
+			action=action, **kwargs)
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
