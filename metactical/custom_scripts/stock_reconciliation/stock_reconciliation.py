@@ -1,9 +1,9 @@
 import frappe
-from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
 from frappe import _, msgprint, is_whitelisted
+from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import StockReconciliation
 
-class CustomPurchaseReceipt(PurchaseReceipt):
+class CustomStockReconciliation(StockReconciliation):
 	def submit(self):
 		if len(self.items) > 100:
 			msgprint(
@@ -14,7 +14,10 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 			self.queue_action("submit", timeout=2000)
 		else:
 			self._submit()
-	
+			
+	def _submit(self):
+		frappe.throw("Some test error")
+		
 	def queue_action(self, action, **kwargs):
 		"""Run an action in background. If the action has an inner function,
 		like _submit for submit, it will call that instead"""
@@ -33,26 +36,3 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		self.lock()
 		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 			action=action, **kwargs)
-
-def validate(self, method):
-	if self.set_warehouse:
-		for item in self.items:
-			if item.warehouse != self.set_warehouse:
-				item.warehouse = self.set_warehouse
-			
-@frappe.whitelist()
-def get_pr_items(docname):
-	items = []
-	added_items = []
-	doc = frappe.get_doc('Purchase Receipt', docname)
-	for item in doc.items:
-		if item.item_code not in added_items:
-			items.append(item)
-			added_items.append(item.item_code)
-		else:
-			for i in items:
-				if i.item_code == item.item_code:
-					i.update({
-						'qty': i.qty + item.qty
-					})
-	return items
