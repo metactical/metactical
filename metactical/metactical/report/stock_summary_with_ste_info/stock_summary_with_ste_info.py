@@ -61,6 +61,9 @@ def get_ste_details(data):
 							`tabUser` AS user ON user.name = ste.owner
 						WHERE
 							details.t_warehouse = %(warehouse)s AND details.item_code = %(item_code)s
+							AND ste.docstatus = 1 AND 
+							(SELECT name FROM `tabStock Entry` WHERE received_from_stock = ste.name OR
+								outgoing_stock_entry = ste.name LIMIT 1) IS NULL
 						GROUP BY
 							ste.name, ste.posting_date, user.full_name, details.s_warehouse
 						ORDER BY ste.posting_date DESC LIMIT %(limit)s
