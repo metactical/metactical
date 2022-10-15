@@ -6,7 +6,7 @@ from frappe.model.document import Document
 from frappe.utils import get_url
 
 class EmployeeSignUpInvitation(Document):
-	def submit(self):
+	def on_submit(self):
 		from email.utils import formataddr
 		from frappe.core.doctype.communication.email import _make as make_communication
 		subject = 'Invite to register for Metactical management system'

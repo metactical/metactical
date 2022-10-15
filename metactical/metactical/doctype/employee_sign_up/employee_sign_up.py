@@ -6,7 +6,7 @@ from frappe.model.document import Document
 from email.utils import formataddr
 
 class EmployeeSignUp(Document):
-	def submit(self):
+	def on_submit(self):
 		self.validate_sin_mail()
 		self.create_user()
 		self.create_employee()
