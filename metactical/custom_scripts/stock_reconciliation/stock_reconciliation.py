@@ -3,7 +3,7 @@ from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
 from frappe import _, msgprint, is_whitelisted
 from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import StockReconciliation
 
-class CustomStockReconciliation(StockReconciliation):
+class CustomStockReconciliation(StockReconciliation):	
 	def submit(self):
 		if len(self.items) > 100:
 			msgprint(
@@ -14,9 +14,6 @@ class CustomStockReconciliation(StockReconciliation):
 			self.queue_action("submit", timeout=2000)
 		else:
 			self._submit()
-			
-	def _submit(self):
-		frappe.throw("Some test error")
 		
 	def queue_action(self, action, **kwargs):
 		"""Run an action in background. If the action has an inner function,
@@ -32,7 +29,8 @@ class CustomStockReconciliation(StockReconciliation):
 		if file_lock.lock_exists(self.get_signature()):
 			frappe.throw(_('This document is currently queued for execution. Please try again'),
 				title=_('Document Queued'))
-
+		
+		frappe.db.set_value(self.doctype, self.name, 'ais_queue_status', 'Queued',  update_modified=False)
 		self.lock()
 		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 			action=action, **kwargs)

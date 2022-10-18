@@ -7,6 +7,7 @@ def execute_action(doctype, name, action, **kwargs):
 	doc = frappe.get_doc(doctype, name)
 	doc.unlock()
 	try:
+		doc.update({"ais_queue_status": "Not Queued"})
 		getattr(doc, action)(**kwargs)
 	except Exception:
 		frappe.db.rollback()
@@ -18,6 +19,6 @@ def execute_action(doctype, name, action, **kwargs):
 			msg = '<pre><code>' + frappe.get_traceback() + '</pre></code>'
 
 		doc.add_comment('Comment', _('Action Failed') + '<br><br>' + msg)
-		doc.update({'ais_queue_failed': 1})
+		doc.update({'ais_queue_failed': 1, 'ais_queue_status': "Failed"})
 		doc.save()
 		doc.notify_update()
