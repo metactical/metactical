@@ -1,9 +1,16 @@
 {
+ "actions": [],
  "creation": "2021-01-01 02:49:30.801488",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "usa_instance_credentials_section",
+  "api_key",
+  "api_secret",
+  "column_break_3",
+  "us_url",
+  "section_warehouses",
   "warehouses",
   "section_price_list",
   "print_price_list"
@@ -25,10 +32,39 @@
    "fieldtype": "Table",
    "label": "User Print Price List Settings",
    "options": "Item Search Print Price List"
+  },
+  {
+   "fieldname": "usa_instance_credentials_section",
+   "fieldtype": "Section Break",
+   "label": "USA Instance Credentials"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "api_secret",
+   "fieldtype": "Password",
+   "label": "API Secret"
+  },
+  {
+   "fieldname": "section_warehouses",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "us_url",
+   "fieldtype": "Data",
+   "label": "URL"
   }
  ],
  "issingle": 1,
- "modified": "2021-10-25 04:49:44.006990",
+ "links": [],
+ "modified": "2022-10-15 13:47:17.887069",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
