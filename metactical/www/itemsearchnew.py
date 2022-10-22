@@ -3,6 +3,7 @@ from frappe import _
 import frappe.sessions
 from frappe.utils import cint, sanitize_html, strip_html
 from datetime import datetime
+import requests
 
 
 def get_context(context):		
@@ -157,8 +158,18 @@ def get_items(search_value="", offset=0):
 			search_text=search_value, offset=offset
 		)
 	items_data = frappe.db.sql(query ,as_dict=1)
-
+	
 	if items_data:
+		item_search_settings = frappe.get_doc("Item Search Settings")
+		#Get US data
+		us_data = {}
+		if item_search_settings.get("us_url") is not None or item_search_settings.get("us_url") != "":
+			us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.api_secret),
+										params={"search_value": search_value})
+		if us_request.status_code == 200:
+			for item in us_request.json().get("message", {}):
+				us_data.update({item["item_code"]: item["actual_qty"]})
+		
 		table_columns = ["RetailSKU", "Item Name", "Price", "GPrice", "SQOH"]
 		table_data = []
 		items = [d.item_code for d in items_data]
@@ -177,7 +188,6 @@ def get_items(search_value="", offset=0):
 		)
 
 		# Get Warehouses and its display name from Item Search Settings
-		item_search_settings = frappe.get_doc("Item Search Settings")
 		'''if not item_search_settings:
 			frappe.msgpring("Please Enter Item Search Settings")'''
 		
@@ -199,12 +209,14 @@ def get_items(search_value="", offset=0):
 				continue
 			warehouse_wise_items[warehouse][item_code] = qty
 			bin_dict[b.get("item_code")] = b.get("actual_qty")
-
+		
+		#Add US column
+		table_columns.append("US Balance")
+		
 		warehouses = warehouse_wise_items.keys()
 		for warehouse in warehouses:
 			if warehouse not in warehouses_to_display:
 				continue
-			#frappe.msgprint(warehouses_to_display[warehouse])
 			table_columns.append(warehouses_to_display[warehouse])
 
 		table_columns.extend(["Barcode", "IFW_location", "ERPItemCode", "ERPNextTemplateSKU"])
@@ -225,6 +237,9 @@ def get_items(search_value="", offset=0):
 			sqoh = item.sqoh
 
 			item_row.extend([retail_skusuffix, item_name, item_price, gorilla_price, sqoh])
+			
+			#Set US balance
+			item_row.append(us_data.get(item_code, 0))
 			
 			for warehouse in warehouses:
 				warehouse_qty = 0.0
