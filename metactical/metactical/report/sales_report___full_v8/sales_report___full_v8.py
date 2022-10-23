@@ -715,21 +715,30 @@ def get_open_po_qty(item,supplier, warehouse=None):
 
 @frappe.whitelist()
 def get_item_details(item, list_type="Selling", supplier=None):
+	price_list = frappe.db.get_value("Stock Settings", "Stock Settings", "ais_default_price_list")
+	if price_list is None or price_list  == "":
+		frappe.throw("Please set a default price list in stock Settings")
 	cond = " and selling = 1"
 	if list_type == "Buying": cond= " and buying = 1"
 	rate = 0
 	date = frappe.utils.nowdate()
-	r = frappe.db.sql("select price_list_rate from `tabItem Price` where '{}' between valid_from and valid_upto and item_code = '{}' {} limit 1".format(date, item, cond))
+	r = frappe.db.sql("select price_list_rate from `tabItem Price` \
+						where '{}' between valid_from and valid_upto and item_code = '{}' \
+						and price_list = '{}' {} limit 1".format(date, item, price_list, cond))
 	if r:
 		if r[0][0]:
 			rate = r[0][0]
 	else:
-		r = frappe.db.sql("select price_list_rate from `tabItem Price` where (valid_from <= '{}' or valid_upto >= '{}') and item_code = '{}' {} limit 1".format(date, date, item, cond))
+		r = frappe.db.sql("select price_list_rate from `tabItem Price` \
+							where (valid_from <= '{}' or valid_upto >= '{}') and item_code = '{}' \
+							and price_list = '{}' {} limit 1".format(date, date, item, price_list, cond))
 		if r:
 			if r[0][0]:
 				rate = r[0][0]
 		else:
-			r = frappe.db.sql("select price_list_rate from `tabItem Price` where valid_from IS NULL and valid_upto IS NULL and item_code = '{}' {} limit 1".format(item, cond))
+			r = frappe.db.sql("select price_list_rate from `tabItem Price` \
+								where valid_from IS NULL and valid_upto IS NULL and item_code = '{}' \
+								and price_list = '{}' {} limit 1".format(item, price_list, cond))
 			if r:
 				if r[0][0]:
 					rate = r[0][0]
