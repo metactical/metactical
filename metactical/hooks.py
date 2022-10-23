@@ -196,7 +196,13 @@ override_whitelisted_methods = {
 #}
 
 #Fixtures
-fixtures = ["Custom Field", "Property Setter", "DocType Link", "List View Settings"]
+fixtures = [{
+    "dt": "Custom Field",
+    "filters": [["name", "in", [
+        'Stock Settings-ais_default_price_list',
+        'Stock Settings-ais_sales_report_settings'
+    ]]]
+}]
 
 #For using in print format
 jenv = {
