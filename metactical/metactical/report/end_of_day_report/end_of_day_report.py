@@ -76,7 +76,7 @@ def get_data(today):
 									invoice.pos_profile, mode_of_payment""", {'posting_date': today}, as_dict=1)'''
 	profiles = {
 		'Downtown Operators': 'DTN', 
-		'Edmodns Operators': 'EDM', 
+		'Edmonds Operators': 'EDM', 
 		'Victoria Operators': 'VIC', 
 		'Queen Operators': 'QEN',
 		'Montreal Operators': 'MON',
