@@ -209,15 +209,15 @@ def get_items(search_value="", offset=0):
 				continue
 			warehouse_wise_items[warehouse][item_code] = qty
 			bin_dict[b.get("item_code")] = b.get("actual_qty")
-		
-		#Add US column
-		table_columns.append("US Balance")
-		
+				
 		warehouses = warehouse_wise_items.keys()
 		for warehouse in warehouses:
 			if warehouse not in warehouses_to_display:
 				continue
 			table_columns.append(warehouses_to_display[warehouse])
+			
+		#Add US column
+		table_columns.append("TXQOH")
 
 		table_columns.extend(["Barcode", "IFW_location", "ERPItemCode", "ERPNextTemplateSKU"])
 		#Get last reconciled
@@ -238,9 +238,6 @@ def get_items(search_value="", offset=0):
 
 			item_row.extend([retail_skusuffix, item_name, item_price, gorilla_price, sqoh])
 			
-			#Set US balance
-			item_row.append(us_data.get(item_code, 0))
-			
 			for warehouse in warehouses:
 				warehouse_qty = 0.0
 				if item_code in warehouse_wise_items[warehouse]:
@@ -253,6 +250,9 @@ def get_items(search_value="", offset=0):
 					last_reconcile_html += 'Never'
 				last_reconcile_html += '</span>'
 				item_row.append(str(int(warehouse_qty)) + last_reconcile_html)
+			
+			#Set US balance
+			item_row.append(us_data.get(item_code, 0))
 
 			item_row.extend([barcode, ifw_location, item_code, variant_of])
 			table_data.append(item_row)
