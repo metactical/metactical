@@ -484,9 +484,18 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Unsynced Delivery Notes With SS",
+   "link_to": "Unsynced Delivery Notes With SS",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2022-10-23 12:35:56.555138",
+ "modified": "2022-11-03 12:13:04.400583",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
