@@ -169,7 +169,12 @@ scheduler_events = {
 # 	]
 # 	"monthly": [
 # 		"metactical.tasks.monthly"
-# 	]
+# 	],
+	"cron": {
+		"15 * * * *": [
+			"metactical.custom_scripts.frappe/document.clear_queues_docs"
+		]
+	}
 }
 
 # Testing

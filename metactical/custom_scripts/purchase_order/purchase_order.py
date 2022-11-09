@@ -37,6 +37,8 @@ class CustomPurchaseOrder(PurchaseOrder):
 				title=_('Document Queued'))
 		
 		frappe.db.set_value(self.doctype, self.name, 'ais_queue_status', 'Queued',  update_modified=False)
+		frappe.db.set_value(self.doctype, self.name, 'ais_queued_date', now_datetime(),  update_modified=False)
+		frappe.db.set_value(self.doctype, self.name, 'ais_queued_by', frappe.session.user,  update_modified=False)
 		self.lock()
 		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 			action=action, **kwargs)

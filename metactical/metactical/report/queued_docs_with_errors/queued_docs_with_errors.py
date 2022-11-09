@@ -31,6 +31,12 @@ def get_columns(filters):
 			"options": "Doctype",
 			"label": "Submitted By",
 			"width": 150
+		},
+		{
+			"fieldname": "comment",
+			"fieldtype": "Small Text",
+			"label": "Comment",
+			"width": 200
 		}
 	]
 	return columns
@@ -44,44 +50,44 @@ def get_data(filters):
 	if "Purchase Order" in references:
 		pos = frappe.db.sql("""SELECT 
 									'Purchase Order' AS reference, name AS reference_name, 
-									modified_by AS submitted_by
+									ais_queued_by AS submitted_by, ais_queueu_comment AS comment
 								FROM
 									`tabPurchase Order`
 								WHERE
-									docstatus = 0 AND ais_queue_failed = 1
+									docstatus = 0 AND ais_queue_failed = 1 AND ais_queue_status = 'Failed'
 								ORDER BY modified
 								""", as_dict=1)
 	
 	if "Purchase Receipt" in references:						
 		prs = frappe.db.sql("""SELECT 
 									'Purchase Receipt' AS reference, name AS reference_name, 
-									modified_by AS submitted_by
+									ais_queued_by AS submitted_by, ais_queueu_comment AS comment
 								FROM
 									`tabPurchase Receipt`
 								WHERE
-									docstatus = 0 AND ais_queue_failed = 1
+									docstatus = 0 AND ais_queue_failed = 1 AND ais_queue_status = 'Failed'
 								ORDER BY modified
 								""", as_dict=1)
 	
 	if "Purchase Invoice" in references:						
 		pis = frappe.db.sql("""SELECT 
 									'Purchase Invoice' AS reference, name AS reference_name, 
-									modified_by AS submitted_by
+									ais_queued_by AS submitted_by, ais_queueu_comment AS comment
 								FROM
 									`tabPurchase Invoice`
 								WHERE
-									docstatus = 0 AND ais_queue_failed = 1
+									docstatus = 0 AND ais_queue_failed = 1 AND ais_queue_status = 'Failed'
 								ORDER BY modified
 								""", as_dict=1)
 	
 	if "Stock Reconciliation" in references:						
 		srs = frappe.db.sql("""SELECT 
 									'Stock Reconciliation' AS reference, name AS reference_name, 
-									modified_by AS submitted_by
+									ais_queued_by AS submitted_by, ais_queueu_comment AS comment
 								FROM
 									`tabStock Reconciliation`
 								WHERE
-									docstatus = 0 AND ais_queue_failed = 1
+									docstatus = 0 AND ais_queue_failed = 1 AND ais_queue_status = 'Failed'
 								ORDER BY modified
 								""", as_dict=1)
 							
