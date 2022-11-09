@@ -5,7 +5,7 @@ from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseReceipt(PurchaseReceipt):
 	def submit(self):
-		if len(self.items) > 1:
+		if len(self.items) > 100:
 			msgprint(
 				_(
 					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this Stock Reconciliation and revert to the Draft stage"
