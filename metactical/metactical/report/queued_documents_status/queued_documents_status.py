@@ -37,6 +37,12 @@ def get_columns(filters):
 			"options": "Doctype",
 			"label": "Submitted By",
 			"width": 150
+		},
+		{
+			"fieldname": "comment",
+			"fieldtype": "Small Text",
+			"label": "Comment",
+			"width": 200
 		}
 	]
 	return columns
@@ -55,7 +61,8 @@ def get_data(filters):
 	if "Purchase Order" in references:
 		pos = frappe.db.sql("""SELECT 
 									'Purchase Order' AS reference, name AS reference_name, 
-									modified_by AS submitted_by, ais_queue_status AS queue_status
+									ais_queued_by AS submitted_by, ais_queue_status AS queue_status,
+									ais_queueu_comment AS comment
 								FROM
 									`tabPurchase Order`
 								WHERE
@@ -66,7 +73,8 @@ def get_data(filters):
 	if "Purchase Receipt" in references:						
 		prs = frappe.db.sql("""SELECT 
 									'Purchase Receipt' AS reference, name AS reference_name, 
-									modified_by AS submitted_by, ais_queue_status AS queue_status
+									ais_queued_by AS submitted_by, ais_queue_status AS queue_status,
+									ais_queueu_comment AS comment
 								FROM
 									`tabPurchase Receipt`
 								WHERE
@@ -77,7 +85,8 @@ def get_data(filters):
 	if "Purchase Invoice" in references:						
 		pis = frappe.db.sql("""SELECT 
 									'Purchase Invoice' AS reference, name AS reference_name, 
-									modified_by AS submitted_by, ais_queue_status AS queue_status
+									ais_queued_by AS submitted_by, ais_queue_status AS queue_status,
+									ais_queueu_comment AS comment
 								FROM
 									`tabPurchase Invoice`
 								WHERE
@@ -88,7 +97,8 @@ def get_data(filters):
 	if "Stock Reconciliation" in references:						
 		srs = frappe.db.sql("""SELECT 
 									'Stock Reconciliation' AS reference, name AS reference_name, 
-									modified_by AS submitted_by, ais_queue_status AS queue_status
+									ais_queued_by AS submitted_by, ais_queue_status AS queue_status,
+									ais_queueu_comment AS comment
 								FROM
 									`tabStock Reconciliation`
 								WHERE

@@ -18,7 +18,7 @@ def get_data(filters):
 									WHERE
 										(SELECT name FROM `tabShipstation Order ID` 
 											AS order_id WHERE order_id.parent = delivery_note.name
-											LIMIT 1) IS NOT NULL
+											LIMIT 1) IS NULL
 										AND ((delivery_note.shipping_address_name is not NULL
 										AND delivery_note.shipping_address_name != "") OR 
 										(delivery_note.customer_address is not NULL AND 
@@ -32,7 +32,7 @@ def get_data(filters):
 									WHERE
 										(SELECT name FROM `tabShipstation Order ID` 
 											AS order_id WHERE order_id.parent = delivery_note.name
-											LIMIT 1) IS NOT NULL
+											LIMIT 1) IS NULL
 										AND ((delivery_note.shipping_address_name is NULL
 										OR delivery_note.shipping_address_name != "") AND
 										(delivery_note.customer_address is NULL OR 

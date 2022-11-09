@@ -1,11 +1,11 @@
 import frappe
 from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
-from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
+from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime
 from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseReceipt(PurchaseReceipt):
 	def submit(self):
-		if len(self.items) > 100:
+		if len(self.items) > 1:
 			msgprint(
 				_(
 					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this Stock Reconciliation and revert to the Draft stage"
@@ -31,6 +31,8 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 				title=_('Document Queued'))
 		
 		frappe.db.set_value(self.doctype, self.name, 'ais_queue_status', 'Queued',  update_modified=False)
+		frappe.db.set_value(self.doctype, self.name, 'ais_queued_date', now_datetime(),  update_modified=False)
+		frappe.db.set_value(self.doctype, self.name, 'ais_queued_by', frappe.session.user,  update_modified=False)
 		self.lock()
 		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 			action=action, **kwargs)

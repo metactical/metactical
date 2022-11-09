@@ -10,7 +10,7 @@
  "idx": 0,
  "is_standard": "Yes",
  "letter_head": "Default",
- "modified": "2022-10-14 11:39:24.357660",
+ "modified": "2022-10-18 05:51:37.536461",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Queued Docs With Errors",
@@ -28,6 +28,9 @@
   },
   {
    "role": "Purchase User"
+  },
+  {
+   "role": "System Manager"
   }
  ]
 }
