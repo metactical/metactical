@@ -1,9 +1,74 @@
 import frappe
 from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
-from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime
+from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime, cint
 from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseReceipt(PurchaseReceipt):
+	def __init__(self, *args, **kwargs):
+		super(PurchaseReceipt, self).__init__(*args, **kwargs)
+		self.status_updater = [
+			{
+				"target_dt": "Purchase Order Item",
+				"join_field": "purchase_order_item",
+				"target_field": "received_qty",
+				"target_parent_dt": "Purchase Order",
+				"target_parent_field": "per_received",
+				"target_ref_field": "qty",
+				"source_dt": "Purchase Receipt Item",
+				"source_field": "received_qty",
+				"second_source_dt": "Purchase Invoice Item",
+				"second_source_field": "received_qty",
+				"second_join_field": "po_detail",
+				"percent_join_field": "purchase_order",
+				"overflow_type": "receipt",
+				"second_source_extra_cond": """ and exists(select name from `tabPurchase Invoice`
+				where name=`tabPurchase Invoice Item`.parent and update_stock = 1)""",
+			},
+			{
+				"source_dt": "Purchase Receipt Item",
+				"target_dt": "Purchase Invoice Item",
+				"join_field": "purchase_invoice_item",
+				"target_field": "received_qty",
+				"target_parent_dt": "Purchase Invoice",
+				"target_parent_field": "per_received",
+				"target_ref_field": "qty",
+				"source_field": "received_qty",
+				"percent_join_field": "purchase_invoice",
+				"overflow_type": "receipt",
+			},
+		]
+
+		if cint(self.is_return):
+			self.status_updater.extend(
+				[
+					{
+						"source_dt": "Purchase Receipt Item",
+						"target_dt": "Purchase Order Item",
+						"join_field": "purchase_order_item",
+						"target_field": "returned_qty",
+						"source_field": "-1 * qty",
+						"second_source_dt": "Purchase Invoice Item",
+						"second_source_field": "-1 * qty",
+						"second_join_field": "po_detail",
+						"extra_cond": """ and exists (select name from `tabPurchase Receipt`
+						where name=`tabPurchase Receipt Item`.parent and is_return=1)""",
+						"second_source_extra_cond": """ and exists (select name from `tabPurchase Invoice`
+						where name=`tabPurchase Invoice Item`.parent and is_return=1 and update_stock=1)""",
+					},
+					{
+						"source_dt": "Purchase Receipt Item",
+						"target_dt": "Purchase Receipt Item",
+						"join_field": "purchase_receipt_item",
+						"target_field": "returned_qty",
+						"target_parent_dt": "Purchase Receipt",
+						"target_parent_field": "per_returned",
+						"target_ref_field": "received_stock_qty",
+						"source_field": "-1 * received_stock_qty",
+						"percent_join_field_parent": "return_against",
+					},
+				]
+			)
+	
 	def submit(self):
 		if len(self.items) > 100:
 			msgprint(
