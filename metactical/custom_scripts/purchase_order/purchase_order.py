@@ -6,7 +6,7 @@ from frappe import msgprint, _
 from frappe.utils import cstr, flt, getdate, new_line_sep, nowdate, add_days
 from erpnext.accounts.party import get_party_details
 from erpnext.buying.doctype.purchase_order.purchase_order import PurchaseOrder
-from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
+from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime
 from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseOrder(PurchaseOrder):

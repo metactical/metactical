@@ -1,6 +1,6 @@
 import frappe
 from erpnext.accounts.doctype.purchase_invoice.purchase_invoice import PurchaseInvoice
-from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff
+from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime
 from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseInvoice(PurchaseInvoice):
