@@ -881,6 +881,7 @@ class PicklistPage{
 				"items": metactical.pick_list.picked_items,
 			},
 			"callback": function(ret){
+				console.log({"ret": ret});
 				frappe.show_alert({
 					message: __('Pick List Submitted'),
 					indicator: 'green'
