@@ -502,9 +502,18 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Supplier Status Report",
+   "link_to": "Supplier List",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2022-11-03 12:13:04.400583",
+ "modified": "2022-11-12 11:36:08.030392",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
