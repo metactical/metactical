@@ -14,21 +14,7 @@ def execute(filters=None):
 	columns = get_column()
 	data=[]
 
-	item_sales = get_data(filters)
-	for d in item_sales:
-		row = {}
-		row['warehouse'] = d.warehouse
-		row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
-		row['item_name'] = d.item_name	
-		row['current_qty'] = d.current_qty
-		row['quantity_difference'] = flt(d.quantity_difference)
-		row['qty'] = d.qty
-		row['amount_difference'] = d.amount_difference
-		row['owner'] = d.owner
-		
-
-		data.append(row)
-
+	data = get_data(filters)
 	return columns, data
 
 
@@ -78,6 +64,12 @@ def get_column():
 			"width": 120,
 		},
 		{
+			"fieldname":"reason_for_adjustment",
+			"label": "Reason for Adjustment",
+			"fieldtype": "Small Text",
+			"width": 120,
+		},
+		{
 			"fieldname":"owner",
 			"label": "Adjusted By",
 			"fieldtype": "Link",
@@ -95,7 +87,7 @@ def get_data(filters):
 	data = frappe.db.sql("""select c.item_code, c.qty, c.current_qty, c.quantity_difference,
 		c.valuation_rate, c.amount_difference, c.warehouse, 
 		i.ifw_retailskusuffix, i.ifw_location, i.item_name,
-		p.name, p.posting_date, p.owner
+		p.name, p.posting_date, p.owner, p.ais_reason_for_adjustment AS reason_for_adjustment
 		from `tabStock Reconciliation Item` c 
 		inner join `tabStock Reconciliation` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
