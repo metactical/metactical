@@ -11,6 +11,9 @@
   "get_items",
   "scan_barcode",
   "items",
+  "section_break_6",
+  "reason_for_adjustment",
+  "column_break_8",
   "amended_from"
  ],
  "fields": [
@@ -61,6 +64,19 @@
    "fieldname": "get_items",
    "fieldtype": "Button",
    "label": "Get Items"
+  },
+  {
+   "fieldname": "section_break_6",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_8",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reason_for_adjustment",
+   "fieldtype": "Small Text",
+   "label": "Reason for Adjustment"
   }
  ],
  "is_submittable": 1,
@@ -70,7 +86,7 @@
    "link_fieldname": "ais_cycle_count_v2"
   }
  ],
- "modified": "2022-07-05 07:32:32.329905",
+ "modified": "2022-11-15 03:11:55.137686",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Cycle Count V2",

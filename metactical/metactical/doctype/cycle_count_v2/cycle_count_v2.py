@@ -10,7 +10,8 @@ class CycleCountV2(Document):
 		doc = frappe.new_doc("Stock Reconciliation");
 		doc.update({
 			"purpose": "Stock Reconciliation",
-			"ais_cycle_count_v2": self.name
+			"ais_cycle_count_v2": self.name,
+			"ais_reason_for_adjustment": self.reason_for_adjustment
 		})
 		for row in self.items:
 			if row.qty != row.expected_qty:
