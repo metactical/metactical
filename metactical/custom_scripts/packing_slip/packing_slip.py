@@ -2,7 +2,7 @@ import frappe
 from erpnext.stock.doctype.packing_slip.packing_slip import PackingSlip
 
 class CustomPackingSlip(PackingSlip):
-	def submit(self):
+	def on_submit(self):
 		#Clear associated tote if any
 		tote_exists = frappe.db.exists('Picklist Tote', {'current_delivery_note': self.delivery_note})
 		if tote_exists:
