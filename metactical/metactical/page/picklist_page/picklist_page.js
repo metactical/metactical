@@ -832,9 +832,11 @@ class PicklistPage{
 								barcode_found = true
 								var picked = {
 									"item_code": to_pick[i].item_code,
-									"picked_qty": 1
+									"picked_qty": 1,
+									"pick_list": to_pick[i].pick_list
 								}
 								me.trigger_picked(picked, true);
+								frappe.utils.play_sound("alert");
 							}
 						}
 					}
@@ -881,7 +883,6 @@ class PicklistPage{
 				"items": metactical.pick_list.picked_items,
 			},
 			"callback": function(ret){
-				console.log({"ret": ret});
 				frappe.show_alert({
 					message: __('Pick List Submitted'),
 					indicator: 'green'
