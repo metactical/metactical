@@ -535,9 +535,9 @@ def get_date_last_received(item, supplier):
 						inner join 
 							`tabPurchase Order Item` c on p.name = c.parent 
 						where 
-							c.item_code = %s and p.supplier=%s and p.docstatus = 1
+							c.item_code = %s and p.docstatus = 1
 							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
-		""",(item,supplier))
+		""",(item))
 	if data:
 		date = data[0][0]
 	if date:
@@ -706,9 +706,9 @@ def get_open_po_qty(item,supplier, warehouse=None):
 							where 
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and  p.status in ("To Receive and Bill", "To Receive")
-								and p.supplier = %s
-								and c.warehouse <> 'US02-Houston - Active Stock - ICL'""" + where, 
-						(item, supplier))
+								and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+							""" + where, 
+						(item))
 	if data:
 		return data[0][0]
 	return 0
