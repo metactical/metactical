@@ -416,6 +416,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Register",
+   "link_to": "Metactical Sales Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -513,7 +522,7 @@
    "type": "Link"
   }
  ],
- "modified": "2022-11-12 11:36:08.030392",
+ "modified": "2022-12-02 10:43:18.810594",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
