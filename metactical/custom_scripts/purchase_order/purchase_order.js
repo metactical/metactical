@@ -1,3 +1,19 @@
+frappe.ui.form.on('Purchase Order', {
+	refresh: function(frm){
+		frm.doc.taxes.forEach((row)=>{
+			var allow_tax_edit = 1;
+			var tax_fields = ['charge_type', 'account_head', 'rate']
+			if(frm.doc.__onload['ais_allow_tax_edit']){
+				allow_tax_edit = 0;
+			}
+			tax_fields.forEach((field) => {
+				frappe.meta.get_docfield(row.doctype, field, row.name).read_only = allow_tax_edit;
+			});
+			frm.refresh_field("taxes");
+		});
+	}
+});
+
 erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderController.extend({
 	onload: function(doc, cdt, cdn){
 		if(this.frm.get_field('shipping_address')) {
@@ -19,6 +35,10 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 				this.frm.set_value("billing_address", "");
 			}, 1000)
 		}
+		if(doc.__onload['ais_allow_tax_edit']){
+			cur_frm.set_df_property('taxes', 'allow_on_submit', doc.__onload['ais_allow_tax_edit']);
+		}
+		console.log({'onload': doc});
 	},
 	
 	supplier: function(doc, cdt, cdn){

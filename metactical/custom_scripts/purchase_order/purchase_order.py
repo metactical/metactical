@@ -10,6 +10,19 @@ from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff,
 from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseOrder(PurchaseOrder):
+	def onload(self):
+		super(CustomPurchaseOrder, self).onload()
+		if self.docstatus == 1:
+			#Check if has Purchase Receipt
+			has_pr = frappe.db.sql("""SELECT name FROM `tabPurchase Receipt Item` WHERE
+									purchase_order = %(purchase_order)s AND docstatus <> 2""", {"purchase_order": self.name}, as_dict=True)
+			has_pi = frappe.db.sql("""SELECT name FROM `tabPurchase Invoice Item` WHERE
+									purchase_order = %(purchase_order)s AND docstatus <> 2""", {"purchase_order": self.name}, as_dict=True)
+			if len(has_pr) == 0 and len(has_pi) == 0:
+				self.set_onload("ais_allow_tax_edit", True)
+			else:
+				self.set_onload("ais_allow_tax_edit", False)
+	
 	def submit(self):
 		if len(self.items) > 100:
 			msgprint(
