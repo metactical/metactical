@@ -6,42 +6,13 @@ import frappe
 def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
-	data = get_pos(filters)
+	pos = get_pos(filters)
+	pos_in_data = []
+	for row in pos:
+		if row.po_no not in pos_in_data:
+			pos_in_data.append(row.po_no)
+			data.append(row)
 	return columns, data
-
-def get_data(filters):
-	suppliers = frappe.db.sql("""
-						SELECT
-							name AS supplier
-						FROM
-							`tabSupplier`
-						WHERE
-							disabled = 0
-						""", as_dict=1)
-	data = []
-	for row in suppliers:
-		row_data = get_last_po(row.supplier)
-		data.append(row.update(row_data))
-	return data
-
-def get_last_po(supplier):
-	data = frappe.db.sql("""SELECT
-								po.name AS recent_po, po.transaction_date AS po_date,
-								pr.name AS recent_pr, pr.status AS pr_status, po.eta_date AS eta,
-								po.carrier_used, po.tracking_id, po.drop_ship_notes AS notes
-							FROM
-								`tabPurchase Order` AS po
-							LEFT JOIN
-								`tabPurchase Receipt` AS pr ON pr.purchase_order = po.name
-							WHERE
-								po.docstatus = 1 AND po.supplier = %(supplier)s
-							ORDER BY
-								po.transaction_date DESC
-							LIMIT 1""", {"supplier": supplier}, as_dict=1)
-	if len(data) > 0:
-		return data[0]
-	else:
-		return frappe._dict()
 		
 def get_pos(filters):
 	data = frappe.db.sql("""SELECT
@@ -53,7 +24,7 @@ def get_pos(filters):
 							LEFT JOIN
 								`tabPurchase Receipt` AS pr ON pr.purchase_order = po.name
 							WHERE
-								po.docstatus = 1 AND po.status <> 'Completed'
+								po.docstatus = 1 AND po.status NOT IN ('Completed', 'Closed', 'Delivered')
 							ORDER BY
 								po.supplier, po.transaction_date DESC
 							""", as_dict=1)
