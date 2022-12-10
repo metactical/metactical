@@ -6,6 +6,7 @@ frappe.ui.form.on('Purchase Order', {
 			if(frm.doc.__onload['ais_allow_tax_edit']){
 				allow_tax_edit = 0;
 			}
+			frm.set_df_property('taxes', 'read_only', allow_tax_edit);
 			tax_fields.forEach((field) => {
 				frappe.meta.get_docfield(row.doctype, field, row.name).read_only = allow_tax_edit;
 			});
@@ -35,10 +36,6 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 				this.frm.set_value("billing_address", "");
 			}, 1000)
 		}
-		if(doc.__onload['ais_allow_tax_edit']){
-			cur_frm.set_df_property('taxes', 'allow_on_submit', doc.__onload['ais_allow_tax_edit']);
-		}
-		console.log({'onload': doc});
 	},
 	
 	supplier: function(doc, cdt, cdn){
