@@ -234,6 +234,7 @@ function populate_current_item() {
 
 function populate_packed_items() {
 	const items = havenir.packing_slip.packed_items;
+	let pending_items = havenir.packing_slip.pending_items;
 	let items_template = "";
 	if (items.length > 0) {
 		items_template = frappe.render_template("packing_items", {
@@ -245,6 +246,21 @@ function populate_packed_items() {
 			() => save_form(),
 			"octicon octicon-check"
 		);
+		
+		//To fix bug(?) that loads confirmation multiple times
+		if(pending_items.length == 0 && !havenir.packing_slip.confirm_raised){
+			havenir.packing_slip.confirm_raised = true;
+			frappe.confirm(
+				'Submit packing slip?',
+				function(){
+					havenir.packing_slip.confirm_raised = false;
+					save_form();
+				},
+				function(){
+					havenir.packing_slip.confirm_raised = false;
+				}
+			);
+		}
 	} else {
 		cur_page.page.page.set_primary_action(
 			"New",
