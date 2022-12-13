@@ -86,6 +86,14 @@ erpnext.utils.update_child_items = function(opts) {
 		in_list_view: 1,
 		label: __('Rate'),
 		precision: get_precision("rate")
+	}, {
+		fieldtype: 'Float',
+		fieldname: 'picked_qty',
+		default: 0,
+		read_only: 1,
+		in_list_view: 0,
+		label: __('Picked Qty'),
+		precision: get_precision('picked_qty')
 	}];
 
 	if (frm.doc.doctype == 'Sales Order' || frm.doc.doctype == 'Purchase Order' ) {
@@ -126,7 +134,7 @@ erpnext.utils.update_child_items = function(opts) {
 			//Add already picked items in Sales orders
 			if(frm.doc.doctype == 'Sales Order'){
 				frm.doc[opts.child_docname].forEach(d => {
-					if(d.picked_qty > 0){
+					if(d.picked_qty == d.qty){
 						this.fields_dict.trans_items.df.data.push({
 							"docname": d.name,
 							"name": d.name,
@@ -136,13 +144,23 @@ erpnext.utils.update_child_items = function(opts) {
 							"conversion_factor": d.conversion_factor,
 							"qty": d.qty,
 							"rate": d.rate,
-							"uom": d.uom
+							"uom": d.uom,
+							"picked_qty": d.picked_qty
 						});
 						this.data = dialog.fields_dict.trans_items.df.data;
 					}
 				});
 			}
 			const trans_items = this.get_values()["trans_items"].filter((item) => !!item.item_code);
+			//Validate picked_qty < qty
+			if(frm.doc.doctype == 'Sales Order'){
+				trans_items.forEach(row => {
+					if(row.picked_qty > row.qty){
+						frappe.throw("Quantity can not be greater than the already picked qty for item " + row.item_code);
+					}
+				});
+			}
+			
 			frappe.call({
 				method: 'erpnext.controllers.accounts_controller.update_child_qty_rate',
 				freeze: true,
@@ -163,7 +181,7 @@ erpnext.utils.update_child_items = function(opts) {
 	});
 
 	frm.doc[opts.child_docname].forEach(d => {
-		if(frm.doc.doctype == 'Sales Order' && d.picked_qty == 0){
+		if(frm.doc.doctype == 'Sales Order' && d.picked_qty < d.qty){
 			dialog.fields_dict.trans_items.df.data.push({
 				"docname": d.name,
 				"name": d.name,
@@ -173,7 +191,8 @@ erpnext.utils.update_child_items = function(opts) {
 				"conversion_factor": d.conversion_factor,
 				"qty": d.qty,
 				"rate": d.rate,
-				"uom": d.uom
+				"uom": d.uom,
+				"picked_qty": d.picked_qty
 			});
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
@@ -188,7 +207,8 @@ erpnext.utils.update_child_items = function(opts) {
 				"conversion_factor": d.conversion_factor,
 				"qty": d.qty,
 				"rate": d.rate,
-				"uom": d.uom
+				"uom": d.uom,
+				"picked_qty": d.picked_qty
 			});
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
