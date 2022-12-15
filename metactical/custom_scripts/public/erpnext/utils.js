@@ -86,15 +86,21 @@ erpnext.utils.update_child_items = function(opts) {
 		in_list_view: 1,
 		label: __('Rate'),
 		precision: get_precision("rate")
-	}, {
-		fieldtype: 'Float',
-		fieldname: 'picked_qty',
-		default: 0,
-		read_only: 1,
-		in_list_view: 0,
-		label: __('Picked Qty'),
-		precision: get_precision('picked_qty')
 	}];
+	
+	if (frm.doc.doctype == 'Sales Order') {
+		fields.push(
+			{
+				fieldtype: 'Float',
+				fieldname: 'picked_qty',
+				default: 0,
+				read_only: 1,
+				in_list_view: 0,
+				label: __('Picked Qty'),
+				precision: get_precision('picked_qty')
+			}
+		);
+	}
 
 	if (frm.doc.doctype == 'Sales Order' || frm.doc.doctype == 'Purchase Order' ) {
 		fields.splice(2, 0, {
@@ -207,8 +213,7 @@ erpnext.utils.update_child_items = function(opts) {
 				"conversion_factor": d.conversion_factor,
 				"qty": d.qty,
 				"rate": d.rate,
-				"uom": d.uom,
-				"picked_qty": d.picked_qty
+				"uom": d.uom
 			});
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
