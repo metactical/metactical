@@ -183,6 +183,9 @@ scheduler_events = {
 
 # before_tests = "metactical.install.before_tests"
 
+# Migrating
+after_migrate = "metactical.migrate.after_migrate"
+
 # Overriding Methods
 # ------------------------------
 #
