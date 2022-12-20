@@ -2043,30 +2043,6 @@
    "property_type": "Text",
    "row_name": null,
    "value": "Today"
-  },
-  {
-   "_assign": null,
-   "_comments": null,
-   "_liked_by": null,
-   "_user_tags": null,
-   "creation": "2022-04-12 16:29:30.368753",
-   "default_value": null,
-   "doc_type": "Purchase Order",
-   "docstatus": 0,
-   "doctype_or_field": "DocField",
-   "field_name": "naming_series",
-   "idx": 0,
-   "modified": "2021-02-24 14:53:52.285210",
-   "modified_by": "Administrator",
-   "name": "Purchase Order-naming_series-options",
-   "owner": "Administrator",
-   "parent": null,
-   "parentfield": null,
-   "parenttype": null,
-   "property": "options",
-   "property_type": "Text",
-   "row_name": null,
-   "value": ".YYYY.-"
   }
  ],
  "sync_on_migrate": 1
