@@ -5,4 +5,6 @@
 from frappe.model.document import Document
 
 class CanadaPost(Document):
-	pass
+	@property
+	def host(self):
+		return 'https://ct.soa-gw.canadapost.ca' if self.is_sandbox else 'https://soa-gw.canadapost.ca'

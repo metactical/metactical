@@ -8,7 +8,11 @@
  "field_order": [
   "enabled",
   "api_key",
-  "api_secret"
+  "api_secret",
+  "column_break_4",
+  "is_sandbox",
+  "customer_number",
+  "contract_number"
  ],
  "fields": [
   {
@@ -26,12 +30,33 @@
    "fieldname": "api_secret",
    "fieldtype": "Password",
    "label": "API Secret"
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Check this for Development Mode",
+   "fieldname": "is_sandbox",
+   "fieldtype": "Check",
+   "label": "Is Sandbox"
+  },
+  {
+   "fieldname": "customer_number",
+   "fieldtype": "Data",
+   "label": "Customer Number"
+  },
+  {
+   "fieldname": "contract_number",
+   "fieldtype": "Data",
+   "label": "Contract Number"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2022-12-18 11:42:14.999011",
+ "modified": "2022-12-23 11:40:13.079755",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Canada Post",

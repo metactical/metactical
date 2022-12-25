@@ -39,7 +39,8 @@ doctype_js = {
 	"Employee": "custom_scripts/employee/employee.js",
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation.js",
 	"Purchase Receipt": "custom_scripts/purchase_receipt/purchase_receipt.js",
-	"Customer": "custom_scripts/customer/customer.js"
+	"Customer": "custom_scripts/customer/customer.js",
+	"Shipment": "public/js/shipment.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
