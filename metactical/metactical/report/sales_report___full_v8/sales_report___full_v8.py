@@ -130,11 +130,7 @@ def execute(filters=None):
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
 				#For sold online and in store
-				websites = ['Website - GPD', 'Website - Valley', 'Website - MRK',
-						'Website - Camo', 'Website - RASUSA', 'Website - RAS',
-						'Website - Zelen', 'Website - Gorilla']
-				#if d.get("source") is not None and d.get("source") != "" and d.get('source').split()[0].strip() == "Website":
-				if d.get("source") is not None and d.get("source") != "" and d.get('source') in websites:
+				if d.get("source") is not None and d.get("source") != "" and d.get('source').split()[0].strip() == "Website":
 					row["sold_online"] += qty
 				else:
 					row["sold_in_store"] += qty
