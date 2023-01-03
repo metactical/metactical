@@ -111,6 +111,8 @@ def execute(filters=None):
 		row["sold_last_ten_days"] = 0
 		row["sold_last_thirty_days"] = 0
 		row["sold_last_sixty_days"] = 0
+		row["sold_online"] = 0
+		row["sold_in_store"] = 0
 		for d in sales_data:
 			posting_date = getdate(d.get("posting_date"))
 			qty = d.get("qty")
@@ -124,10 +126,18 @@ def execute(filters=None):
 			# if row.get(frappe.scrub("sold"+month+str(posting_date.year))):
 			# 	row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
 			# row[frappe.scrub("soldjanuary2021")] += qty
-
 			last12_month_date = today - relativedelta(years=1)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
+				#For sold online and in store
+				websites = ['Website - GPD', 'Website - Valley', 'Website - MRK',
+						'Website - Camo', 'Website - RASUSA', 'Website - RAS',
+						'Website - Zelen', 'Website - Gorilla']
+				#if d.get("source") is not None and d.get("source") != "" and d.get('source').split()[0].strip() == "Website":
+				if d.get("source") is not None and d.get("source") != "" and d.get('source') in websites:
+					row["sold_online"] += qty
+				else:
+					row["sold_in_store"] += qty
 
 			sold_last_ten_days = today - timedelta(days=10)
 			sold_last_thirty_days = today - timedelta(days=30)
@@ -139,6 +149,7 @@ def execute(filters=None):
 					row["sold_last_thirty_days"] += qty
 					if posting_date >= sold_last_ten_days:
 						row["sold_last_ten_days"] += qty
+						
 		#For Quantity to order
 		reference_warehouse = get_reference_warehouse(filters)
 		if row.get(reference_warehouse, 0) <= row.get("ais_poreorderlevel", 0):
@@ -459,6 +470,18 @@ def get_column(filters,conditions):
 			"fieldname": "last_twelve_months",
 			"fieldtype": "Int",
 			"width": 140,
+		},
+		{
+			"label": _("OnlineSold12Months"),
+			"fieldname": "sold_online",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _("StoreSold12Months"),
+			"fieldname": "sold_in_store",
+			"fieldtype": "Int",
+			"width": 140,
 		}
 	])
 	today = getdate(nowdate())
@@ -536,7 +559,7 @@ def get_date_last_received(item, supplier):
 							`tabPurchase Order Item` c on p.name = c.parent 
 						where 
 							c.item_code = %s and p.docstatus = 1
-							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
 		""",(item))
 	if data:
 		date = data[0][0]
@@ -558,7 +581,7 @@ def get_date_last_sold(item):
 								`tabAddress` address on address.name = p.customer_address
 						where 
 							c.item_code = %s and p.docstatus = 1
-							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
 		""",(item))
 	if data:
 		date = data[0][0]
@@ -571,14 +594,15 @@ def get_date_last_sold(item):
 
 def get_total_sold(item):
 	data= frappe.db.sql("""select 
-							p.posting_date, c.qty 
+							p.posting_date, c.qty, p.source
 						from 
-							`tabSales Invoice` p 
-						inner join
-							`tabSales Invoice Item` c on p.name = c.parent 
+							`tabSales Invoice Item` c 
+						left join
+							`tabSales Invoice` p on p.name = c.parent 
 						where 
 							c.item_code = %s and p.docstatus = 1
-							and c.warehouse <> 'US02-Houston - Active Stock - ICL'
+							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
+						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
 
