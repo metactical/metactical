@@ -11,6 +11,14 @@ frappe.query_reports["End of Day Report - V2"] = {
 			"label": "Date",
 			"reqd": 1,
 			default: tday
-		}
+		},
+		{
+                        "fieldname": "end_date",
+                        "fieldtype": "Date",
+                        "label": "End Date",
+                        "reqd": 1,
+                        default: tday,
+			"hidden": 1
+                }
 	]
 };
