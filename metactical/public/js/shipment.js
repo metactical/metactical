@@ -1,11 +1,11 @@
 const ShipmentController = frappe.ui.form.Controller.extend({
-    refresh: function() {
+    refresh: function () {
         console.log(this.frm.doc.shipment_id)
         if (!this.frm.doc.shipment_id) {
             this.make_rate_btn()
         }
     },
-    make_rate_btn: function() {
+    make_rate_btn: function () {
         this.frm.add_custom_button(__("Get Rate"), () => {
             if (this.frm.is_dirty()) {
                 frappe.throw(__("Please Save before fetch rate"))
@@ -13,7 +13,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
             this.fetch_rate()
         })
     },
-    fetch_rate: function() {
+    fetch_rate: function () {
         frappe.xcall("metactical.utils.shipping.shipping.get_rate", {
             name: this.frm.docname,
             provider: this.frm.doc.service_provider
@@ -23,54 +23,67 @@ const ShipmentController = frappe.ui.form.Controller.extend({
             }
         })
     },
-    show_rate: function(rates) {
-        this.rateDialog = frappe.msgprint({
-            title: __("Choose best one."),
-            msg:`
-        <div class="list-group radio-list-group">
-            <div class="list-group-item disabled">
-                <span class="list-group-item-text">
-                    <span></span>
-                    <span>${__("Service")}</span>
-                    <span>${__("Base Price")}</span>
-                    <span>${__("Total")}</span>
-                    <span>${__("Guaranteed Delivery")}</span>
-                    <span>${__("Expected Transit Time")}</span>
-                    <span>${__("Expected Delivery Date")}</span>
-                </span>
-            </div>
-            ${this.get_html(rates)}
-        </div>
-        `}).set_primary_action(__("Create Shipmnet"), ()=>{
-            let service_code = $(this.rateDialog.body).find('[name="service_code"]:checked').val()
-            frappe.xcall("metactical.utils.shipping.create_shipping", {
-                name: this.frm.doc,
-                provider: this.frm.doc.service_provider,
-                service_code: service_code
-            }).then(r=>{
-                this.rateDialog.hide()
-                this.frm.reload()
+    show_rate: function (rates) {
+        this.rates = rates
+        if (!this.rateDialog) {
+
+            this.rateDialog = new frappe.ui.Dialog({
+                title: __("Choose best one."),
+                size: 'large',
+                minimizable: true,
+                primary_action: () => {
+                    let carrier_service = $(this.rateDialog.body).find('[name="carrier_service"]:checked').val()
+                    frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
+                        name: this.frm.docname,
+                        provider: this.frm.doc.service_provider,
+                        carrier_service: this.rate_dict[carrier_service]
+                    }).then(r => {
+                        this.rateDialog.hide()
+                        this.frm.reload()
+                    })
+                },
+                primary_action_label: __("Create Shipmnet")
             })
-        })
+        }
+        let [rows, last_id] = this.get_html()
+        this.rateDialog.$body.html(`
+        <table class="table table-bordered">
+            <tr>
+                <th></th>
+                <th>${__("Service")}</th>
+                <th>${__("Base Price")}</th>
+                <th>${__("Total")}</th>
+                <th>${__("Guaranteed Delivery")}</th>
+                <th>${__("Expected Transit Time")}</th>
+                <th>${__("Expected Delivery Date")}</th>
+            </tr>
+            ${rows}
+        </table>`)
+        this.rateDialog.$body.find(`[value="${last_id}"]`).prop('checked', true)
+        this.rateDialog.show()
     },
-    get_html: function(rates) {
+    get_html: function () {
         let html = ''
-        rates.forEach(row=>{
-            html += `<div class="list-group-item">&nbsp;
-                <label>
-                    <input type="radio" name="service_code" value="${row.service_code}">
-                    <span class="list-group-item-text">
-                        <span>${row.service_name}</span>
-                        <span>${row.base}</span>
-                        <span>${row.total}</span>
-                        <span>${row.guaranteed_delivery?"Yes": "No"}</span>
-                        <span>${row.expected_transit_time}</span>
-                        <span>${row.expected_delivery_date}</span>
-                    </span>
-                </label>
-            </div>`
+        let last_rate=0;
+        let last_id;
+        this.rate_dict = {}
+        this.rates.forEach(row => {
+            if (last_rate > flt(row.shipment_amount) || last_rate===0) {
+                last_id=row.carrier_service
+                last_rate=flt(row.shipment_amount)
+            }
+            this.rate_dict[row.carrier_service] = row
+            html += `<tr>&nbsp;
+                        <td><input type="radio" name="carrier_service" value="${row.carrier_service}"></td>
+                        <td>${row.service_name}</td>
+                        <td>${row.base}</td>
+                        <td>${row.shipment_amount}</td>
+                        <td>${row.guaranteed_delivery ? "Yes" : "No"}</td>
+                        <td>${row.expected_transit_time}</td>
+                        <td>${row.expected_delivery_date}</td>
+            </tr>`
         })
-        return html
+        return [html, last_id]
     }
 })
 

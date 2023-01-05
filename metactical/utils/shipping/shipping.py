@@ -11,9 +11,8 @@ def get_rate(name, provider='Canada Post', context=None):
 
 
 @frappe.whitelist()
-def create_shipping(name, provider='Canada Post', sercie_code=None):
-    return True
+def create_shipping(name, provider='Canada Post', carrier_service=None):
     if provider=="Canada Post":
         cp = CanadaPost()
-        response = cp.create_shipping(name, {'service_code': sercie_code} if sercie_code else None)
+        response = cp.create_shipping(name, carrier_service)
         return response

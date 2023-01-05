@@ -12,20 +12,20 @@
         </dimensions>
     </parcel-characteristics>
     {% endfor %}
-    <origin-postal-code>{{ pickup_address_doc.pincode }}</origin-postal-code>
+    <origin-postal-code>{{ pickup_address_doc.pincode|replace(' ','') }}</origin-postal-code>
     <destination>
         {% if delivery_address_doc.country=="Canada" %}
         <domestic>
-            <postal-code>{{ delivery_address_doc.pincode }}</postal-code>
+            <postal-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-code>
         </domestic>
         {% elif delivery_address_doc.country=="United States" %}
         <united-states>
-            <zip-code>{{ delivery_address_doc.pincode }}</zip-code>
+            <zip-code>{{ delivery_address_doc.pincode|replace(' ','') }}</zip-code>
         </united-states>
         {% else %}
         <international>
             <country-code>{{ frappe.db.get_value("Country", delivery_address_doc.country, "code").upper() }}</country-code>
-            <postal-code>{{ delivery_address_doc.pincode }}</postal-code>
+            <postal-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-code>
         </international>
         {% endif %}
     </destination>
