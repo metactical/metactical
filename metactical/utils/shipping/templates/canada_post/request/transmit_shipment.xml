@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<transmit-set xmlns="http://www.canadapost.ca/ws/manifest-v8">
+    <group-ids>
+        <group-id>{{ doc.name }}</group-id>
+    </group-ids>
+    <requested-shipping-point>K1K4T3</requested-shipping-point>
+    <cpc-pickup-indicator>true</cpc-pickup-indicator>
+    <detailed-manifests>true</detailed-manifests>
+    <method-of-payment>Account</method-of-payment>
+    <manifest-address>
+        <manifest-company>{{ doc.pickup_company }}</manifest-company>
+        <manifest-name>{{ pickup_contact_person_doc.full_name }}</manifest-name>
+        <phone-number>{{ pickup_contact_person_doc.mobile_no }}</phone-number>
+        <address-details>
+            <address-line-1>{{ pickup_address_doc.address_line1 }}</address-line-1>
+            <city>{{ pickup_address_doc.city }}</city>
+            <prov-state>{{ pickup_address_doc.state or "" }}</prov-state>
+            {% if pickup_address_doc.country != "Canada" %}
+            <country-code>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code") }}</country-code>
+            {% endif %}
+            <postal-zip-code>{{ pickup_address_doc.pincode|replace(' ','') }}</postal-zip-code>
+        </address-details>
+    </manifest-address>
+</transmit-set>

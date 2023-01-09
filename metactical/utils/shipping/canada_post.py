@@ -94,32 +94,55 @@ class CanadaPost():
         doc.set('carrier_status', response['shipment-info']['shipment-status'])
         doc.set('service_provider', 'Canada Post')
         # Download Label
+        if self.settings.required_transmit_shipment:
+            self.get_make_transmit_shipment(name)
         for link in response['shipment-info']['links']['link']:
-            if link['@rel'] == "price":
+            if link['@rel'] == "self":
                 doc.set('tracking_url', link['@href'])
             elif link['@rel'] == "price":
                 res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-                                                              'Content-Type': link['@media-type']}, method='GET')
+                                                                'Content-Type': link['@media-type']}, method='GET')
                 if res:
                     doc.set('shipment_amount',
                             res['shipment-price']['due-amount'])
             elif link['@rel'] == "label":
                 res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-                                                              'Content-Type': link['@media-type']}, return_request=True, method='GET')
-                self.write_file(doc, res)
+                                                                'Content-Type': link['@media-type']}, return_request=True, method='GET')
+                self.write_file(doc, res, f"{link['@rel']}_{name}")
 
         doc.save()
         return doc.as_dict()
 
-    def write_file(self, doc, res):
-        file_path = get_files_path(f"{doc.shipment_id}.pdf", is_private=True)
-        with open(file_path) as f:
+    def get_make_transmit_shipment(self, name):
+        context = self.get_context(name)
+        body = frappe.render_template(
+            "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
+        response = self.get_response(
+            f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept':'application/vnd.cpc.manifest-v8+xml', 'Content-Type':'application/vnd.cpc.manifest-v8+xml'})
+        po_numbers = []
+        if response:
+            res = self.get_response(response['manifests']['link']['@href'], None, {'Accept': response['manifests']['link']['@media-type'],
+                                                                  'Content-Type': response['manifests']['link']['@media-type']}, method='GET')
+            if res:
+                po_numbers.append(res['manifest']['po-number'])
+                # for l in res['manifest']['links']['link']:
+                #     if l['@rel'] == 'details':
+                #         res_details = self.get_response(l['@href'], None, {'Accept': l['@media-type'],
+                #                                                             'Content-Type': l['@media-type']}, return_request=True, method='GET')
+                #         if res_details:
+                #             self.write_file(doc, res_details, f"{l['@rel']}_{name}")
+
+    def write_file(self, doc, res, file_name=None):
+        if not file_name:
+            file_name = doc.shipment_id
+        file_path = get_files_path(f"{file_name}.pdf", is_private=True)
+        with open(file_path, 'wb') as f:
             f.write(res.content)
-            f.close()
+            # f.close()
         file_doc = frappe.new_doc('File')
         file_doc.update({
-            'file_name': f"{doc.shipment_id}.pdf",
-            'file_url': f"private/files/{doc.shipment_id}.pdf",
+            'file_name': f"{file_name}.pdf",
+            'file_url': file_path.replace(frappe.get_site_path(), ''),
             'is_private': 1,
             'folder': 'Home/Attachments',
             'attached_to_doctype': doc.doctype,

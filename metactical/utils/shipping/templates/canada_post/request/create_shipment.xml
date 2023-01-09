@@ -13,7 +13,7 @@
                 <address-line-1>{{ pickup_address_doc.address_line1 }}</address-line-1>
                 <city>{{ pickup_address_doc.city }}</city>
                 <prov-state>{{ pickup_address_doc.state or "" }}</prov-state>
-                <country-code>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code") }}</country-code>
+                <country-code>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code").upper() }}</country-code>
                 <postal-zip-code>{{ pickup_address_doc.pincode|replace(' ','') }}</postal-zip-code>
             </address-details>
         </sender>

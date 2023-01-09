@@ -9,6 +9,7 @@
   "enabled",
   "api_key",
   "api_secret",
+  "required_transmit_shipment",
   "column_break_4",
   "is_sandbox",
   "customer_number",
@@ -51,12 +52,18 @@
    "fieldname": "contract_number",
    "fieldtype": "Data",
    "label": "Contract Number"
+  },
+  {
+   "default": "0",
+   "fieldname": "required_transmit_shipment",
+   "fieldtype": "Check",
+   "label": "Required Transmit Shipment"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2022-12-23 11:40:13.079755",
+ "modified": "2023-01-07 04:39:27.400227",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Canada Post",

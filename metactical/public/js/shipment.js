@@ -1,6 +1,5 @@
 const ShipmentController = frappe.ui.form.Controller.extend({
     refresh: function () {
-        console.log(this.frm.doc.shipment_id)
         if (!this.frm.doc.shipment_id) {
             this.make_rate_btn()
         }
