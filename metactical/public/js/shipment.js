@@ -38,7 +38,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
                         carrier_service: this.rate_dict[carrier_service]
                     }).then(r => {
                         this.rateDialog.hide()
-                        this.frm.reload()
+                        this.frm.reload_doc()
                     })
                 },
                 primary_action_label: __("Create Shipmnet")
