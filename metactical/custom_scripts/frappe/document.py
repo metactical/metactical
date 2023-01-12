@@ -9,7 +9,7 @@ def execute_action(doctype, name, action, **kwargs):
 	doc = frappe.get_doc(doctype, name)
 	doc.unlock()
 	try:
-		doc.update({"ais_queue_status": "Not Queued"})
+		frappe.db.set_value(doctype, name, "ais_queue_status", "Not Queued", update_modified=False)
 		getattr(doc, action)(**kwargs)
 	except Exception:
 		frappe.db.rollback()
