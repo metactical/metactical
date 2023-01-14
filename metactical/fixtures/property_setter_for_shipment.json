@@ -1,0 +1,36 @@
+[
+ {
+  "default_value": "",
+  "doc_type": "Shipment",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "shipment_type",
+  "modified": "2023-01-14 03:35:08.801880",
+  "name": "Shipment-shipment_type-options",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "options",
+  "property_type": null,
+  "row_name": null,
+  "value": "Document\nCommercial Sample\nRepair or Warranty\nGoods\nOther"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Shipment",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "description_of_content",
+  "modified": "2023-01-14 03:30:36.560297",
+  "name": "Shipment-description_of_content-reqd",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "reqd",
+  "property_type": "Check",
+  "row_name": null,
+  "value": "0"
+ }
+]

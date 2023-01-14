@@ -25,18 +25,19 @@ const ShipmentController = frappe.ui.form.Controller.extend({
     show_rate: function (rates) {
         this.rates = rates
         if (!this.rateDialog) {
-
             this.rateDialog = new frappe.ui.Dialog({
                 title: __("Choose best one."),
                 size: 'large',
                 minimizable: true,
                 primary_action: () => {
+                    this.rateDialog.disable_primary_action()
                     let carrier_service = $(this.rateDialog.body).find('[name="carrier_service"]:checked').val()
                     frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
                         name: this.frm.docname,
                         provider: this.frm.doc.service_provider,
                         carrier_service: this.rate_dict[carrier_service]
                     }).then(r => {
+                        this.rateDialog.enable_primary_action()
                         this.rateDialog.hide()
                         this.frm.reload_doc()
                     })
@@ -44,6 +45,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
                 primary_action_label: __("Create Shipmnet")
             })
         }
+        this.rateDialog.enable_primary_action()
         let [rows, last_id] = this.get_html()
         this.rateDialog.$body.html(`
         <table class="table table-bordered">

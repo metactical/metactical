@@ -24,15 +24,10 @@
                 <address-line-1>{{ delivery_address_doc.address_line1 }}</address-line-1>
                 <city>{{ delivery_address_doc.city }}</city>
                 <prov-state>{{ delivery_address_doc.state or "" }}</prov-state>
-                <country-code>{{ frappe.db.get_value("Country", delivery_address_doc.country, "code") }}</country-code>
+                <country-code>{{ frappe.db.get_value("Country", delivery_address_doc.country, "code")|upper }}</country-code>
                 <postal-zip-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-zip-code>
             </address-details>
         </destination>
-        <options>
-            <option>
-                <option-code>{% if delivery_address_doc.country=="United States" %}RTS{% else %}DC{%endif%}</option-code>
-            </option>
-        </options>
         {% set parcel = doc.shipment_parcel[-1] %}
         <parcel-characteristics>
             <weight>{{ parcel.weight }}</weight>
@@ -63,7 +58,28 @@
         </settlement-info>
         {% if delivery_address_doc.country!="Canada" %}
         <customs>
-            <customs-description>{{ doc.description_of_content[:45] }}</customs-description>
+            <currency>{{ delivery_note.currency }}</currency>
+            <conversion-from-cad>{{ delivery_note.conversion_rate }}</conversion-from-cad>
+            <reason-for-export>{{ doc.shipment_type }}</reason-for-export>
+            {% if doc.shipment_type|lower == "OTH" %}
+            <other-reason>{{ doc.other_reason }}</other-reason>
+            {% endif %}
+            <sku-list>
+                {% for item in delivery_note.get("items") %}
+                <item>
+                    <customs-number-of-units>{{ item.stock_qty|int }}</customs-number-of-units>
+                    <customs-unit-of-measure>{% if item.stock_uom|upper in ("PCE","NMB","PAR","PKG","ENV","LTR","MLT","BOX","BAG","MTR","MMT","DZN","GRM","KGM","CTN","BIN","SET","BOT","TBE","KIT") %}{{item.stock_uom|upper}}{% else %}BOX{% endif %}</customs-unit-of-measure>
+                    <customs-description>{{ item.description[:45] }}</customs-description>
+                    <sku>{{ frappe.db.get_value("Item", item.item_code, "ifw_sku") }}</sku>
+                    <unit-weight>{{ item.total_weight|int or (parcel.weight/item.stock_qty)|int }}</unit-weight>
+                    <customs-value-per-unit>{{ item.weight_per_unit|int or 1 }}</customs-value-per-unit>
+                    <country-of-origin>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code").upper() }}</country-of-origin>
+                    {% if pickup_address_doc.country=="Canada" %}
+                    <province-of-origin>{{ pickup_address_doc.state or "" }}</province-of-origin>
+                    {% endif %}
+                </item>
+                {% endfor %}
+            </sku-list>
         </customs>
         {% endif %}
     </delivery-spec>

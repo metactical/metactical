@@ -40,8 +40,11 @@ class CanadaPost():
 
     def get_context(self, name, context=None):
         doc = frappe.get_doc('Shipment', name)
+        if len(doc.shipment_parcel) !=1:
+            frappe.throw(_("Should be only one Shiopment Parcel row"))
         if context:
             doc.update(context)
+        doc.shipment_type = self.get_shipment_type(doc.shipment_type)
         delivery_address_doc = frappe.get_doc(
             'Address', doc.delivery_address_name).as_dict()
         pickup_address_doc = frappe.get_doc(
@@ -50,14 +53,25 @@ class CanadaPost():
             'User', doc.pickup_contact_person).as_dict()
         delivery_contact_doc = frappe.get_doc(
             'Contact', doc.delivery_contact_name).as_dict()
+        delivery_note = frappe.get_doc('Delivery Note', doc.shipment_delivery_note[-1].delivery_note).as_dict()
         return {
             "doc": doc.as_dict(),
             "settings": self.settings.as_dict(),
             "delivery_address_doc": delivery_address_doc,
             "pickup_address_doc": pickup_address_doc,
             "delivery_contact_doc": delivery_contact_doc,
-            "pickup_contact_person_doc": pickup_person_doc
+            "pickup_contact_person_doc": pickup_person_doc,
+            "delivery_note": delivery_note,
         }
+    
+    def get_shipment_type(self, s_type):
+        return {
+            "Document": "DOC",
+            "Commercial Sample": "SAM",
+            "Repair or Warranty": "REP",
+            "Goods": "SOG",
+            "Other": "OTH",
+        }[s_type]
 
     def get_rate(self, name, context=None):
         body = frappe.render_template(
