@@ -135,26 +135,10 @@ class CanadaPost():
                     'carrier_status': response['shipment-info']['shipment-status'],
                     'row_id': parcel.name
                 })
-                # Download Label
-                # if self.settings.required_transmit_shipment:
-                #     self.get_make_transmit_shipment(name)
                 for link in response['shipment-info']['links']['link']:
                     rel = 'tracking' if link['@rel'] == "self" else link['@rel']
-                    row.set(f'{rel}_url', f'''<link rel="self" href="{link['@href']}" media-type="{link['@media-type']}"></link>''')
-                    # if link['@rel'] == "self":
-                    #     doc.set('tracking_url', link['@href'])
-                    # elif link['@rel'] == "price":
-                    #     res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-                    #                                                 'Content-Type': link['@media-type']}, method='GET')
-                    #     if res:
-                    #         doc.set('shipment_amount',
-                    #                 res['shipment-price']['due-amount'])
-                    # elif link['@rel'] == "label":
-                    #     res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-                    #                                                 'Content-Type': link['@media-type']}, return_request=True, method='GET')
-                    #     self.write_file(doc, res, f"{link['@rel']}_{name}")
+                    row.set(f'{rel}_url', f'''<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>''')
                 row.db_insert()
-
         doc.save()
         return doc.as_dict()
     
@@ -178,14 +162,9 @@ class CanadaPost():
                                                                                    'Content-Type': response['manifests']['link']['@media-type']}, method='GET')
             if res:
                 po_numbers.append(res['manifest']['po-number'])
-                # for l in res['manifest']['links']['link']:
-                #     if l['@rel'] == 'details':
-                #         res_details = self.get_response(l['@href'], None, {'Accept': l['@media-type'],
-                #                                                             'Content-Type': l['@media-type']}, return_request=True, method='GET')
-                #         if res_details:
-                #             self.write_file(doc, res_details, f"{l['@rel']}_{name}")
-
     def write_file(self, doc, res, file_name=None):
+        if res.status_code!=200:
+            return
         if not file_name:
             file_name = doc.shipment_id
         file_path = get_files_path(f"{file_name}.pdf", is_private=True)
@@ -203,6 +182,23 @@ class CanadaPost():
             'file_size': len(res.content)
         })
         file_doc.insert(ignore_permissions=True)
+    
+    def avoid_shpment(self, name, shipments_name):
+        if not shipments_name:
+            frappe.throw(_("Please select min one shipment"))
+        if isinstance(shipments_name, string_types) and shipments_name.startswith('['):
+            shipments_name = ast.literal_eval(shipments_name)
+        doc = frappe.get_doc('Shipment', name)
+        to_be_remove=[]
+        for shipment in doc.get('shipments', {'name': ('in', shipments_name or [])}):
+            url = self.xml_to_json(shipment.tracking_url)
+            res = self.get_response(url['link']['@href'], None, {'Accept': url['link']['@media-type'], 'Content-Type': url['link']['@media-type']}, True, 'DELETE')
+            if res.status_code==204:
+                to_be_remove.append(shipment)
+        for row in to_be_remove:
+            doc.remove(row)
+        doc.save()
+        return doc.as_dict()
 
     def get_response(self, url, body, headers=None, return_request=False, method='POST', retry=False):
         if headers:
@@ -211,13 +207,31 @@ class CanadaPost():
             r = self.sess.request(method, url if url.startswith(
                 'https://') else f'{self.settings.host}{url}', data=body)
             r.raise_for_status()
+            if return_request:
+                return r
             if r.status_code == 200:
-                if return_request:
-                    return r
                 return self.xml_to_json(r.content)
         except requests.exceptions.SSLError:
             if not retry:
                 self.get_response(url, body, headers,
                                   return_request, method, True)
         except:
-            frappe.throw(r.content, title=r.status_code)
+            res = r.content
+            try:
+                content = self.xml_to_json(res)
+                res = frappe.render_template("""
+                    <table class="table table-bordered">
+                    <tr>
+                        <th>Code</th>
+                        <th> Description </th>
+                    </tr>
+                    {% for message in messages.message %}
+                    <tr>
+                        <th>{{ message.code }} </th>
+                        <td>{{ message.description }} </td>
+                    {% endfor %}
+                    </table>
+                """, content)
+            except:
+                pass
+            frappe.throw(res, title=f"Error from Provider Server, Code: {r.status_code}")

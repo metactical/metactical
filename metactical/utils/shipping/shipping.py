@@ -16,3 +16,11 @@ def create_shipping(name, provider='Canada Post', carrier_service=None):
         cp = CanadaPost()
         response = cp.create_shipping(name, carrier_service)
         return response
+
+
+@frappe.whitelist()
+def avoid_shpment(name, provider='Canada Post', shipments_name=None):
+    if provider=="Canada Post":
+        cp = CanadaPost()
+        response = cp.avoid_shpment(name, shipments_name)
+        return response
