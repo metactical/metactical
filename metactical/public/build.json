@@ -113,7 +113,8 @@
 		"frappe_public/js/frappe/form/controls/control.js",
 		"frappe_public/js/frappe/views/formview.js",
 		"frappe_public/js/frappe/form/form.js",
-		"frappe_public/js/frappe/meta_tag.js"
+		"frappe_public/js/frappe/meta_tag.js",
+		"public/js/template/shipment_rate.html"
 	],
 	"js/erpnext.min.js": [
 		"erpnext_public/js/conf.js",

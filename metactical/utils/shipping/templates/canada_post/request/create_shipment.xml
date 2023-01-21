@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <shipment xmlns="http://www.canadapost.ca/ws/shipment-v8">
     <group-id>{{ doc.name }}</group-id>
-    <requested-shipping-point>{{ pickup_address_doc.pincode }}</requested-shipping-point>
+    <requested-shipping-point>{{ pickup_address_doc.pincode|replace(' ','') }}</requested-shipping-point>
     <cpc-pickup-indicator>true</cpc-pickup-indicator>
     <delivery-spec>
-        <service-code>{{ doc.carrier_service }}</service-code>
+        <service-code>{{ parcel.carrier_service }}</service-code>
         <sender>
             <name>{{ pickup_contact_person_doc.full_name }}</name>
             <company>{{ doc.pickup_company }}</company>
@@ -28,7 +28,6 @@
                 <postal-zip-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-zip-code>
             </address-details>
         </destination>
-        {% set parcel = doc.shipment_parcel[-1] %}
         <parcel-characteristics>
             <weight>{{ parcel.weight }}</weight>
             <dimensions>
@@ -45,7 +44,7 @@
             <on-delivery>true</on-delivery>
         </notification>
         <print-preferences>
-            <output-format>8.5x11</output-format>
+            <output-format>{{doc.output_format or '4x6'}}</output-format>
         </print-preferences>
         <preferences>
             <show-packing-instructions>true</show-packing-instructions>
