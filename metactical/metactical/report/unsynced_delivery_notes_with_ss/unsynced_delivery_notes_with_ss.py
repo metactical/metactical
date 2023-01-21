@@ -10,9 +10,12 @@ def execute(filters=None):
 	return columns, data
 	
 def get_data(filters):
+	button = ""
 	query = frappe.db.sql("""SELECT
 										delivery_note.name AS reference, delivery_note.posting_date,
-										'Not Synced With SS' AS error
+										'Not Synced With SS' AS error,
+										CONCAT('<button onClick="resync_shipstation(''',delivery_note.name,''')">Resync With Shipstation</button>')
+										AS action
 									FROM
 										`tabDelivery Note` AS delivery_note
 									WHERE
@@ -60,6 +63,11 @@ def get_columns(filters):
 			"fieldname": "error",
 			"fieldtype": "Data",
 			"label": "Error",
+			"width": 200
+		},
+		{
+			"fieldname": "action",
+			"fieldtype": "Data",
 			"width": 200
 		}
 	]
