@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <transmit-set xmlns="http://www.canadapost.ca/ws/manifest-v8">
     <group-ids>
-        <group-id>{{ doc.name }}</group-id>
+        {% for gid in groups %}
+        <group-id>{{ gid }}</group-id>
+        {% endfor %}
     </group-ids>
-    <requested-shipping-point>K1K4T3</requested-shipping-point>
-    <cpc-pickup-indicator>true</cpc-pickup-indicator>
     <detailed-manifests>true</detailed-manifests>
     <method-of-payment>Account</method-of-payment>
     <manifest-address>

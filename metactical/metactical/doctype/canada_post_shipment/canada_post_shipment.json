@@ -19,7 +19,8 @@
   "tracking_url",
   "price_url",
   "label_url",
-  "minifest_url"
+  "label_after_manifest",
+  "manifest"
  ],
  "fields": [
   {
@@ -117,18 +118,23 @@
    "label": "Label URL"
   },
   {
+   "fieldname": "label_after_manifest",
+   "fieldtype": "Attach",
+   "label": "Label after Manifest"
+  },
+  {
    "allow_on_submit": 1,
-   "fieldname": "minifest_url",
+   "fieldname": "manifest",
    "fieldtype": "Small Text",
    "hidden": 1,
    "ignore_xss_filter": 1,
-   "label": "Minifest URL"
+   "label": "Manifest URL"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-01-21 08:41:42.294708",
+ "modified": "2023-01-22 12:29:40.041555",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Canada Post Shipment",

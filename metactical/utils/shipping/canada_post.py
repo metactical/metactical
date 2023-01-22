@@ -6,6 +6,7 @@ from requests.auth import _basic_auth_str
 from frappe.utils import get_files_path
 from six import string_types
 import ast
+from PyPDF2 import PdfFileMerger
 
 
 class CanadaPost():
@@ -77,10 +78,10 @@ class CanadaPost():
     def get_rate(self, name, context=None):
         res = []
         options = {}
-        context = self.get_context(name, context)        
+        context = self.get_context(name, context)
         exists = self.existing_shipments(context.doc)
         for parcel in context.doc.shipment_parcel:
-            if (parcel.count - exists.get(parcel.name, 0)) <1:
+            if (parcel.count - exists.get(parcel.name, 0)) < 1:
                 continue
             context.parcel = parcel
             body = frappe.render_template(
@@ -107,15 +108,15 @@ class CanadaPost():
                     'count': parcel.count,
                     'items': items,
                 })
-        return {'data': res, 'options': [{'key':k, 'val':v} for k,v in options.items()]}
+        return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
 
     def create_shipping(self, name, carrier_service):
         if carrier_service is None:
             frappe.throw(_("Service Code Required. please select service"))
         if isinstance(carrier_service, string_types) and carrier_service.startswith('{'):
             carrier_service = ast.literal_eval(carrier_service)
-        
-        doc=frappe.get_doc('Shipment', name)
+        files = []
+        doc = frappe.get_doc('Shipment', name)
         context = self.get_context(name)
         exists = self.existing_shipments(context.doc)
         for parcel in context.doc.shipment_parcel:
@@ -125,9 +126,10 @@ class CanadaPost():
                 body = frappe.render_template(
                     "metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
                 response = self.get_response(
-                    f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body)
+                    f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
+                                                                                                            'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
                 row = doc.append('shipments', {
-                    'shipment_id':response['shipment-info']['shipment-id'],
+                    'shipment_id': response['shipment-info']['shipment-id'],
                     'awb_number': response['shipment-info']['tracking-pin'],
                     'service_provider': 'Canada Post',
                     'carrier_service': context.parcel.carrier_service,
@@ -137,11 +139,27 @@ class CanadaPost():
                 })
                 for link in response['shipment-info']['links']['link']:
                     rel = 'tracking' if link['@rel'] == "self" else link['@rel']
-                    row.set(f'{rel}_url', f'''<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>''')
+                    row.set(
+                        f'{rel}_url', f'''<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>''')
+                    if link['@rel'] == "label":
+                        self.get_label(row, link, 'label', files)
                 row.db_insert()
         doc.save()
-        return doc.as_dict()
+        # Merger PDFs.
+        if files:
+            files = [self.pdf_merge(files, doc).file_url]
+        return files
     
+    def pdf_merge(self, files, doc, prefix="before"):
+        file_path = get_files_path(f"{prefix}_manifest_{doc.name}.pdf", is_private=True)
+        wFile = PdfFileMerger()
+        for file in files:
+            wFile.append(frappe.get_site_path(file.lstrip('/')))
+        wFile.write(file_path)
+        wFile.close()
+        file = self.create_file_doc(f"{prefix}_manifest_{doc.name}.pdf", file_path, doc)
+        return file
+
     def existing_shipments(self, doc):
         shipments = frappe._dict()
         for d in doc.get('shipments', []):
@@ -149,51 +167,86 @@ class CanadaPost():
                 shipments[d.row_id] = 0
             shipments[d.row_id] = shipments[d.row_id]+1
         return shipments
-
-    def get_make_transmit_shipment(self, name):
-        context = self.get_context(name)
+    
+    def create_manifest(self, shipments, manifest_doc):
+        context = self.get_context(shipments[-1])
+        context.gropus = shipments
         body = frappe.render_template(
             "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
         response = self.get_response(
             f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
         po_numbers = []
         if response:
-            res = self.get_response(response['manifests']['link']['@href'], None, {'Accept': response['manifests']['link']['@media-type'],
-                                                                                   'Content-Type': response['manifests']['link']['@media-type']}, method='GET')
-            if res:
-                po_numbers.append(res['manifest']['po-number'])
-    def write_file(self, doc, res, file_name=None):
-        if res.status_code!=200:
+            if isinstance(response['manifests']['link'], dict):
+                links = [response['manifests']['link']]
+            else:
+                links = response['manifests']['link']
+            for link in links:
+                res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
+                                                                                    'Content-Type': link['@media-type']}, method='GET')
+                if res and res['manifest']['po-number']:
+                    po_numbers.append(res['manifest']['po-number'])
+        files=[]
+        if po_numbers:
+            for shipment in shipments:
+                doc = frappe.get_doc('Shipment', shipment)
+                for row in doc.shipments:
+                    row.set('po_number', ",".join(po_numbers))
+                    link = self.xml_to_json(row.label_url)['link']
+                    self.get_label(row, link, 'label_after_manifest', files)
+                doc.save()
+            manifest_doc.db_set('po_number', ",".join(po_numbers))
+        if files:
+            files = [self.pdf_merge(files, manifest_doc, 'after').file_url]
+        return files
+    
+    def get_label(self, row, link, fieldname, files):
+        res = self.get_response(
+            link['@href'], None, {'Accept': link['@media-type'], 'Content-Type': link['@media-type']}, True, 'GET')
+        if res.status_code == 200:
+            file = self.write_file(
+                row, res, f"{fieldname}_{row.shipment_id}.pdf", fieldname)
+            row.set(fieldname, file.file_url)
+            files.append(file.file_url)
+    
+    def write_file(self, doc, res, file_name=None, field_name=None):
+        if res.status_code != 200:
             return
         if not file_name:
-            file_name = doc.shipment_id
-        file_path = get_files_path(f"{file_name}.pdf", is_private=True)
+            file_name = f'{doc.shipment_id}.pdf'
+        file_path = get_files_path(f"{file_name}", is_private=True)
         with open(file_path, 'wb') as f:
             f.write(res.content)
             # f.close()
+        return self.create_file_doc(file_name, file_path, doc, len(res.content), field_name)
+
+    def create_file_doc(self, file_name, file_path, doc, file_size=0, field_name=None):
         file_doc = frappe.new_doc('File')
         file_doc.update({
-            'file_name': f"{file_name}.pdf",
+            'file_name': f"{file_name}",
             'file_url': file_path.replace(frappe.get_site_path(), ''),
             'is_private': 1,
             'folder': 'Home/Attachments',
             'attached_to_doctype': doc.doctype,
             'attached_to_name': doc.name,
-            'file_size': len(res.content)
+            'attached_to_field': field_name,
+            'file_size': file_size,
         })
         file_doc.insert(ignore_permissions=True)
-    
+        return file_doc
+
     def avoid_shpment(self, name, shipments_name):
         if not shipments_name:
             frappe.throw(_("Please select min one shipment"))
         if isinstance(shipments_name, string_types) and shipments_name.startswith('['):
             shipments_name = ast.literal_eval(shipments_name)
         doc = frappe.get_doc('Shipment', name)
-        to_be_remove=[]
+        to_be_remove = []
         for shipment in doc.get('shipments', {'name': ('in', shipments_name or [])}):
             url = self.xml_to_json(shipment.tracking_url)
-            res = self.get_response(url['link']['@href'], None, {'Accept': url['link']['@media-type'], 'Content-Type': url['link']['@media-type']}, True, 'DELETE')
-            if res.status_code==204:
+            res = self.get_response(url['link']['@href'], None, {
+                                    'Accept': url['link']['@media-type'], 'Content-Type': url['link']['@media-type']}, True, 'DELETE')
+            if res.status_code == 204:
                 to_be_remove.append(shipment)
         for row in to_be_remove:
             doc.remove(row)
@@ -231,7 +284,8 @@ class CanadaPost():
                         <td>{{ message.description }} </td>
                     {% endfor %}
                     </table>
-                """, content)
+                """, content) if content and isinstance(content['messages']['message'], dict) else content
             except:
                 pass
-            frappe.throw(res, title=f"Error from Provider Server, Code: {r.status_code}")
+            frappe.throw(
+                res, title=f"Error from Provider Server, Code: {r.status_code}")
