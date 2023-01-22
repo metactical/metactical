@@ -1,6 +1,6 @@
 const ShipmentController = frappe.ui.form.Controller.extend({
     refresh: function () {
-        if (this.has_shipments()) {
+        if (this.has_shipments() && this.frm.doc.docstatus===1) {
             this.make_rate_btn()
         }
         if (this.has_shipments(false)) {

@@ -18,6 +18,7 @@ class Manifest(Document):
             self.append('items', row)
         return self.as_dict()
 
+    @frappe.whitelist()
     def create_manifest(self):
         address_wise_shipments = {}
         for d in frappe.get_all('Shipment', [['name', 'in', (x.shipment for x in self.items)]], ['name', 'pickup_address_name']):
@@ -26,5 +27,5 @@ class Manifest(Document):
         cp = CanadaPost()
         files = []
         for key in address_wise_shipments:
-            files.extend(cp.create_manifest(address_wise_shipments[key]))
+            files.extend(cp.create_manifest(address_wise_shipments[key], self))
         return files

@@ -170,7 +170,7 @@ class CanadaPost():
     
     def create_manifest(self, shipments, manifest_doc):
         context = self.get_context(shipments[-1])
-        context.gropus = shipments
+        context.groups = shipments
         body = frappe.render_template(
             "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
         response = self.get_response(
@@ -272,19 +272,22 @@ class CanadaPost():
             res = r.content
             try:
                 content = self.xml_to_json(res)
-                res = frappe.render_template("""
-                    <table class="table table-bordered">
-                    <tr>
-                        <th>Code</th>
-                        <th> Description </th>
-                    </tr>
-                    {% for message in messages.message %}
-                    <tr>
-                        <th>{{ message.code }} </th>
-                        <td>{{ message.description }} </td>
-                    {% endfor %}
-                    </table>
-                """, content) if content and isinstance(content['messages']['message'], dict) else content
+                if content and isinstance(content['messages']['message'], (dict, list)):
+                    if isinstance(content['messages']['message'], dict):
+                        content['messages']['message'] = [content['messages']['message']]
+                    res = frappe.render_template("""
+                        <table class="table table-bordered">
+                        <tr>
+                            <th>Code</th>
+                            <th> Description </th>
+                        </tr>
+                        {% for message in messages.message %}
+                        <tr>
+                            <th>{{ message.code }} </th>
+                            <td>{{ message.description }} </td>
+                        {% endfor %}
+                        </table>
+                    """, content)
             except:
                 pass
             frappe.throw(
