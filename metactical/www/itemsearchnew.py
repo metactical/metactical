@@ -165,10 +165,10 @@ def get_items(search_value="", offset=0):
 		us_data = {}
 		if item_search_settings.get("us_url") is not None or item_search_settings.get("us_url") != "":
 			us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.api_secret),
-										params={"search_value": search_value})
-		if us_request.status_code == 200:
-			for item in us_request.json().get("message", {}):
-				us_data.update({item["item_code"]: item["actual_qty"]})
+										params={"search_value": search_value}, verify=False)
+			if us_request.status_code == 200:
+				for item in us_request.json().get("message", {}):
+					us_data.update({item["item_code"]: item["actual_qty"]})
 		
 		table_columns = ["RetailSKU", "Item Name", "Price", "GPrice", "SQOH"]
 		table_data = []
