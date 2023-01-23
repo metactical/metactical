@@ -143,21 +143,31 @@ class CanadaPost():
                         f'{rel}_url', f'''<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>''')
                     if link['@rel'] == "label":
                         self.get_label(row, link, 'label', files)
+                    elif link['@rel'] == "price":
+                        self.set_price(row, link)
                 row.db_insert()
         doc.save()
         # Merger PDFs.
         if files:
             files = [self.pdf_merge(files, doc).file_url]
         return files
-    
+
+    def set_price(self, row, link):
+        res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
+                                                      'Content-Type': link['@media-type']}, method='GET')
+        if res:
+            row.set('shipment_amount', res['shipment-price']['due-amount'])
+
     def pdf_merge(self, files, doc, prefix="before"):
-        file_path = get_files_path(f"{prefix}_manifest_{doc.name}.pdf", is_private=True)
+        file_path = get_files_path(
+            f"{prefix}_manifest_{doc.name}.pdf", is_private=True)
         wFile = PdfFileMerger()
         for file in files:
             wFile.append(frappe.get_site_path(file.lstrip('/')))
         wFile.write(file_path)
         wFile.close()
-        file = self.create_file_doc(f"{prefix}_manifest_{doc.name}.pdf", file_path, doc)
+        file = self.create_file_doc(
+            f"{prefix}_manifest_{doc.name}.pdf", file_path, doc)
         return file
 
     def existing_shipments(self, doc):
@@ -167,10 +177,11 @@ class CanadaPost():
                 shipments[d.row_id] = 0
             shipments[d.row_id] = shipments[d.row_id]+1
         return shipments
-    
+
     def create_manifest(self, shipments, manifest_doc):
         context = self.get_context(shipments[-1])
         context.groups = shipments
+        context.manifest_doc = manifest_doc
         body = frappe.render_template(
             "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
         response = self.get_response(
@@ -183,10 +194,10 @@ class CanadaPost():
                 links = response['manifests']['link']
             for link in links:
                 res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-                                                                                    'Content-Type': link['@media-type']}, method='GET')
+                                                              'Content-Type': link['@media-type']}, method='GET')
                 if res and res['manifest']['po-number']:
                     po_numbers.append(res['manifest']['po-number'])
-        files=[]
+        files = []
         if po_numbers:
             for shipment in shipments:
                 doc = frappe.get_doc('Shipment', shipment)
@@ -194,12 +205,13 @@ class CanadaPost():
                     row.set('po_number', ",".join(po_numbers))
                     link = self.xml_to_json(row.label_url)['link']
                     self.get_label(row, link, 'label_after_manifest', files)
+                    self.set_price(row, self.xml_to_json(row.price_url)['link'])
                 doc.save()
             manifest_doc.db_set('po_number', ",".join(po_numbers))
         if files:
             files = [self.pdf_merge(files, manifest_doc, 'after').file_url]
         return files
-    
+
     def get_label(self, row, link, fieldname, files):
         res = self.get_response(
             link['@href'], None, {'Accept': link['@media-type'], 'Content-Type': link['@media-type']}, True, 'GET')
@@ -208,7 +220,7 @@ class CanadaPost():
                 row, res, f"{fieldname}_{row.shipment_id}.pdf", fieldname)
             row.set(fieldname, file.file_url)
             files.append(file.file_url)
-    
+
     def write_file(self, doc, res, file_name=None, field_name=None):
         if res.status_code != 200:
             return
@@ -274,7 +286,8 @@ class CanadaPost():
                 content = self.xml_to_json(res)
                 if content and isinstance(content['messages']['message'], (dict, list)):
                     if isinstance(content['messages']['message'], dict):
-                        content['messages']['message'] = [content['messages']['message']]
+                        content['messages']['message'] = [
+                            content['messages']['message']]
                     res = frappe.render_template("""
                         <table class="table table-bordered">
                         <tr>

@@ -11,6 +11,8 @@
   "to_date",
   "get_shipments",
   "column_break_4",
+  "drop_to_point",
+  "point_zip_code",
   "po_number",
   "section_break_6",
   "items"
@@ -60,11 +62,23 @@
   {
    "fieldname": "section_break_6",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "drop_to_point",
+   "fieldtype": "Check",
+   "label": "Drop to Point"
+  },
+  {
+   "depends_on": "drop_to_point",
+   "fieldname": "point_zip_code",
+   "fieldtype": "Data",
+   "label": "Point zip code"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-01-22 12:55:11.714486",
+ "modified": "2023-01-22 22:40:20.264976",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest",

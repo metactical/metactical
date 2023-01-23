@@ -5,6 +5,10 @@
         <group-id>{{ gid }}</group-id>
         {% endfor %}
     </group-ids>
+    {% if manifest_doc.drop_to_point %}
+    <requested-shipping-point>{{ manifest_doc.point_zip_code|replace(' ','') }}</requested-shipping-point>
+    <cpc-pickup-indicator>true</cpc-pickup-indicator>
+    {% endif %}
     <detailed-manifests>true</detailed-manifests>
     <method-of-payment>Account</method-of-payment>
     <manifest-address>
