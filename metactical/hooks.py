@@ -134,7 +134,10 @@ doc_events = {
 	},
 	#"Purchase Receipt": {
 	#	"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
-	#}
+	#},
+	"Shipment": {
+		"validate": "metactical.doc_events.shipment.validate"
+	}
 }
 
 # DocType Class
