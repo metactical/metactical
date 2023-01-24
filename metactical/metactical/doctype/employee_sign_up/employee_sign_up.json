@@ -29,7 +29,6 @@
   "bank_account_no",
   "extra_information",
   "sin_no",
-  "is_student",
   "sin_expiry_date",
   "column_break_22",
   "comments",
@@ -105,13 +104,6 @@
    "label": "SIN No"
   },
   {
-   "default": "0",
-   "fieldname": "is_student",
-   "fieldtype": "Check",
-   "label": "Are you an International Student?"
-  },
-  {
-   "depends_on": "eval:doc.is_student==1",
    "fieldname": "sin_expiry_date",
    "fieldtype": "Date",
    "label": "SIN Expiry Date"
@@ -236,7 +228,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2022-10-01 05:56:41.513299",
+ "modified": "2023-01-24 15:35:58.660536",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Employee Sign Up",
