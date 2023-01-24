@@ -16,7 +16,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/metactical/css/metactical.css"
-# app_include_js = "/assets/metactical/js/metactical.js"
+app_include_js = "/assets/js/metactical.min.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -134,7 +134,10 @@ doc_events = {
 	},
 	#"Purchase Receipt": {
 	#	"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
-	#}
+	#},
+	"Shipment": {
+		"validate": "metactical.doc_events.shipment.validate"
+	}
 }
 
 # DocType Class

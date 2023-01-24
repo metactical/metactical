@@ -2,7 +2,6 @@
 <mailing-scenario xmlns="http://www.canadapost.ca/ws/ship/rate-v4">
     <customer-number>{{settings.customer_number}}</customer-number>
     <contract-id>{{settings.contract_number}}</contract-id>
-    {% for parcel in doc.shipment_parcel %}
     <parcel-characteristics>
         <weight>{{ parcel.weight }}</weight>
         <dimensions>
@@ -11,7 +10,6 @@
             <height>{{ parcel.height }}</height>
         </dimensions>
     </parcel-characteristics>
-    {% endfor %}
     <origin-postal-code>{{ pickup_address_doc.pincode|replace(' ','') }}</origin-postal-code>
     <destination>
         {% if delivery_address_doc.country=="Canada" %}
