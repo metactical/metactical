@@ -57,7 +57,8 @@ frappe.ui.form.on('Sales Order', {
 		old_tax_template = frm.doc.taxes_and_charges;
 		base_in_words = frm.doc.base_in_words;
 		if(!frm.doc.delivery_date){
-			frm.set_value("delivery_date", new Date());
+			let delivery_date = new Date();
+			frm.set_value("delivery_date", delivery_date.toISOString().split('T')[0]);
 		}
 	},
 	
