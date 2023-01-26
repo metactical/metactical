@@ -56,7 +56,6 @@ class EmployeeSignUp(Document):
 			'status': 'Active',
 			'date_of_birth': self.date_of_birth,
 			'date_of_joining': self.hire_date,
-			'ais_isstudent': 'Yes' if self.is_student == 1 else 'No',
 			'ais_sin_no': self.sin_no,
 			'ais_sin_expiry': self.sin_expiry_date,
 			'ais_bank_transit': self.bank_transit_no,
