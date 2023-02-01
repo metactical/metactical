@@ -87,7 +87,7 @@ def connect():
 	
 @frappe.whitelist()
 def create_shipstation_orders(order_no=None, is_cancelled=False):
-	#order_no = 'MAT-DN-2021-00039'
+	#order_no = 'MAT-DN-2022-00071'
 	if order_no is not None:
 		order = frappe.get_doc('Delivery Note', order_no)
 		if order.get('is_return') == 1:
@@ -106,7 +106,8 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 		
 		for settings in shipstation_settings:
 			data = order_json(order, is_cancelled, settings)
-			response = requests.post('https://ssapi.shipstation.com/orders/createorder',
+			orders_url = 'https://ssapi.shipstation.com/orders/createorder'
+			response = requests.post(orders_url,
 						auth=(settings.api_key, settings.get_password('api_secret')),
 						json=data)
 			if response.status_code == 200:
@@ -120,6 +121,17 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 									'shipstation_order_id': sorder.get('orderId')
 								})
 					order_table.save()
+			else:
+				#Add it to Shipstation API requests for troubleshooting
+				new_req = frappe.new_doc('Shipstation API Requests')
+				new_req.update({
+					"resource_url": orders_url,
+					"resource_type": 'CREATE_ORDER',
+					"result": response.text,
+					"reference_type": "Delivery Note",
+					"reference_name": order_no
+				})
+				new_req.insert(ignore_permissions=True)
 		
 	
 	
@@ -314,8 +326,8 @@ def orders_shipped_webhook():
 			#Log the request
 			new_req = frappe.get_doc({
 				"doctype": "Shipstation API Requests",
-				"start_date": resource_url,
-				"end_date": resource_type,
+				"resource_url": resource_url,
+				"resource_type": resource_type,
 				"settingid": settingid[0]
 			})
 			if resource_type == 'SHIP_NOTIFY':
@@ -362,6 +374,12 @@ def orders_shipped_webhook():
 							'ignore_pricing_rule': 1
 						})
 						delivery_note.submit()
+						
+						#Add reference to Shipstation API Requests
+						new_req.update({
+							'reference_type': 'Delivery Note',
+							'reference_name': existing_delivery
+						})
 						
 						#Delete order from other shipstation accounts
 						for row in delivery_note.get('ais_shipstation_order_ids'):

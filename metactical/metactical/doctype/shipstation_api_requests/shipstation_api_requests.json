@@ -1,4 +1,5 @@
 {
+ "actions": [],
  "autoname": "naming_series:",
  "creation": "2021-06-26 08:39:09.101990",
  "doctype": "DocType",
@@ -6,20 +7,28 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
+  "resource_url",
   "start_date",
+  "resource_type",
   "end_date",
   "settingid",
-  "result"
+  "result",
+  "section_break",
+  "reference_type",
+  "column_break_10",
+  "reference_name"
  ],
  "fields": [
   {
    "fieldname": "start_date",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Resource URL"
   },
   {
    "fieldname": "end_date",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Resource Type"
   },
   {
@@ -30,7 +39,6 @@
   {
    "fieldname": "naming_series",
    "fieldtype": "Select",
-   "in_list_view": 1,
    "label": "Series",
    "options": "SHIP-REQ-",
    "reqd": 1
@@ -39,9 +47,46 @@
    "fieldname": "settingid",
    "fieldtype": "Data",
    "label": "Settings ID"
+  },
+  {
+   "fieldname": "resource_url",
+   "fieldtype": "Data",
+   "label": "Resource URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resource_type",
+   "fieldtype": "Data",
+   "label": "Resource Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "reference_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Reference Type",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_10",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Reference Name",
+   "options": "reference_type",
+   "read_only": 1
   }
  ],
- "modified": "2021-08-23 04:17:28.308832",
+ "links": [],
+ "modified": "2023-01-21 15:50:34.648772",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Shipstation API Requests",

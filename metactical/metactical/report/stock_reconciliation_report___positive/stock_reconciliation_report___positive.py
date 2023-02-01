@@ -92,7 +92,7 @@ def get_data(filters):
 	data = frappe.db.sql("""select c.item_code, c.qty, c.current_qty, c.quantity_difference,
 		c.valuation_rate, c.amount_difference, c.warehouse, 
 		i.ifw_retailskusuffix, i.ifw_location, i.item_name,
-		p.name, p.posting_date, p.owner, p.ais_reason_for_adjustment AS reason_for_adjustment
+		p.name AS sre, p.posting_date, p.owner, p.ais_reason_for_adjustment AS reason_for_adjustment
 		from `tabStock Reconciliation Item` c 
 		inner join `tabStock Reconciliation` p on p.name = c.parent
 		inner join `tabItem` i on c.item_code = i.name 
