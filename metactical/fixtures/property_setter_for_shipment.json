@@ -32,5 +32,39 @@
   "property_type": "Check",
   "row_name": null,
   "value": "0"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Shipment",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "pickup_address_name",
+  "modified": "2023-02-01 01:58:30.924979",
+  "name": "Shipment-pickup_address_name-label",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "label",
+  "property_type": "Data",
+  "row_name": null,
+  "value": "Billing Address"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Shipment",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "delivery_address_name",
+  "modified": "2023-02-01 01:58:31.237813",
+  "name": "Shipment-delivery_address_name-label",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "property": "label",
+  "property_type": "Data",
+  "row_name": null,
+  "value": "Shipping Address"
  }
 ]

@@ -48,8 +48,10 @@ class CanadaPost():
         doc.shipment_type = self.get_shipment_type(doc.shipment_type)
         delivery_address_doc = frappe.get_doc(
             'Address', doc.delivery_address_name).as_dict()
+        delivery_address_doc.state = get_state_code(delivery_address_doc.state)
         pickup_address_doc = frappe.get_doc(
             'Address', doc.pickup_address_name).as_dict()
+        pickup_address_doc.state = get_state_code(pickup_address_doc.state)
         pickup_person_doc = frappe.get_doc(
             'User', doc.pickup_contact_person).as_dict()
         delivery_contact_doc = frappe.get_doc(
@@ -205,7 +207,8 @@ class CanadaPost():
                     row.set('po_number', ",".join(po_numbers))
                     link = self.xml_to_json(row.label_url)['link']
                     self.get_label(row, link, 'label_after_manifest', files)
-                    self.set_price(row, self.xml_to_json(row.price_url)['link'])
+                    self.set_price(row, self.xml_to_json(
+                        row.price_url)['link'])
                 doc.save()
             manifest_doc.db_set('po_number', ",".join(po_numbers))
         if files:
@@ -305,3 +308,85 @@ class CanadaPost():
                 pass
             frappe.throw(
                 res, title=f"Error from Provider Server, Code: {r.status_code}")
+
+
+def get_state_code(state):
+    return {
+        "Armed Forces America": "AA",
+        "Armed Forces Europe": "AE",
+        "Alaska": "AK",
+        "Alabama": "AL",
+        "Armed Forces Pacific": "AP",
+        "Arkansas": "AR",
+        "American Samoa": "AS",
+        "Arizona": "AZ",
+        "California": "CA",
+        "Colorado": "CO",
+        "Connecticut": "CT",
+        "District of Columbia": "DC",
+        "Delaware": "DE",
+        "Florida": "FL",
+        "Micronesia": "FM",
+        "Georgia": "GA",
+        "Guam": "GU",
+        "Hawaii": "HI",
+        "Iowa": "IA",
+        "Idaho": "ID",
+        "Illinois": "IL",
+        "Indiana": "IN",
+        "Kansas": "KS",
+        "Kentucky": "KY",
+        "Louisiana": "LA",
+        "Massachusetts": "MA",
+        "Maryland": "MD",
+        "Maine": "ME",
+        "Marshall Islands": "MH",
+        "Michigan": "MI",
+        "Minnesota": "MN",
+        "Missouri": "MO",
+        "North Mariana Isls.": "MP",
+        "Mississippi": "MS",
+        "Montana": "MT",
+        "North Carolina": "NC",
+        "North Dakota": "ND",
+        "Nebraska": "NE",
+        "New Hampshire": "NH",
+        "New Jersey": "NJ",
+        "New Mexico": "NM",
+        "Nevada": "NV",
+        "New York": "NY",
+        "Ohio": "OH",
+        "Oklahoma": "OK",
+        "Oregon": "OR",
+        "Pennsylvania": "PA",
+        "Puerto Rico": "PR",
+        "Palau": "PW",
+        "Rhode Island": "RI",
+        "South Carolina": "SC",
+        "South Dakota": "SD",
+        "Tennessee": "TN",
+        "Texas": "TX",
+        "Minor Outlying Isls.": "UM",
+        "Utah": "UT",
+        "Virginia": "VA",
+        "Virgin Islands": "VI",
+        "Vermont": "VT",
+        "Washington": "WA",
+        "Wisconsin": "WI",
+        "West Virginia": "WV",
+        "Wyoming": "WY",
+        "Alberta": "AB",
+        "British Columbia": "BC",
+        "Manitoba": "MB",
+        "New Brunswick": "NB",
+        "Old code, use NL": "NF",
+        "Newfoundland & Labr.": "NL",
+        "Nova Scotia": "NS",
+        "NW Territories": "NT",
+        "Nunavut": "NU",
+        "Ontario": "ON",
+        "Prince Edward Island": "PE",
+        "Quebec": "QC",
+        "Saskatchewan": "SK",
+        "Yukon Territory": "YT",
+    }.get(state, state)
