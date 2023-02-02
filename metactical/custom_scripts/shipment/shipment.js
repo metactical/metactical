@@ -109,7 +109,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
                         newWindow.document.close()
                     })
                 },
-                primary_action_label: __(`Create Shipmnet<small>(s)</small>`)
+                primary_action_label: __(`Create Shipment<small>(s)</small>`)
             })
         }
         this.rateDialog.enable_primary_action()
