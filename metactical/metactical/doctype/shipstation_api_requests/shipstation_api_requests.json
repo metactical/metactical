@@ -66,10 +66,9 @@
   },
   {
    "fieldname": "reference_type",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Reference Type",
-   "options": "DocType",
    "read_only": 1
   },
   {
@@ -78,15 +77,14 @@
   },
   {
    "fieldname": "reference_name",
-   "fieldtype": "Dynamic Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Reference Name",
-   "options": "reference_type",
    "read_only": 1
   }
  ],
  "links": [],
- "modified": "2023-01-21 15:50:34.648772",
+ "modified": "2023-02-02 03:11:53.998943",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Shipstation API Requests",
