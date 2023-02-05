@@ -20,7 +20,7 @@ app_license = "MIT"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
-web_include_css = "/assets/metactical/node_modules/intl-tel-input/build/css/intlTelInput.css"
+web_include_css = ["/assets/metactical/node_modules/intl-tel-input/build/css/intlTelInput.css", "/assets/metactical/css/metactical_time_tracker.css"]
 # web_include_js = "/assets/metactical/js/metactical.js"
 web_include_js = "/assets/metactical/node_modules/intl-tel-input/build/js/intlTelInput.js"
 
