@@ -434,6 +434,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report - Stores V2",
+   "link_to": "Sales Report - Stores V2",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -531,7 +540,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-01-03 14:58:02.947396",
+ "modified": "2023-02-02 09:31:19.220599",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
