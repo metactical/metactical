@@ -16,7 +16,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/metactical/css/metactical.css"
-# app_include_js = "/assets/metactical/js/metactical.js"
+app_include_js = "/assets/js/metactical.min.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -40,7 +40,8 @@ doctype_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation.js",
 	"Purchase Receipt": "custom_scripts/purchase_receipt/purchase_receipt.js",
 	"Customer": "custom_scripts/customer/customer.js",
-	"Shipment": "public/js/shipment.js"
+	"Shipment": "custom_scripts/shipment/shipment.js",
+	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -134,7 +135,11 @@ doc_events = {
 	},
 	#"Purchase Receipt": {
 	#	"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
-	#}
+	#},
+	"Shipment": {
+		"validate": "metactical.custom_scripts.shipment.shipment.validate",
+		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
+	}
 }
 
 # DocType Class

@@ -45,6 +45,7 @@
 		"frappe_public/js/frappe/model/meta.js",
 		"frappe_public/js/frappe/model/sync.js",
 		"frappe_public/js/frappe/model/create_new.js",
+		"custom_scripts/public/frappe/create_new.js",
 		"frappe_public/js/frappe/model/perm.js",
 		"frappe_public/js/frappe/model/workflow.js",
 		"frappe_public/js/frappe/model/user_settings.js",
@@ -144,5 +145,8 @@
 		"erpnext_public/js/telephony.js",
 		"erpnext_public/js/templates/call_link.html",
 		"erpnext_public/js/templates/node_card.html"
+	],
+	"js/metactical.min.js": [
+		"public/js/template/shipment_rate.html"
 	]
 }
