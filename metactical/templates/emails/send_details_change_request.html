@@ -1,0 +1,46 @@
+<div>
+    <p>
+        <b>Username: </b><span>{{ username }}</span>
+    </p>
+    <p>
+        <b>First Name: </b><span>{{ first_name }}</span>
+    </p>
+    <p>
+        <b>Last Name: </b><span>{{ last_name }}</span>
+    </p>
+
+    <table border="1px">
+        <thead>
+            <tr>
+                <th>Change</th>
+                <th>Date</th>
+                <th>CheckIn</th>
+                <th>CheckOut</th>
+                <th>Total Hours</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <th>Incorrect</th>
+                <td>{{ date }}</td>
+                <td>{{ check_in }}</td>
+                <td>{{ check_out }}</td>
+                <td>{{ total_hours }} Hours</td>
+            </tr>
+            <tr>
+                <th>Correct</th>
+                <td>{{ date }}</td>
+                <td>{{ checkInTime12 }}</td>
+                <td>{{ checkOutTime12 }}</td>
+                <td>{{ requestedTotalHours }} Hours</td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    <div>
+        <a class="btn btn-primary" href="{{ approve_url }}" role="button">Approve</a>
+    </div> <br>
+    <div>
+        <a class="btn btn-danger" href="{{ decline_url }}" role="button">Decline</a>
+    </div>
+</div>

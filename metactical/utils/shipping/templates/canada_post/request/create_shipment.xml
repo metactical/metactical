@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shipment xmlns="http://www.canadapost.ca/ws/shipment-v8">
+    <group-id>{{ doc.name }}</group-id>
+    <requested-shipping-point>{{ pickup_address_doc.pincode|replace(' ','') }}</requested-shipping-point>
+    <cpc-pickup-indicator>true</cpc-pickup-indicator>
+    <delivery-spec>
+        <service-code>{{ parcel.carrier_service }}</service-code>
+        <sender>
+            <name>{{ pickup_contact_person_doc.full_name }}</name>
+            <company>{{ doc.pickup_company }}</company>
+            <contact-phone>{{ pickup_contact_person_doc.mobile_no }}</contact-phone>
+            <address-details>
+                <address-line-1>{{ pickup_address_doc.address_line1 }}</address-line-1>
+                <city>{{ pickup_address_doc.city }}</city>
+                <prov-state>{{ pickup_address_doc.state or "" }}</prov-state>
+                <country-code>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code").upper() }}</country-code>
+                <postal-zip-code>{{ pickup_address_doc.pincode|replace(' ','') }}</postal-zip-code>
+            </address-details>
+        </sender>
+        <destination>
+            <name>{{ [delivery_contact_doc.first_name, delivery_contact_doc.middle_name or "", delivery_contact_doc.last_name or ""]|join(" ") }}</name>
+            <company>{{ delivery_contact_doc.company_name or "" }}</company>
+            <address-details>
+                <address-line-1>{{ delivery_address_doc.address_line1 }}</address-line-1>
+                <city>{{ delivery_address_doc.city }}</city>
+                <prov-state>{{ delivery_address_doc.state or "" }}</prov-state>
+                <country-code>{{ frappe.db.get_value("Country", delivery_address_doc.country, "code")|upper }}</country-code>
+                <postal-zip-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-zip-code>
+            </address-details>
+        </destination>
+        <parcel-characteristics>
+            <weight>{{ parcel.weight }}</weight>
+            <dimensions>
+                <length>{{ parcel.length }}</length>
+                <width>{{ parcel.width }}</width>
+                <height>{{ parcel.height }}</height>
+            </dimensions>
+            <mailing-tube>false</mailing-tube>
+        </parcel-characteristics>
+        <notification>
+            <email>{{ doc.pickup_contact_email }}</email>
+            <on-shipment>true</on-shipment>
+            <on-exception>false</on-exception>
+            <on-delivery>true</on-delivery>
+        </notification>
+        <print-preferences>
+            <output-format>{{doc.output_format or '4x6'}}</output-format>
+        </print-preferences>
+        <preferences>
+            <show-packing-instructions>true</show-packing-instructions>
+            <show-postage-rate>true</show-postage-rate>
+            <show-insured-value>true</show-insured-value>
+        </preferences>
+        <settlement-info>
+            <contract-id>{{ settings.contract_number }}</contract-id>
+            <intended-method-of-payment>Account</intended-method-of-payment>
+        </settlement-info>
+        {% if delivery_address_doc.country!="Canada" %}
+        <customs>
+            <currency>{{ delivery_note.currency }}</currency>
+            <conversion-from-cad>{{ delivery_note.conversion_rate }}</conversion-from-cad>
+            <reason-for-export>{{ doc.shipment_type }}</reason-for-export>
+            {% if doc.shipment_type|lower == "OTH" %}
+            <other-reason>{{ doc.other_reason }}</other-reason>
+            {% endif %}
+            <sku-list>
+                {% for item in delivery_note.get("items") %}
+                <item>
+                    <customs-number-of-units>{{ item.stock_qty|int }}</customs-number-of-units>
+                    <customs-unit-of-measure>{% if item.stock_uom|upper in ("PCE","NMB","PAR","PKG","ENV","LTR","MLT","BOX","BAG","MTR","MMT","DZN","GRM","KGM","CTN","BIN","SET","BOT","TBE","KIT") %}{{item.stock_uom|upper}}{% else %}BOX{% endif %}</customs-unit-of-measure>
+                    <customs-description>{{ item.description[:45] }}</customs-description>
+                    <sku>{{ frappe.db.get_value("Item", item.item_code, "ifw_sku") }}</sku>
+                    <unit-weight>{{ item.total_weight|int or (parcel.weight/item.stock_qty)|int }}</unit-weight>
+                    <customs-value-per-unit>{{ item.weight_per_unit|int or 1 }}</customs-value-per-unit>
+                    <country-of-origin>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code").upper() }}</country-of-origin>
+                    {% if pickup_address_doc.country=="Canada" %}
+                    <province-of-origin>{{ pickup_address_doc.state or "" }}</province-of-origin>
+                    {% endif %}
+                </item>
+                {% endfor %}
+            </sku-list>
+        </customs>
+        {% endif %}
+    </delivery-spec>
+</shipment>
