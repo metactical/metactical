@@ -145,5 +145,8 @@
 		"erpnext_public/js/telephony.js",
 		"erpnext_public/js/templates/call_link.html",
 		"erpnext_public/js/templates/node_card.html"
+	],
+	"js/metactical.min.js": [
+		"public/js/template/shipment_rate.html"
 	]
 }

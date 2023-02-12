@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mailing-scenario xmlns="http://www.canadapost.ca/ws/ship/rate-v4">
+    <customer-number>{{settings.customer_number}}</customer-number>
+    <contract-id>{{settings.contract_number}}</contract-id>
+    <parcel-characteristics>
+        <weight>{{ parcel.weight }}</weight>
+        <dimensions>
+            <length>{{ parcel.length }}</length>
+            <width>{{ parcel.width }}</width>
+            <height>{{ parcel.height }}</height>
+        </dimensions>
+    </parcel-characteristics>
+    <origin-postal-code>{{ pickup_address_doc.pincode|replace(' ','') }}</origin-postal-code>
+    <destination>
+        {% if delivery_address_doc.country=="Canada" %}
+        <domestic>
+            <postal-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-code>
+        </domestic>
+        {% elif delivery_address_doc.country=="United States" %}
+        <united-states>
+            <zip-code>{{ delivery_address_doc.pincode|replace(' ','') }}</zip-code>
+        </united-states>
+        {% else %}
+        <international>
+            <country-code>{{ frappe.db.get_value("Country", delivery_address_doc.country, "code").upper() }}</country-code>
+            <postal-code>{{ delivery_address_doc.pincode|replace(' ','') }}</postal-code>
+        </international>
+        {% endif %}
+    </destination>
+</mailing-scenario>
