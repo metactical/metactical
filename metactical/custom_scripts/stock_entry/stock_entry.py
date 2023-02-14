@@ -6,9 +6,6 @@ from frappe.model.mapper import get_mapped_doc, map_child_doc
 from frappe.utils import flt
 from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 from erpnext.stock.doctype.serial_no.serial_no import update_serial_nos_after_submit
-import barcode as _barcode
-from barcode.writer import ImageWriter
-from io import BytesIO
 
 
 def validate(self, method):
@@ -34,11 +31,6 @@ def validate(self, method):
 
 def on_submit(self, method):
 	frappe.db.set_value('Stock Entry', self.name, 'ais_submitted_date', frappe.utils.today())
-	#STE Barcode
-	sv = BytesIO()
-	_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
-	stoBarcode = sv.getvalue()
-	self.ais_ste_barcode = stoBarcode.decode('ISO-8859-1')
 
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):
