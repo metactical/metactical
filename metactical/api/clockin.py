@@ -1,9 +1,158 @@
 import frappe
 import datetime
 
+@frappe.whitelist()
+def get_clockin_status():
+	user = frappe.session.user
+
+	clocked_in = frappe.db.exists("Clockin Log", {"user": user, "has_clocked_out": 0})
+	
+	if clocked_in:
+		return {"clocked_in": 1}
+
+	else:
+		return {"clocked_in": 0}
+
+@frappe.whitelist()
+def get_pay_cycle_data(current_date):
+	frappe.errprint("Call to api made")
+	user = frappe.session.user
+	employee = frappe.db.exists("Employee", {"user_id": user})
+	current_shift = None
+	
+	#Get current pay cycle
+	current_pay_cycle_exists = frappe.db.exists("Pay Cycle Record", {
+		"from_date": ("<=", current_date),
+		"to_date": (">=", current_date)
+	})
+
+	#Check shift assignment
+	shift_assignment = frappe.db.exists("Shift Assignment", {
+		"employee": employee,
+		"status": "Active",
+		"docstatus": 1
+	})
+
+	if employee:
+		if shift_assignment:
+			shift_type_record = frappe.get_value("Shift Assignment", shift_assignment, "shift_type")
+			shift_type = frappe.get_doc("Shift Type", shift_type_record)
+			current_shift = shift_type
+
+			#New Code Starts
+			if current_pay_cycle_exists:
+				frappe.errprint("Current pay cycle exists")
+				from_date = frappe.get_value("Pay Cycle Record", current_pay_cycle_exists, "from_date")
+				to_date = frappe.get_value("Pay Cycle Record", current_pay_cycle_exists, "to_date")
+
+				user_pay_cycle_record_exists = frappe.db.exists("Pay Cycle", {
+					"user": user,
+					"from_date": from_date,
+					"to_date": to_date
+				})
+
+				if not user_pay_cycle_record_exists:
+					create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date)
+					frappe.errprint("User pay cycle record created successfully")
+			#New Code Ends
+
+			""" if time_difference((current_time), str(shift_type.start_time)) >= 0 and time_difference((current_time), str(shift_type.end_time)) < 0:
+				if current_pay_cycle_exists:
+					from_date = frappe.get_value("Pay Cycle Record", current_pay_cycle_exists, "from_date")
+					to_date = frappe.get_value("Pay Cycle Record", current_pay_cycle_exists, "to_date")
+
+					user_pay_cycle_record_exists = frappe.db.exists("Pay Cycle", {
+						"user": user,
+						"from_date": from_date,
+						"to_date": to_date
+					})
+
+					if not user_pay_cycle_record_exists:
+						create_user_pay_cycle_record(user, from_date, to_date, current_date, current_time)
+
+					else:
+						clockin_log_record_today_exists = frappe.db.exists("Clockin Log", {
+							"user": user,
+							"date": current_date
+						})
+
+						if not clockin_log_record_today_exists:
+							create_clockin_log(user, current_date, current_time)
+
+				else:
+					frappe.throw("Couldn not find pay cycle period. Contact administrator")
+			
+			else:
+				#frappe.throw("Clockin too early")
+				return {
+					"clockin_status": 0
+				} """
+		
+		else:
+			frappe.throw("Shift assignment not found")
+	else:
+		frappe.throw("User not active employee. Contact Administrator")
+
+	user_pay_cycle_record = frappe.db.exists("Pay Cycle", {
+		"user": user,
+		"from_date": ("<=", current_date),
+		"to_date": (">=", current_date),
+	})
+
+	if not user_pay_cycle_record:
+		return {"pay_cycle_data_exists": 0}
+
+	user_pay_cycle = frappe.get_doc("Pay Cycle", user_pay_cycle_record)
+	current_pay_cycle = frappe.get_doc("Pay Cycle Record", current_pay_cycle_exists)
+	
+	previous_pay_cycles_viewable = frappe.db.get_single_value("Time Tracker Settings", "previous_viewable_pay_cycles")
+	#frappe.errprint(previous_pay_cycles_viewable)
+	pay_cycles = [user_pay_cycle]
+
+	##
+	available_prev_pay_cycles = frappe.db.count("Pay Cycle", {"user": user})
+
+	if available_prev_pay_cycles < previous_pay_cycles_viewable:
+		previous_pay_cycles_viewable = available_prev_pay_cycles
+
+	frappe.errprint(previous_pay_cycles_viewable)
+	##
+
+	prev_index = 1
+	while prev_index < previous_pay_cycles_viewable:
+		previous_pay_cycle_record = frappe.db.exists("Pay Cycle Record", {"idx": current_pay_cycle.idx + prev_index})
+		
+		if previous_pay_cycle_record:
+			previous_pay_cycle = frappe.get_doc("Pay Cycle Record", previous_pay_cycle_record)
+
+			user_previous_pay_cycle_record = frappe.db.exists("Pay Cycle", {
+				"user": user,
+				"from_date": previous_pay_cycle.from_date,
+				"to_date": previous_pay_cycle.to_date
+			})
+
+			if user_previous_pay_cycle_record:
+				user_previous_pay_cycle = frappe.get_doc("Pay Cycle", user_previous_pay_cycle_record)
+				#frappe.errprint(user_previous_pay_cycle)
+				pay_cycles.append(user_previous_pay_cycle)
+
+				prev_index += 1
+
+	#frappe.errprint(current_pay_cycle.idx)
+	button_activation_delay = frappe.db.get_single_value("Time Tracker Settings", "clockinout_delay")
+
+	return {
+		"pay_cycle_data_exists": 1,
+		"pay_cycles": pay_cycles, 
+		"button_activation_delay": button_activation_delay,
+		"clockin_status": 1,
+		"current_shift": current_shift
+		}
+
 #Check if logged in user has current pay cycle record
 @frappe.whitelist()
 def check_current_pay_cycle_record(current_date, current_time):
+	frappe.errprint("Clockin attempt")
 	user = frappe.session.user
 	employee = frappe.db.exists("Employee", {"user_id": user})
 	current_shift = None
@@ -44,10 +193,12 @@ def check_current_pay_cycle_record(current_date, current_time):
 					else:
 						clockin_log_record_today_exists = frappe.db.exists("Clockin Log", {
 							"user": user,
-							"date": current_date
+							"date": current_date,
+							"has_clocked_out": 0
 						})
 
 						if not clockin_log_record_today_exists:
+							frappe.errprint("Clockin log does not exist. Creating new")
 							create_clockin_log(user, current_date, current_time)
 
 				else:
@@ -70,6 +221,10 @@ def check_current_pay_cycle_record(current_date, current_time):
 		"to_date": (">=", current_date),
 	})
 
+	## Start debugging
+	#if not user_pay_cycle_record:
+	## Stop debugging
+
 	user_pay_cycle = frappe.get_doc("Pay Cycle", user_pay_cycle_record)
 	current_pay_cycle = frappe.get_doc("Pay Cycle Record", current_pay_cycle_exists)
 	
@@ -77,8 +232,17 @@ def check_current_pay_cycle_record(current_date, current_time):
 	#frappe.errprint(previous_pay_cycles_viewable)
 	pay_cycles = [user_pay_cycle]
 
+	##
+	available_prev_pay_cycles = frappe.db.count("Pay Cycle", {"user": user})
+
+	if available_prev_pay_cycles < previous_pay_cycles_viewable:
+		previous_pay_cycles_viewable = available_prev_pay_cycles
+
+	frappe.errprint(previous_pay_cycles_viewable)
+	##
+
 	prev_index = 1
-	while prev_index <= previous_pay_cycles_viewable:
+	while prev_index < previous_pay_cycles_viewable:
 		previous_pay_cycle_record = frappe.db.exists("Pay Cycle Record", {"idx": current_pay_cycle.idx + prev_index})
 		
 		if previous_pay_cycle_record:
@@ -106,6 +270,37 @@ def check_current_pay_cycle_record(current_date, current_time):
 		"clockin_status": 1,
 		"current_shift": current_shift
 		}
+
+def create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date):
+	user_pay_cycle_record = frappe.get_doc({
+		"doctype": "Pay Cycle",
+		"user": user,
+		"from_date": from_date,
+		"to_date": to_date
+	})
+
+	user_pay_cycle_record.insert()
+
+	#Create child day records
+	index = 1
+	date_index = from_date 
+
+	while date_index != to_date:
+		row = user_pay_cycle_record.append("days", {
+			"date": date_index
+		})
+
+		row.insert()
+		
+		date_index = from_date + datetime.timedelta(days=index)
+		index += 1
+
+	row = user_pay_cycle_record.append("days", {
+		"date": date_index
+	})
+
+	row.insert()
+	frappe.db.commit()
 
 def create_user_pay_cycle_record(user, from_date, to_date, current_date, current_time):
 	user_pay_cycle_record = frappe.get_doc({
