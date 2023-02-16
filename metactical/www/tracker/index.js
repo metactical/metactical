@@ -1,3 +1,6 @@
+const loginButton = document.getElementById("login-btn")
+const logoutButton = document.getElementById("logout-btn")
+
 const clockInButton = document.getElementById("clock-in-btn");
 const clockOutButton = document.getElementById("clock-out-btn");
 
@@ -19,21 +22,30 @@ let selectedClockinLog;
 let pageIndex = 0;
 let countIndex = 0;
 
+loginButton.onclick = login
+logoutButton.onclick = logout
 clockInButton.onclick = clockIn
 clockOutButton.onclick = clockOut
 prevButton.onclick = onPrevButton
 nextButton.onclick = onNextButton
 
+//Hide navbar
+$("nav").hide()
+
 frappe.ready(function () {
     //Check if clocked in on load
     if (frappe.session.user != "Guest") {
         //Validate button states if clocked in
-        onClockIn();
+        //onClockIn();
+        //loginButton.classList.toggle('d-none');
+        //logoutButton.classList.toggle('d-none');
+
+        onLogin();
     }
 
     //Display buttons
-    clockInButton.classList.toggle('d-none');
-    clockOutButton.classList.toggle('d-none');
+    //clockInButton.classList.toggle('d-none');
+    //clockOutButton.classList.toggle('d-none');
 });
 
 //Clock
@@ -58,11 +70,168 @@ function checkTime(i) {
 
 startTime();
 
-function clockIn() {
-    //Clockin/Login
-    //buttonActivationDelay(clockInButton)
-
+//Login
+function login() {
     fetch(`${window.origin}/api/method/login`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            usr: document.getElementById('email').value,
+            pwd: document.getElementById('password').value
+        })
+    })
+        .then(r => r.json())
+        .then(r => {
+            console.log(r);
+            if (r.message == 'Logged In') {
+                //Login in success
+                notify('success', 'Login success')
+                onLogin()
+            }
+
+            else {
+                //Login failed
+                notify('danger', 'Invalid credentials')
+            }
+        })
+}
+
+function onLogin() {
+    //Hide login fields
+    hideLogin()
+
+    //Hide login button
+    loginButton.classList.toggle('d-none');
+
+    //Show logout button
+    logoutButton.classList.toggle('d-none');
+
+    //Activate clockin button
+    clockInButton.removeAttribute('disabled')
+
+    //Activate clockin button
+    clockInButton.classList.toggle("btn-success");
+    clockInButton.classList.toggle("btn-secondary");
+
+    //Show paycycle data
+    //Call api after login
+    const date = new Date();
+    const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+
+    frappe.call({
+        method: "metactical.api.clockin.get_pay_cycle_data",
+        args: {
+            current_date: today,
+            //current_time: current_time
+        },
+        callback: r => {
+            console.log(r.message)
+
+            if (r.message.pay_cycle_data_exists) {
+                payCycles = r.message.pay_cycles
+                //button_activation_delay = r.message.button_activation_delay
+                //validateLogin()
+                prevPayCycles = r.message.pay_cycles.length - 1
+                validateButtons()
+                toggleTable()
+                table(payCycles)
+                checkClockinStatus()
+            }
+
+            else {
+                notify("danger", "No data to display")
+            }
+
+        }
+    })
+
+    //table(payCycles)
+}
+
+function checkClockinStatus() {
+    frappe.call({
+        method: "metactical.api.clockin.get_clockin_status",
+        callback: r => {
+            console.log(r.message)
+            if (r.message.clocked_in) {
+                //grey out clockin button if success
+                clockInButton.classList.toggle("btn-success");
+                clockInButton.classList.toggle("btn-secondary");
+                clockInButton.setAttribute("disabled", "");
+
+                //red in clockout button if success
+                clockOutButton.classList.toggle("btn-secondary");
+                clockOutButton.classList.toggle("btn-danger");
+                clockOutButton.removeAttribute("disabled");
+            }
+        }
+    })
+}
+
+function logout() {
+    fetch(`${window.origin}/api/method/logout`, {
+        method: 'GET',
+    })
+        .then(r => r.json())
+        .then(r => {
+            console.log(r);
+
+            //grey out clockout button if success
+            //clockOutButton.classList.toggle("btn-danger");
+            //clockOutButton.classList.toggle("btn-secondary");
+            //clockOutButton.setAttribute("disabled", "");
+
+            //green in clockin button if success
+            //clockInButton.classList.toggle("btn-secondary");
+            //clockInButton.classList.toggle("btn-success");
+            //clockInButton.removeAttribute("disabled");
+            //Display success message
+            /* notify('danger', message);
+            if (!document.getElementById("pay-cycle").classList.contains("d-none")) {
+                toggleTable()
+            } */
+            //toggleTable()
+            //showLogin()
+            notify('success', 'Logout success')
+
+            //Show login fields
+            showLogin()
+
+            //Check if clockedin
+            if (clockOutButton.classList.contains("btn-danger")) {
+                //Disable clock out button
+                clockOutButton.classList.toggle("btn-danger")
+                clockOutButton.classList.toggle("btn-secondary")
+                clockOutButton.setAttribute("disabled", "true")
+            }
+
+            else {
+                clockInButton.setAttribute('disabled', 'true')
+                clockInButton.classList.toggle("btn-success");
+                clockInButton.classList.toggle("btn-secondary");
+            }
+
+            //Hide logout button
+            logoutButton.classList.toggle('d-none')
+
+            //Show login button
+            loginButton.classList.toggle('d-none')
+
+            //Hide pay cycle data
+            hidePayCycleData()
+
+            //Clear field values
+            $("#email").val("")
+            $("#password").val("")
+        })
+}
+
+function clockIn() {
+    onClockIn()
+    /* fetch(`${window.origin}/api/method/login`, {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -84,24 +253,25 @@ function clockIn() {
             else {
                 notify('danger', 'Invalid credentials')
             }
-        })
+        }) */
 }
 
 function clockOut() {
     //Clockout/Log out
+    
     const date = new Date();
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
     frappe.call({
-        method: "metactical.api.update_clockin_log",
+        method: "metactical.api.clockin.update_clockin_log",
         args: {
             current_date: today,
             to_time: current_time
         },
         callback: r => {
-            console.log("Logging out")
+            console.log("Clocking out")
             console.log(r)
-            onClockOut("Logout success")
+            onClockOut("Clockout success")
         }
     });
 
@@ -119,12 +289,14 @@ function onClockIn() {
     clockOutButton.classList.toggle("btn-danger");
     clockOutButton.removeAttribute("disabled");
 
-    //Call api after login
+    //Call api
     const date = new Date();
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
+    console.log("Attempting to clockin")
+    
     frappe.call({
-        method: "metactical.api.check_current_pay_cycle_record",
+        method: "metactical.api.clockin.check_current_pay_cycle_record",
         args: {
             current_date: today,
             current_time: current_time
@@ -133,19 +305,19 @@ function onClockIn() {
             console.log(r.message)
             //table(r.message.pay_cycles)
             if (r.message.clockin_status == 1) {
-                payCycles = r.message.pay_cycles
-                button_activation_delay = r.message.button_activation_delay
-                validateLogin()
-                prevPayCycles = r.message.pay_cycles.length - 1
-                validateButtons()
-                toggleTable()
+                //payCycles = r.message.pay_cycles
+                //button_activation_delay = r.message.button_activation_delay
+                //validateLogin()
+                //prevPayCycles = r.message.pay_cycles.length - 1
+                //validateButtons()
+                //toggleTable()
 
-                //$("#starts-at").text(r.message.current_shift.start_time)
-                //$("#ends-at").text(r.message.current_shift.end_time)
-                //current_shift_name = r.message.current_shift.name
+                $("#starts-at").text(r.message.current_shift.start_time)
+                $("#ends-at").text(r.message.current_shift.end_time)
+                current_shift_name = r.message.current_shift.name
 
                 //Display success message
-                notify('success', 'Login success');
+                notify('success', 'Clockin success');
             }
 
             else {
@@ -159,7 +331,17 @@ function onClockIn() {
 }
 
 function onClockOut(message) {
-    fetch(`${window.origin}/api/method/logout`, {
+    clockOutButton.classList.toggle("btn-danger");
+    clockOutButton.classList.toggle("btn-secondary");
+    clockOutButton.setAttribute("disabled", "");
+
+    //green in clockin button if success
+    clockInButton.classList.toggle("btn-secondary");
+    clockInButton.classList.toggle("btn-success");
+    clockInButton.removeAttribute("disabled");
+    //Display success message
+    notify('danger', message);
+    /* fetch(`${window.origin}/api/method/logout`, {
         method: 'GET',
     })
         .then(r => r.json())
@@ -182,7 +364,7 @@ function onClockOut(message) {
             }
             //toggleTable()
             showLogin()
-        })
+        }) */
 }
 
 function notify(type, message) {
@@ -252,12 +434,21 @@ function dateFormatter(date) {
     return formattedDate;
 }
 
-const validateLogin = () => {
+const hideLogin = () => {
     //hide form
     const form = $("#auth")
     form.hide()
+}
 
-    table(payCycles)
+const hidePayCycleData = () => {
+    //Hide Pay Cycle Table
+    pc = document.getElementById("pay-cycle")
+    if (!pc.classList.contains("d-none")) {
+        toggleTable()
+    }
+
+    //Empty pay cycles array
+    payCycles = []
 }
 
 const showLogin = () => {
@@ -324,7 +515,7 @@ $("body").on("click", ".table-btn", function () {
 
 function getDateDetails(date) {
     frappe.call({
-        method: "metactical.api.get_date_details",
+        method: "metactical.api.clockin.get_date_details",
         args: {
             date: date
         },
@@ -433,7 +624,7 @@ function convertTimeToMilitary(timeStr) {
         callback: r => {
             console.log(r.message)
             $("#shifts").empty()
-
+ 
             for (let i = 0; i < r.message.shifts.length; i++) {
                 //const element = r.message.shifts[i];
                 $("#shifts").append(
@@ -449,7 +640,7 @@ function convertTimeToMilitary(timeStr) {
 //To modify
 /* $("body").on("click", "#shift-change-submit", function() {
     //let shift_type = $("#shifts").text($(this).children(".shift-time").text())
-
+ 
     console.log(selectedShiftType)
     frappe.call({
         method: "metactical_time_tracker.api.shift_request",
@@ -507,7 +698,7 @@ $("body").on("click", "#submit-time-change", function (event) {
     const log_name = selectedClockinLog.find(".name.d-none").text()
 
     frappe.call({
-        method: "metactical.api.send_details_change_request",
+        method: "metactical.api.clockin.send_details_change_request",
         args: {
             "log_name": log_name,
             "checkInTime12": checkInTime12,

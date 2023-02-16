@@ -6,7 +6,7 @@ req = params.get("req")
 frappe.ready(function() {
     if (frappe.session.user != "Guest") {
         frappe.call({
-            method: "metactical.api.approve_details_change_request",
+            method: "metactical.api.clockin.approve_details_change_request",
             args: {
                 "request_name": req
             },

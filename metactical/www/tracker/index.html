@@ -11,17 +11,22 @@
     <!-- <button type="submit" class="btn btn-primary">Submit</button> -->
   </form>
 
+  <div class="login-out-btn">
+    <button id="login-btn" class="login btn btn-primary">Login</button>
+    <button id="logout-btn" class="logout btn btn-danger d-none">Loguot</button>
+  </div>
+
   <div id="clock-container">
     <h1 class="text-muted" id="clock"></h1>
   </div>
 
   <div class="clock-in-out-buttons">
     <div class="clock-in">
-      <button id="clock-in-btn" type="button" class="btn btn-success btn-lg d-none">Clock In</button>
+      <button id="clock-in-btn" type="button" class="btn btn-secondary btn-lg" disabled>Clock In</button>
     </div>
 
     <div class="clock-out">
-      <button id="clock-out-btn" type="button" class="btn btn-secondary btn-lg d-none" disabled>Clock Out</button>
+      <button id="clock-out-btn" type="button" class="btn btn-secondary btn-lg" disabled>Clock Out</button>
     </div>
   </div>
 
