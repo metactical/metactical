@@ -538,10 +538,27 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Time Tracker Screen Settings",
+   "link_to": "Time Tracker Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2023-01-03 14:58:02.947396",
- "modified_by": "Administrator",
+ "modified": "2023-02-17 06:58:37.185440",
+ "modified_by": "web6@dogtagbuilder.com",
  "module": "Metactical",
  "name": "Metactical",
  "owner": "Administrator",
