@@ -185,7 +185,8 @@ def create_material_transfer(**args):
 	source_warehouse = "W01-WHS-Active Stock - " + frappe.db.get_value("Company", init_data[0].company, "abbr")
 	doc = frappe.new_doc("Stock Entry")
 	doc.update({
-		"stock_entry_type": "Material Transfer"
+		"stock_entry_type": "Material Transfer",
+		"ais_from_report": 1
 	})
 	for row in init_data:
 		wh_actual = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "actual_qty") or 0.0
