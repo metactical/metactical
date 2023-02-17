@@ -30,6 +30,11 @@ frappe.ui.form.on('Stock Entry', {
 				return false;
 			}
 		});
+	},
+	
+	on_submit: function(frm){
+		var print_url = window.location.origin + "/printview?doctype=Stock%20Entry&name=" + frm.doc.name + "&trigger_print=1&format=STE%20Pick%20List&no_letterhead=0&_lang=en"		
+		window.open(print_url)
 	}
 })
 
