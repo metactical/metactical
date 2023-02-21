@@ -7,6 +7,11 @@ from datetime import datetime
 
 
 class ClockinLog(Document):
+	def after_insert(self):
+		#Create employee Checkin
+		#self.insert_employee_checkin()
+		pass
+	
 	def before_save(self):
 		# Validate total hours worked for clockin log
 		if self.has_clocked_out:
@@ -22,7 +27,56 @@ class ClockinLog(Document):
 	def save(self, *args, **kwargs):
 		super().save(*args, **kwargs)
 		self.update_user_pay_cycle_record()
+		self.employee_checkin()
 
+	""" def insert_employee_checkin(self):
+		employee_exists = frappe.db.exists("Employee", {"user_id": self.user})
+
+		if employee_exists:
+			in_employee_checkin = frappe.get_doc({
+				"doctype": "Employee Checkin",
+				"log_type": "IN",
+				"employee": employee_exists,
+				"time": f'{self.date} {self.to_time}'
+			})
+
+			in_employee_checkin.insert()
+
+			#Link employee checkin to clockin log doc
+			self.in_employee_checkin_record = in_employee_checkin.name
+
+		else:
+			frappe.throw("Employee record not found") """
+	
+	#Manipulate Employee Checkin Log
+	def employee_checkin(self):
+		pass
+		""" employee_exists = frappe.db.exists("Employee", {"user_id": self.user})
+
+		if employee_exists:
+			if not self.out_employee_checkin_record:
+				#Create employee out checkin record
+				out_employee_checkin = frappe.get_doc({
+					"doctype": "Employee Checkin",
+					"log_type": "OUT",
+					"employee": employee_exists,
+					"time": f'{self.date} {self.to_time}'
+				})
+
+				out_employee_checkin.insert()
+				frappe.db.commit()
+
+				#Link record
+				self.out_employee_checkin_record = out_employee_checkin.name
+
+			else:
+				out_employee_checkin_record = frappe.get_doc("Employee Checkin", self.out_employee_checkin_record)
+				out_employee_checkin_record.time = f"{self.date} {self.to_time}"
+				out_employee_checkin_record.save()
+
+		else:
+			frappe.throw("Employee record not found") """
+	
 	def update_user_pay_cycle_record(self):
 		clockin_logs = frappe.get_all("Clockin Log", filters={
 			"user": self.user,

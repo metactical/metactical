@@ -11,7 +11,9 @@
   "from_time",
   "to_time",
   "total_hours",
-  "has_clocked_out"
+  "has_clocked_out",
+  "in_employee_checkin_record",
+  "out_employee_checkin_record"
  ],
  "fields": [
   {
@@ -58,11 +60,23 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Has Clocked Out"
+  },
+  {
+   "fieldname": "in_employee_checkin_record",
+   "fieldtype": "Link",
+   "label": "In Employee Checkin Record",
+   "options": "Employee Checkin"
+  },
+  {
+   "fieldname": "out_employee_checkin_record",
+   "fieldtype": "Link",
+   "label": "Out Employee Checkin Record",
+   "options": "Employee Checkin"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-02-15 05:59:55.848795",
+ "modified": "2023-02-20 14:39:10.277717",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Clockin Log",

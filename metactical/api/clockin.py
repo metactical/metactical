@@ -1,6 +1,68 @@
 import frappe
 import datetime
 
+def insert_in_employee_checkin(doc, method):
+	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
+
+	if employee_exists:
+		frappe.errprint(doc.from_time)
+		in_employee_checkin = frappe.get_doc({
+			"doctype": "Employee Checkin",
+			"log_type": "IN",
+			"employee": employee_exists,
+			"time": f'{doc.date} {doc.from_time}'
+		})
+
+		in_employee_checkin.insert()
+
+		#Link employee checkin to clockin log doc
+		doc.in_employee_checkin_record = in_employee_checkin.name
+		doc.save()
+
+	else:
+		frappe.throw("Employee record not found")
+
+def insert_out_employee_checkin(doc, method):
+	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
+
+	if employee_exists:
+		if doc.has_clocked_out:
+			if not doc.out_employee_checkin_record:
+				#Create employee out checkin record
+				out_employee_checkin = frappe.get_doc({
+					"doctype": "Employee Checkin",
+					"log_type": "OUT",
+					"employee": employee_exists,
+					"time": f'{doc.date} {doc.to_time}'
+				})
+
+				out_employee_checkin.insert()
+				frappe.db.commit()
+
+				#Link record
+				frappe.errprint("Out record")
+				frappe.errprint(out_employee_checkin.name)
+				doc.out_employee_checkin_record = out_employee_checkin.name
+				doc.save()
+
+			else:
+				out_employee_checkin_record = frappe.get_doc("Employee Checkin", doc.out_employee_checkin_record)
+				out_employee_checkin_record.time = f"{doc.date} {doc.to_time}"
+				out_employee_checkin_record.save()
+
+				in_employee_checkin_record = frappe.get_doc("Employee Checkin", doc.in_employee_checkin_record)
+				in_employee_checkin_record.time = f"{doc.date} {doc.from_time}"
+				in_employee_checkin_record.save()
+
+	else:
+		frappe.throw("Employee record not found")
+
+@frappe.whitelist()
+def get_logout_delay():
+	logout_delay = frappe.db.get_single_value("Time Tracker Settings", "logout_delay")
+
+	return {"logout_delay": logout_delay}
+
 @frappe.whitelist()
 def get_clockin_status():
 	user = frappe.session.user
@@ -344,7 +406,8 @@ def create_clockin_log(user, current_date, from_time):
 		"doctype": "Clockin Log",
 		"user": user,
 		"date": current_date,
-		"from_time": from_time
+		"from_time": from_time,
+		"total_hours": 0.0
 	})
 
 	clockin_log_record.insert()
@@ -355,7 +418,8 @@ def update_clockin_log(current_date, to_time):
 
 	clockin_log_record = frappe.db.exists("Clockin Log", {
 		"user": user,
-		"date": current_date,
+		"has_clocked_out": 0
+		#"date": current_date,
 	})
 
 	clockin_log = frappe.get_doc("Clockin Log", clockin_log_record)

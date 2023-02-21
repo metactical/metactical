@@ -9,6 +9,8 @@ const nextButton = document.getElementById("next-button")
 
 let button_activation_delay = 1;
 
+let logOutTimerToggled = false;
+
 let payCycles;
 let prevPayCycles = 0;
 let shiftSelected = false;
@@ -132,8 +134,6 @@ function onLogin() {
 
             if (r.message.pay_cycle_data_exists) {
                 payCycles = r.message.pay_cycles
-                //button_activation_delay = r.message.button_activation_delay
-                //validateLogin()
                 prevPayCycles = r.message.pay_cycles.length - 1
                 validateButtons()
                 toggleTable()
@@ -258,7 +258,7 @@ function clockIn() {
 
 function clockOut() {
     //Clockout/Log out
-    
+
     const date = new Date();
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
@@ -274,11 +274,11 @@ function clockOut() {
             onClockOut("Clockout success")
         }
     });
-
-
 }
 
 function onClockIn() {
+    logOutTimerToggled = false
+
     //grey out clockin button if success
     clockInButton.classList.toggle("btn-success");
     clockInButton.classList.toggle("btn-secondary");
@@ -294,7 +294,7 @@ function onClockIn() {
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
     console.log("Attempting to clockin")
-    
+
     frappe.call({
         method: "metactical.api.clockin.check_current_pay_cycle_record",
         args: {
@@ -341,6 +341,8 @@ function onClockOut(message) {
     clockInButton.removeAttribute("disabled");
     //Display success message
     notify('danger', message);
+
+    startLogoutTimer()
     /* fetch(`${window.origin}/api/method/logout`, {
         method: 'GET',
     })
@@ -413,7 +415,8 @@ const table = (tableData) => {
     if (tableData[pageIndex].days.length > 6) {
         for (; countIndex <= 6; countIndex++) {
             trh1.append(`<th class="table-btn" scope="col">${dateFormatter(tableData[pageIndex].days[countIndex].date)}<span class='d-none'>${tableData[pageIndex].days[countIndex].date}</span></th>`)
-            trb1.append(`<td scope="col">${Math.round(tableData[pageIndex].days[countIndex].hours_worked)} hours</td>`)
+            //trb1.append(`<td scope="col">${Math.round(tableData[pageIndex].days[countIndex].hours_worked)} hours</td>`)
+            trb1.append(`<td scope="col">${tableData[pageIndex].days[countIndex].hours_worked.toFixed(2)} hours</td>`)
             console.log("looping")
         }
         console.log(trh1)
@@ -421,7 +424,7 @@ const table = (tableData) => {
 
     for (; countIndex < tableData[pageIndex].days.length; countIndex++) {
         trh2.append(`<th class="table-btn" scope="col">${dateFormatter(tableData[pageIndex].days[countIndex].date)}<span class='d-none'>${tableData[pageIndex].days[countIndex].date}</span></th>`)
-        trb2.append(`<td scope="col">${Math.round(tableData[pageIndex].days[countIndex].hours_worked)} hours</td>`)
+        trb2.append(`<td scope="col">${tableData[pageIndex].days[countIndex].hours_worked.toFixed(2)} hours</td>`)
     }
 
     totalHoursWorked.text(`Total: ${Math.round(tableData[pageIndex].total_hours_worked)} hours`)
@@ -716,3 +719,33 @@ $("body").on("click", "#submit-time-change", function (event) {
         }
     })
 })
+
+//Enter is pressed
+$(document).on('keypress', function (e) {
+    if (e.which == 13) {
+        if ($("#email").is(":focus") || $("#password").is(":focus")) {
+            login()
+        }
+    }
+});
+
+function startLogoutTimer() {
+    console.log("Logout timer started")
+    logOutTimerToggled = true
+    frappe.call({
+        method: "metactical.api.clockin.get_logout_delay",
+        callback: r => {
+            console.log(r.message)
+            if (r.message.logout_delay > 1) {
+                console.log("Waiting")
+                let logout_delay = r.message.logout_delay * 1000
+                setTimeout(() => {
+                    if (logOutTimerToggled) {
+                        //window.alert("Logged out")
+                        logout()
+                    }
+                }, logout_delay)
+            }
+        }
+    })
+}

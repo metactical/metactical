@@ -8,6 +8,7 @@
  "field_order": [
   "previous_viewable_pay_cycles",
   "checkin_approver",
+  "logout_delay",
   "start_date",
   "pay_cycles",
   "clockinout_delay"
@@ -46,12 +47,19 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "ClockInOut Delay"
+  },
+  {
+   "default": "10",
+   "fieldname": "logout_delay",
+   "fieldtype": "Int",
+   "label": "Logout Delay",
+   "non_negative": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-02-16 04:00:02.141010",
+ "modified": "2023-02-21 03:09:40.256730",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Time Tracker Settings",
@@ -66,6 +74,13 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Employee",
+   "share": 1
   }
  ],
  "sort_field": "modified",
