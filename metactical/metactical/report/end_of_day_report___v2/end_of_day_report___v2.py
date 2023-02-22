@@ -49,19 +49,37 @@ def get_data(filters):
 	date = filters.get("date")
 	sources = frappe.db.get_list("Lead Source", pluck="name")
 	for source in sources:
+		wtype = source.split("-")
 		row = {"lead_source": source, "total_with_tax": 0, "total_without_tax": 0}
-		query = frappe.db.sql("""SELECT 
-									SUM(total) AS total_without_tax,
-									SUM(grand_total) AS total_with_tax
-								FROM
-									`tabSales Invoice`
-								WHERE
-									source = %(source)s AND posting_date = %(date)s""",
-				{"source": source, "date": date}, as_dict=1)
+		sql = ""
+		if len(wtype) > 0 and wtype[0].strip() == "Website":
+			sql = """SELECT 
+						COALESCE(SUM(total), 0) AS total_without_tax,
+						COALESCE(SUM(grand_total), 0) AS total_with_tax
+					FROM
+						`tabSales Order`
+					WHERE
+						source = %(source)s AND transaction_date = %(date)s
+						AND docstatus = 1"""
+		else:
+			sql = """SELECT 
+						COALESCE(SUM(total), 0) AS total_without_tax,
+						COALESCE(SUM(grand_total), 0) AS total_with_tax
+					FROM
+						`tabSales Invoice`
+					WHERE
+						source = %(source)s AND posting_date = %(date)s
+						AND docstatus = 1"""
+		query = frappe.db.sql(sql, {"source": source, "date": date}, as_dict=1)
 		if len(query) > 0:
 			row.update({
 				"total_with_tax": query[0].total_with_tax,
 				"total_without_tax": query[0].total_without_tax
+			})
+		else:
+			row.update({
+				"total_with_tax": 0.0,
+				"total_without_tax": 0.0
 			})
 		data.append(row)
 	#Add date to first row
