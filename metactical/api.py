@@ -3,7 +3,6 @@ import datetime
 
 def insert_in_employee_checkin(doc, method):
 	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
-
 	if employee_exists:
 		frappe.errprint(doc.from_time)
 		in_employee_checkin = frappe.get_doc({
