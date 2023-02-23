@@ -122,11 +122,13 @@ def get_website_stores_data(filters, location):
 		sql = ""
 		
 		#Check if you're getting website or stores data
-		if location == "Website" and len(wtype) > 0 and wtype[0].strip() == "Website":
+		if location == "Website" and len(wtype) > 0 and wtype[0].strip() == "Website" \
+			and source.ais_report_label is not None and source.ais_report_label != "":
 			matches = True
 			doctype = "tabSales Order"
 			date_column = "transaction_date"
-		elif location == "Stores" and (len(wtype) == 0 or wtype[0].strip() != "Website"):
+		elif location == "Stores" and (len(wtype) == 0 or wtype[0].strip() != "Website")\
+			and source.ais_report_label is not None and source.ais_report_label != "":
 			matches = True
 			doctype = "tabSales Invoice"
 			date_column = "posting_date"
