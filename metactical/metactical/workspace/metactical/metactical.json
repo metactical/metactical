@@ -426,6 +426,15 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "End of Day Report - V3",
+   "link_to": "End of Day Report - V3",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Sales Register",
    "link_to": "Metactical Sales Register",
    "link_type": "Report",
@@ -557,7 +566,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-02-05 06:40:45.700890",
+ "modified": "2023-02-21 18:12:36.756144",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

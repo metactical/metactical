@@ -1,0 +1,24 @@
+// Copyright (c) 2023, Techlift Technologies and contributors
+// For license information, please see license.txt
+/* eslint-disable */
+
+var tday = new Date().toISOString().split('T')[0];
+frappe.query_reports["End of Day Report - V3"] = {
+	"filters": [
+		{
+			"fieldname": "date",
+			"fieldtype": "Date",
+			"label": "Date",
+			"reqd": 1,
+			default: tday
+		},
+		{
+			"fieldname": "end_date",
+			"fieldtype": "Date",
+			"label": "End Date",
+			"reqd": 1,
+			default: tday,
+			"hidden": 1
+        }
+	]
+};

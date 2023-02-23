@@ -10,6 +10,7 @@
   "api_secret",
   "column_break_3",
   "us_url",
+  "daily_report_url",
   "section_warehouses",
   "warehouses",
   "section_price_list",
@@ -59,12 +60,17 @@
   {
    "fieldname": "us_url",
    "fieldtype": "Data",
-   "label": "URL"
+   "label": "Item Search URL"
+  },
+  {
+   "fieldname": "daily_report_url",
+   "fieldtype": "Data",
+   "label": "Daily Report URL"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2022-10-15 13:47:17.887069",
+ "modified": "2023-02-21 18:06:08.815163",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
