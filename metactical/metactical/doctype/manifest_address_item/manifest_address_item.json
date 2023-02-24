@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-02-23 12:50:48.109201",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "address",
+  "manifest_url",
+  "po_number",
+  "manifest"
+ ],
+ "fields": [
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Address",
+   "options": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "manifest_url",
+   "fieldtype": "Data",
+   "label": "Manifest URL"
+  },
+  {
+   "fieldname": "po_number",
+   "fieldtype": "Data",
+   "label": "PO Number"
+  },
+  {
+   "fieldname": "manifest",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "Manifest"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2023-02-24 00:49:14.212841",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Manifest Address Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
