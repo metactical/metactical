@@ -32,7 +32,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
         })
     },
     avoid_shipment_btn: function () {
-        this.frm.add_custom_button(__("Avoid Shipment<small>(s)</small>"), () => {
+        this.frm.add_custom_button(__("Void Shipment<small>(s)</small>"), () => {
             if (this.frm.is_dirty()) {
                 frappe.throw(__("Please Save before fetch rate"))
                 return
@@ -42,7 +42,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
     },
     avoid_shipment: function () {
         let d = new frappe.ui.Dialog({
-            title: __("Select Shipment to Avoid"),
+            title: __("Select Shipment to Void"),
             fields: this.frm.doc.shipments.map(r => {
                 return {
                     fieldname: r.name,
@@ -50,7 +50,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
                     label: r.shipment_id
                 }
             }),
-            primary_action_label: __('Avoid'),
+            primary_action_label: __('Void'),
             primary_action: values => {
                 frappe.xcall('metactical.utils.shipping.shipping.avoid_shpment', {
                     name: this.frm.docname,
