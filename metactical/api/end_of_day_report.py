@@ -25,8 +25,7 @@ def get_us_report_data(date):
 		if not (len(wtype) > 0 and wtype[0].strip() == "Website") \
 			and source.ais_report_label is not None and source.ais_report_label != "":
 			sql = """SELECT 
-						COALESCE(SUM(total), 0) AS total_without_tax,
-						COALESCE(SUM(grand_total), 0) AS total_with_tax
+						COALESCE(SUM(total), 0) AS total_without_tax
 					FROM
 						`tabSales Invoice`
 					WHERE
@@ -35,10 +34,8 @@ def get_us_report_data(date):
 			query = frappe.db.sql(sql, {"source": source.name, "date": date}, as_dict=1)
 			if len(query) > 0:
 				row.update({
-					"total_with_tax": query[0].total_with_tax,
 					"total_without_tax": query[0].total_without_tax
 				})
-				total_web_with_tax += query[0].total_with_tax
 				total_web_without_tax += query[0].total_without_tax
 			else:
 				row.update({
@@ -74,9 +71,9 @@ def get_us_report_data(date):
 			query = frappe.db.sql("""SELECT
 										COALESCE(SUM(total), 0) AS total_pmtd
 									FROM
-										`tabSales Invoice`
+										`tabSales Order`
 									WHERE
-										source = %(source)s AND posting_date BETWEEN %(start_date)s
+										source = %(source)s AND transaction_date BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""", 
 								{"source": source.name, "start_date": start_date, "end_date": end_date}, as_dict=1)
 			if len(query) > 0:
@@ -108,14 +105,11 @@ def get_us_report_data(date):
 			query = frappe.db.sql(sql, {"source": source.name, "date": date}, as_dict=1)
 			if len(query) > 0:
 				row.update({
-					"total_with_tax": query[0].total_with_tax,
 					"total_without_tax": query[0].total_without_tax
 				})
-				total_stores_with_tax += query[0].total_with_tax
 				total_stores_without_tax += query[0].total_without_tax
 			else:
 				row.update({
-					"total_with_tax": 0.0,
 					"total_without_tax": 0.0
 				})
 				
