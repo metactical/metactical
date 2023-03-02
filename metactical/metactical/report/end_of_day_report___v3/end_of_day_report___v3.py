@@ -29,12 +29,6 @@ def get_columns(filters):
 			"width": 200
 		},
 		{
-			"fieldname": "total_with_tax",
-			"fieldtype": "Currency",
-			"label": "Total With Tax",
-			"width": 120
-		},
-		{
 			"fieldname": "total_without_tax",
 			"fieldtype": "Currency",
 			"label": "Total Without Tax",
@@ -135,8 +129,7 @@ def get_website_stores_data(filters, location):
 		
 		if matches:
 			sql = """SELECT 
-						COALESCE(SUM(total), 0) AS total_without_tax,
-						COALESCE(SUM(grand_total), 0) AS total_with_tax
+						COALESCE(SUM(total), 0) AS total_without_tax
 					FROM
 						`""" + doctype + """`
 					WHERE
@@ -145,14 +138,11 @@ def get_website_stores_data(filters, location):
 			query = frappe.db.sql(sql, {"source": source.name, "date": date}, as_dict=1)
 			if len(query) > 0:
 				row.update({
-					"total_with_tax": query[0].total_with_tax,
 					"total_without_tax": query[0].total_without_tax
 				})
-				total_with_tax += query[0].total_with_tax
 				total_without_tax += query[0].total_without_tax
 			else:
 				row.update({
-					"total_with_tax": 0.0,
 					"total_without_tax": 0.0
 				})
 			
@@ -184,9 +174,9 @@ def get_website_stores_data(filters, location):
 			query = frappe.db.sql("""SELECT
 										COALESCE(SUM(total), 0) AS total_pmtd
 									FROM
-										`""" + doctype + """`
+										`tabSales Order`
 									WHERE
-										source = %(source)s AND """ + date_column + """ BETWEEN %(start_date)s
+										source = %(source)s AND transaction_date BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""", 
 								{"source": source.name, "start_date": start_date, "end_date": end_date}, as_dict=1)
 			if len(query) > 0:
