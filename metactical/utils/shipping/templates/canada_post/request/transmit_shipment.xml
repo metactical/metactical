@@ -12,7 +12,7 @@
     <detailed-manifests>true</detailed-manifests>
     <method-of-payment>Account</method-of-payment>
     <manifest-address>
-        <manifest-company>{{ pickup_address_doc.company or doc.pickup_company }}</manifest-company>
+        <manifest-company>{{ pickup_address_doc.ais_company or doc.pickup_company }}</manifest-company>
         <manifest-name>{{ pickup_contact_person_doc.full_name }}</manifest-name>
         <phone-number>{{ pickup_contact_person_doc.mobile_no }}</phone-number>
         <address-details>

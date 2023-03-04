@@ -7,7 +7,7 @@
         <service-code>{{ parcel.carrier_service }}</service-code>
         <sender>
             <name>{{ pickup_contact_person_doc.full_name }}</name>
-            <company>{{ pickup_address_doc.company or doc.pickup_company }}</company>
+            <company>{{ pickup_address_doc.ais_company or doc.pickup_company }}</company>
             <contact-phone>{{ pickup_contact_person_doc.mobile_no }}</contact-phone>
             <address-details>
                 <address-line-1>{{ pickup_address_doc.address_line1 }}</address-line-1>
