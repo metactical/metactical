@@ -1,6 +1,7 @@
 import frappe
 import datetime
 
+<<<<<<< HEAD
 def insert_in_employee_checkin(doc, method):
 	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
 	if employee_exists:
@@ -214,6 +215,11 @@ def get_pay_cycle_data(current_date):
 @frappe.whitelist()
 def check_current_pay_cycle_record(current_date, current_time):
 	frappe.errprint("Clockin attempt")
+=======
+#Check if logged in user has current pay cycle record
+@frappe.whitelist()
+def check_current_pay_cycle_record(current_date, current_time):
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 	user = frappe.session.user
 	employee = frappe.db.exists("Employee", {"user_id": user})
 	current_shift = None
@@ -254,12 +260,19 @@ def check_current_pay_cycle_record(current_date, current_time):
 					else:
 						clockin_log_record_today_exists = frappe.db.exists("Clockin Log", {
 							"user": user,
+<<<<<<< HEAD
 							"date": current_date,
 							"has_clocked_out": 0
 						})
 
 						if not clockin_log_record_today_exists:
 							frappe.errprint("Clockin log does not exist. Creating new")
+=======
+							"date": current_date
+						})
+
+						if not clockin_log_record_today_exists:
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 							create_clockin_log(user, current_date, current_time)
 
 				else:
@@ -282,10 +295,13 @@ def check_current_pay_cycle_record(current_date, current_time):
 		"to_date": (">=", current_date),
 	})
 
+<<<<<<< HEAD
 	## Start debugging
 	#if not user_pay_cycle_record:
 	## Stop debugging
 
+=======
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 	user_pay_cycle = frappe.get_doc("Pay Cycle", user_pay_cycle_record)
 	current_pay_cycle = frappe.get_doc("Pay Cycle Record", current_pay_cycle_exists)
 	
@@ -293,6 +309,7 @@ def check_current_pay_cycle_record(current_date, current_time):
 	#frappe.errprint(previous_pay_cycles_viewable)
 	pay_cycles = [user_pay_cycle]
 
+<<<<<<< HEAD
 	##
 	available_prev_pay_cycles = frappe.db.count("Pay Cycle", {"user": user})
 
@@ -304,6 +321,10 @@ def check_current_pay_cycle_record(current_date, current_time):
 
 	prev_index = 1
 	while prev_index < previous_pay_cycles_viewable:
+=======
+	prev_index = 1
+	while prev_index <= previous_pay_cycles_viewable:
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 		previous_pay_cycle_record = frappe.db.exists("Pay Cycle Record", {"idx": current_pay_cycle.idx + prev_index})
 		
 		if previous_pay_cycle_record:
@@ -332,6 +353,7 @@ def check_current_pay_cycle_record(current_date, current_time):
 		"current_shift": current_shift
 		}
 
+<<<<<<< HEAD
 def create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date):
 	user_pay_cycle_record = frappe.get_doc({
 		"doctype": "Pay Cycle",
@@ -363,6 +385,8 @@ def create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date):
 	row.insert()
 	frappe.db.commit()
 
+=======
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 def create_user_pay_cycle_record(user, from_date, to_date, current_date, current_time):
 	user_pay_cycle_record = frappe.get_doc({
 		"doctype": "Pay Cycle",
@@ -405,8 +429,12 @@ def create_clockin_log(user, current_date, from_time):
 		"doctype": "Clockin Log",
 		"user": user,
 		"date": current_date,
+<<<<<<< HEAD
 		"from_time": from_time,
 		"total_hours": 0.0
+=======
+		"from_time": from_time
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 	})
 
 	clockin_log_record.insert()
@@ -417,8 +445,12 @@ def update_clockin_log(current_date, to_time):
 
 	clockin_log_record = frappe.db.exists("Clockin Log", {
 		"user": user,
+<<<<<<< HEAD
 		"has_clocked_out": 0
 		#"date": current_date,
+=======
+		"date": current_date,
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 	})
 
 	clockin_log = frappe.get_doc("Clockin Log", clockin_log_record)

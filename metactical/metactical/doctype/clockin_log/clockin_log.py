@@ -7,11 +7,14 @@ from datetime import datetime
 
 
 class ClockinLog(Document):
+<<<<<<< HEAD
 	def after_insert(self):
 		#Create employee Checkin
 		#self.insert_employee_checkin()
 		pass
 	
+=======
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 	def before_save(self):
 		# Validate total hours worked for clockin log
 		if self.has_clocked_out:
@@ -27,6 +30,7 @@ class ClockinLog(Document):
 	def save(self, *args, **kwargs):
 		super().save(*args, **kwargs)
 		self.update_user_pay_cycle_record()
+<<<<<<< HEAD
 		self.employee_checkin()
 
 	""" def insert_employee_checkin(self):
@@ -77,6 +81,9 @@ class ClockinLog(Document):
 		else:
 			frappe.throw("Employee record not found") """
 	
+=======
+
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 	def update_user_pay_cycle_record(self):
 		clockin_logs = frappe.get_all("Clockin Log", filters={
 			"user": self.user,
