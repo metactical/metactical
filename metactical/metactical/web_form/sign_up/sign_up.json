@@ -20,7 +20,7 @@
  "is_standard": 1,
  "login_required": 0,
  "max_attachment_size": 0,
- "modified": "2023-01-24 15:34:13.045282",
+ "modified": "2023-02-21 06:59:04.725029",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "sign-up",
@@ -280,7 +280,7 @@
   {
    "allow_read_on_all_link_options": 0,
    "fieldname": "bank_account_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "hidden": 0,
    "label": "Bank Account No.",
    "max_length": 0,
