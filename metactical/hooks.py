@@ -20,7 +20,7 @@ app_include_js = "/assets/js/metactical.min.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
-web_include_css = "/assets/metactical/node_modules/intl-tel-input/build/css/intlTelInput.css"
+web_include_css = ["/assets/metactical/node_modules/intl-tel-input/build/css/intlTelInput.css", "/assets/metactical/css/metactical_time_tracker.css"]
 # web_include_js = "/assets/metactical/js/metactical.js"
 web_include_js = "/assets/metactical/node_modules/intl-tel-input/build/js/intlTelInput.js"
 
@@ -139,6 +139,10 @@ doc_events = {
 	"Shipment": {
 		"validate": "metactical.custom_scripts.shipment.shipment.validate",
 		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
+	},
+    "Clockin Log": {
+		"after_insert": "metactical.api.clockin.insert_in_employee_checkin",
+        "on_update": "metactical.api.clockin.insert_out_employee_checkin",
 	}
 }
 

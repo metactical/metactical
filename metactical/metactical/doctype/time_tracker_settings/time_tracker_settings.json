@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-01-16 10:57:56.548777",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "previous_viewable_pay_cycles",
+  "checkin_approver",
+  "logout_delay",
+  "start_date",
+  "pay_cycles",
+  "clockinout_delay"
+ ],
+ "fields": [
+  {
+   "default": "2",
+   "fieldname": "previous_viewable_pay_cycles",
+   "fieldtype": "Int",
+   "label": "Viewable Pay Cycles",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "checkin_approver",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Checkin Approver",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pay_cycles",
+   "fieldtype": "Table",
+   "label": "Pay Cycles",
+   "options": "Pay Cycle Record"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Start Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "clockinout_delay",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "ClockInOut Delay"
+  },
+  {
+   "default": "10",
+   "fieldname": "logout_delay",
+   "fieldtype": "Int",
+   "label": "Logout Delay",
+   "non_negative": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2023-02-21 03:09:40.256730",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Time Tracker Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Employee",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
