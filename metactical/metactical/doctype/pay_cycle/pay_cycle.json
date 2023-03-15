@@ -56,7 +56,11 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
+<<<<<<< HEAD
  "modified": "2023-02-15 06:00:42.140957",
+=======
+ "modified": "2023-02-05 06:12:55.362068",
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pay Cycle",
@@ -73,6 +77,7 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+<<<<<<< HEAD
   },
   {
    "create": 1,
@@ -85,6 +90,8 @@
    "role": "Employee",
    "share": 1,
    "write": 1
+=======
+>>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
   }
  ],
  "sort_field": "modified",
