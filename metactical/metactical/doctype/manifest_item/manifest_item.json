@@ -10,7 +10,7 @@
   "row_name",
   "shipment_id",
   "po_number",
-  "pickup_address",
+  "warehouse",
   "status"
  ],
  "fields": [
@@ -50,17 +50,17 @@
    "label": "Status"
   },
   {
-   "fetch_from": "shipment.pickup_address_name",
-   "fieldname": "pickup_address",
+   "fetch_from": "shipment.warehouse",
+   "fieldname": "warehouse",
    "fieldtype": "Link",
-   "label": "Pickup Address",
-   "options": "Address"
+   "label": "Warehouse",
+   "options": "Warehouse"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-02-24 00:48:28.955453",
+ "modified": "2023-03-17 10:54:47.662480",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest Item",
