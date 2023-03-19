@@ -76,7 +76,7 @@ class ClockinLog(Document):
 
 		else:
 			frappe.throw("Employee record not found") """
-
+	
 	def update_user_pay_cycle_record(self):
 		clockin_logs = frappe.get_all("Clockin Log", filters={
 			"user": self.user,

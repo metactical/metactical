@@ -45,6 +45,9 @@ class TimeTrackerSettings(Document):
 			date_pair.append(to_dates[i])
 			date_pairs.append(date_pair)
 
+		#Clear child table
+		self.pay_cycles = []
+
 		for d in range(len(date_pairs)):
 			frappe.errprint(date_pairs[d][0])
 			frappe.errprint(date_pairs[d][1])

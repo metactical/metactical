@@ -627,7 +627,7 @@ function convertTimeToMilitary(timeStr) {
         callback: r => {
             console.log(r.message)
             $("#shifts").empty()
-
+ 
             for (let i = 0; i < r.message.shifts.length; i++) {
                 //const element = r.message.shifts[i];
                 $("#shifts").append(
@@ -643,7 +643,7 @@ function convertTimeToMilitary(timeStr) {
 //To modify
 /* $("body").on("click", "#shift-change-submit", function() {
     //let shift_type = $("#shifts").text($(this).children(".shift-time").text())
-
+ 
     console.log(selectedShiftType)
     frappe.call({
         method: "metactical_time_tracker.api.shift_request",
@@ -747,5 +747,5 @@ function startLogoutTimer() {
                 }, logout_delay)
             }
         }
-    })
+    })=
 }
