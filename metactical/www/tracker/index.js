@@ -747,5 +747,5 @@ function startLogoutTimer() {
                 }, logout_delay)
             }
         }
-    })=
+    })
 }
