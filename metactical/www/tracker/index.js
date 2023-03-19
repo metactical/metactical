@@ -1,9 +1,6 @@
-<<<<<<< HEAD
 const loginButton = document.getElementById("login-btn")
 const logoutButton = document.getElementById("logout-btn")
 
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 const clockInButton = document.getElementById("clock-in-btn");
 const clockOutButton = document.getElementById("clock-out-btn");
 
@@ -12,11 +9,8 @@ const nextButton = document.getElementById("next-button")
 
 let button_activation_delay = 1;
 
-<<<<<<< HEAD
 let logOutTimerToggled = false;
 
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 let payCycles;
 let prevPayCycles = 0;
 let shiftSelected = false;
@@ -30,27 +24,20 @@ let selectedClockinLog;
 let pageIndex = 0;
 let countIndex = 0;
 
-<<<<<<< HEAD
 loginButton.onclick = login
 logoutButton.onclick = logout
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 clockInButton.onclick = clockIn
 clockOutButton.onclick = clockOut
 prevButton.onclick = onPrevButton
 nextButton.onclick = onNextButton
 
-<<<<<<< HEAD
 //Hide navbar
 $("nav").hide()
 
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 frappe.ready(function () {
     //Check if clocked in on load
     if (frappe.session.user != "Guest") {
         //Validate button states if clocked in
-<<<<<<< HEAD
         //onClockIn();
         //loginButton.classList.toggle('d-none');
         //logoutButton.classList.toggle('d-none');
@@ -61,14 +48,6 @@ frappe.ready(function () {
     //Display buttons
     //clockInButton.classList.toggle('d-none');
     //clockOutButton.classList.toggle('d-none');
-=======
-        onClockIn();
-    }
-
-    //Display buttons
-    clockInButton.classList.toggle('d-none');
-    clockOutButton.classList.toggle('d-none');
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 });
 
 //Clock
@@ -93,7 +72,6 @@ function checkTime(i) {
 
 startTime();
 
-<<<<<<< HEAD
 //Login
 function login() {
     fetch(`${window.origin}/api/method/login`, {
@@ -254,13 +232,6 @@ function logout() {
 function clockIn() {
     onClockIn()
     /* fetch(`${window.origin}/api/method/login`, {
-=======
-function clockIn() {
-    //Clockin/Login
-    //buttonActivationDelay(clockInButton)
-
-    fetch(`${window.origin}/api/method/login`, {
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -282,34 +253,22 @@ function clockIn() {
             else {
                 notify('danger', 'Invalid credentials')
             }
-<<<<<<< HEAD
         }) */
-=======
-        })
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 }
 
 function clockOut() {
     //Clockout/Log out
-<<<<<<< HEAD
 
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
     const date = new Date();
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
     frappe.call({
-<<<<<<< HEAD
         method: "metactical.api.clockin.update_clockin_log",
-=======
-        method: "metactical.api.update_clockin_log",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
         args: {
             current_date: today,
             to_time: current_time
         },
         callback: r => {
-<<<<<<< HEAD
             console.log("Clocking out")
             console.log(r)
             onClockOut("Clockout success")
@@ -320,18 +279,6 @@ function clockOut() {
 function onClockIn() {
     logOutTimerToggled = false
 
-=======
-            console.log("Logging out")
-            console.log(r)
-            onClockOut("Logout success")
-        }
-    });
-
-
-}
-
-function onClockIn() {
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
     //grey out clockin button if success
     clockInButton.classList.toggle("btn-success");
     clockInButton.classList.toggle("btn-secondary");
@@ -342,7 +289,6 @@ function onClockIn() {
     clockOutButton.classList.toggle("btn-danger");
     clockOutButton.removeAttribute("disabled");
 
-<<<<<<< HEAD
     //Call api
     const date = new Date();
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
@@ -351,14 +297,6 @@ function onClockIn() {
 
     frappe.call({
         method: "metactical.api.clockin.check_current_pay_cycle_record",
-=======
-    //Call api after login
-    const date = new Date();
-    const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-
-    frappe.call({
-        method: "metactical.api.check_current_pay_cycle_record",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
         args: {
             current_date: today,
             current_time: current_time
@@ -367,7 +305,6 @@ function onClockIn() {
             console.log(r.message)
             //table(r.message.pay_cycles)
             if (r.message.clockin_status == 1) {
-<<<<<<< HEAD
                 //payCycles = r.message.pay_cycles
                 //button_activation_delay = r.message.button_activation_delay
                 //validateLogin()
@@ -381,21 +318,6 @@ function onClockIn() {
 
                 //Display success message
                 notify('success', 'Clockin success');
-=======
-                payCycles = r.message.pay_cycles
-                button_activation_delay = r.message.button_activation_delay
-                validateLogin()
-                prevPayCycles = r.message.pay_cycles.length - 1
-                validateButtons()
-                toggleTable()
-
-                //$("#starts-at").text(r.message.current_shift.start_time)
-                //$("#ends-at").text(r.message.current_shift.end_time)
-                //current_shift_name = r.message.current_shift.name
-
-                //Display success message
-                notify('success', 'Login success');
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
             }
 
             else {
@@ -409,7 +331,6 @@ function onClockIn() {
 }
 
 function onClockOut(message) {
-<<<<<<< HEAD
     clockOutButton.classList.toggle("btn-danger");
     clockOutButton.classList.toggle("btn-secondary");
     clockOutButton.setAttribute("disabled", "");
@@ -423,9 +344,6 @@ function onClockOut(message) {
 
     startLogoutTimer()
     /* fetch(`${window.origin}/api/method/logout`, {
-=======
-    fetch(`${window.origin}/api/method/logout`, {
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
         method: 'GET',
     })
         .then(r => r.json())
@@ -448,11 +366,7 @@ function onClockOut(message) {
             }
             //toggleTable()
             showLogin()
-<<<<<<< HEAD
         }) */
-=======
-        })
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 }
 
 function notify(type, message) {
@@ -501,12 +415,8 @@ const table = (tableData) => {
     if (tableData[pageIndex].days.length > 6) {
         for (; countIndex <= 6; countIndex++) {
             trh1.append(`<th class="table-btn" scope="col">${dateFormatter(tableData[pageIndex].days[countIndex].date)}<span class='d-none'>${tableData[pageIndex].days[countIndex].date}</span></th>`)
-<<<<<<< HEAD
             //trb1.append(`<td scope="col">${Math.round(tableData[pageIndex].days[countIndex].hours_worked)} hours</td>`)
             trb1.append(`<td scope="col">${tableData[pageIndex].days[countIndex].hours_worked.toFixed(2)} hours</td>`)
-=======
-            trb1.append(`<td scope="col">${Math.round(tableData[pageIndex].days[countIndex].hours_worked)} hours</td>`)
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
             console.log("looping")
         }
         console.log(trh1)
@@ -514,11 +424,7 @@ const table = (tableData) => {
 
     for (; countIndex < tableData[pageIndex].days.length; countIndex++) {
         trh2.append(`<th class="table-btn" scope="col">${dateFormatter(tableData[pageIndex].days[countIndex].date)}<span class='d-none'>${tableData[pageIndex].days[countIndex].date}</span></th>`)
-<<<<<<< HEAD
         trb2.append(`<td scope="col">${tableData[pageIndex].days[countIndex].hours_worked.toFixed(2)} hours</td>`)
-=======
-        trb2.append(`<td scope="col">${Math.round(tableData[pageIndex].days[countIndex].hours_worked)} hours</td>`)
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
     }
 
     totalHoursWorked.text(`Total: ${Math.round(tableData[pageIndex].total_hours_worked)} hours`)
@@ -531,7 +437,6 @@ function dateFormatter(date) {
     return formattedDate;
 }
 
-<<<<<<< HEAD
 const hideLogin = () => {
     //hide form
     const form = $("#auth")
@@ -547,14 +452,6 @@ const hidePayCycleData = () => {
 
     //Empty pay cycles array
     payCycles = []
-=======
-const validateLogin = () => {
-    //hide form
-    const form = $("#auth")
-    form.hide()
-
-    table(payCycles)
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
 }
 
 const showLogin = () => {
@@ -621,11 +518,7 @@ $("body").on("click", ".table-btn", function () {
 
 function getDateDetails(date) {
     frappe.call({
-<<<<<<< HEAD
         method: "metactical.api.clockin.get_date_details",
-=======
-        method: "metactical.api.get_date_details",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
         args: {
             date: date
         },
@@ -734,11 +627,7 @@ function convertTimeToMilitary(timeStr) {
         callback: r => {
             console.log(r.message)
             $("#shifts").empty()
-<<<<<<< HEAD
- 
-=======
 
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
             for (let i = 0; i < r.message.shifts.length; i++) {
                 //const element = r.message.shifts[i];
                 $("#shifts").append(
@@ -754,11 +643,7 @@ function convertTimeToMilitary(timeStr) {
 //To modify
 /* $("body").on("click", "#shift-change-submit", function() {
     //let shift_type = $("#shifts").text($(this).children(".shift-time").text())
-<<<<<<< HEAD
- 
-=======
 
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
     console.log(selectedShiftType)
     frappe.call({
         method: "metactical_time_tracker.api.shift_request",
@@ -816,11 +701,7 @@ $("body").on("click", "#submit-time-change", function (event) {
     const log_name = selectedClockinLog.find(".name.d-none").text()
 
     frappe.call({
-<<<<<<< HEAD
         method: "metactical.api.clockin.send_details_change_request",
-=======
-        method: "metactical.api.send_details_change_request",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
         args: {
             "log_name": log_name,
             "checkInTime12": checkInTime12,
@@ -837,7 +718,6 @@ $("body").on("click", "#submit-time-change", function (event) {
             $("#success-modal").modal("show")
         }
     })
-<<<<<<< HEAD
 })
 
 //Enter is pressed
@@ -869,6 +749,3 @@ function startLogoutTimer() {
         }
     })
 }
-=======
-})
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")

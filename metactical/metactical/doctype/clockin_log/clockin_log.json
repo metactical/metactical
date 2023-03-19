@@ -11,13 +11,9 @@
   "from_time",
   "to_time",
   "total_hours",
-<<<<<<< HEAD
   "has_clocked_out",
   "in_employee_checkin_record",
   "out_employee_checkin_record"
-=======
-  "has_clocked_out"
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
  ],
  "fields": [
   {
@@ -64,7 +60,6 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Has Clocked Out"
-<<<<<<< HEAD
   },
   {
    "fieldname": "in_employee_checkin_record",
@@ -77,17 +72,11 @@
    "fieldtype": "Link",
    "label": "Out Employee Checkin Record",
    "options": "Employee Checkin"
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
-<<<<<<< HEAD
  "modified": "2023-02-20 14:39:10.277717",
-=======
- "modified": "2023-02-05 06:36:04.680634",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Clockin Log",
@@ -104,7 +93,6 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
-<<<<<<< HEAD
   },
   {
    "create": 1,
@@ -117,8 +105,6 @@
    "role": "Employee",
    "share": 1,
    "write": 1
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
   }
  ],
  "sort_field": "modified",

@@ -1,7 +1,6 @@
 # Copyright (c) 2023, Techlift Technologies and contributors
 # For license information, please see license.txt
 
-<<<<<<< HEAD
 import frappe
 from frappe.model.document import Document
 from datetime import datetime, timedelta
@@ -56,10 +55,3 @@ class TimeTrackerSettings(Document):
 			})
 
 			row.insert()
-=======
-# import frappe
-from frappe.model.document import Document
-
-class TimeTrackerSettings(Document):
-	pass
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
