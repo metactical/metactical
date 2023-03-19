@@ -10,6 +10,7 @@
   "row_name",
   "shipment_id",
   "po_number",
+  "warehouse",
   "status"
  ],
  "fields": [
@@ -47,12 +48,19 @@
    "hidden": 1,
    "in_list_view": 1,
    "label": "Status"
+  },
+  {
+   "fetch_from": "shipment.warehouse",
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-01-22 12:52:39.034977",
+ "modified": "2023-03-17 10:54:47.662480",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest Item",

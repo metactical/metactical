@@ -8,6 +8,25 @@ from metactical.utils.shipping.canada_post import CanadaPost
 
 
 class Manifest(Document):
+    def validate(self):
+        self.sync_warehouse()
+    
+    def sync_warehouse(self):
+        warehouses = set(x.warehouse for x in self.get('items', default=[]) if x.warehouse)
+        # Remove Unwanted Address.
+        exists = []
+        to_be_remove = []
+        for x in self.get('manifests', default=[]):
+            exists.append(x.warehouse)
+            if x.warehouse not in warehouses:
+                to_be_remove.append(x)
+        for rx in to_be_remove:
+            self.remove(rx)
+        # Added new on
+        for warehosue in warehouses:
+            if warehosue not in exists:
+                self.append('manifests', {'warehouse': warehosue})
+
     @frappe.whitelist()
     def get_shipments(self):
         if not (self.from_date and self.to_date):
@@ -20,12 +39,13 @@ class Manifest(Document):
 
     @frappe.whitelist()
     def create_manifest(self):
-        address_wise_shipments = {}
-        for d in frappe.get_all('Shipment', [['name', 'in', (x.shipment for x in self.items)]], ['name', 'pickup_address_name']):
-            r = address_wise_shipments.setdefault(d.pickup_address_name, [])
-            r.append(d.name)
         cp = CanadaPost()
         files = []
-        for key in address_wise_shipments:
-            files.extend(cp.create_manifest(address_wise_shipments[key], self))
+        for warehouse in self.get('manifests', default=[]):
+            if warehouse.manifest:
+                continue
+            items = [x.shipment for x in self.get('items', {'warehouse': warehouse.warehouse})]
+            if items:
+                files.extend(cp.create_manifest(items, self, warehouse))
+        self.save()
         return files

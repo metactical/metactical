@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-02-23 12:50:48.109201",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "warehouse",
+  "manifest_url",
+  "po_number",
+  "manifest"
+ ],
+ "fields": [
+  {
+   "fieldname": "manifest_url",
+   "fieldtype": "Data",
+   "label": "Manifest URL"
+  },
+  {
+   "fieldname": "po_number",
+   "fieldtype": "Data",
+   "label": "PO Number"
+  },
+  {
+   "fieldname": "manifest",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "Manifest"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2023-03-17 10:52:13.551027",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Manifest Address Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

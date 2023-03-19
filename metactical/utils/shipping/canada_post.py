@@ -180,15 +180,17 @@ class CanadaPost():
             shipments[d.row_id] = shipments[d.row_id]+1
         return shipments
 
-    def create_manifest(self, shipments, manifest_doc):
+    def create_manifest(self, shipments, manifest_doc, manifest_row):
         context = self.get_context(shipments[-1])
         context.groups = shipments
         context.manifest_doc = manifest_doc
+        context.warehouse_doc = frappe.get_doc('Warehouse', manifest_row.warehouse).as_dict()
         body = frappe.render_template(
             "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
         response = self.get_response(
             f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
         po_numbers = []
+        files = []
         if response:
             if isinstance(response['manifests']['link'], dict):
                 links = [response['manifests']['link']]
@@ -199,20 +201,12 @@ class CanadaPost():
                                                               'Content-Type': link['@media-type']}, method='GET')
                 if res and res['manifest']['po-number']:
                     po_numbers.append(res['manifest']['po-number'])
-        files = []
+                    for mlink in res['manifest']['links']['link']:
+                        if mlink['@rel']=="artifact":
+                            manifest_row.db_set('manifest_url', f'''<link rel="{mlink['@rel']}" href="{mlink['@href']}" media-type="{mlink['@media-type']}"></link>''')
+                            self.get_label(manifest_row, mlink, 'manifest', files)
         if po_numbers:
-            for shipment in shipments:
-                doc = frappe.get_doc('Shipment', shipment)
-                for row in doc.shipments:
-                    row.set('po_number', ",".join(po_numbers))
-                    link = self.xml_to_json(row.label_url)['link']
-                    self.get_label(row, link, 'label_after_manifest', files)
-                    self.set_price(row, self.xml_to_json(
-                        row.price_url)['link'])
-                doc.save()
-            manifest_doc.db_set('po_number', ",".join(po_numbers))
-        if files:
-            files = [self.pdf_merge(files, manifest_doc, 'after').file_url]
+            manifest_row.db_set('po_number', ",".join(po_numbers))
         return files
 
     def get_label(self, row, link, fieldname, files):
@@ -220,7 +214,7 @@ class CanadaPost():
             link['@href'], None, {'Accept': link['@media-type'], 'Content-Type': link['@media-type']}, True, 'GET')
         if res.status_code == 200:
             file = self.write_file(
-                row, res, f"{fieldname}_{row.shipment_id}.pdf", fieldname)
+                row, res, f"{fieldname}_{row.name}.pdf", fieldname)
             row.set(fieldname, file.file_url)
             files.append(file.file_url)
 

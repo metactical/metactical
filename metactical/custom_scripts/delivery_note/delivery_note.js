@@ -11,3 +11,10 @@ frappe.ui.form.on('Delivery Note', {
         }
     }
 })
+
+cur_frm.cscript.make_shipment = function () {
+    frappe.model.open_mapped_doc({
+        method: "metactical.utils.shipping.shipping.make_shipment",
+        frm: cur_frm
+    })
+}
