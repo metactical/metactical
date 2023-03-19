@@ -180,10 +180,11 @@ class CanadaPost():
             shipments[d.row_id] = shipments[d.row_id]+1
         return shipments
 
-    def create_manifest(self, shipments, manifest_doc, address_row):
+    def create_manifest(self, shipments, manifest_doc, manifest_row):
         context = self.get_context(shipments[-1])
         context.groups = shipments
         context.manifest_doc = manifest_doc
+        context.warehouse_doc = frappe.get_doc('Warehouse', manifest_row.warehouse).as_dict()
         body = frappe.render_template(
             "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
         response = self.get_response(
@@ -202,10 +203,10 @@ class CanadaPost():
                     po_numbers.append(res['manifest']['po-number'])
                     for mlink in res['manifest']['links']['link']:
                         if mlink['@rel']=="artifact":
-                            address_row.db_set('manifest_url', f'''<link rel="{mlink['@rel']}" href="{mlink['@href']}" media-type="{mlink['@media-type']}"></link>''')
-                            self.get_label(address_row, mlink, 'manifest', files)
+                            manifest_row.db_set('manifest_url', f'''<link rel="{mlink['@rel']}" href="{mlink['@href']}" media-type="{mlink['@media-type']}"></link>''')
+                            self.get_label(manifest_row, mlink, 'manifest', files)
         if po_numbers:
-            address_row.db_set('po_number', ",".join(po_numbers))
+            manifest_row.db_set('po_number', ",".join(po_numbers))
         return files
 
     def get_label(self, row, link, fieldname, files):
