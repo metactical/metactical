@@ -1,0 +1,12 @@
+{% for row in items %}
+<div class="packing-item">
+  <img src="{{ row.image }}" alt="{{ row.item_name }}" />
+  <div class="item-detail">
+    <h5 class="item-title">{{ row.item_name }}</h5>
+    <p class="item-description">{{ row.item_code }}</p>
+  </div>
+  <div class="item-quantity">
+    <span>X {{ row.qty }}</span>
+  </div>
+</div>
+{% endfor %}

@@ -195,6 +195,24 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "STE Packing Page",
+   "link_to": "ste-packing-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "STE Packing Slip",
+   "link_to": "STE Packing Slip",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "HR",
    "link_type": "DocType",
    "onboard": 0,
@@ -566,7 +584,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-02-21 18:12:36.756144",
+ "modified": "2023-03-24 14:34:36.291454",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
