@@ -9,7 +9,62 @@ from erpnext.stock.doctype.serial_no.serial_no import update_serial_nos_after_su
 import barcode as _barcode
 from barcode.writer import ImageWriter
 from io import BytesIO
+from frappe.utils import cint, comma_or, cstr, flt, format_time, formatdate, getdate, nowdate
+from erpnext.stock.stock_ledger import NegativeStockError, get_previous_sle, get_valuation_rate
 
+class CustomStockEntry(StockEntry):
+	def set_actual_qty(self):
+		allow_negative_stock = cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock"))
+
+		for d in self.get("items"):
+			previous_sle = get_previous_sle(
+				{
+					"item_code": d.item_code,
+					"warehouse": d.s_warehouse or d.t_warehouse,
+					"posting_date": self.posting_date,
+					"posting_time": self.posting_time,
+				}
+			)
+
+			# get actual stock at source warehouse
+			d.actual_qty = previous_sle.get("qty_after_transaction") or 0
+			
+			# get actual quantity at target wareous
+			target_previous_sle = get_previous_sle(
+				{
+					"item_code": d.item_code,
+					"warehouse": d.t_warehouse,
+					"posting_date": self.posting_date,
+					"posting_time": self.posting_time,
+				}
+			)
+			d.ais_target_qoh = target_previous_sle.get("qty_after_transaction")
+
+			# validate qty during submit
+			if (
+				d.docstatus == 1
+				and d.s_warehouse
+				and not allow_negative_stock
+				and flt(d.actual_qty, d.precision("actual_qty"))
+				< flt(d.transfer_qty, d.precision("actual_qty"))
+			):
+				frappe.throw(
+					_(
+						"Row {0}: Quantity not available for {4} in warehouse {1} at posting time of the entry ({2} {3})"
+					).format(
+						d.idx,
+						frappe.bold(d.s_warehouse),
+						formatdate(self.posting_date),
+						format_time(self.posting_time),
+						frappe.bold(d.item_code),
+					)
+					+ "<br><br>"
+					+ _("Available quantity is {0}, you need {1}").format(
+						frappe.bold(d.actual_qty), frappe.bold(d.transfer_qty)
+					),
+					NegativeStockError,
+					title=_("Insufficient Stock"),
+				)
 
 def validate(self, method):
 	user = frappe.session.user
