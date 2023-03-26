@@ -154,6 +154,8 @@ def execute(filters=None):
 		row["qty_to_order"] = row.get("qty_to_order", 0) + row.get("mr_total_qty", 0) - row.get("ordered_qty", 0)
 		if row["qty_to_order"] < 0:
 			row["qty_to_order"] = 0
+		row["gdp_price"] = frappe.db.get_value("Item Price", {"price_list": "RET - GPD", "selling": 1, 
+								"item_code": i.get("item_code")}, "price_list_rate")
 		data.append(row)
 	data = sorted(data, key=itemgetter("olast_sold_date"), reverse=True)
 
@@ -517,7 +519,14 @@ def get_column(filters,conditions):
             "fieldname": "last_sold_date",
             "fieldtype": "Data",
             "width": 100,
-	}])
+		},
+		{
+			"label": "GDP Price",
+			"fieldname": "gdp_price",
+			"fieldtype": "Currency",
+			"width": 140 	
+		}
+	])
 	return columns
 
 
