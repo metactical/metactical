@@ -1,0 +1,202 @@
+<div id="tracker">
+  <form id="auth">
+    <div class="form-group">
+      <label for="email">Email address</label>
+      <input type="email" class="form-control" id="email" aria-describedby="emailHelp" placeholder="Enter email">
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" class="form-control" id="password" placeholder="Password">
+    </div>
+    <!-- <button type="submit" class="btn btn-primary">Submit</button> -->
+  </form>
+
+  <div class="login-out-btn">
+    <button id="login-btn" class="login btn btn-primary">Login</button>
+    <button id="logout-btn" class="logout btn btn-danger d-none">Logout</button>
+  </div>
+
+  <div id="clock-container">
+    <h1 class="text-muted" id="clock"></h1>
+  </div>
+
+  <div class="clock-in-out-buttons">
+    <div class="clock-in">
+      <button id="clock-in-btn" type="button" class="btn btn-secondary btn-lg" disabled>Clock In</button>
+    </div>
+
+    <div class="clock-out">
+      <button id="clock-out-btn" type="button" class="btn btn-secondary btn-lg" disabled>Clock Out</button>
+    </div>
+  </div>
+
+  <br>
+
+  <div id="notification-container">
+    <div id="danger-notification" class="alert alert-danger d-none" role="alert"></div>
+    <div id="success-notification" class="alert alert-success d-none" role="alert"></div>
+  </div>
+
+  <div id="pay-cycle" class="table-responsive d-none">
+    <div class="next-prev-buttons">
+      <div class="prev-button">
+        <button id="prev-button" class="btn btn-dark">Previous</button>
+      </div>
+
+      <div class="next-button">
+        <button id="next-button" class="btn btn-info" disabled>Next</button>
+      </div>
+    </div>
+
+    <table id="table1" class="table table-bordered">
+      <thead class="thead-light">
+        <tr id="trh1"></tr>
+      </thead>
+
+      <tbody>
+        <tr id="trb1"></tr>
+      </tbody>
+    </table>
+
+    <table id="table2" class="table table-bordered">
+      <thead class="thead-light">
+        <tr id="trh2"></tr>
+      </thead>
+      <tbody>
+        <tr id="trb2"></tr>
+      </tbody>
+    </table>
+
+    <div id="hours-worked">
+      <div id="total-hours-worked" class="alert alert-info text-center"></div>
+    </div>
+
+    <br>
+
+    <div id="date-details">
+      <div id="details"></div>
+      <div id="shift-info" class="d-none">
+        <div id="selected-clockin-log"></div>
+        <!-- <div id="current-shift">
+          <h2>Current shift details</h2>
+          <div><b>Starts at: </b><span id="starts-at"></span></div>
+          <div><b>Ends at: </b><span id="ends-at"></span></div>
+        </div> --> <br>
+        <button id="request-details-change-button" type="button" class="btn btn-primary" data-toggle="modal" data-target="#change-details-modal">Request details change</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <!-- Button trigger modal -->
+  <!-- <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
+    Launch demo modal
+  </button> -->
+
+  <!-- Modal -->
+  <div class="modal fade" id="change-details-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLongTitle">Input new details</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <!-- DROP DOWN -->
+          <!-- <div class="dropdown">
+            <button id="select-shift-button" class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
+              Select shift
+            </button>
+            <div class="dropdown-menu" id="shifts">
+              <p class="dropdown-item"><span class="shift-time">Action</span><span class="shift-name d-none">something</span></p>
+              <p class="dropdown-item">Another action</p>
+              <p class="dropdown-item">Something else here</p>
+            </div>
+          </div> -->
+
+          <form id="select-time">
+            <div id="check-in">
+              <h2>CheckIn</h2>
+              <div>
+                <div>
+                  <span>Hours</span> <br>
+                  <input value="01" id="check-in-hours" type="number" min="1" max="12">
+                </div>
+                
+                <div>
+                  <span>Minutes</span> <br>
+                  <input value="00" id="check-in-minutes" type="number" min="00" max="60">
+                </div>
+                
+                <div>
+                  <span>AM/PM</span> <br>
+                  <select id="check-in-am-pm">
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+              </div>  
+            </div>
+
+            <br>
+
+            <div id="check-out">
+              <h2>CheckOut</h2>
+              <div>
+                <div>
+                  <span>Hours</span> <br>
+                  <input value="01" id="check-out-hours" type="number" min="1" max="12">
+                </div>
+                
+                <div>
+                  <span>Minutes</span> <br>
+                  <input value="00" id="check-out-minutes" type="number" min="00" max="60">
+                </div>
+                
+                <div>
+                  <span>AM/PM</span> <br>
+                  <select id="check-out-am-pm">
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
+              </div>  
+            </div>
+            <br>
+            <button id="submit-time-change" type="submit" class="btn btn-primary">Submit</button>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <!-- <button id="shift-change-submit" type="button" class="btn btn-primary">Submit</button> -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS MODAL -->
+  <div class="modal fade" id="success-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalCenterTitle">Message</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div>
+            <p class="alert alert-success">Request submitted<p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,132 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "REQ.######",
+ "creation": "2023-02-03 05:47:34.618830",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "date",
+  "current_checkin",
+  "current_checkout",
+  "current_total_hours",
+  "column_break_5",
+  "status",
+  "log",
+  "requested_checkin",
+  "requested_checkout",
+  "requested_total_hours",
+  "section_break_12",
+  "requested_checkin_military",
+  "requested_checkout_military"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "current_checkin",
+   "fieldtype": "Data",
+   "label": "Current CheckIn",
+   "reqd": 1
+  },
+  {
+   "fieldname": "current_checkout",
+   "fieldtype": "Data",
+   "label": "Current CheckOut",
+   "reqd": 1
+  },
+  {
+   "fieldname": "current_total_hours",
+   "fieldtype": "Data",
+   "label": "Current Total Hours"
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nDeclined\nApproved",
+   "reqd": 1
+  },
+  {
+   "fieldname": "log",
+   "fieldtype": "Link",
+   "label": "Log",
+   "options": "Clockin Log",
+   "reqd": 1
+  },
+  {
+   "fieldname": "requested_checkin",
+   "fieldtype": "Data",
+   "label": "Requested CheckIn",
+   "reqd": 1
+  },
+  {
+   "fieldname": "requested_checkout",
+   "fieldtype": "Data",
+   "label": "Requested CheckOut",
+   "reqd": 1
+  },
+  {
+   "fieldname": "requested_total_hours",
+   "fieldtype": "Data",
+   "label": "Requested Total Hours"
+  },
+  {
+   "fieldname": "section_break_12",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "requested_checkin_military",
+   "fieldtype": "Time",
+   "label": "Requested Checkin Military"
+  },
+  {
+   "fieldname": "requested_checkout_military",
+   "fieldtype": "Time",
+   "label": "Requested Checkout Military"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2023-02-05 06:12:18.847949",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Checkin Request Modification",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

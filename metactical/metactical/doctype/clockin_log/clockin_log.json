@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-01-16 09:55:20.065399",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "date",
+  "from_time",
+  "to_time",
+  "total_hours",
+  "has_clocked_out",
+  "in_employee_checkin_record",
+  "out_employee_checkin_record"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "from_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "From Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_time",
+   "fieldtype": "Time",
+   "label": "To Time"
+  },
+  {
+   "fieldname": "total_hours",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Total Hours",
+   "non_negative": 1,
+   "precision": "1"
+  },
+  {
+   "default": "0",
+   "fieldname": "has_clocked_out",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Has Clocked Out"
+  },
+  {
+   "fieldname": "in_employee_checkin_record",
+   "fieldtype": "Link",
+   "label": "In Employee Checkin Record",
+   "options": "Employee Checkin"
+  },
+  {
+   "fieldname": "out_employee_checkin_record",
+   "fieldtype": "Link",
+   "label": "Out Employee Checkin Record",
+   "options": "Employee Checkin"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2023-02-20 14:39:10.277717",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Clockin Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Employee",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "user"
+}

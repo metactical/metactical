@@ -163,7 +163,7 @@ def get_items(search_value="", offset=0):
 		item_search_settings = frappe.get_doc("Item Search Settings")
 		#Get US data
 		us_data = {}
-		if item_search_settings.get("us_url") is not None or item_search_settings.get("us_url") != "":
+		if item_search_settings.get("us_url") is not None and item_search_settings.get("us_url") != "":
 			us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.api_secret),
 										params={"search_value": search_value}, verify=False)
 			if us_request.status_code == 200:

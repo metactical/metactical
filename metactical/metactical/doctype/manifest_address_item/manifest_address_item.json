@@ -6,20 +6,12 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "address",
+  "warehouse",
   "manifest_url",
   "po_number",
   "manifest"
  ],
  "fields": [
-  {
-   "fieldname": "address",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Address",
-   "options": "Address",
-   "reqd": 1
-  },
   {
    "fieldname": "manifest_url",
    "fieldtype": "Data",
@@ -35,12 +27,20 @@
    "fieldtype": "Attach",
    "in_list_view": 1,
    "label": "Manifest"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-02-24 00:49:14.212841",
+ "modified": "2023-03-17 10:52:13.551027",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest Address Item",
