@@ -307,6 +307,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Currency",
 				"width": 100,
 			},
+			{
+				"label": "GDP Price",
+				"fieldname": "gdp_price",
+				"fieldtype": "Currency",
+				"width": 140 	
+			},
 			# {
 			# 	"label": _("Discointinued"),
 			# 	"fieldname": "item_discontinued",
@@ -519,12 +525,6 @@ def get_column(filters,conditions):
             "fieldname": "last_sold_date",
             "fieldtype": "Data",
             "width": 100,
-		},
-		{
-			"label": "GDP Price",
-			"fieldname": "gdp_price",
-			"fieldtype": "Currency",
-			"width": 140 	
 		}
 	])
 	return columns
