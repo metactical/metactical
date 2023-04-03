@@ -1,7 +1,6 @@
 # Copyright (c) 2023, Techlift Technologies and contributors
 # For license information, please see license.txt
 
-<<<<<<< HEAD
 import frappe
 from frappe.model.document import Document
 from datetime import datetime, timedelta
@@ -46,6 +45,9 @@ class TimeTrackerSettings(Document):
 			date_pair.append(to_dates[i])
 			date_pairs.append(date_pair)
 
+		#Clear child table
+		self.pay_cycles = []
+
 		for d in range(len(date_pairs)):
 			frappe.errprint(date_pairs[d][0])
 			frappe.errprint(date_pairs[d][1])
@@ -56,10 +58,3 @@ class TimeTrackerSettings(Document):
 			})
 
 			row.insert()
-=======
-# import frappe
-from frappe.model.document import Document
-
-class TimeTrackerSettings(Document):
-	pass
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")

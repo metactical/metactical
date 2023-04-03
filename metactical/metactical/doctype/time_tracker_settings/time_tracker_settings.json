@@ -6,7 +6,6 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-<<<<<<< HEAD
   "previous_viewable_pay_cycles",
   "checkin_approver",
   "logout_delay",
@@ -20,47 +19,21 @@
    "fieldname": "previous_viewable_pay_cycles",
    "fieldtype": "Int",
    "label": "Viewable Pay Cycles",
-=======
-  "clockinout_delay",
-  "previous_viewable_pay_cycles",
-  "checkin_approver",
-  "pay_cycles"
- ],
- "fields": [
-  {
-   "default": "3",
-   "fieldname": "clockinout_delay",
-   "fieldtype": "Int",
-   "label": "Clock in/out Delay (Seconds)",
-   "non_negative": 1
-  },
-  {
-   "default": "2",
-   "fieldname": "previous_viewable_pay_cycles",
-   "fieldtype": "Int",
-   "label": "Previous Viewable Pay Cycles",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
    "non_negative": 1
   },
   {
    "fieldname": "checkin_approver",
    "fieldtype": "Data",
-<<<<<<< HEAD
    "in_list_view": 1,
    "label": "Checkin Approver",
    "options": "Email",
    "reqd": 1
-=======
-   "label": "Checkin Approver",
-   "options": "Email"
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
   },
   {
    "fieldname": "pay_cycles",
    "fieldtype": "Table",
    "label": "Pay Cycles",
    "options": "Pay Cycle Record"
-<<<<<<< HEAD
   },
   {
    "fieldname": "start_date",
@@ -81,18 +54,12 @@
    "fieldtype": "Int",
    "label": "Logout Delay",
    "non_negative": 1
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
-<<<<<<< HEAD
  "modified": "2023-02-21 03:09:40.256730",
-=======
- "modified": "2023-02-05 06:12:39.668625",
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Time Tracker Settings",
@@ -107,7 +74,6 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
-<<<<<<< HEAD
   },
   {
    "email": 1,
@@ -115,8 +81,6 @@
    "read": 1,
    "role": "Employee",
    "share": 1
-=======
->>>>>>> parent of 1e30092 (Revert "Test clockin request details modification")
   }
  ],
  "sort_field": "modified",
