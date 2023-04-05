@@ -185,6 +185,7 @@ class CanadaPost():
         context.groups = shipments
         context.manifest_doc = manifest_doc
         context.warehouse_doc = frappe.get_doc('Warehouse', manifest_row.warehouse).as_dict()
+        context.warehouse_doc.state = get_state_code(context.warehouse_doc.state)
         body = frappe.render_template(
             "metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
         response = self.get_response(
