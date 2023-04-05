@@ -236,11 +236,14 @@ function populate_packed_items() {
 	const items = havenir.packing_slip.packed_items;
 	let pending_items = havenir.packing_slip.pending_items;
 	let items_template = "";
-	if (items.length > 0) {
+	
+	if(items.length > 0){
 		items_template = frappe.render_template("packing_items", {
 			items: items,
 		});
-
+	} 
+	
+	if (pending_items.length == 0) {
 		cur_page.page.page.set_primary_action(
 			"Submit",
 			() => save_form(),
