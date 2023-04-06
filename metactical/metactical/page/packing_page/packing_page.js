@@ -243,7 +243,7 @@ function populate_packed_items() {
 		});
 	} 
 	
-	if (pending_items.length == 0) {
+	if (pending_items.length == 0 && items.length > 0) {
 		cur_page.page.page.set_primary_action(
 			"Submit",
 			() => save_form(),
