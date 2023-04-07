@@ -470,6 +470,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report Based on Delivery Note",
+   "link_to": "Sales Report Based on Delivery Note",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -593,7 +602,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-03-28 08:10:38.542882",
+ "modified": "2023-04-07 09:57:00.504403",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
