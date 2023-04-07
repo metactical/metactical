@@ -61,6 +61,7 @@ def execute(filters=None):
 		# row["item_discontinued"] = i.get("disabled")
 		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
 		row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("supplier"))
+		row["stock_uom"] = i.get("stock_uom")
 		
 		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
 		row["wh_dtn"] = get_qty(i.get("item_code"), "R05-DTN-Active Stock - ICL") or 0
@@ -363,6 +364,12 @@ def get_column(filters,conditions):
 				"fieldname": "sqoh",
 				"fieldtype": "Float",
 				"width": 100,
+			},
+			{
+				"label": _("UOM"),
+				"fieldname": "stock_uom",
+				"fieldtype": "Data",
+				"width": 100,
 			}
 		]
 		
@@ -544,13 +551,18 @@ def get_column(filters,conditions):
 
 
 def get_master(conditions="", filters={}):
-	data = frappe.db.sql("""select  i.ifw_retailskusuffix, i.item_code, i.item_name, i.image,
-			i.asi_item_class,
-			s.supplier, s.supplier_part_no, i.disabled, country_of_origin,customs_tariff_number,
-			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
-			ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, s.ifw_supplier_qoh
-			from `tabItem Supplier` s 
-			inner join `tabItem` i on i.name = s.parent
+	data = frappe.db.sql("""
+			select  
+				i.ifw_retailskusuffix, i.item_code, i.item_name, i.image,
+				i.asi_item_class, s.supplier, s.supplier_part_no, i.disabled, 
+				country_of_origin,customs_tariff_number, ifw_duty_rate,
+				ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
+				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
+				s.ifw_supplier_qoh, i.stock_uom
+			from 
+				`tabItem Supplier` s 
+			inner join 
+				`tabItem` i on i.name = s.parent
 			where 1 = 1 %s
 		"""%(conditions), filters, as_dict=1)
 	return data
