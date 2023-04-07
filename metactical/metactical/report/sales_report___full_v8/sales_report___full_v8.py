@@ -10,6 +10,7 @@ from frappe.utils import getdate, nowdate
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta, datetime
 from operator import itemgetter
+import requests
 
 def execute(filters=None):
 	if not filters:
@@ -20,6 +21,11 @@ def execute(filters=None):
 	data = []
 
 	master = get_master(conditions,filters)
+	
+	#Get US data
+	us_data = {}
+	us_data = get_us_data(filters)
+	
 	# details = get_details(conditions,filters)
 	combo_dict = {}
 	total = 0
@@ -64,6 +70,7 @@ def execute(filters=None):
 		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
 		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
 		row["wh_gor"] = get_qty(i.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
+		row["us_qoh"] = us_data.get(i.get("item_code")) or 0
 		
 		row["total_actual_qty"] = 0
 		
@@ -428,6 +435,12 @@ def get_column(filters,conditions):
 			"width": 140,
 		},
 		{
+			"label": _("US QOH"),
+			"fieldname": "us_qoh",
+			"fieldtype": "Int",
+			"width": 200
+		},
+		{
 			"label": _("Material Request"),
 			"fieldname": "material_request",
 			"fieldtype": "Data",
@@ -536,7 +549,8 @@ def get_master(conditions="", filters={}):
 			s.supplier, s.supplier_part_no, i.disabled, country_of_origin,customs_tariff_number,
 			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
 			ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, s.ifw_supplier_qoh
-			from `tabItem Supplier` s inner join `tabItem` i on i.name = s.parent
+			from `tabItem Supplier` s 
+			inner join `tabItem` i on i.name = s.parent
 			where 1 = 1 %s
 		"""%(conditions), filters, as_dict=1)
 	return data
@@ -783,3 +797,14 @@ def test():
 		print(last_month.month)
 		print(last_month.year)
 		last_month = last_month + relativedelta(months=1)
+
+def get_us_data(filters):
+	item_search_settings = frappe.get_doc("Item Search Settings")
+	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
+		us_request = requests.get(item_search_settings.get("sales_report_url"), 
+						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+									params=filters, verify=False)
+		if us_request.status_code == 200:
+			return us_request.json().get("message", {})
+	else:
+		return {}
