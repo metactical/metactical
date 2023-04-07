@@ -484,11 +484,8 @@ def get_total_sold(item):
 								`tabSales Invoice` p 
 							inner join 
 								`tabSales Invoice Item` c on p.name = c.parent 
-							left join
-								`tabAddress` address on address.name = p.customer_address
 							where 
 								c.item_code = %s and p.docstatus = 1
-								AND address.country = 'United States'
 		""",(item), as_dict=1)
 	return data
 
