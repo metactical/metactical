@@ -6,11 +6,12 @@
  "engine": "InnoDB",
  "field_order": [
   "usa_instance_credentials_section",
-  "api_key",
-  "api_secret",
-  "column_break_3",
   "us_url",
   "daily_report_url",
+  "sales_report_url",
+  "column_break_3",
+  "api_key",
+  "api_secret",
   "section_warehouses",
   "warehouses",
   "section_price_list",
@@ -66,11 +67,16 @@
    "fieldname": "daily_report_url",
    "fieldtype": "Data",
    "label": "Daily Report URL"
+  },
+  {
+   "fieldname": "sales_report_url",
+   "fieldtype": "Data",
+   "label": "Sales Report URL"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2023-02-21 18:06:08.815163",
+ "modified": "2023-04-06 09:50:29.331590",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
