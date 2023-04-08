@@ -205,7 +205,6 @@ override_whitelisted_methods = {
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
 	"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate",
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
-	"erpnext.accounts.doctype.payment_entry.payment_entry.get_payment_entry": "metactical.custom_scripts.payment_entry.payment_entry.get_payment_entry",
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice"
 }
