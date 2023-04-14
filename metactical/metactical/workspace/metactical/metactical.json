@@ -195,6 +195,24 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "STE Packing Page",
+   "link_to": "ste-packing-page",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "STE Packing Slip",
+   "link_to": "STE Packing Slip",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "HR",
    "link_type": "DocType",
    "onboard": 0,
@@ -452,6 +470,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report Based on Delivery Note",
+   "link_to": "Sales Report Based on Delivery Note",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -550,6 +577,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "QBO Import Report",
+   "link_to": "QBO Import Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Settings",
    "link_type": "DocType",
@@ -566,7 +602,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-02-05 06:40:45.700890",
+ "modified": "2023-04-07 09:57:00.504403",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
