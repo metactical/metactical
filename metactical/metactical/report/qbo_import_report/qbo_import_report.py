@@ -22,7 +22,8 @@ def get_data(filters):
 								invoice.status AS invoice_status, address.state AS province, 
 								address.country, invoice.total AS sub_total, SUM(gst_hst.tax_amount) AS gst_amount,
 								SUM(pst.tax_amount) AS pst_amount, SUM(qst.tax_amount) AS qst_amount,
-								invoice.grand_total AS final_amount, invoice.currency, pe_ref.name
+								invoice.grand_total AS final_amount, invoice.currency, pe_ref.name, invoice.source,
+								invoice.po_no
 							FROM
 								`tabPayment Entry Reference` AS pe_ref
 							LEFT JOIN
@@ -206,6 +207,19 @@ def get_columns(filters):
 			"fieldtype": "Link",
 			"options": "Currency",
 			"width": "130"
+		},
+		{
+			"label": "LeadSource",
+			"fieldname": "source",
+			"fieldtype": "Link",
+			"options": "Lead Source",
+			"width": 130
+		},
+		{
+			"label": "Customer's Purchase Order",
+			"fieldname": "po_no",
+			"fieldtype": "Data",
+			"width": 130
 		}
 	]
 	return columns
