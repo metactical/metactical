@@ -29,7 +29,7 @@ class CustomStockEntry(StockEntry):
 			# get actual stock at source warehouse
 			d.actual_qty = previous_sle.get("qty_after_transaction") or 0
 			
-			# get actual quantity at target wareous
+			# Metactical Customization: Get actual quantity at target wareous
 			target_previous_sle = get_previous_sle(
 				{
 					"item_code": d.item_code,
@@ -66,34 +66,37 @@ class CustomStockEntry(StockEntry):
 					title=_("Insufficient Stock"),
 				)
 
-def validate(self, method):
-	user = frappe.session.user
-	setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
-	if setting_exists:
-		s_warehouses = []
-		t_warehouses = []
-		settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
-		for row in settings.source_warehouse:
-			s_warehouses.append(row.warehouse)
+	def validate(self):
+		super(CustomStockEntry, self).validate()
+		# Metactical Customization: Validate that user has permission to make stock entry against warehouse
+		user = frappe.session.user
+		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		if setting_exists:
+			s_warehouses = []
+			t_warehouses = []
+			settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
+			for row in settings.source_warehouse:
+				s_warehouses.append(row.warehouse)
+				
+			for row in settings.target_warehouse:
+				t_warehouses.append(row.warehouse)
 			
-		for row in settings.target_warehouse:
-			t_warehouses.append(row.warehouse)
-		
-		for row in self.items:
-			if row.s_warehouse not in s_warehouses:
-				frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, frappe.session.user))
+			for row in self.items:
+				if row.s_warehouse not in s_warehouses:
+					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, frappe.session.user))
+					
+				if row.t_warehouse not in t_warehouses:
+					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
 				
-			if row.t_warehouse not in t_warehouses:
-				frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
-				
-
-def on_submit(self, method):
-	frappe.db.set_value('Stock Entry', self.name, 'ais_submitted_date', frappe.utils.today())
-	#STE Barcode
-	sv = BytesIO()
-	_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
-	stoBarcode = sv.getvalue()
-	self.ais_ste_barcode = stoBarcode.decode('ISO-8859-1')
+	def on_submit(self):
+		super(CustomStockEntry, self).on_submit()
+		# Metactical Customization: Add submitted date and barcode
+		frappe.db.set_value('Stock Entry', self.name, 'ais_submitted_date', frappe.utils.today())
+		#STE Barcode
+		sv = BytesIO()
+		_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
+		stoBarcode = sv.getvalue()
+		self.ais_ste_barcode = stoBarcode.decode('ISO-8859-1')
 
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):
