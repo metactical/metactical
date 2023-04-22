@@ -1,0 +1,27 @@
+{
+ "attach_print": 0,
+ "channel": "Email",
+ "creation": "2023-04-22 14:51:43.448726",
+ "days_in_advance": 0,
+ "docstatus": 0,
+ "doctype": "Notification",
+ "document_type": "Employee Sign Up",
+ "enabled": 1,
+ "event": "New",
+ "idx": 0,
+ "is_standard": 1,
+ "message": "Hello,\n\nA new Employee Sign Up Invitation document has been created at <a href=\"https://{{frappe.get_url()}}/app/employee-sign-up-invitation/{{doc.name}}\">{{doc.name}}</a>",
+ "modified": "2023-04-22 14:51:43.448726",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "New Employee Filled Invite Form",
+ "owner": "Administrator",
+ "recipients": [
+  {
+   "receiver_by_role": "Employee Filled Sign Up Form Alert"
+  }
+ ],
+ "send_system_notification": 0,
+ "send_to_all_assignees": 0,
+ "subject": "New Employee Filled Invite Form"
+}
