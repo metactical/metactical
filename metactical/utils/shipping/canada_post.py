@@ -279,6 +279,8 @@ class CanadaPost():
                 self.get_response(url, body, headers,
                                   return_request, method, True)
         except:
+            if 'r' not in locals():
+                frappe.throw(frappe.get_traceback())
             res = r.content
             try:
                 content = self.xml_to_json(res)
