@@ -31,9 +31,13 @@ class Manifest(Document):
     def get_shipments(self):
         if not (self.from_date and self.to_date):
             frappe.throw(_("From Date and To Date are Mandatory"))
-        for row in frappe.get_all('Shipment', [['pickup_date', '>=', self.from_date],
+        rows = frappe.get_all('Shipment', [['pickup_date', '>=', self.from_date],
                                                ['pickup_date', '<=', self.to_date], ['Canada Post Shipment', 'shipment_id', 'is', 'set']],
-                                  ['name as shipment', '`tabCanada Post Shipment`.name as row_name', '`tabCanada Post Shipment`.shipment_id']):
+                                  ['name as shipment', '`tabCanada Post Shipment`.name as row_name', '`tabCanada Post Shipment`.shipment_id'])
+        existings = frappe.get_all('Manifest Item', [['shipment_id', 'in', [x.shipment_id for x in rows]]], pluck='shipment_id')
+        for row in rows:
+            if row.shipment_id in existings:
+                continue
             self.append('items', row)
         return self.as_dict()
 
