@@ -120,16 +120,9 @@ doc_events = {
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
-	#"Purchase Receipt": {
-	#	"validate": "metactical.custom_scripts.purchase_receipt.purchase_receipt.validate"
-	#},
 	"Shipment": {
 		"validate": "metactical.custom_scripts.shipment.shipment.validate",
 		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
-	},
-    "Clockin Log": {
-		"after_insert": "metactical.api.clockin.insert_in_employee_checkin",
-        "on_update": "metactical.api.clockin.insert_out_employee_checkin",
 	}
 }
 

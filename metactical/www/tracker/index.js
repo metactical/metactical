@@ -266,7 +266,7 @@ function clockOut() {
         method: "metactical.api.clockin.update_clockin_log",
         args: {
             current_date: today,
-            to_time: current_time
+            to_time: today + " " + current_time
         },
         callback: r => {
             console.log("Clocking out")
