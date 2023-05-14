@@ -1,7 +1,7 @@
 import frappe
 import datetime
 
-def insert_in_employee_checkin(doc, method):
+def insert_in_employee_checkin(doc, method=None):
 	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
 	if employee_exists:
 		frappe.errprint(doc.from_time)
@@ -9,7 +9,7 @@ def insert_in_employee_checkin(doc, method):
 			"doctype": "Employee Checkin",
 			"log_type": "IN",
 			"employee": employee_exists,
-			"time": f'{doc.date} {doc.from_time}'
+			"time": doc.from_time
 		})
 
 		in_employee_checkin.insert()
@@ -21,7 +21,7 @@ def insert_in_employee_checkin(doc, method):
 	else:
 		frappe.throw("Employee record not found")
 
-def insert_out_employee_checkin(doc, method):
+def insert_out_employee_checkin(doc, method=None):
 	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
 
 	if employee_exists:
@@ -32,7 +32,7 @@ def insert_out_employee_checkin(doc, method):
 					"doctype": "Employee Checkin",
 					"log_type": "OUT",
 					"employee": employee_exists,
-					"time": f'{doc.date} {doc.to_time}'
+					"time": doc.to_time
 				})
 
 				out_employee_checkin.insert()
@@ -46,11 +46,11 @@ def insert_out_employee_checkin(doc, method):
 
 			else:
 				out_employee_checkin_record = frappe.get_doc("Employee Checkin", doc.out_employee_checkin_record)
-				out_employee_checkin_record.time = f"{doc.date} {doc.to_time}"
+				out_employee_checkin_record.time = doc.to_time
 				out_employee_checkin_record.save()
 
 				in_employee_checkin_record = frappe.get_doc("Employee Checkin", doc.in_employee_checkin_record)
-				in_employee_checkin_record.time = f"{doc.date} {doc.from_time}"
+				in_employee_checkin_record.time = doc.from_time
 				in_employee_checkin_record.save()
 
 	else:
@@ -405,7 +405,7 @@ def create_clockin_log(user, current_date, from_time):
 		"doctype": "Clockin Log",
 		"user": user,
 		"date": current_date,
-		"from_time": from_time,
+		"from_time": current_date + " " + from_time,
 		"total_hours": 0.0
 	})
 

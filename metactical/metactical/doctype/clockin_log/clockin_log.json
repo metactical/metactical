@@ -34,14 +34,14 @@
   },
   {
    "fieldname": "from_time",
-   "fieldtype": "Time",
+   "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "From Time",
    "reqd": 1
   },
   {
    "fieldname": "to_time",
-   "fieldtype": "Time",
+   "fieldtype": "Datetime",
    "label": "To Time"
   },
   {
@@ -76,7 +76,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-02-20 14:39:10.277717",
+ "modified": "2023-05-10 17:19:16.452849",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Clockin Log",
