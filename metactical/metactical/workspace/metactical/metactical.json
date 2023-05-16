@@ -488,6 +488,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report - For Admins",
+   "link_to": "Sales Report - For Admins",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -612,7 +621,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-05-13 17:13:03.521436",
+ "modified": "2023-05-16 11:21:18.779434",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
