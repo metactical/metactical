@@ -6,7 +6,7 @@ from frappe.model.document import Document
 from frappe import _
 from frappe.model.mapper import get_mapped_doc, map_child_doc
 from frappe.utils import cstr, flt, getdate, cint, nowdate, add_days, get_link_to_form, strip_html
-from erpnext.stock.doctype.pick_list.pick_list import PickList
+from erpnext.stock.doctype.pick_list.pick_list import PickList, get_available_item_locations, get_items_with_location_and_quantity
 import barcode as _barcode
 from barcode.writer import ImageWriter
 from io import BytesIO
@@ -142,7 +142,7 @@ class CustomPickList(PickList):
 		delivery_note.save()
 	
 	
-	def on_cancel(self, method):
+	def on_cancel(self):
 		delivery_notes = frappe.get_all('Delivery Note', filters={'pick_list': self.name, 'docstatus': 0}, fields=['name'])
 		for delivery_note in delivery_notes:
 			doc = frappe.get_doc('Delivery Note', delivery_note.name)
@@ -157,6 +157,72 @@ class CustomPickList(PickList):
 			sales_doc = frappe.get_doc("Sales Order", sales_order)
 			sales_doc.update({"pick_list_submitted_date": ""})
 			sales_doc.save()
+			
+	@frappe.whitelist()
+	def set_item_locations(self, save=False):
+		self.validate_for_qty()
+		items = self.aggregate_item_qty()
+		self.item_location_map = frappe._dict()
+
+		from_warehouses = None
+		if self.parent_warehouse:
+			from_warehouses = get_descendants_of("Warehouse", self.parent_warehouse)
+
+		# Create replica before resetting, to handle empty table on update after submit.
+		locations_replica = self.get("locations")
+
+		# reset
+		self.delete_key("locations")
+		#Metactical Customization: Get shipping items
+		shipping_items = frappe.db.get_all('Pick List Shipping Item', fields=["item"], pluck='item')
+		
+		for item_doc in items:
+			item_code = item_doc.item_code
+			# Metactical Customization: If item is one of the shipping items, 
+			# skip this step and readd it later to the locations table
+			if item_code in shipping_items:
+				continue
+
+			self.item_location_map.setdefault(
+				item_code,
+				get_available_item_locations(
+					item_code, from_warehouses, self.item_count_map.get(item_code), self.company
+				),
+			)
+
+			locations = get_items_with_location_and_quantity(
+				item_doc, self.item_location_map, self.docstatus
+			)
+
+			item_doc.idx = None
+			item_doc.name = None
+
+			for row in locations:
+				location = item_doc.as_dict()
+				location.update(row)
+				self.append("locations", location)
+
+		# If table is empty on update after submit, set stock_qty, picked_qty to 0 so that indicator is red
+		# and give feedback to the user. This is to avoid empty Pick Lists.
+		if not self.get("locations") and self.docstatus == 1:
+			for location in locations_replica:
+				location.stock_qty = 0
+				location.picked_qty = 0
+				self.append("locations", location)
+			frappe.msgprint(
+				_(
+					"Please Restock Items and Update the Pick List to continue. To discontinue, cancel the Pick List."
+				),
+				title=_("Out of Stock"),
+				indicator="red",
+			)
+		# Metactical Customization: Re-add the shipping items
+		for location in locations_replica:
+			if location.item_code in shipping_items:
+				self.append("locations", location)
+
+		if save:
+			self.save()
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
