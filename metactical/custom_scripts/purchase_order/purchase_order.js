@@ -188,8 +188,9 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 	},
 	
 	get_items_from_open_material_requests: function() {
+		// Metactical Customization: Replace company in Material Request selection with supplier
 		this.map_current_doc({
-			method: "metactical.custom_scripts.purchase_order.purchase_order.make_purchase_order_based_on_supplier",
+			method: "erpnext.stock.doctype.material_request.material_request.make_purchase_order_based_on_supplier",
 			args: {
 				supplier: this.frm.doc.supplier
 			},
