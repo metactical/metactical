@@ -322,7 +322,13 @@ frappe.ui.form.on('Sales Order', {
 				frm.fields_dict['currency_and_price_list'].collapse(0);
 			});
 		}, 1000);
-	}
+	},
+	
+	setup(frm) {
+		frm.set_indicator_formatter('item_code',
+			function(doc) { return (doc.actual_qty>=doc.qty) ? "green" : "red" }
+		);
+    }
 });
 frappe.ui.form.on("Sales Order Item", {
 	delivered_by_supplier: function(frm, cdt, cdn){
@@ -339,7 +345,11 @@ frappe.ui.form.on("Sales Order Item", {
 					}
 				});
 		}
-	}
+	},
+	
+	qty(frm) {
+        cur_frm.refresh_field("items")
+    }
 });
 
 erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
