@@ -13,6 +13,23 @@ from frappe.utils import cint, comma_or, cstr, flt, format_time, formatdate, get
 from erpnext.stock.stock_ledger import NegativeStockError, get_previous_sle, get_valuation_rate
 
 class CustomStockEntry(StockEntry):
+	def before_submit(self):
+		if self.stock_entry_type == "Material Transfer":
+			for d in self.items:
+				available_qty = self.get_qty(d.item_code, d.s_warehouse)
+				if d.qty > available_qty:
+					frappe.throw("""Cannot Transfer Qty {} for Item {}, Available Qty is {}, at Row {}
+						""".format(str(d.qty), d.item_code, str(available_qty), str(d.idx)))
+						
+	def get_qty(self, item, warehouse):
+		qty = 0
+		data= frappe.db.sql("""select actual_qty-reserved_qty from `tabBin`
+			where item_code = %s and warehouse=%s
+			""",(item,warehouse))
+		if data:
+			qty = data[0][0] or 0
+		return qty
+	
 	def set_actual_qty(self):
 		allow_negative_stock = cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock"))
 
