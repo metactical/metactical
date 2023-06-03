@@ -23,6 +23,10 @@ def test():
 				json=data)				
 	print(response)
 	print(response.json())'''
+	delivery_note = frappe.get_doc('Delivery Note', 'MAT-DN-2023-00001')
+	settings = frappe.get_doc("Shipstation Settings", 'eb788d04eb')
+	return order_json(delivery_note, False, settings)
+	
 	
 @frappe.whitelist()
 def sync_shipping_status():
@@ -228,6 +232,17 @@ def order_json(order, is_cancelled, settings):
 			})
 			items.append(row)
 	data = {}
+	
+	# Get customer and shipping name from the addresses
+	customer_name = "{} {}".format(customer_address.get("ifw_first_name"), customer_address.get("ifw_last_name"))
+	shipping_name = "{} {}".format(shipping_address.get("ifw_first_name"), shipping_address.get("ifw_last_name"))
+	
+	if customer_name.strip() == "":
+		customer_name = order.customer
+		
+	if shipping_name.strip() == "":
+		shipping_name = order.customer
+	
 	data.update({
 		"orderNumber": order_no,
 		"orderKey": order_no,
@@ -238,7 +253,7 @@ def order_json(order, is_cancelled, settings):
 		"customerUsername": order.customer,
 		"customerEmail": customer_address.get('email_id'),
 		"billTo": {
-			"name": order.customer,
+			"name": customer_name,
 			"company": '',
 			"street1": customer_address.get('address_line1'),
 			"street2": customer_address.get('address_line2'),
@@ -251,7 +266,7 @@ def order_json(order, is_cancelled, settings):
 			"residential": None
 		},
 		"shipTo": {
-			"name": order.customer,
+			"name": shipping_name,
 			"company": "",
 			"street1": shipping_address.get('address_line1'),
 			"street2": shipping_address.get('address_line2'),
