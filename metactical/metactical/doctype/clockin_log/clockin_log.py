@@ -14,15 +14,16 @@ class ClockinLog(Document):
 		
 	def on_update(self):
 		insert_out_employee_checkin(self)
+		self.update_user_pay_cycle_record()
 	
 	def before_save(self):
 		# Validate total hours worked for clockin log
 		if self.has_clocked_out:
 			self.total_hours = time_difference(self.from_time, self.to_time)
 			
-	def save(self, *args, **kwargs):
+	'''def save(self, *args, **kwargs):
 		super().save(*args, **kwargs)
-		self.update_user_pay_cycle_record()
+		self.update_user_pay_cycle_record()'''
 	
 	def update_user_pay_cycle_record(self):
 		clockin_logs = frappe.get_all("Clockin Log", filters={
@@ -44,8 +45,6 @@ class ClockinLog(Document):
 
 		#Get parent field for work day
 		parent_field = frappe.db.get_value("Pay Cycle Log", work_day, "parent")
-
-		frappe.errprint(work_day)
 
 		#Update work day hours
 		frappe.db.set_value("Pay Cycle Log", work_day, "hours_worked", total_hours_worked)

@@ -114,10 +114,9 @@ function onLogin() {
     const today = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     frappe.call({
         method: "metactical.api.clockin.get_pay_cycle_data",
-        args: {
-            current_date: today
-        },
+        args: {},
         callback: function(r){
+			console.log({"paycycle": r.message.pay_cycles});
 			if (r.message.pay_cycle_data_exists) {
                 payCycles = r.message.pay_cycles
                 prevPayCycles = r.message.pay_cycles.length - 1
