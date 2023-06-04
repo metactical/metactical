@@ -1,12 +1,19 @@
 frappe.provide("metactical.ste_packing_page");
 frappe.pages['ste-packing-page'].on_page_load = function(wrapper) {
-	frappe.ste_packing_page = new STEPackingPage(wrapper);
+	// Check if user has permisssion to add
+	frappe.call({
+		method: "metactical.metactical.page.packing_page.packing_page.check_to_add_permission",
+		freeze: true,
+		callback: function(ret){
+			metactical.ste_packing_page.has_add_permission = ret.message;
+			frappe.ste_packing_page = new STEPackingPage(wrapper);
+		}
+	});
 }
 
 class STEPackingPage {
 	constructor(wrapper) {
 		this.page = wrapper.page;
-		console.log({"page": wrapper});
 		frappe.run_serially([
 			() => this.make_page(wrapper),
 			() => this.make_action_bar(),
@@ -163,11 +170,13 @@ function populate_pending_items() {
 function populate_current_item() {
 	const item = metactical.ste_packing_page.current_item;
 	if (item.item_code) {
+		let add_button_html = "Scan this item to move next "
+		if(metactical.ste_packing_page.has_add_permission){
+			add_button_html += "or <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button> \
+				<button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>";
+		}
 		$(".cur-item-barcode").html("Packing Now " + item.item_barcode);
-		$(".cur-item-scan-feedback").html(
-			"Scan this item to move next or <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button>"
-			+ " <button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>"
-		);
+		$(".cur-item-scan-feedback").html(add_button_html);
 		$(".cur-item-name").html(item.item_name);
 		$(".cur-item-code").html(item.item_code);
 		$(".cur-item-quantity-remaining").html(item.qty + " more to scan");
@@ -333,9 +342,6 @@ metactical.ste_packing_page.fetch_ste_items = (from_refresh = false) => {
 							items: items,
 						})
 						.then((r) => {
-							console.log({
-								"item": r.message
-							});
 							items = r.message;
 
 							$(".packing-slip-wrapper").html(
@@ -368,7 +374,6 @@ metactical.ste_packing_page.calc_packing_items = (barcode, amount=1) => {
 	let pending_items = metactical.ste_packing_page.pending_items;
 
 	if (barcode == "SKIP") {
-		console.log("skip");
 		re_generate_current_item();
 		return;
 	}
@@ -396,7 +401,6 @@ metactical.ste_packing_page.calc_packing_items = (barcode, amount=1) => {
 			}
 
 			if (cur_item.qty == 0) {
-				//console.log("not skip");
 				re_generate_current_item();
 			}
 			else{
