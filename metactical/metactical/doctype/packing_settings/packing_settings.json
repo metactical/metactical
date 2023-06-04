@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-06-04 10:57:28.556265",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "allowed_user"
+ ],
+ "fields": [
+  {
+   "fieldname": "allowed_user",
+   "fieldtype": "Table",
+   "label": "Click to Add Allowed Users",
+   "options": "Packing Allowed User"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2023-06-04 10:57:28.556265",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Packing Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

@@ -51,24 +51,6 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
-   "label": "Upload Images",
-   "link_to": "Upload Images",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Search Settings",
-   "link_to": "Item Search Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
    "is_query_report": 1,
    "label": "Stock Reconciliation Report",
    "link_to": "Stock Reconciliation Report",
@@ -124,16 +106,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Stock Settings",
-   "link_to": "Stock Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pick Lists and Packing ",
+   "label": "Pick Lists and Packing",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -170,15 +143,6 @@
    "is_query_report": 0,
    "label": "Pick List Totes",
    "link_to": "Picklist Tote",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pick List Settings",
-   "link_to": "Pick List Settings",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -312,15 +276,6 @@
    "is_query_report": 0,
    "label": "City Symbol",
    "link_to": "City Symbol",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Shipstation Settings",
-   "link_to": "Shipstation Settings",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -619,9 +574,54 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Search Settings",
+   "link_to": "Item Search Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Settings",
+   "link_to": "Stock Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pick List Settings",
+   "link_to": "Pick List Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shipstation Settings",
+   "link_to": "Shipstation Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Packing Settings",
+   "link_to": "Packing Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2023-05-16 11:21:18.779434",
+ "modified": "2023-06-04 12:45:16.524319",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
