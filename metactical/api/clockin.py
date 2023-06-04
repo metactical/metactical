@@ -4,7 +4,6 @@ import datetime
 def insert_in_employee_checkin(doc, method=None):
 	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
 	if employee_exists:
-		frappe.errprint(doc.from_time)
 		in_employee_checkin = frappe.get_doc({
 			"doctype": "Employee Checkin",
 			"log_type": "IN",
@@ -39,8 +38,6 @@ def insert_out_employee_checkin(doc, method=None):
 				frappe.db.commit()
 
 				#Link record
-				frappe.errprint("Out record")
-				frappe.errprint(out_employee_checkin.name)
 				doc.out_employee_checkin_record = out_employee_checkin.name
 				doc.save()
 
@@ -75,7 +72,9 @@ def get_clockin_status():
 		return {"clocked_in": 0}
 
 @frappe.whitelist()
-def get_pay_cycle_data(current_date):
+def get_pay_cycle_data(current_date=None):
+	if current_date is None:
+		current_date = datetime.date.today()
 	user = frappe.session.user
 	employee = frappe.db.exists("Employee", {"user_id": user})
 	current_shift = None
@@ -100,7 +99,6 @@ def get_pay_cycle_data(current_date):
 			current_shift = shift_type
 
 			if current_pay_cycle_exists:
-				frappe.errprint("Current pay cycle exists")
 				from_date = frappe.get_value("Pay Cycle Record", current_pay_cycle_exists, "from_date")
 				to_date = frappe.get_value("Pay Cycle Record", current_pay_cycle_exists, "to_date")
 
@@ -112,7 +110,6 @@ def get_pay_cycle_data(current_date):
 
 				if not user_pay_cycle_record_exists:
 					create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date)
-					frappe.errprint("User pay cycle record created successfully")
 		else:
 			frappe.throw("Shift assignment not found")
 	else:
@@ -168,7 +165,6 @@ def get_pay_cycle_data(current_date):
 #Check if logged in user has current pay cycle record
 @frappe.whitelist()
 def check_current_pay_cycle_record(current_date, current_time):
-	frappe.errprint("Clockin attempt")
 	user = frappe.session.user
 	employee = frappe.db.exists("Employee", {"user_id": user})
 	current_shift = None
@@ -214,7 +210,6 @@ def check_current_pay_cycle_record(current_date, current_time):
 						})
 
 						if not clockin_log_record_today_exists:
-							frappe.errprint("Clockin log does not exist. Creating new")
 							create_clockin_log(user, current_date, current_time)
 
 				else:
@@ -245,7 +240,6 @@ def check_current_pay_cycle_record(current_date, current_time):
 	current_pay_cycle = frappe.get_doc("Pay Cycle Record", current_pay_cycle_exists)
 	
 	previous_pay_cycles_viewable = frappe.db.get_single_value("Time Tracker Settings", "previous_viewable_pay_cycles")
-	#frappe.errprint(previous_pay_cycles_viewable)
 	pay_cycles = [user_pay_cycle]
 
 	##
@@ -253,8 +247,6 @@ def check_current_pay_cycle_record(current_date, current_time):
 
 	if available_prev_pay_cycles < previous_pay_cycles_viewable:
 		previous_pay_cycles_viewable = available_prev_pay_cycles
-
-	frappe.errprint(previous_pay_cycles_viewable)
 	##
 
 	prev_index = 1
@@ -272,12 +264,10 @@ def check_current_pay_cycle_record(current_date, current_time):
 
 			if user_previous_pay_cycle_record:
 				user_previous_pay_cycle = frappe.get_doc("Pay Cycle", user_previous_pay_cycle_record)
-				#frappe.errprint(user_previous_pay_cycle)
 				pay_cycles.append(user_previous_pay_cycle)
 
 				prev_index += 1
-
-	#frappe.errprint(current_pay_cycle.idx)
+				
 	button_activation_delay = frappe.db.get_single_value("Time Tracker Settings", "clockinout_delay")
 
 	return {
@@ -350,11 +340,6 @@ def create_user_pay_cycle_record(user, from_date, to_date, current_date, current
 
 	create_clockin_log(user, current_date, current_time)
 
-	frappe.errprint(index)
-	frappe.errprint(date_index)
-	frappe.errprint(to_date)
-	frappe.errprint(date_index == to_date)
-
 def create_clockin_log(user, current_date, from_time):
 	clockin_log_record = frappe.get_doc({
 		"doctype": "Clockin Log",
@@ -416,7 +401,6 @@ def shift_request(date, shift_type):
 	doc.insert()
 	frappe.db.commit()
 
-	#frappe.errprint()
 	recipients = [f'{doc.approver}']
 	frappe.sendmail(
 		recipients=recipients,
@@ -436,18 +420,12 @@ def shift_request(date, shift_type):
 	)
 
 def convert_to_12hr(time_24hr):
-	frappe.errprint(time_24hr)
 	time = datetime.datetime.strptime(time_24hr, '%H:%M').strftime('%I:%M %p')
 	return time
 
 @frappe.whitelist()
 def send_details_change_request(log_name, checkInTime12, checkInTimeMilitary, checkOutTime12, checkOutTimeMilitary, currentCheckIn12, currentCheckOut12, date):
 	user = frappe.session.user
-	#employee = frappe.db.exists("Employee", {"user_id": user})
-	#selected_shift_details = frappe.get_doc("Shift Type", shift_type)
-
-	#frappe.errprint("Log is")
-	#frappe.errprint(log_name)
 
 	user_doc = frappe.get_doc("User", user)
 	username = user_doc.username
