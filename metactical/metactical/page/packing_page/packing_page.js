@@ -1,9 +1,16 @@
-frappe.pages["packing-page"].on_page_load = function (wrapper) {
-	console.log("reloaded");
-	frappe.packing_slip = new PackingPage(wrapper);
-};
-
 frappe.provide("havenir.packing_slip");
+
+frappe.pages["packing-page"].on_page_load = function (wrapper) {
+	// Check if user has permisssion to add
+	frappe.call({
+		method: "metactical.metactical.page.packing_page.packing_page.check_to_add_permission",
+		freeze: true,
+		callback: function(ret){
+			havenir.packing_slip.has_add_permission = ret.message;
+			frappe.packing_slip = new PackingPage(wrapper);
+		}
+	});
+};
 
 class PackingPage {
 	constructor(wrapper) {
@@ -128,7 +135,6 @@ class PackingPage {
 						},
 						freeze: true,
 						callback: function(ret){
-							console.log({'Delivery Note': ret.message});
 							delivery_note_field.set_value(ret.message);
 						}
 					});
@@ -147,7 +153,6 @@ function create_new() {
 }
 
 function refresh() {
-	console.log("From refresh");
 	$('input[data-fieldname="tote_barcode"]').val("");
 	$('input[data-fieldname="delivery_note"]').val("");
 	havenir.packing_slip.fetch_dn_items(true);
@@ -167,7 +172,6 @@ function save_form() {
 		freeze: true,
 		btn: $(".primary-action"),
 		callback: (r) => {
-			console.log("Refresh");
 			refresh();
 		},
 		error: (r) => {
@@ -211,11 +215,13 @@ function populate_pending_items() {
 function populate_current_item() {
 	const item = havenir.packing_slip.current_item;
 	if (item.item_code) {
+		let add_button_html = "Scan this item to move next "
+		if(havenir.packing_slip.has_add_permission){
+			add_button_html += "or <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button> \
+				<button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>";
+		}
 		$(".cur-item-barcode").html("Packing Now " + item.item_barcode);
-		$(".cur-item-scan-feedback").html(
-			"Scan this item to move next or <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button>"
-			+ " <button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>"
-		);
+		$(".cur-item-scan-feedback").html(add_button_html);
 		$(".cur-item-name").html(item.item_name);
 		$(".cur-item-code").html(item.item_code);
 		$(".cur-item-quantity-remaining").html(item.qty + " more to scan");
@@ -275,7 +281,6 @@ function populate_packed_items() {
 }
 
 function re_generate_current_item(item = null) {
-	console.log("regenerate");
 	pending_items = havenir.packing_slip.pending_items;
 	current_item = havenir.packing_slip.current_item;
 	if (!item) {
@@ -287,7 +292,6 @@ function re_generate_current_item(item = null) {
 		pending_items.splice(i, 1);
 	}
 	if (pending_items.length > 0) {
-		console.log(pending_items);
 		if (item) {
 			pending_items.forEach(function (row) {
 				if (row.item_code == item) {
@@ -394,9 +398,6 @@ havenir.packing_slip.fetch_dn_items = (from_refresh = false) => {
 							items: items,
 						})
 						.then((r) => {
-							console.log({
-								"item": r.message
-							});
 							items = r.message;
 
 							$(".packing-slip-wrapper").html(
@@ -430,7 +431,6 @@ havenir.packing_slip.calc_packing_items = (barcode, amount=1) => {
 	let pending_items = havenir.packing_slip.pending_items;
 
 	if (barcode == "SKIP") {
-		console.log("skip");
 		re_generate_current_item();
 		return;
 	}
@@ -458,7 +458,6 @@ havenir.packing_slip.calc_packing_items = (barcode, amount=1) => {
 			}
 
 			if (cur_item.qty == 0) {
-				//console.log("not skip");
 				re_generate_current_item();
 			}
 			else{
