@@ -105,6 +105,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Stock Balance With Purchase Rates",
+   "link_to": "Stock Balance With Purchase Rates",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
@@ -621,7 +630,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-06-04 12:45:16.524319",
+ "modified": "2023-06-06 08:43:27.491741",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
