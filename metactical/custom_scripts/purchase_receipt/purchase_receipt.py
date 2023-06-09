@@ -4,6 +4,15 @@ from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff,
 from frappe import _, msgprint, is_whitelisted
 
 class CustomPurchaseReceipt(PurchaseReceipt):
+	def validate(self):
+		super(CustomPurchaseReceipt, self).validate()
+		if self.purchase_order:
+			for d in self.items:
+				d.purchase_order = self.purchase_order
+				d.purchase_order_item = frappe.db.get_value("Purchase Order Item", {"item_code": d.item_code, "parent": d.purchase_order}, "name")
+				if not d.purchase_order_item:
+					frappe.throw("Purchase Order Missing for Item {} at Row {}".format(d.item_code, str(d.idx)))
+	
 	def submit(self):
 		if len(self.items) > 100:
 			msgprint(

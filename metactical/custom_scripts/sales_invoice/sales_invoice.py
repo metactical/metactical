@@ -12,22 +12,28 @@ from erpnext.controllers.accounts_controller import AccountsController
 
 class CustomSalesInvoice(SalesInvoice):
 	def on_cancel(self):
-		AccountsController.on_cancel = accounts_on_cancel
-		super(CustomSalesInvoice, self).on_cancel()
-
-def accounts_on_cancel(self):
-	if self.doctype in ["Sales Invoice", "Purchase Invoice"]:
-		if frappe.db.get_single_value("Accounts Settings", "unlink_payment_on_cancellation_of_invoice"):
-			unlink_ref_doc_from_payment_entries(self)
-
-		elif self.doctype in ["Sales Order", "Purchase Order"]:
-			if frappe.db.get_single_value(
-				"Accounts Settings", "unlink_advance_payment_on_cancelation_of_order"
-			):
+		# Metactical Customization: Relink payment entries to sales orders when sales invoice is cancelled
+		if self.doctype in ["Sales Invoice", "Purchase Invoice"]:
+			if frappe.db.get_single_value("Accounts Settings", "unlink_payment_on_cancellation_of_invoice"):
 				unlink_ref_doc_from_payment_entries(self)
 
-			if self.doctype == "Sales Order":
-				self.unlink_ref_doc_from_po()
+			elif self.doctype in ["Sales Order", "Purchase Order"]:
+				if frappe.db.get_single_value(
+					"Accounts Settings", "unlink_advance_payment_on_cancelation_of_order"
+				):
+					unlink_ref_doc_from_payment_entries(self)
+
+				if self.doctype == "Sales Order":
+					self.unlink_ref_doc_from_po()
+		super(CustomSalesInvoice, self).on_cancel()
+		
+	def before_save(self):
+		super(CustomSalesInvoice, self).before_save()
+		#Metactical Customization: Add barcode to Sales Invoice
+		rv = BytesIO()
+		_barcode.get('code128', self.name).write(rv)
+		bstring = rv.getvalue()
+		self.ais_barcode = bstring.decode('ISO-8859-1')
 	
 
 def unlink_ref_doc_from_payment_entries(ref_doc):	
@@ -146,11 +152,6 @@ def remove_ref_doc_link_from_pe(ref_type, ref_no, multiple_orders, sales_order=N
 
 			frappe.msgprint(_("Payment Entries {0} are un-linked").format("\n".join(linked_pe)))
 
-def before_save(self, method):
-	rv = BytesIO()
-	_barcode.get('code128', self.name).write(rv)
-	bstring = rv.getvalue()
-	self.ais_barcode = bstring.decode('ISO-8859-1')
 
 @frappe.whitelist()
 def create_journal_entry(source_name, bank_cash, amount, purpose, target_doc=None):
@@ -233,7 +234,8 @@ def create_journal_entry(source_name, bank_cash, amount, purpose, target_doc=Non
 	source_doc = frappe.get_doc('Sales Invoice', source_name)
 	update_accounts(source_doc, target_doc)
 	return target_doc
-		
+
+# Metactical Customization: Get mode of payment for the print format		
 @frappe.whitelist()
 def si_mode_of_payment(name):
 	payment_mode = ''

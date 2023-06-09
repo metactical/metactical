@@ -41,8 +41,6 @@ frappe.ui.form.on('Sales Order', {
 			var amended_order = frappe.get_doc("Sales Order", frm.doc.amended_from);
 			frm.doc.taxes_and_charges = amended_order.taxes_and_charges ;
 		}
-
-		dashboard_sales_order_doctype(frm, "Stock Entry");
 		
 		//For changing to drop ship
 		if(frm.doc.docstatus == 1 && (frm.doc.delivery_status == "Not Delivered" || frm.doc.delivery_status == "Partly Delivered")){
@@ -324,7 +322,13 @@ frappe.ui.form.on('Sales Order', {
 				frm.fields_dict['currency_and_price_list'].collapse(0);
 			});
 		}, 1000);
-	}
+	},
+	
+	setup(frm) {
+		frm.set_indicator_formatter('item_code',
+			function(doc) { return (doc.actual_qty>=doc.qty) ? "green" : "red" }
+		);
+    }
 });
 frappe.ui.form.on("Sales Order Item", {
 	delivered_by_supplier: function(frm, cdt, cdn){
@@ -341,11 +345,16 @@ frappe.ui.form.on("Sales Order Item", {
 					}
 				});
 		}
-	}
+	},
+	
+	qty(frm) {
+        cur_frm.refresh_field("items")
+    }
 });
 
 erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
 	customer_address: function(doc, dt, dn){
+		// Metactical Customization: Add ability to change address even when submitted
 		if(doc.docstatus == 1){
 			erpnext.utils.get_address_display(this.frm, "customer_address");		
 		}
@@ -354,7 +363,49 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 			erpnext.utils.set_taxes_from_address(this.frm, "customer_address", "customer_address", "shipping_address_name");
 		}
 	},
+	
 	warehouse: function(doc, cdt, cdn){
+		var me = this;
+		var item = frappe.get_doc(cdt, cdn);
+
+		// check if serial nos entered are as much as qty in row
+		if (item.serial_no) {
+			let serial_nos = item.serial_no.split(`\n`).filter(sn => sn.trim()); // filter out whitespaces
+			if (item.qty === serial_nos.length) return;
+		}
+
+		if (item.serial_no && !item.batch_no) {
+			item.serial_no = null;
+		}
+
+		var has_batch_no;
+		frappe.db.get_value('Item', {'item_code': item.item_code}, 'has_batch_no', (r) => {
+			has_batch_no = r && r.has_batch_no;
+			if(item.item_code && item.warehouse) {
+				return this.frm.call({
+					method: "erpnext.stock.get_item_details.get_bin_details_and_serial_nos",
+					child: item,
+					args: {
+						item_code: item.item_code,
+						warehouse: item.warehouse,
+						has_batch_no: has_batch_no || 0,
+						stock_qty: item.stock_qty,
+						serial_no: item.serial_no || "",
+					},
+					callback:function(r){
+						if (in_list(['Delivery Note', 'Sales Invoice'], doc.doctype)) {
+							if (doc.doctype === 'Sales Invoice' && (!doc.update_stock)) return;
+							if (has_batch_no) {
+								me.set_batch_number(cdt, cdn);
+								me.batch_no(doc, cdt, cdn);
+							}
+						}
+					}
+				});
+			}
+		})
+		
+		// Metactical Customization: Load reserved qty in sales order
 		var row = locals[cdt][cdn];
 		if (row.item_code && row.warehouse) {
 			return this.frm.call({
@@ -376,6 +427,7 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 	},
 	
 	customer: function(frm){
+		// Metactical Customization: Clear company address to force them to enter manually
 		var me = this;
 		var args = {"company_address": ''}
 		get_party_details(this.frm, null, null, function() {
@@ -391,8 +443,8 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 	},
 	
 	close_sales_order: function(){
+		// Metactical Customization: Pop up to enter reason for closing
 		var me = this;
-		//Pop up to enter reason for closing
 		frappe.prompt([
 				{'fieldname': 'close_reason', 'fieldtype': 'Small Text', 'label': 'Enter Reason', 'reqd': 1}
 			],
@@ -416,63 +468,7 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 
 $.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
 
-
-//Add Stock Entry in dashboard
-var dashboard_sales_order_doctype = function (frm, doctype) {
-		frappe.call({
-				'method': 'metactical.custom_scripts.sales_order.sales_order.get_open_count',
-				'args': {
-					'docname': cur_frm.docname,
-				},
-				'callback': function(r){
-					var items = [];
-					$.each((r.message), function(i, d){
-						items.push(d.name);		
-					})
-					load_template_links(frm, doctype, items);
-				}
-		});
-}
-
-var load_template_links = function(frm, doctype, items){
-	var sales_orders = ['in'];
-	var count_links = 0;
-	items.forEach(function(item){
-		console.log("in loop");		
-		if( sales_orders.indexOf(item) == -1){
-			count_links++;
-			sales_orders.push(item);
-		}
-	});
-
-	var parent = $('.form-dashboard-wrapper [data-doctype="Purchase Order"]').closest('div').parent();
-	parent.find('[data-doctype="' + doctype + '"]').remove();
-	parent.append(frappe.render_template("dashboard_sales_order_doctype", {
-		doctype: doctype
-	}));
-
-	var self = parent.find('[data-doctype="' + doctype + '"]');
-	
-
-	// bind links
-	self.find(".badge-link").on('click', function () {
-		frappe.route_options = {
-			"sales_order_no": frm.doc.name
-		}
-		frappe.set_route("List", doctype);
-	});
-
-	self.find('.count').html(count_links);
-}
-
-frappe.templates["dashboard_sales_order_doctype"] = ' \
-    	<div class="document-link" data-doctype="{{ doctype }}"> \
-    	<a class="badge-link small">{{ __(doctype) }}</a> \
-    	<span class="text-muted small count"></span> \
-    	<span class="open-notification hidden" title="{{ __("Open {0}", [__(doctype)])}}"></span> \
-    	</div>';
-
-//Replace erpnext.utils.get_party_details
+//Metactical Customization: Replace erpnext.utils.get_party_details
 var get_party_details = function(frm, method, args, callback) {
 	if (!method) {
 		method = "erpnext.accounts.party.get_party_details";

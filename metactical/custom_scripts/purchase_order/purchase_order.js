@@ -17,6 +17,30 @@ frappe.ui.form.on('Purchase Order', {
 
 erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderController.extend({
 	onload: function(doc, cdt, cdn){
+		this.setup_queries(doc, cdt, cdn);
+		this._super();
+
+		this.frm.set_query('shipping_rule', function() {
+			return {
+				filters: {
+					"shipping_rule_type": "Buying"
+				}
+			};
+		});
+
+		if (this.frm.doc.__islocal
+			&& frappe.meta.has_field(this.frm.doc.doctype, "disable_rounded_total")) {
+
+				var df = frappe.meta.get_docfield(this.frm.doc.doctype, "disable_rounded_total");
+				var disable = cint(df.default) || cint(frappe.sys_defaults.disable_rounded_total);
+				this.frm.set_value("disable_rounded_total", disable);
+		}
+
+		/* eslint-disable */
+		// no idea where me is coming from
+		
+		// Metactical Customization: Made company address available in shipping address 
+		// filter in PO even when drop ship PO
 		if(this.frm.get_field('shipping_address')) {
 			this.frm.set_query("shipping_address", function() {
 				if(me.frm.doc.customer) {
@@ -28,8 +52,8 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 					return erpnext.queries.company_address_query(me.frm.doc)
 			});
 		}
-		
-		//Remove address if it's new doc
+		/* eslint-enable */
+		// Metactical Customization: Remove address if it's new doc
 		if(this.frm.doc.__islocal == 1){
 			setTimeout(() => {
 				this.frm.set_value("shipping_address", '');
@@ -39,13 +63,18 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 	},
 	
 	supplier: function(doc, cdt, cdn){
-		//Remove address
+		var me = this;
+		erpnext.utils.get_party_details(this.frm, null, null, function(){
+			me.apply_price_list();
+		});
+		// Metactical Customization: Remove address
 		this.frm.set_value("shipping_address", '');
 	},
 	
 	add_from_mappers: function() {
 		var me = this;
 		this.frm.add_custom_button(__('Material Request'),
+			// Metactical Customization: Add supplier filter
 			function() {
 				erpnext.utils.map_current_doc({
 					method: "erpnext.stock.doctype.material_request.material_request.make_purchase_order",
@@ -63,10 +92,14 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 						material_request_type: "Purchase",
 						docstatus: 1,
 						status: ["!=", "Stopped"],
-						per_ordered: ["<", 99.99],
-					}
+						per_ordered: ["<", 100],
+						company: me.frm.doc.company
+					},
+					allow_child_item_selection: true,
+					child_fieldname: "items",
+					child_columns: ["item_code", "qty"]
 				})
-			}, __("Get items from"));
+			}, __("Get Items From"));
 
 		this.frm.add_custom_button(__('Supplier Quotation'),
 			function() {
@@ -75,16 +108,17 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 					source_doctype: "Supplier Quotation",
 					target: me.frm,
 					setters: {
-						company: me.frm.doc.company
+						supplier: me.frm.doc.supplier,
+						valid_till: undefined
 					},
 					get_query_filters: {
 						docstatus: 1,
-						status: ["!=", "Stopped"],
+						status: ["not in", ["Stopped", "Expired"]],
 					}
 				})
-			}, __("Get items from"));
+			}, __("Get Items From"));
 
-		this.frm.add_custom_button(__('Update rate as per last purchase'),
+		this.frm.add_custom_button(__('Update Rate as per Last Purchase'),
 			function() {
 				frappe.call({
 					"method": "get_last_purchase_rate",
@@ -154,24 +188,33 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 	},
 	
 	get_items_from_open_material_requests: function() {
+		// Metactical Customization: Replace company in Material Request selection with supplier
 		this.map_current_doc({
-			method: "metactical.custom_scripts.purchase_order.purchase_order.make_purchase_order_based_on_supplier",
+			method: "erpnext.stock.doctype.material_request.material_request.make_purchase_order_based_on_supplier",
+			args: {
+				supplier: this.frm.doc.supplier
+			},
+			source_doctype: "Material Request",
 			source_name: this.frm.doc.supplier,
+			target: this.frm,
+			setters: {
+				company: me.frm.doc.company
+			},
 			get_query_filters: {
 				docstatus: ["!=", 2],
-			}
+				supplier: this.frm.doc.supplier
+			},
+			get_query_method: "erpnext.stock.doctype.material_request.material_request.get_material_requests_based_on_supplier"
 		});
 	},
 	
 	map_current_doc: function(opts) {
+		// Metactical Customization: Moved the location for price list information
+		// load. Not sure why
 		var me = this;
 		frappe.dom.freeze();
-		if(opts.get_query_filters) {
-			opts.get_query = function() {
-				return {filters: opts.get_query_filters};
-			}
-		}
-		var _map = function() {
+		
+		function _map() {
 			if($.isArray(cur_frm.doc.items) && cur_frm.doc.items.length > 0) {
 				// remove first item row if empty
 				if(!cur_frm.doc.items[0].item_code) {
@@ -224,16 +267,20 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 					})
 				}
 			}
+
 			return frappe.call({
 				// Sometimes we hit the limit for URL length of a GET request
 				// as we send the full target_doc. Hence this is a POST request.
+				
+				// Metactical Customization: Moved the location for price list information
+				// load. Not sure why
 				type: "POST",
 				method: 'frappe.model.mapper.map_docs',
 				args: {
 					"method": opts.method,
 					"source_names": opts.source_name,
 					"target_doc": cur_frm.doc,
-					'args': opts.args
+					"args": opts.args
 				},
 				callback: function(r) {
 					if(!r.exc) {
@@ -248,26 +295,52 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 				}
 			});
 		}
-		if(opts.source_doctype) {
-			var d = new frappe.ui.form.MultiSelectDialog({
+		
+		let query_args = {};
+		if (opts.get_query_filters) {
+			query_args.filters = opts.get_query_filters;
+		}
+
+		if (opts.get_query_method) {
+			query_args.query = opts.get_query_method;
+		}
+
+		if (query_args.filters || query_args.query) {
+			opts.get_query = () => query_args;
+		}
+
+		if (opts.source_doctype) {
+			const d = new frappe.ui.form.MultiSelectDialog({
 				doctype: opts.source_doctype,
 				target: opts.target,
 				date_field: opts.date_field || undefined,
 				setters: opts.setters,
 				get_query: opts.get_query,
+				add_filters_group: 1,
+				allow_child_item_selection: opts.allow_child_item_selection,
+				child_fieldname: opts.child_fieldname,
+				child_columns: opts.child_columns,
+				size: opts.size,
 				action: function(selections, args) {
 					let values = selections;
-					if(values.length === 0){
+					if (values.length === 0) {
 						frappe.msgprint(__("Please select {0}", [opts.source_doctype]))
 						return;
 					}
 					opts.source_name = values;
-					opts.setters = args;
+					if (opts.allow_child_item_selection) {
+						// args contains filtered child docnames
+						opts.args = args;
+					}
 					d.dialog.hide();
 					_map();
 				},
 			});
-		} else if(opts.source_name) {
+
+			return d;
+		}
+
+		if (opts.source_name) {
 			opts.source_name = [opts.source_name];
 			_map();
 		}
