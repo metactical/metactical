@@ -5,7 +5,6 @@ import frappe
 from frappe.model.document import Document
 from datetime import datetime
 from metactical.api.clockin import insert_in_employee_checkin
-from metactical.api.clockin import insert_out_employee_checkin
 
 
 class ClockinLog(Document):
@@ -13,17 +12,13 @@ class ClockinLog(Document):
 		insert_in_employee_checkin(self)
 		
 	def on_update(self):
-		insert_out_employee_checkin(self)
 		self.update_user_pay_cycle_record()
 	
 	def before_save(self):
 		# Validate total hours worked for clockin log
 		if self.has_clocked_out:
 			self.total_hours = time_difference(self.from_time, self.to_time)
-			
-	'''def save(self, *args, **kwargs):
-		super().save(*args, **kwargs)
-		self.update_user_pay_cycle_record()'''
+			self.insert_out_employee_checkin()
 	
 	def update_user_pay_cycle_record(self):
 		clockin_logs = frappe.get_all("Clockin Log", filters={
@@ -48,12 +43,42 @@ class ClockinLog(Document):
 
 		#Update work day hours
 		frappe.db.set_value("Pay Cycle Log", work_day, "hours_worked", total_hours_worked)
-		frappe.db.commit()
 
 		#Calculate total hours in pay cycle
 		pay_cycle_record = frappe.get_doc("Pay Cycle", parent_field)
 		pay_cycle_record.update_hours()
 		pay_cycle_record.save()
+		
+	def insert_out_employee_checkin(self):
+		employee_exists = frappe.db.exists("Employee", {"user_id": self.user})
+
+		if employee_exists:
+			if self.has_clocked_out:
+				if not self.out_employee_checkin_record:
+					#Create employee out checkin record
+					out_employee_checkin = frappe.get_doc({
+						"doctype": "Employee Checkin",
+						"log_type": "OUT",
+						"employee": employee_exists,
+						"time": self.to_time
+					})
+
+					out_employee_checkin.insert(ignore_permissions=True)
+
+					#Link record
+					self.out_employee_checkin_record = out_employee_checkin.name
+
+				else:
+					out_employee_checkin_record = frappe.get_doc("Employee Checkin", self.out_employee_checkin_record)
+					out_employee_checkin_record.time = self.to_time
+					out_employee_checkin_record.save()
+
+					in_employee_checkin_record = frappe.get_doc("Employee Checkin", self.in_employee_checkin_record)
+					in_employee_checkin_record.time = self.from_time
+					in_employee_checkin_record.save()
+
+		else:
+			frappe.throw("Employee record not found")
 
 def time_difference(time1, time2):
 	# convert times to datetime objects
