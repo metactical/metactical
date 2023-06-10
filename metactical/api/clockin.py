@@ -20,39 +20,6 @@ def insert_in_employee_checkin(doc, method=None):
 	else:
 		frappe.throw("Employee record not found")
 
-def insert_out_employee_checkin(doc, method=None):
-	employee_exists = frappe.db.exists("Employee", {"user_id": doc.user})
-
-	if employee_exists:
-		if doc.has_clocked_out:
-			if not doc.out_employee_checkin_record:
-				#Create employee out checkin record
-				out_employee_checkin = frappe.get_doc({
-					"doctype": "Employee Checkin",
-					"log_type": "OUT",
-					"employee": employee_exists,
-					"time": doc.to_time
-				})
-
-				out_employee_checkin.insert()
-				frappe.db.commit()
-
-				#Link record
-				doc.out_employee_checkin_record = out_employee_checkin.name
-				doc.save()
-
-			else:
-				out_employee_checkin_record = frappe.get_doc("Employee Checkin", doc.out_employee_checkin_record)
-				out_employee_checkin_record.time = doc.to_time
-				out_employee_checkin_record.save()
-
-				in_employee_checkin_record = frappe.get_doc("Employee Checkin", doc.in_employee_checkin_record)
-				in_employee_checkin_record.time = doc.from_time
-				in_employee_checkin_record.save()
-
-	else:
-		frappe.throw("Employee record not found")
-
 @frappe.whitelist()
 def get_logout_delay():
 	logout_delay = frappe.db.get_single_value("Time Tracker Settings", "logout_delay")
