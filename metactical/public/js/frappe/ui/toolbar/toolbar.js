@@ -60,7 +60,7 @@ frappe.ui.toolbar.Toolbar = class {
 			frappe.ui.toolbar.toggle_full_width();
 		});
 		
-		//Bind for chein/out
+		//Metactical Customization: Bind for check in/out
 		$('#checkin_btn').on('click', function(){
 			frappe.call({
 				"method": "metactical.custom_scripts.employee_checkin.employee_checkin.login_checkin",
@@ -137,7 +137,7 @@ frappe.ui.toolbar.Toolbar = class {
 				$("<a>", {
 					href: url,
 					class: "dropdown-item",
-					text: link.label,
+					text: __(link.label),
 					target: "_blank"
 				}).appendTo($help_links);
 			}

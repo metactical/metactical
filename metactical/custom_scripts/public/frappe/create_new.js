@@ -53,7 +53,7 @@ $.extend(frappe.model, {
 		}
 
 		// set route options
-		//Comment this out to prevent creating new document with info from filters
+		//Metactical Customizatino: Comment this out to prevent creating new document with info from filters
 		if (frappe.route_options && !doc.parent) {
 			/*$.each(frappe.route_options, function(fieldname, value) {
 				var df = frappe.meta.has_field(doctype, fieldname);

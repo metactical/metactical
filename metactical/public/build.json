@@ -148,5 +148,8 @@
 	],
 	"js/metactical.min.js": [
 		"public/js/template/shipment_rate.html"
+	],
+	"css/metactical.css": [
+		"metactical/page/packing_page/packing_page.scss"
 	]
 }
