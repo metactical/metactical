@@ -237,8 +237,8 @@ class CanadaPost():
             'file_url': file_path.replace(frappe.get_site_path(), ''),
             'is_private': 1,
             'folder': 'Home/Attachments',
-            'attached_to_doctype': doc.doctype,
-            'attached_to_name': doc.name,
+            'attached_to_doctype': doc.parenttype,
+            'attached_to_name': doc.parent,
             'attached_to_field': field_name,
             'file_size': file_size,
         })
