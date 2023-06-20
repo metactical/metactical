@@ -7,6 +7,7 @@ from erpnext.accounts.party import get_party_account
 from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
 from frappe.utils import flt, comma_or, nowdate, getdate
 from frappe import _, scrub, ValidationError
+from erpnext.accounts.doctype.payment_entry.payment_entry import get_reference_as_per_payment_terms
 
 
 @frappe.whitelist()
