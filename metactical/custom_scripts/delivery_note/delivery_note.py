@@ -34,6 +34,9 @@ def on_cancel(self, method):
 	
 def on_submit(self, method):
 	#check if delivery note doesn't have a sales invoice
+	if self.ais_skip_auto_invoice == 1:
+		return
+	
 	if self.per_billed == 100:
 		return
 	
