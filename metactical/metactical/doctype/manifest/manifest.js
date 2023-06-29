@@ -6,6 +6,7 @@ frappe.ui.form.on('Manifest', {
 		if (frm.doc.items?.length && !frm.doc.po_number) {
 			frm.add_custom_button(__("Make Manifest"), () => {
 				frm.call("create_manifest",{}, r => {
+					console.log({"r": r});
 					frm.reload_doc()
 					let html = ''
 					r.message.forEach(file => {
