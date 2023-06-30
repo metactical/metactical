@@ -18,24 +18,25 @@ def execute(filters=None):
 
 	opening_closing = get_data(conditions, filters)
 	for d in opening_closing:
-		transit_warehouse = get_transit_warehouse(d.warehouse)
-		row = {}
-		row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
-		row['item_code'] = d.item_code
-		row['ifw_location'] = d.ifw_location
-		row['item_name'] = d.item_name
-		row['supplier_part_number'] = frappe.db.get_value("Item Supplier", {"parent": d.item_code}, "supplier_part_no")
-		row['closing'] = frappe.db.get_value("Bin", {"warehouse": d.warehouse, "item_code": d.item_code}, "actual_qty") or 0.0
-		wh_actual = frappe.db.get_value("Bin", {"warehouse": "W01-WHS-Active Stock - ICL", "item_code": d.item_code}, "actual_qty") or 0.0
-		wh_res = frappe.db.get_value("Bin", {"warehouse": "W01-WHS-Active Stock - ICL", "item_code": d.item_code}, "reserved_qty") or 0.0
-		row['stock_levels'] = wh_actual - wh_res
-		row["in_transit"] = frappe.db.get_value("Bin", {"warehouse": transit_warehouse, "item_code": d.item_code}, "actual_qty") or 0
-		row['sale'] = d.qty
-		row['pos_profile'] = d.pos_profile
-		row["button"] = '<button onClick="create_material_transfer(\'{}\', \'{}\', \'{}\')">Create Material Transfer</button>'.format(
-							filters.get("pos_profile", ""), filters.get("to_date"), filters.get("item_code", ""))
-		if row['stock_levels'] > 0:
-			data.append(row)
+		if d.qty > 0:
+			transit_warehouse = get_transit_warehouse(d.warehouse)
+			row = {}
+			row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
+			row['item_code'] = d.item_code
+			row['ifw_location'] = d.ifw_location
+			row['item_name'] = d.item_name
+			row['supplier_part_number'] = frappe.db.get_value("Item Supplier", {"parent": d.item_code}, "supplier_part_no")
+			row['closing'] = frappe.db.get_value("Bin", {"warehouse": d.warehouse, "item_code": d.item_code}, "actual_qty") or 0.0
+			wh_actual = frappe.db.get_value("Bin", {"warehouse": "W01-WHS-Active Stock - ICL", "item_code": d.item_code}, "actual_qty") or 0.0
+			wh_res = frappe.db.get_value("Bin", {"warehouse": "W01-WHS-Active Stock - ICL", "item_code": d.item_code}, "reserved_qty") or 0.0
+			row['stock_levels'] = wh_actual - wh_res
+			row["in_transit"] = frappe.db.get_value("Bin", {"warehouse": transit_warehouse, "item_code": d.item_code}, "actual_qty") or 0
+			row['sale'] = d.qty
+			row['pos_profile'] = d.pos_profile
+			row["button"] = '<button onClick="create_material_transfer(\'{}\', \'{}\', \'{}\')">Create Material Transfer</button>'.format(
+								filters.get("pos_profile", ""), filters.get("to_date"), filters.get("item_code", ""))
+			if row['stock_levels'] > 0:
+				data.append(row)
 
 	return columns, data
 
@@ -129,11 +130,18 @@ def get_transit_warehouse(warehouse):
 	return transit_warehouse
 
 def get_data(conditions, filters):
-	data = frappe.db.sql("""select c.item_code, c.item_name, i.ifw_retailskusuffix, i.ifw_location, c.warehouse, sum(c.qty) as qty,
-		p.pos_profile, p.company, c.uom, c.stock_uom, c.conversion_factor
-		from `tabSales Invoice Item` c inner join `tabSales Invoice` p on p.name = c.parent
-		inner join `tabItem` i on c.item_code = i.name 
-		where p.docstatus = 1 and is_pos =1 and p.posting_date = '{}' {}
+	data = frappe.db.sql("""
+		select 
+			c.item_code, c.item_name, i.ifw_retailskusuffix, i.ifw_location, c.warehouse, sum(c.qty) as qty,
+			p.pos_profile, p.company, c.uom, c.stock_uom, c.conversion_factor
+		from
+			`tabSales Invoice Item` c 
+		inner join 
+			`tabSales Invoice` p on p.name = c.parent
+		inner join 
+			`tabItem` i on c.item_code = i.name 
+		where 
+			p.docstatus = 1 and is_pos =1 and p.posting_date = '{}' {}
 		group by 1,7 order by 2,7
 		""".format(filters.get("to_date"), conditions), as_dict=1)
 	return data
