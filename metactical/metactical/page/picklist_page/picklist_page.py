@@ -4,9 +4,12 @@ import json
 @frappe.whitelist()
 def get_defaults(user):
 	default_settings = {}
-	defaults = frappe.db.sql("""SELECT default_warehouse 
-								FROM `tabPick List Settings Default` AS settings
-								WHERE settings.user = %(user)s""",
+	defaults = frappe.db.sql("""SELECT 
+									default_warehouse, default_location 
+								FROM 
+									`tabPick List Settings Default` AS settings
+								WHERE 
+									settings.user = %(user)s""",
 							{"user": frappe.session.user}, as_dict=1)
 	if len(defaults) > 0:
 		default_settings = defaults[0]

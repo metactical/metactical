@@ -48,8 +48,9 @@ class PicklistPage{
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
 			me.$selected_warehouse.html(ret.message.default_warehouse);
+			me.$selected_source.html(ret.message.default_location);
 			metactical.pick_list.selected_warehouse = ret.message.default_warehouse;
-			metactical.pick_list.selected_source = me.$selected_source.html();
+			metactical.pick_list.selected_source = ret.message.default_location;
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -99,6 +100,9 @@ class PicklistPage{
 		frappe.prompt(
 			[{"fieldtype": "Link", "fieldname": "source", "options": "Lead Source", "label": 'Source'}],
 			function(values){
+				if(typeof values.source == "undefined"){
+					values.source = "All";
+				}
 				me.$selected_source.html(values.source);
 				metactical.pick_list.selected_source = values.source
 				me.load_summary();
@@ -186,7 +190,7 @@ class PicklistPage{
 				});
 				me.wrapper.find('.start-picking-btn').on('click', function(){
 					//me.list_tote_items();
-					me.list_multi_orders();
+					me.list_multi_orders(metactical.pick_list.selected_source);
 				});
 			}
 		});
@@ -469,7 +473,16 @@ class PicklistPage{
 						}
 					},
 					render_input: true
-				});
+				})
+				
+				// Set default location
+				/*let current_location = me.pl_source.get_value();
+				if(current_location == "" && metactical.pick_list.default_location != "" &&
+					metactical.pick_list.selected_source == "All"){
+						metactical.pick_list.selected_source = metactical.pick_list.default_location;
+						me.pl_source.set_value(metactical.pick_list.default_location);
+				}*/
+				
 				me.pl_barcode.set_value(filter);
 				me.pl_barcode.set_focus();
 				/*if(metactical.pick_list.selected_source != "All"){
@@ -499,7 +512,7 @@ class PicklistPage{
 						me.list_orders(filter=barcode);
 					}
 				});
-				me.wrapper.find('.pl-source').on('change', function(){
+				me.wrapper.find('.pl-source').on('focusout', function(){
 					
 				});
 			}
