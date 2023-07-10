@@ -6,7 +6,9 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "allowed_user"
+  "allowed_user",
+  "section_break_p947q",
+  "default_warehouses"
  ],
  "fields": [
   {
@@ -14,12 +16,22 @@
    "fieldtype": "Table",
    "label": "Click to Add Allowed Users",
    "options": "Packing Allowed User"
+  },
+  {
+   "fieldname": "section_break_p947q",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "default_warehouses",
+   "fieldtype": "Table",
+   "label": "Default Warehouses",
+   "options": "Packing Default Warehouse"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-06-04 10:57:28.556265",
+ "modified": "2023-07-07 18:10:28.752348",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Packing Settings",

@@ -11,3 +11,11 @@ def check_to_add_permission():
 		return False
 	else:
 		return True
+		
+@frappe.whitelist()
+def get_default_warehouse():
+	has_warehouse = frappe.db.exists('Packing Default Warehouse', {"user": frappe.session.user})
+	if has_warehouse:
+		return frappe.db.get_value('Packing Default Warehouse', {"user": frappe.session.user}, 'default_warehouse')
+	else:
+		return ""

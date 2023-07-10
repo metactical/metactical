@@ -7,6 +7,16 @@ frappe.pages["packing-page"].on_page_load = function (wrapper) {
 		freeze: true,
 		callback: function(ret){
 			havenir.packing_slip.has_add_permission = ret.message;
+		}
+	});
+	
+	//Load the default warehouse
+	havenir.packing_slip.default_warehouse = "";
+	frappe.call({
+		method: "metactical.metactical.page.packing_page.packing_page.get_default_warehouse",
+		freeze: true,
+		callback: function(ret){
+			havenir.packing_slip.default_warehouse = ret.message;
 			frappe.packing_slip = new PackingPage(wrapper);
 		}
 	});
@@ -142,6 +152,12 @@ class PackingPage {
 			},
 			render_input:true
 		});
+		
+		// Load default warehouse
+		if(havenir.packing_slip.default_warehouse != ""){
+			$('[data-fieldname=selected_warehouse]').val(havenir.packing_slip.default_warehouse);
+			$('.picklist-tote-wrapper').show();
+		}
 	}
 }
 
