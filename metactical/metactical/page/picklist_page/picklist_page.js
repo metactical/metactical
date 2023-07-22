@@ -47,10 +47,14 @@ class PicklistPage{
 		this.$user_name = this.wrapper.find('#user_name');
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
+			let default_location = ret.message.default_location;
+			if(default_location == ""){
+				default_location = "All"
+			}
 			me.$selected_warehouse.html(ret.message.default_warehouse);
-			me.$selected_source.html(ret.message.default_location);
+			me.$selected_source.html(default_location);
 			metactical.pick_list.selected_warehouse = ret.message.default_warehouse;
-			metactical.pick_list.selected_source = ret.message.default_location;
+			metactical.pick_list.selected_source = default_location;
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
