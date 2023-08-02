@@ -1,8 +1,13 @@
 import frappe
 
 @frappe.whitelist()
-def get_delivery_from_tote(tote):
-	return frappe.db.get_value('Picklist Tote', tote, 'current_delivery_note')
+def get_delivery_from_tote(tote, warehouse):
+	is_tote = frappe.db.exists('Picklist Tote', {"name": tote, "warehouse": warehouse})
+	if not is_tote:
+		return {"is_tote": False, "delivery_note": None}
+	else:
+		delivery_note = frappe.db.get_value('Picklist Tote', tote, 'current_delivery_note')
+		return {"is_tote": True, "delivery_note": delivery_note}
 	
 @frappe.whitelist()
 def check_to_add_permission():

@@ -127,8 +127,7 @@ class PackingPage {
 			df: {
 				label: "Tote Barcode",
 				fieldname: "tote_barcode",
-				fieldtype: "Link",
-				options: "Picklist Tote",
+				fieldtype: "Data",
 				get_query: function(){
 					return {
 						filters: [
@@ -138,14 +137,27 @@ class PackingPage {
 					}
 				},
 				change: function(){
-					frappe.call({
-						method: "metactical.metactical.page.packing_page.packing_page.get_delivery_from_tote",
-						args: {
-							tote: tote_barcode_field.get_value()
-						},
-						freeze: true,
-						callback: function(ret){
-							delivery_note_field.set_value(ret.message);
+					$('.picklist-tote-wrapper').on('keypress', function(event){
+						//Only when enter is pressed
+						if(event.keyCode == 13)
+						{
+							frappe.call({
+								method: "metactical.metactical.page.packing_page.packing_page.get_delivery_from_tote",
+								args: {
+									tote: tote_barcode_field.get_value(),
+									warehouse: selected_warehouse.get_value()
+								},
+								freeze: true,
+								callback: function(ret){
+									let is_tote = ret.message.is_tote;
+									if(is_tote){
+										delivery_note_field.set_value(ret.message.delivery_note);
+									}
+									else{
+										frappe.throw("Error: No tote registered at warehouse with that name. Please check and try again.");
+									}
+								}
+							});
 						}
 					});
 				}
