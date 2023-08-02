@@ -141,6 +141,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Packing Page V2",
+   "link_to": "packing-page-v2",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Packing Slip",
    "link_to": "Packing Slip",
    "link_type": "DocType",
@@ -648,7 +657,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-07-14 03:33:33.407550",
+ "modified": "2023-08-02 12:33:16.920577",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
