@@ -8,7 +8,8 @@
  "field_order": [
   "allowed_user",
   "section_break_p947q",
-  "default_warehouses"
+  "default_warehouses",
+  "default_weight_uom"
  ],
  "fields": [
   {
@@ -26,12 +27,18 @@
    "fieldtype": "Table",
    "label": "Default Warehouses",
    "options": "Packing Default Warehouse"
+  },
+  {
+   "fieldname": "default_weight_uom",
+   "fieldtype": "Link",
+   "label": "Default Weight UOM",
+   "options": "UOM"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-07-07 18:10:28.752348",
+ "modified": "2023-07-31 11:11:54.011289",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Packing Settings",
