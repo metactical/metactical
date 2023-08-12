@@ -204,14 +204,6 @@ def get_columns():
 				"width": 200,
 				"align": "center",
 			},
-
-			# {
-			# 	"label": _("Rate"),
-			# 	"fieldname": "rate",
-			# 	"fieldtype": "Currency",
-			# 	"width": 100,
-			# },		
-			
 			{
 				"label": _("Default Supplier"),
 				"fieldname": "supplier_name",
@@ -258,6 +250,12 @@ def get_columns():
 			{
 				"label": _("R07-Queen-Active Stock - ICL"),
 				"fieldname": "wh_queen",
+				"fieldtype": "Int",
+				"width": 200,
+			},
+			{
+				"label": _("R04-Mon-Active Stock - ICL"),
+				"fieldname": "wh_mon",
 				"fieldtype": "Int",
 				"width": 200,
 			},
