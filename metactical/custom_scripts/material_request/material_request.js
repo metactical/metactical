@@ -1,5 +1,8 @@
 frappe.ui.form.on('Material Request', {
 	get_item_data: function(frm, item, overwrite_warehouse=false) {
+		// Metactical customizatino: Prevent overwriting of target warehouse
+		overwrite_warehouse = false;
+		
 		if (item && !item.item_code) { return; }
 		frm.call({
 			method: "erpnext.stock.get_item_details.get_item_details",
