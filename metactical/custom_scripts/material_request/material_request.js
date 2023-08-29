@@ -1,5 +1,7 @@
 frappe.ui.form.on('Material Request', {
 	get_item_data: function(frm, item) {
+		// Metactical Customization: Prevent overwriting of warehouse
+		let overwrite_warehouse = false;
 		if (item && !item.item_code) { return; }
 
 		frm.call({
@@ -21,7 +23,8 @@ frappe.ui.form.on('Material Request', {
 					plc_conversion_rate: 1,
 					rate: item.rate,
 					conversion_factor: item.conversion_factor
-				}
+				},
+				overwrite_warehouse: overwrite_warehouse
 			},
 			callback: function(r) {
 				const d = item;
