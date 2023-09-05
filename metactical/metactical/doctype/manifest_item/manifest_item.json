@@ -7,9 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "shipment",
-  "row_name",
   "shipment_id",
-  "po_number",
   "warehouse",
   "status"
  ],
@@ -23,29 +21,14 @@
    "reqd": 1
   },
   {
-   "fieldname": "row_name",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Row Name"
-  },
-  {
    "fieldname": "shipment_id",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Shipment ID"
   },
   {
-   "fieldname": "po_number",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "in_list_view": 1,
-   "label": "PO Number",
-   "read_only": 1
-  },
-  {
    "fieldname": "status",
    "fieldtype": "Select",
-   "hidden": 1,
    "in_list_view": 1,
    "label": "Status"
   },
@@ -60,7 +43,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-03-17 10:54:47.662480",
+ "modified": "2023-09-05 18:29:29.713757",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest Item",

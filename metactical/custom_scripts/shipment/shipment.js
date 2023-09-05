@@ -137,7 +137,25 @@ const ShipmentController = frappe.ui.form.Controller.extend({
         }
         // end select default
         this.rateDialog.show()
-    }
+    },
+    
+    get_manifest: function(){
+		let shipment_id = this.frm.doc.shipments[0].shipment_id;
+		this.frm.call({
+			method: "metactical.custom_scripts.shipment.shipment.get_manifest",
+			args: {
+				start_date: moment(this.frm.doc.creation).format("YYYYMMDD"),
+				shipment_id: shipment_id,
+				doctype: this.frm.doctype,
+				docname: this.frm.docname
+			},
+			freeze: true,
+			callback: function(ret){
+				console.log({"ret": ret});
+			}
+		});
+		
+	}
 })
 
 $.extend(cur_frm.cscript, new ShipmentController({ frm: cur_frm }));

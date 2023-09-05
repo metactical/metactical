@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <shipment xmlns="http://www.canadapost.ca/ws/shipment-v8">
-    <group-id>{{ doc.name }}</group-id>
+    <group-id>{{ group_id }}</group-id>
+    <customer-request-id>{{ doc.name }}-parcel-{{ parcel.idx }}</customer-request-id>
     <requested-shipping-point>{{ pickup_address_doc.pincode|replace(' ','') }}</requested-shipping-point>
     <cpc-pickup-indicator>true</cpc-pickup-indicator>
     <delivery-spec>

@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <transmit-set xmlns="http://www.canadapost.ca/ws/manifest-v8">
     <group-ids>
-        {% for gid in groups %}
-        <group-id>{{ gid }}</group-id>
-        {% endfor %}
+        <group-id>{{ group }}</group-id>
     </group-ids>
     {% if manifest_doc.drop_to_point %}
     <requested-shipping-point>{{ manifest_doc.point_zip_code|replace(' ','') }}</requested-shipping-point>
