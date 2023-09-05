@@ -7,39 +7,26 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "from_date",
-  "to_date",
+  "pickup_date",
+  "warehouse",
+  "pickup_company",
+  "pickup_address",
+  "pickup_address_display",
+  "pickup_contact_person",
+  "pickup_contact_display",
   "get_shipments",
   "column_break_4",
   "drop_to_point",
   "point_zip_code",
   "po_number",
   "section_break_6",
-  "manifests",
   "items"
  ],
  "fields": [
   {
-   "default": "Today",
-   "fieldname": "from_date",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "From Date",
-   "reqd": 1
-  },
-  {
-   "default": "Today",
-   "fieldname": "to_date",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "label": "To Date",
-   "reqd": 1
-  },
-  {
    "fieldname": "items",
    "fieldtype": "Table",
-   "label": "Items",
+   "label": "Shipments",
    "options": "Manifest Item"
   },
   {
@@ -77,15 +64,51 @@
    "label": "Point zip code"
   },
   {
-   "fieldname": "manifests",
-   "fieldtype": "Table",
-   "label": "Manifests",
-   "options": "Manifest Address Item"
+   "fieldname": "pickup_date",
+   "fieldtype": "Date",
+   "label": "Pickup Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pickup_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "pickup_contact_person",
+   "fieldtype": "Link",
+   "label": "Pickup Contact Person",
+   "options": "User"
+  },
+  {
+   "fieldname": "pickup_company",
+   "fieldtype": "Link",
+   "label": "Pickup Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pickup_address_display",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pickup_contact_display",
+   "fieldtype": "Small Text",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-02-24 00:47:35.461536",
+ "modified": "2023-09-05 16:57:34.126764",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest",

@@ -2,7 +2,14 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Canada Post', {
-	// refresh: function(frm) {
-
-	// }
+	get_manifest: function(frm){
+		frm.call({
+			method: "metactical.metactical.doctype.canada_post.canada_post.get_manifest",
+			args: {},
+			freeze: true,
+			callback: function(ret){
+				console.log(ret);
+			}
+		});
+	}
 });
