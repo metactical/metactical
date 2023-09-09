@@ -233,7 +233,7 @@ def check_current_pay_cycle_record(current_date, current_time):
 				user_previous_pay_cycle = frappe.get_doc("Pay Cycle", user_previous_pay_cycle_record)
 				pay_cycles.append(user_previous_pay_cycle)
 
-				prev_index += 1
+		prev_index += 1
 				
 	button_activation_delay = frappe.db.get_single_value("Time Tracker Settings", "clockinout_delay")
 
