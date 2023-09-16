@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_events_in_timeline": 1,
  "allow_rename": 1,
  "autoname": "format:MF-{MM}-{DD}-{YYYY}-{##}",
  "creation": "2023-01-22 00:12:59.974856",
@@ -11,29 +12,25 @@
   "warehouse",
   "pickup_company",
   "pickup_address",
+  "address_company",
   "pickup_address_display",
   "pickup_contact_person",
   "pickup_contact_display",
-  "get_shipments",
   "column_break_4",
   "drop_to_point",
   "point_zip_code",
   "po_number",
   "section_break_6",
-  "items"
+  "items",
+  "status"
  ],
  "fields": [
   {
    "fieldname": "items",
    "fieldtype": "Table",
    "label": "Shipments",
-   "options": "Manifest Item"
-  },
-  {
-   "fieldname": "get_shipments",
-   "fieldtype": "Button",
-   "label": "Get Shipments",
-   "options": "get_shipments"
+   "options": "Manifest Item",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_4",
@@ -80,13 +77,15 @@
    "fieldname": "pickup_address",
    "fieldtype": "Link",
    "label": "Pickup Address",
-   "options": "Address"
+   "options": "Address",
+   "reqd": 1
   },
   {
    "fieldname": "pickup_contact_person",
    "fieldtype": "Link",
    "label": "Pickup Contact Person",
-   "options": "User"
+   "options": "User",
+   "reqd": 1
   },
   {
    "fieldname": "pickup_company",
@@ -104,11 +103,25 @@
    "fieldname": "pickup_contact_display",
    "fieldtype": "Small Text",
    "read_only": 1
+  },
+  {
+   "fetch_from": "pickup_address.ais_company",
+   "fieldname": "address_company",
+   "fieldtype": "Data",
+   "label": "Address Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nError\nCompleted",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-09-05 16:57:34.126764",
+ "modified": "2023-09-16 14:42:47.980377",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest",

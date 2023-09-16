@@ -186,39 +186,6 @@ class CanadaPost():
 				shipments[d.row_id] = 0
 			shipments[d.row_id] = shipments[d.row_id]+1
 		return shipments
-
-	"""def create_manifest(self, shipments, manifest_doc, manifest_row):
-		# Check if shipments are available for transmition
-		
-		context = self.get_context(shipments[-1])
-		context.groups = shipments
-		context.manifest_doc = manifest_doc
-		context.warehouse_doc = frappe.get_doc('Warehouse', manifest_row.warehouse).as_dict()
-		context.warehouse_doc.state = get_state_code(context.warehouse_doc.state)
-		body = frappe.render_template(
-			"metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
-		response = self.get_response(
-				f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
-				
-		po_numbers = []
-		files = []
-		if response:
-			if isinstance(response['manifests']['link'], dict):
-				links = [response['manifests']['link']]
-			else:
-				links = response['manifests']['link']
-			for link in links:
-				res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-															  'Content-Type': link['@media-type']}, method='GET')
-				if res and res['manifest']['po-number']:
-					po_numbers.append(res['manifest']['po-number'])
-					for mlink in res['manifest']['links']['link']:
-						if mlink['@rel']=="artifact":
-							manifest_row.db_set('manifest_url', f'''<link rel="{mlink['@rel']}" href="{mlink['@href']}" media-type="{mlink['@media-type']}"></link>''')
-							self.get_label(manifest_row, mlink, 'manifest', files)
-		if po_numbers:
-			manifest_row.db_set('po_number', ",".join(po_numbers))
-		return files"""
 		
 	def create_manifest(self, manifest):
 		context = frappe._dict()
@@ -248,7 +215,6 @@ class CanadaPost():
 					po_number = res['manifest']['po-number']
 					for mlink in res['manifest']['links']['link']:
 						if mlink['@rel']=="artifact":
-							#manifest_row.db_set('manifest_url', f'''<link rel="{mlink['@rel']}" href="{mlink['@href']}" media-type="{mlink['@media-type']}"></link>''')
 							manifest_file = self.get_response(
 									mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
 							if manifest_file.status_code == 200:
@@ -273,10 +239,7 @@ class CanadaPost():
 							else:
 								shipment_links = manifest_shipments["shipments"]["link"]
 							for shipment in shipment_links:
-								#not_shipments = ["@rel", "@href", "@media-type"]
-								#if shipment not in not_shipments:
 								shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
-								#shipment_infos.append(shipment_info)
 								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 		return shipment_ids, po_number
 							
