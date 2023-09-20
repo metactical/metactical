@@ -333,7 +333,7 @@ const table = (tableData) => {
 }
 
 function dateFormatter(date) {
-    const formattedDate = new Date(`${date}T00:00:00Z`).toUTCString().slice(0, 11);
+    const formattedDate = moment(new Date(date)).format('ddd MMM DD');
     return formattedDate;
 }
 
