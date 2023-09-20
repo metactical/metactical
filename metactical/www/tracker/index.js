@@ -333,7 +333,7 @@ const table = (tableData) => {
 }
 
 function dateFormatter(date) {
-    const formattedDate = new Date(date).toDateString().slice(0, 10);
+    const formattedDate = moment(new Date(date)).format('ddd MMM DD');
     return formattedDate;
 }
 
