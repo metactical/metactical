@@ -460,8 +460,8 @@ def approve_details_change_request(request_name):
 	req.save()
 
 	clockin_log = frappe.get_doc("Clockin Log", req.log)
-	clockin_log.from_time = req.requested_checkin_military
-	clockin_log.to_time = req.requested_checkout_military
+	clockin_log.from_time = f"{clockin_log.date} {str(req.requested_checkin_military)}"
+	clockin_log.to_time = f"{clockin_log.date} {str(req.requested_checkout_military)}"
 	clockin_log.save()
 
 	return "success"
