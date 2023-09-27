@@ -595,6 +595,24 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Returns and Store Credits - POS",
+   "link_to": "Returns and Store Credits - POS",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Returns and Store Credits - Non POS",
+   "link_to": "Returns and Store Credits - Non POS",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Settings",
    "link_to": "Accounts Settings",
@@ -657,7 +675,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-08-02 12:33:16.920577",
+ "modified": "2023-09-27 11:43:42.067286",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
