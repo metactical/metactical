@@ -3,7 +3,7 @@ from frappe import _
 from frappe.utils import add_days, flt, get_datetime_str, nowdate
 
 @frappe.whitelist()
-def get_exchange_rate(from_currency, to_currency, transaction_date=None, args=None):
+def get_exchange_rate(from_currency, to_currency, transaction_date, args=None):
 	if not (from_currency and to_currency):
 		# manqala 19/09/2016: Should this be an empty return or should it throw and exception?
 		return
@@ -45,15 +45,15 @@ def get_exchange_rate(from_currency, to_currency, transaction_date=None, args=No
 
 		if not value:
 			import requests
-
-			api_url = "http://api.exchangerate.host/convert"
+			
+			api_url = f"https://api.frankfurter.app/{transaction_date}"
 			response = requests.get(
-				api_url, params={"date": transaction_date, "from": from_currency, "to": to_currency, 
-					"access_key": "d2792ef5cbaa18d87550feb1c12afa58", "amount": 1}
+				api_url, params={"from": from_currency, "to": to_currency, 
+					"amount": 1}
 			)
 			# expire in 6 hours
 			response.raise_for_status()
-			value = response.json()["result"]
+			value = response.json().get("rates", {}).get(to_currency)
 			cache.setex(name=key, time=21600, value=flt(value))
 		return flt(value)
 	except Exception:
