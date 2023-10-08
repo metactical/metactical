@@ -2,11 +2,6 @@ frappe.provide("erpnext");
 frappe.provide("erpnext.utils");
 erpnext.utils.update_child_items = function(opts) {
 	const frm = opts.frm;
-	/*for(let row in frm.doc.items){
-		if(frm.doc.items[row].picked_qty > 0){
-			frappe.throw('A pick list has already been created for this Order. Please cancel it first.');
-		}
-	}*/
 	const cannot_add_row = (typeof opts.cannot_add_row === 'undefined') ? true : opts.cannot_add_row;
 	const child_docname = (typeof opts.cannot_add_row === 'undefined') ? "items" : opts.child_docname;
 	const child_meta = frappe.get_meta(`${frm.doc.doctype} Item`);
@@ -88,6 +83,8 @@ erpnext.utils.update_child_items = function(opts) {
 		precision: get_precision("rate")
 	}];
 	
+	// Metactical Customization: Add picked qty validation in Item Update
+	// pop up so we don't reduce amount by amount already picked
 	if (frm.doc.doctype == 'Sales Order') {
 		fields.push(
 			{
@@ -137,7 +134,9 @@ erpnext.utils.update_child_items = function(opts) {
 			},
 		],
 		primary_action: function() {
-			//Add already picked items in Sales orders
+			// Metactical Customization: Add picked qty validation in Item Update
+			// pop up so we don't reduce amount by amount already picked
+			// Add already picked items in Sales orders
 			if(frm.doc.doctype == 'Sales Order'){
 				frm.doc[opts.child_docname].forEach(d => {
 					if(d.picked_qty == d.qty){
@@ -158,7 +157,9 @@ erpnext.utils.update_child_items = function(opts) {
 				});
 			}
 			const trans_items = this.get_values()["trans_items"].filter((item) => !!item.item_code);
-			//Validate picked_qty < qty
+			// Metactical Customization: Add picked qty validation in Item Update
+			// pop up so we don't reduce amount by amount already picked
+			// Validate picked_qty < qty
 			if(frm.doc.doctype == 'Sales Order'){
 				trans_items.forEach(row => {
 					if(row.picked_qty > row.qty){
@@ -187,6 +188,8 @@ erpnext.utils.update_child_items = function(opts) {
 	});
 
 	frm.doc[opts.child_docname].forEach(d => {
+		// Metactical Customization: Add picked qty validation in Item Update
+		// pop up so we don't reduce amount by amount already picked
 		if(frm.doc.doctype == 'Sales Order' && d.picked_qty < d.qty){
 			dialog.fields_dict.trans_items.df.data.push({
 				"docname": d.name,

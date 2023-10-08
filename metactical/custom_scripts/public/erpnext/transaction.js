@@ -10,6 +10,7 @@ erpnext.TransactionController = erpnext.TransactionController.extend({
 				}
 			}).then(r => {
 				const data = r && r.message;
+				// MEtactical Customization: Added sound on scan of barcode 
 				if (!data || Object.keys(data).length === 0) {
 					frappe.utils.play_sound("error");
 					frappe.show_alert({
@@ -28,6 +29,7 @@ erpnext.TransactionController = erpnext.TransactionController.extend({
 		return false;
 	},
 	
+	// Metactical Customization: Add scan to confirm button functionality
 	ais_scan_to_confirm: function() {
 		var me = this;
 		var items = this.frm.doc.items;

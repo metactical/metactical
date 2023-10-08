@@ -162,7 +162,7 @@ def set_missing_values(source, target_doc, for_validate=False):
 	target_doc.set_supplier_from_item_default()
 	target_doc.set_price_list_currency("Buying")
 
-	# set contact and address details for supplier, if they are not mentioned
+	# Metactical Customization: Set contact and address details for supplier, if they are not mentioned
 	if getattr(target_doc, "supplier", None):
 		target_doc.update_if_missing(get_party_details(target_doc.supplier, party_type="Supplier", ignore_permissions=target_doc.flags.ignore_permissions,
 		doctype=target_doc.doctype, company=target_doc.company, party_address=target_doc.supplier_address, shipping_address=target_doc.get('shipping_address')))

@@ -1,3 +1,8 @@
+########
+# Metactical Customizatino: The whole file is not needed anymore. It was to fix a bug that did not
+# update reserved quantity in Sales Orders. Will be deleted in next update
+########
+
 import frappe, erpnext
 from erpnext.stock.stock_balance import update_bin_qty, get_reserved_qty
 import json
