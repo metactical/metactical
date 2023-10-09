@@ -46,7 +46,18 @@ class CustomPickList(PickList):
 		frappe.db.set_value(item_table, item.sales_order_item, "picked_qty", already_picked + picked_qty)
 
 	def before_save(self):
-		super(CustomPickList, self).before_save()
+		# Metactical Customization: removed auto location assignement. Will remove the whole
+		# set_item_location in the future from this page
+		# self.set_item_locations()
+		
+		# set percentage picked in SO
+		for location in self.get("locations"):
+			if (
+				location.sales_order
+				and frappe.db.get_value("Sales Order", location.sales_order, "per_picked") == 100
+			):
+				frappe.throw("Row " + str(location.idx) + " has been picked already!")
+				
 		if len(self.locations) > 0:
 			rv = BytesIO()
 			_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
