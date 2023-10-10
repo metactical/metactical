@@ -25,7 +25,8 @@ def get_data():
 									itm.name sku, max(itm.item_name) item_name,
 									max(itm.last_purchase_rate) last_purchase_rate_CAD,
 									-- Evaluating the supplier price according to the price list currency
-									max(case when prc.currency = 'USD' then prc.price_list_rate * %(usd_rate)s else prc.price_list_rate end) supplier_price_evaluated
+									max(case when prc.currency = 'USD' then prc.price_list_rate * %(usd_rate)s else prc.price_list_rate end) supplier_price_evaluated,
+									prc.currency
 								FROM 
 									`tabItem` itm
 								LEFT JOIN 
@@ -37,7 +38,8 @@ def get_data():
 							SELECT 
 								cte.sku, cte.item_name, sum(bin.actual_qty) qty_all_warehouse,
 								-- Using the evaluated supplier price if there is no purchase transaction
-								max(case when last_purchase_rate_CAD = 0 then supplier_price_evaluated else last_purchase_rate_CAD end) purchase_rate_or_supplier_price
+								max(case when last_purchase_rate_CAD = 0 then supplier_price_evaluated else last_purchase_rate_CAD end) purchase_rate_or_supplier_price,
+								cte.currency
 							FROM 
 								cte
 							JOIN
@@ -72,6 +74,12 @@ def get_columns():
 			"fieldtype": "Currency",
 			"label": "Purchase Rate/ Supplier Price",
 			"width": "200"
+		},
+		{
+			"fieldname": "currency",
+			"fieldtype": "Data",
+			"label": "Currency",
+			"width": 150
 		}
 	]
 	return columns
