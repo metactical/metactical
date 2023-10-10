@@ -256,15 +256,16 @@ def create_pick_list(source_name, target_doc=None):
 				pending_percent = (item.qty - max(picked_qty, item.delivered_qty)) / item.qty
 				target.qty = target.stock_qty = qty * pending_percent
 				return
-
+	
+	# Metactical Customization: Add bundled item instead of breaking it down to it's individual items
 	def should_pick_order_item(item) -> bool:
 		return (
 			abs(item.delivered_qty) < abs(item.qty)
 			and item.delivered_by_supplier != 1
-			and not is_product_bundle(item.item_code)
 		)
 	
 	# Metactcal Customization: Add warehouse, sales order and source to item map
+	# and removed packed items replacement 
 	doc = get_mapped_doc(
 		"Sales Order",
 		source_name,
@@ -282,17 +283,7 @@ def create_pick_list(source_name, target_doc=None):
 				"field_map": {"parent": "sales_order", "name": "sales_order_item"},
 				"postprocess": update_item_quantity,
 				"condition": should_pick_order_item,
-			},
-			"Packed Item": {
-				"doctype": "Pick List Item",
-				"field_map": {
-					"parent": "sales_order",
-					"name": "sales_order_item",
-					"parent_detail_docname": "product_bundle_item",
-				},
-				"field_no_map": ["picked_qty"],
-				"postprocess": update_packed_item_qty,
-			},
+			}
 		},
 		target_doc,
 	)
