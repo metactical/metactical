@@ -16,11 +16,13 @@ def before_cancel(doc, method=None):
 		avoid_shpment(doc.name, doc.service_provider, [x.name for x in doc.shipments])
 		
 @frappe.whitelist()
-def get_manifest(start_date="20230824", shipment_id="359281692911265918", doctype="Shipment", docname="SHIPMENT-00007"):
+def get_manifest(start_date, shipment_id, doctype, docname):
 	cp = CanadaPost()
-	#start_date = datetime.strptime(start_date, "%Y-%m-%d").strftime(self.creation, "%Y%m%d")
+	start_date = datetime.strptime(start_date, "%Y-%m-%d").strftime("%Y%m%d")
+	frappe.errprint(start_date)
+	frappe.errprint(shipment_id)
 	#end_date = datetime.strftime(datetime.now(), "%Y%m%d")
-	end_date = "20230825"
+	end_date = start_date
 	url = f"/rs/{cp.settings.customer_number}/{cp.settings.customer_number}/manifest?start={start_date}&end={end_date}"
 	headers={'Accept': 'application/vnd.cpc.manifest-v8+xml'}
 	response = cp.get_response(url, "", headers=headers, method='GET')
