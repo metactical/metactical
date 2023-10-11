@@ -144,7 +144,7 @@ const ShipmentController = frappe.ui.form.Controller.extend({
 		this.frm.call({
 			method: "metactical.custom_scripts.shipment.shipment.get_manifest",
 			args: {
-				start_date: moment(this.frm.doc.creation).format("YYYYMMDD"),
+				start_date: this.frm.doc.pickup_date,
 				shipment_id: shipment_id,
 				doctype: this.frm.doctype,
 				docname: this.frm.docname
