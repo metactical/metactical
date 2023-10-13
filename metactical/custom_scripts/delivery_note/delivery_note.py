@@ -29,6 +29,17 @@ def on_cancel(self, method):
 
 	self.make_gl_entries_on_cancel()
 	
+	# Metactical Customization: Return picked qty to previous one if is return
+	if self.is_return == 1 and self.pick_list:
+		for row in self.items:
+			if row.against_sales_order:
+				#Get the picked qty
+				is_stock_item = frappe.db.get_value("Item", row.item_code, "is_stock_item")
+				if is_stock_item == 1:
+					picked_qty = frappe.db.get_value("Sales Order Item", row.so_detail, "picked_qty")
+					new_qty = picked_qty - row.qty
+					frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
+	
 	#Cancel on shipstation
 	create_shipstation_orders(self.name, True)
 	
@@ -39,22 +50,32 @@ def on_submit(self, method):
 	
 	if self.per_billed == 100:
 		return
-	
-	for row in self.items:
-		if row.against_sales_order and row.against_sales_invoice is None:
-			sales_order = frappe.get_doc('Sales Order', row.against_sales_order)
-			
-			#check sales order is fully delivered and not billed
-			if sales_order.per_billed != 0 or sales_order.per_delivered != 100:
-				break
-			
-			#check sales order is fully paid
-			if sales_order.grand_total != sales_order.advance_paid:
-				break
-			sales_invoice = frappe.new_doc('Sales Invoice')
-			sales_invoice.update({'ignore_pricing_rule': sales_order.ignore_pricing_rule})
-			sales_invoice = make_sales_invoice(row.against_sales_order, sales_invoice)
-			sales_invoice.update({"ais_automated_creation": 1, "disable_rounded_total": 1})
+		
+	# Metactical Customization: If is return, set picked qty in sales order to be zero
+	if self.is_return == 1 and self.pick_list:
+		for row in self.items:
+			if row.against_sales_order:
+				#Get the picked qty
+				picked_qty = frappe.db.get_value("Sales Order Item", row.so_detail, "picked_qty")
+				if picked_qty > 0:
+					new_qty = picked_qty + row.qty
+					frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
+	elif self.is_return == 0:
+		for row in self.items:
+			if row.against_sales_order and row.against_sales_invoice is None:
+				sales_order = frappe.get_doc('Sales Order', row.against_sales_order)
+				
+				#check sales order is fully delivered and not billed
+				if sales_order.per_billed != 0 or sales_order.per_delivered != 100:
+					break
+				
+				#check sales order is fully paid
+				if sales_order.grand_total != sales_order.advance_paid:
+					break
+				sales_invoice = frappe.new_doc('Sales Invoice')
+				sales_invoice.update({'ignore_pricing_rule': sales_order.ignore_pricing_rule})
+				sales_invoice = make_sales_invoice(row.against_sales_order, sales_invoice)
+				sales_invoice.update({"ais_automated_creation": 1, "disable_rounded_total": 1})
 			
 			
 			#Get payment entry with Sales Order and add it to advance paid
