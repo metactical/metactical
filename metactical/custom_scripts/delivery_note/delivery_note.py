@@ -37,8 +37,9 @@ def on_cancel(self, method):
 				is_stock_item = frappe.db.get_value("Item", row.item_code, "is_stock_item")
 				if is_stock_item == 1:
 					picked_qty = frappe.db.get_value("Sales Order Item", row.so_detail, "picked_qty")
-					new_qty = picked_qty - row.qty
-					frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
+					if picked_qty < abs(row.qty):
+						new_qty = picked_qty + abs(row.qty)
+						frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
 	
 	#Cancel on shipstation
 	create_shipstation_orders(self.name, True)
@@ -58,7 +59,7 @@ def on_submit(self, method):
 				#Get the picked qty
 				picked_qty = frappe.db.get_value("Sales Order Item", row.so_detail, "picked_qty")
 				if picked_qty > 0:
-					new_qty = picked_qty + row.qty
+					new_qty = picked_qty - abs(row.qty)
 					frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
 	elif self.is_return == 0:
 		for row in self.items:
