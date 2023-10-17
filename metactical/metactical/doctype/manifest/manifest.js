@@ -15,7 +15,7 @@ frappe.ui.form.on('Manifest', {
 	},
 	
 	show_shipment_button: function(frm){
-		if(!frm.doc.__islocal && !frm.doc.po_number){
+		if(!frm.doc.__islocal && !frm.doc.po_number && frm.doc.status != "Completed"){
 			frm.add_custom_button(__("Get Shipments"), () => {
 				frappe.call({
 					method: "metactical.metactical.doctype.manifest.manifest.get_shipments",
@@ -45,7 +45,7 @@ frappe.ui.form.on('Manifest', {
 	},
 	
 	show_manifest_button: function(frm){
-		if (frm.doc.items?.length && !frm.doc.po_number) {
+		if (frm.doc.items?.length && !frm.doc.po_number && frm.doc.status != "Completed") {
 			frm.add_custom_button(__("Make Manifest"), () => {
 				if(frm.doc.__unsaved == 1){
 					frappe.msgprint("Please save the document first");
@@ -55,6 +55,26 @@ frappe.ui.form.on('Manifest', {
 						method: "metactical.metactical.doctype.manifest.manifest.create_manifest",
 						args: {
 							"manifest": frm.docname
+						},
+						freeze: true,
+						callback: function(ret){
+							console.log(ret);
+							frm.reload_doc();
+						}
+					});
+				}
+			})
+		}
+		else if(frm.doc.status == "Completed"){
+			frm.add_custom_button(__("Re-download Manifest"), () => {
+				if(frm.doc.__unsaved == 1){
+					frappe.msgprint("Please save the document first");
+				}
+				else{
+					frappe.call({
+						method: "metactical.metactical.doctype.manifest.manifest.redownload_manifest",
+						args: {
+							"docname": frm.docname
 						},
 						freeze: true,
 						callback: function(ret){
