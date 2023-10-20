@@ -29,6 +29,7 @@ frappe.ui.form.on('Manifest', {
 						if(!frm.doc.pickup_contact_person){
 							frm.set_value("pickup_contact_person", ret.message.pickup_contact_person);
 						}
+						frm.doc.items = []
 						shipments.forEach(function(row){
 							frm.add_child("items", {
 								"shipment": row.shipment_name,

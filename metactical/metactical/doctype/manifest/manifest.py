@@ -21,17 +21,18 @@ def create_manifest(manifest):
 		doc.po_number = po_number
 		
 		# Update shipments
-		doc.items = []
-		for shipment in shipments:
-			exists = frappe.db.exists("Canada Post Shipment", {"shipment_id": shipment})
-			if exists:
-				shipment_name = frappe.db.get_value("Canada Post Shipment", {"shipment_id": shipment}, "parent")
-				frappe.db.set_value("Shipment", shipment_name, "po_number", po_number)
-				doc.append("items", {
-					"shipment": shipment_name,
-					"shipment_id": shipment,
-					"status": "Transmitted"
-				})
+		if len(shipments) > 0:
+			doc.items = []
+			for shipment in shipments:
+				exists = frappe.db.exists("Canada Post Shipment", {"shipment_id": shipment})
+				if exists:
+					shipment_name = frappe.db.get_value("Canada Post Shipment", {"shipment_id": shipment}, "parent")
+					frappe.db.set_value("Shipment", shipment_name, "po_number", po_number)
+					doc.append("items", {
+						"shipment": shipment_name,
+						"shipment_id": shipment,
+						"status": "Transmitted"
+					})
 		doc.status = "Completed"
 		doc.save()
 		return {"po_number": po_number, "shipments": shipments}
