@@ -31,8 +31,12 @@ def on_cancel(self, method):
 	
 	# Metactical Customization: Return picked qty to previous one if is return
 	if self.is_return == 1 and self.pick_list:
+		sales_orders = []
 		for row in self.items:
 			if row.against_sales_order:
+				if row.against_sales_order not in sales_orders:
+					sales_orders.append(row.against_sales_order)
+					
 				#Get the picked qty
 				is_stock_item = frappe.db.get_value("Item", row.item_code, "is_stock_item")
 				if is_stock_item == 1:
@@ -40,6 +44,10 @@ def on_cancel(self, method):
 					if picked_qty < abs(row.qty):
 						new_qty = picked_qty + abs(row.qty)
 						frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
+						
+		for sales_order in sales_orders:
+			doc = frappe.get_doc("Sales Order", sales_order)
+			doc.update_picking_status()
 	
 	#Cancel on shipstation
 	create_shipstation_orders(self.name, True)
@@ -54,13 +62,19 @@ def on_submit(self, method):
 		
 	# Metactical Customization: If is return, set picked qty in sales order to be zero
 	if self.is_return == 1 and self.pick_list:
+		sales_orders = []
 		for row in self.items:
 			if row.against_sales_order:
+				if row.against_sales_order not in sales_orders:
+					sales_orders.append(row.against_sales_order)
 				#Get the picked qty
 				picked_qty = frappe.db.get_value("Sales Order Item", row.so_detail, "picked_qty")
 				if picked_qty > 0:
 					new_qty = picked_qty - abs(row.qty)
 					frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
+		for sales_order in sales_orders:
+			doc = frappe.get_doc("Sales Order", sales_order)
+			doc.update_picking_status()
 	elif self.is_return == 0:
 		for row in self.items:
 			if row.against_sales_order and row.against_sales_invoice is None:
