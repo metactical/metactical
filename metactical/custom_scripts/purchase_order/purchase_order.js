@@ -189,11 +189,15 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 	
 	get_items_from_open_material_requests: function() {
 		// Metactical Customization: Replace company in Material Request selection with supplier
+		// Metactical Customization: Add option to get all material requeasts with default supplier
 		this.map_current_doc({
-			method: "erpnext.stock.doctype.material_request.material_request.make_purchase_order_based_on_supplier",
+			//method: "erpnext.stock.doctype.material_request.material_request.make_purchase_order_based_on_supplier",
+			method: "metactical.custom_scripts.purchase_order.purchase_order.make_purchase_order_based_on_supplier",
 			args: {
-				supplier: this.frm.doc.supplier
+				supplier: this.frm.doc.supplier,
+				get_all_items: true
 			},
+			get_all_items: true,
 			source_doctype: "Material Request",
 			source_name: this.frm.doc.supplier,
 			target: this.frm,
@@ -248,6 +252,7 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 
 				if(already_set) {
 					opts.source_name.forEach(function(src) {
+						//frappe.model.with_doc(opts.source_doctype, src, function(r) {
 						frappe.model.with_doc(opts.source_doctype, src, function(r) {
 							var source_doc = frappe.model.get_doc(opts.source_doctype, src);
 							$.each(source_doc.items || [], function(i, row) {
@@ -309,7 +314,7 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 			opts.get_query = () => query_args;
 		}
 
-		if (opts.source_doctype) {
+		if (opts.source_doctype && !opts.get_all_items) {
 			const d = new frappe.ui.form.MultiSelectDialog({
 				doctype: opts.source_doctype,
 				target: opts.target,
