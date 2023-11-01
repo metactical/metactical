@@ -247,6 +247,8 @@ function onClockIn() {
 
                 //Display success message
                 notify('success', 'Clockin success');
+                
+                startLogoutTimer();
             }
 
             else {
@@ -572,3 +574,8 @@ function startLogoutTimer() {
         }
     })
 }
+
+//On window close, logout user
+$(window).on("beforeunload", function(){
+	logout();
+})
