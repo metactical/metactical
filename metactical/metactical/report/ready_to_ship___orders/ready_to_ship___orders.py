@@ -75,13 +75,13 @@ def get_data(filters):
 	where = ''
 	where_filter = {}
 	
-	if filters.from_date and filters.to_date:
+	if filters.get("from_date") and filters.get("to_date"):
 		where = ' AND so.transaction_date BETWEEN %(from_date)s AND %(to_date)s '
-		where_filter.update({'from_date': filters.from_date, 'to_date': filters.to_date})
+		where_filter.update({'from_date': filters.get("from_date"), 'to_date': filters.get("to_date")})
 		
-	if filters.source:
+	if filters.get("source"):
 		where = ' AND so.source = %(source)s '
-		where_filter.update({'source': filters.source})
+		where_filter.update({'source': filters.get("source")})
 	
 	query = frappe.db.sql('''
 							SELECT
@@ -95,7 +95,7 @@ def get_data(filters):
 							FROM
 								`tabSales Order` so
 							WHERE
-								so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft"'''
+								(so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft")'''
 								+ where, where_filter, as_dict=1)
 	init_data = get_print_date(query)
 	warehouses = ['R01-Gor-Active Stock - ICL', 'R02-Edm-Active Stock - ICL', 'R03-Vic-Active Stock - ICL', 
