@@ -71,11 +71,11 @@ class ClockinLog(Document):
 				else:
 					out_employee_checkin_record = frappe.get_doc("Employee Checkin", self.out_employee_checkin_record)
 					out_employee_checkin_record.time = self.to_time
-					out_employee_checkin_record.save()
+					out_employee_checkin_record.save(ignore_permissions=True)
 
 					in_employee_checkin_record = frappe.get_doc("Employee Checkin", self.in_employee_checkin_record)
 					in_employee_checkin_record.time = self.from_time
-					in_employee_checkin_record.save()
+					in_employee_checkin_record.save(ignore_permissions=True)
 
 		else:
 			frappe.throw("Employee record not found")
