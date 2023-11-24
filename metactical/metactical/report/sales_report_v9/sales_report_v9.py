@@ -124,6 +124,7 @@ def execute(filters=None):
 		row["jrc_discountitem"] = float(get_discountitem(last_year, i.get("item_code")) or 0)
 		row["jrc_templatesku"] =  get_templatesku(i.get("item_code"))
 		row["jrc_mthsck"] = beginvt  / ((float(get_mthsck(i.get("item_code"), warehouse, today))) or 1) 
+		row["jrc_gpdsales"] = get_gpdsales(i.get("item_code"))
 		last_month = getdate(str(datetime(today.year-1, 1,1)))
 		while last_month <= today:
 			month = last_month.strftime("%B")
@@ -643,9 +644,27 @@ def get_column(filters,conditions):
             "fieldname": "jrc_mthsck",
             "fieldtype": "Float",
             "width": 100,
+		},
+		{
+            "label": _("GPDSales"),
+            "fieldname": "jrc_gpdsales",
+            "fieldtype": "Float",
+            "width": 100,
 		}
 	])
 	return columns
+
+def get_gpdsales(item_code):
+
+	data =  frappe.db.sql("""
+		SELECT SUM(`tabSales Invoice Item`.stock_qty) as total from `tabSales Invoice Item`
+		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
+		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.source = 'Website - GPD'
+	""", (item_code), as_dict=1)
+	gpdsales = 0
+	if data[0].total:
+		gpdsales = data[0].total
+	return gpdsales
 
 def get_mthsck(item_code, warehouse, today):
 	fromdate = str(today.year)+"-"+str(today.month)+"-01"
