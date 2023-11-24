@@ -66,7 +66,7 @@ def execute(filters=None):
 		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
 		row["wh_dtn"] = get_qty(i.get("item_code"), "R05-DTN-Active Stock - ICL") or 0
 		row["wh_queen"] = get_qty(i.get("item_code"), "R07-Queen-Active Stock - ICL") or 0
-		row["wh_amb"] = get_qty(i.get("item_code"), "R06-AMB-Active Stock - ICL") or 0
+		#row["wh_amb"] = get_qty(i.get("item_code"), "R06-AMB-Active Stock - ICL") or 0
 		row["wh_mon"] = get_qty(i.get("item_code"), "R04-Mon-Active Stock - ICL") or 0
 		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
 		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
@@ -81,8 +81,8 @@ def execute(filters=None):
 			row["total_actual_qty"] += row.get("wh_dtn")
 		if row.get("wh_queen") > 0:
 			row["total_actual_qty"] += row.get("wh_queen")
-		if row.get("wh_amb") > 0:
-			row["total_actual_qty"] += row.get("wh_amb")
+		# if row.get("wh_amb") > 0:
+		# 	row["total_actual_qty"] += row.get("wh_amb")
 		if row.get("wh_mon") > 0:
 			row["total_actual_qty"] += row.get("wh_mon")
 		if row.get("wh_vic") > 0:
@@ -110,9 +110,9 @@ def execute(filters=None):
 		last_year = today.year-1
 		current_year = today.year
 		unique_customer_order = float(get_nocust12months(last_year, i.get("item_code")))
-		
+		beginvt = int(get_beginvt(i.get("item_code"), warehouse, today))
 		row["jrc_nocust"]= unique_customer_order
-		row["jrc_beginvt"] = int(get_beginvt(i.get("item_code"), warehouse, today))
+		row["jrc_beginvt"] = beginvt
 		row["jrc_endinvt"] = int(get_endinvt(i.get("item_code"), warehouse, today))
 		row["jrc_invtor"] = float(get_invtor(i.get("item_code"), warehouse, today))
 		row["jrc_lt"] = int(get_leadtime(i.get("item_code")))
@@ -122,7 +122,8 @@ def execute(filters=None):
 		row["jrc_moo"] = get_moo(i.get("item_code"))
 		row["jrc_ss"] = get_ss(i.get("item_code"))
 		row["jrc_discountitem"] = float(get_discountitem(last_year, i.get("item_code")) or 0)
-		row["jrc_image"] = get_image(i.get("item_code"))
+		row["jrc_templatesku"] =  get_templatesku(i.get("item_code"))
+		row["jrc_mthsck"] = beginvt  / ((float(get_mthsck(i.get("item_code"), warehouse, today))) or 1) 
 		last_month = getdate(str(datetime(today.year-1, 1,1)))
 		while last_month <= today:
 			month = last_month.strftime("%B")
@@ -189,7 +190,7 @@ def get_reference_warehouse(filters):
 		"W01-WHS-Active Stock - ICL": "wh_whs",
 		"R05-DTN-Active Stock - ICL": "wh_dtn",
 		"R07-Queen-Active Stock - ICL": "wh_queen",
-		"R06-AMB-Active Stock - ICL": "wh_amb",
+		#"R06-AMB-Active Stock - ICL": "wh_amb",
 		"R04-Mon-Active Stock - ICL": "wh_mon",
 		"R03-Vic-Active Stock - ICL": "wh_vic",
 		"R02-Edm-Active Stock - ICL": "wh_edm",
@@ -415,12 +416,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Int",
 				"width": 200,
 			},
-			{
-				"label": _("R06-AMB-Active Stock - ICL"),
-				"fieldname": "wh_amb",
-				"fieldtype": "Int",
-				"width": 200,
-			},
+			# {
+			# 	"label": _("R06-AMB-Active Stock - ICL"),
+			# 	"fieldname": "wh_amb",
+			# 	"fieldtype": "Int",
+			# 	"width": 200,
+			# },
 			{
 				"label": _("R04-Mon-Active Stock - ICL"),
 				"fieldname": "wh_mon",
@@ -626,35 +627,49 @@ def get_column(filters,conditions):
             "width": 100,
 		},
 		{
-            "label": _("SS"),
-            "fieldname": "jrc_ss",
-            "fieldtype": "Data",
-            "width": 100,
-		},
-		{
             "label": _("DiscountPer12M"),
             "fieldname": "jrc_discountitem",
             "fieldtype": "Float",
             "width": 100,
 		},
 		{
-            "label": _("Image"),
-            "fieldname": "jrc_image",
+            "label": _("Temp. SKU"),
+            "fieldname": "jrc_templatesku",
             "fieldtype": "Data",
+            "width": 100,
+		},
+		{
+            "label": _("MthStck"),
+            "fieldname": "jrc_mthsck",
+            "fieldtype": "Float",
             "width": 100,
 		}
 	])
 	return columns
 
-def get_image(item_code):
-	data =  frappe.db.sql(""" SELECT image from `tabItem` where name =%s """,item_code, as_dict=1)
-	return data[0].image
+def get_mthsck(item_code, warehouse, today):
+	fromdate = str(today.year)+"-"+str(today.month)+"-01"
+	enddate = str(today.year)+"-"+str(today.month)+"-30"
+
+	data =  frappe.db.sql("""
+		SELECT SUM(`tabSales Invoice Item`.stock_qty) as total from `tabSales Invoice Item`
+		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
+		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.posting_date BETWEEN %s and %s
+	""", (item_code, fromdate , enddate), as_dict=1)
+	tqoh = 0
+	if data[0].total:
+		tqoh = data[0].total
+	return tqoh
+def get_templatesku(item_code):
+	data =  frappe.db.sql(""" SELECT variant_of from `tabItem` where name =%s """,item_code, as_dict=1)
+
+	return data[0].variant_of
 
 def get_discountitem(last_year, item_code):
 	data =  frappe.db.sql("""
-		SELECT sum(`tabSales Invoice Item`.discount_amount) as total from `tabSales Invoice Item`
+		SELECT count(DISTINCT(`tabSales Invoice`.name))as total from `tabSales Invoice Item`
 		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
-		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.posting_date BETWEEN %s and %s
+		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.discount_amount > 0 and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.posting_date BETWEEN %s and %s
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -705,8 +720,8 @@ def get_endinvt(item_code, warehouse, today):
 
 	data = frappe.db.sql("""
 		Select sum(actual_qty) as total from `tabStock Ledger Entry`
-		where item_code =%s and warehouse = %s and posting_date between %s and %s 
-	""",(item_code, warehouse, fromdate, enddate), as_dict=1)
+		where item_code =%s and posting_date between %s and %s 
+	""",(item_code, fromdate, enddate), as_dict=1)
 	total = 0
 	if data[0].total:
 		total = data[0].total
@@ -718,8 +733,8 @@ def get_beginvt(item_code, warehouse, today):
 
 	data = frappe.db.sql("""
 		Select sum(actual_qty) as total from `tabStock Ledger Entry`
-		where item_code =%s and warehouse = %s and posting_date between %s and %s 
-	""",(item_code, warehouse, fromdate, enddate), as_dict=1)
+		where item_code =%s and posting_date between %s and %s 
+	""",(item_code, fromdate, enddate), as_dict=1)
 	total = 0
 	if data[0].total:
 		total = data[0].total
@@ -734,13 +749,13 @@ def get_invtor(item_code, warehouse, today):
 
 	current = frappe.db.sql("""
 		Select sum(stock_value_difference) as total from `tabStock Ledger Entry`
-		where item_code =%s and warehouse = %s and posting_date between %s and %s 
-	""",(item_code, warehouse, fromdate, enddate), as_dict=1)
+		where item_code =%s  and posting_date between %s and %s 
+	""",(item_code,  fromdate, enddate), as_dict=1)
 
 	prev = frappe.db.sql("""
 		Select sum(stock_value_difference) as total from `tabStock Ledger Entry`
-		where item_code =%s and warehouse = %s and posting_date between %s and %s 
-	""",(item_code, warehouse, prev_fromdate, prev_enddate), as_dict=1)
+		where item_code =%s  and posting_date between %s and %s 
+	""",(item_code, prev_fromdate, prev_enddate), as_dict=1)
 	
 	total = 0
 	current_month = 0
