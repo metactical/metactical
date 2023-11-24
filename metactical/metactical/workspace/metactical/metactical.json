@@ -497,6 +497,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report V9",
+   "link_to": "Sales Report V9",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -684,7 +693,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-10-15 17:29:32.748958",
+ "modified": "2023-11-24 12:27:30.336828",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
