@@ -9,7 +9,7 @@ frappe.query_reports["Sales Report V9"] = {
 			"fieldtype": "Select",
 			"label": "Reference Warehouse",
 			"options": "Total QOH\nW01-WHS-Active Stock - ICL\nR05-DTN-Active Stock - ICL\nR07-Queen-Active Stock - ICL\
-						\nR06-AMB-Active Stock - ICL\nR04-Mon-Active Stock - ICL\nR03-Vic-Active Stock - ICL\
+						\nR04-Mon-Active Stock - ICL\nR03-Vic-Active Stock - ICL\
 						\nR02-Edm-Active Stock - ICL\nR01-Gor-Active Stock - ICL",
 			"default": "Total QOH",
 			"reqd": 1
@@ -33,7 +33,7 @@ frappe.query_reports["Sales Report V9"] = {
 			"label": __("Limit"),
 			"fieldtype": "Select",
 			"options": ["20", "500", "1000", "5000", "10000", "All"],
-			"default": "20"
+			"default": "All"
 		}
 	]
 };
