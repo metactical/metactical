@@ -48,7 +48,7 @@ class PicklistPage{
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
 			let default_location = ret.message.default_location;
-			if(default_location == ""){
+			if(default_location == "" || default_location == null){
 				default_location = "All"
 			}
 			me.$selected_warehouse.html(ret.message.default_warehouse);
