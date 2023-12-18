@@ -34,6 +34,69 @@ class CustomSalesInvoice(SalesInvoice):
 		_barcode.get('code128', self.name).write(rv)
 		bstring = rv.getvalue()
 		self.ais_barcode = bstring.decode('ISO-8859-1')
+		
+	def validate_pos(self):
+		if self.is_return:
+			return
+			
+	def calculate_paid_amount(self):
+
+		paid_amount = base_paid_amount = 0.0
+		
+		if self.doc.is_return:
+			self.doc.set("payments", [])
+		elif self.doc.is_pos:
+			for payment in self.doc.get("payments"):
+				payment.amount = flt(payment.amount)
+				payment.base_amount = payment.amount * flt(self.doc.conversion_rate)
+				paid_amount += payment.amount
+				base_paid_amount += payment.base_amount
+		elif not self.doc.is_return:
+			self.doc.set("payments", [])
+
+		if self.doc.redeem_loyalty_points and self.doc.loyalty_amount:
+			base_paid_amount += self.doc.loyalty_amount
+			paid_amount += self.doc.loyalty_amount / flt(self.doc.conversion_rate)
+
+		self.doc.paid_amount = flt(paid_amount, self.doc.precision("paid_amount"))
+		self.doc.base_paid_amount = flt(base_paid_amount, self.doc.precision("base_paid_amount"))
+		
+	def set_total_amount_to_default_mop(self, total_amount_to_pay):
+		if self.doc.get("is_return"):
+			self.doc.payments = []
+			return
+			
+		total_paid_amount = 0
+		for payment in self.doc.get("payments"):
+			total_paid_amount += (
+				payment.amount if self.doc.party_account_currency == self.doc.currency else payment.base_amount
+			)
+
+		pending_amount = total_amount_to_pay - total_paid_amount
+
+		if pending_amount > 0:
+			default_mode_of_payment = frappe.db.get_value(
+				"POS Payment Method",
+				{"parent": self.doc.pos_profile, "default": 1},
+				["mode_of_payment"],
+				as_dict=1,
+			)
+
+			if default_mode_of_payment:
+				self.doc.payments = []
+				self.doc.append(
+					"payments",
+					{
+						"mode_of_payment": default_mode_of_payment.mode_of_payment,
+						"amount": pending_amount,
+						"default": 1,
+					},
+				)
+				
+	def validate_pos_paid_amount(self):
+		if len(self.payments) == 0 and self.is_pos and not self.is_return:
+			frappe.throw(_("At least one mode of payment is required for POS invoice."))
+
 	
 
 def unlink_ref_doc_from_payment_entries(ref_doc):	
