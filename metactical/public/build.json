@@ -58,6 +58,7 @@
 		"frappe_public/js/frappe/utils/tools.js",
 		"frappe_public/js/frappe/utils/datetime.js",
 		"frappe_public/js/frappe/utils/number_format.js",
+		"custom_scripts/public/frappe/number_format.js",
 		"frappe_public/js/frappe/utils/help.js",
 		"frappe_public/js/frappe/utils/help_links.js",
 		"frappe_public/js/frappe/utils/address_and_contact.js",
