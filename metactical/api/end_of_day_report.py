@@ -17,7 +17,7 @@ def get_us_report_data(date):
 	
 	sources = frappe.db.get_all("Lead Source", ['name', 'ais_report_label'])
 	
-	#Get Stores data
+	# Get Stores data
 	for source in sources:
 		wtype = source.name.split("-")
 		row = {"location": source.ais_report_label, "total_with_tax": 0, "total_without_tax": 0}
@@ -36,7 +36,7 @@ def get_us_report_data(date):
 				row.update({
 					"total_without_tax": query[0].total_without_tax
 				})
-				total_web_without_tax += query[0].total_without_tax
+				total_stores_without_tax += query[0].total_without_tax
 			else:
 				row.update({
 					"total_with_tax": 0.0,
@@ -88,6 +88,7 @@ def get_us_report_data(date):
 				
 			data.append(row)
 	
+	# Get website data
 	for source in sources:
 		wtype = source.name.split("-")
 		row = {"location": source.ais_report_label, "total_with_tax": 0, "total_without_tax": 0}
@@ -107,7 +108,7 @@ def get_us_report_data(date):
 				row.update({
 					"total_without_tax": query[0].total_without_tax
 				})
-				total_stores_without_tax += query[0].total_without_tax
+				total_web_without_tax += query[0].total_without_tax
 			else:
 				row.update({
 					"total_without_tax": 0.0
