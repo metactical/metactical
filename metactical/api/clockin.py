@@ -11,11 +11,11 @@ def insert_in_employee_checkin(doc, method=None):
 			"time": doc.from_time
 		})
 
-		in_employee_checkin.insert()
+		in_employee_checkin.insert(ignore_permissions=True)
 
 		#Link employee checkin to clockin log doc
 		doc.in_employee_checkin_record = in_employee_checkin.name
-		doc.save()
+		doc.save(ignore_permissions=True)
 
 	else:
 		frappe.throw("Employee record not found")
@@ -252,7 +252,7 @@ def create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date):
 		"to_date": to_date
 	})
 
-	user_pay_cycle_record.insert()
+	user_pay_cycle_record.insert(ignore_permissions=True)
 
 	#Create child day records
 	index = 1
@@ -263,7 +263,7 @@ def create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date):
 			"date": date_index
 		})
 
-		row.insert()
+		row.insert(ignore_permissions=True)
 		
 		date_index = from_date + datetime.timedelta(days=index)
 		index += 1
@@ -272,7 +272,7 @@ def create_user_pay_cycle_record_without_clockin_log(user, from_date, to_date):
 		"date": date_index
 	})
 
-	row.insert()
+	row.insert(ignore_permissions=True)
 	frappe.db.commit()
 
 def create_user_pay_cycle_record(user, from_date, to_date, current_date, current_time):
@@ -283,7 +283,7 @@ def create_user_pay_cycle_record(user, from_date, to_date, current_date, current
 		"to_date": to_date
 	})
 
-	user_pay_cycle_record.insert()
+	user_pay_cycle_record.insert(ignore_permissions=True)
 
 	#Create child day records
 	index = 1
@@ -294,7 +294,7 @@ def create_user_pay_cycle_record(user, from_date, to_date, current_date, current
 			"date": date_index
 		})
 
-		row.insert()
+		row.insert(ignore_permissions=True)
 		
 		date_index = from_date + datetime.timedelta(days=index)
 		index += 1
@@ -303,7 +303,7 @@ def create_user_pay_cycle_record(user, from_date, to_date, current_date, current
 		"date": date_index
 	})
 
-	row.insert()
+	row.insert(ignore_permissions=True)
 
 	create_clockin_log(user, current_date, current_time)
 
@@ -316,7 +316,7 @@ def create_clockin_log(user, current_date, from_time):
 		"total_hours": 0.0
 	})
 
-	clockin_log_record.insert()
+	clockin_log_record.insert(ignore_permissions=True)
 
 @frappe.whitelist()
 def update_clockin_log(current_date, to_time):
@@ -331,7 +331,7 @@ def update_clockin_log(current_date, to_time):
 	clockin_log = frappe.get_doc("Clockin Log", clockin_log_record)
 	clockin_log.to_time = to_time
 	clockin_log.has_clocked_out = 1
-	clockin_log.save()
+	clockin_log.save(ignore_permissions=True)
 
 @frappe.whitelist()
 def get_date_details(date):
@@ -365,7 +365,7 @@ def shift_request(date, shift_type):
 		"employee": employee
 	})
 
-	doc.insert()
+	doc.insert(ignore_permissions=True)
 	frappe.db.commit()
 
 	recipients = [f'{doc.approver}']
@@ -449,7 +449,7 @@ def send_details_change_request(log_name, checkInTime12, checkInTimeMilitary, ch
 def decline_details_change_request(request_name):
 	req = frappe.get_doc("Checkin Request Modification", request_name)
 	req.status = "Declined"
-	req.save()
+	req.save(ignore_permissions=True)
 
 	return "success"
 
@@ -457,12 +457,12 @@ def decline_details_change_request(request_name):
 def approve_details_change_request(request_name):
 	req = frappe.get_doc("Checkin Request Modification", request_name)
 	req.status = "Approved"
-	req.save()
+	req.save(ignore_permissions=True)
 
 	clockin_log = frappe.get_doc("Clockin Log", req.log)
 	clockin_log.from_time = f"{clockin_log.date} {str(req.requested_checkin_military)}"
 	clockin_log.to_time = f"{clockin_log.date} {str(req.requested_checkout_military)}"
-	clockin_log.save()
+	clockin_log.save(ignore_permissions=True)
 
 	return "success"
 
