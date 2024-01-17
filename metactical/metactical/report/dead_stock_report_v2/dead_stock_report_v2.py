@@ -10,6 +10,7 @@ from frappe.utils import getdate, nowdate
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta, datetime
 
+
 def execute(filters=None):
 	data = []
 	columns = get_columns()
@@ -23,7 +24,6 @@ def execute(filters=None):
 		row["item_name"] = i.get("item_name")
 		row["item_code"] = i.get("item_code")
 		row["variant_of"] = i.get("variant_of")
-		
 
 		row["ifw_discontinued"] = int(i.get("ifw_discontinued"))
 		row["supplier_sku"] = i.get("supplier_part_no")		
@@ -36,9 +36,7 @@ def execute(filters=None):
 		row["rate_camo"] = get_item_details(i.get("item_code"), "RET - Camo", "Selling" )
 		row["rate_gpd"] = get_item_details(i.get("item_code"), "RET - GPD", "Selling", )
 
-
 		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
-		#row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 		row["item_cost"] = get_cost_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 
 		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
@@ -111,9 +109,8 @@ def execute(filters=None):
 		if total_active > 0:
 			data.append(row)
 
-		#data.append(row)
-
 	return columns, data
+
 
 def get_columns():
 	columns = [
@@ -158,7 +155,6 @@ def get_columns():
 				"width": 150,
 				"align": "left",
 			},
-			
 			{
 				"label": _("Rate Camo"),
 				"fieldname": "rate_camo",
@@ -270,16 +266,17 @@ def get_columns():
 				"fieldname": "last_twelve_months",
 				"fieldtype": "Int",
 				"width": 140,
-			}]
+			}
+	]
 	today = getdate(nowdate())
 	last_month = getdate(str(datetime(today.year, 1,1)))
 	while last_month <= today:
 		month = last_month.strftime("%B")
 		columns.append({
-        		"label": _(str(last_month.year) + "_Sold" + month),
-                "fieldname": frappe.scrub("sold"+month+str(last_month.year)),
-                "fieldtype": "Int",
-                "width": 140,
+			"label": _(str(last_month.year) + "_Sold" + month),
+			"fieldname": frappe.scrub("sold" + month + str(last_month.year)),
+			"fieldtype": "Int",
+			"width": 140,
 		})
 		last_month = last_month + relativedelta(months=1)
 
@@ -288,19 +285,18 @@ def get_columns():
 	while counter_month < end_loop_month:
 		month = counter_month.strftime("%B")
 		columns.append({
-        		"label": _(str(counter_month.year) + "_Sold" + month),
-                "fieldname": frappe.scrub("sold"+month+str(counter_month.year)),
-                "fieldtype": "Int",
-                "width": 140,
+			"label": _(str(counter_month.year) + "_Sold" + month),
+			"fieldname": frappe.scrub("sold" + month + str(counter_month.year)),
+			"fieldtype": "Int",
+			"width": 140,
 		})
 		counter_month = counter_month + relativedelta(months=1)
 
-	columns.extend([
-        {
-            "label": _("DateLastSold"),
-            "fieldname": "last_sold_date",
-            "fieldtype": "Data",
-            "width": 100,
+	columns.extend([{
+		"label": _("DateLastSold"),
+		"fieldname": "last_sold_date",
+		"fieldtype": "Data",
+		"width": 100,
 	}])
 	return columns
 
@@ -315,20 +311,26 @@ def get_warehouses():
 	
 
 def get_masters(warehouses):
-	data = frappe.db.sql("""SELECT 
-								b.item_code, i.ifw_retailskusuffix, i.item_name,
-								i.asi_item_class, i.variant_of, i.ifw_discontinued, i.creation,
-								i.disabled, country_of_origin,customs_tariff_number, ifw_po_notes,
-								ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
-								s.supplier, s.supplier_part_no
-							FROM
-								`tabBin` b
-							LEFT JOIN `tabItem` i ON b.item_code = i.name
-							LEFT JOIN `tabItem Supplier` s ON s.parent = i.name
-							WHERE
-								b.warehouse in %(warehouses)s
-							GROUP BY item_code""", {"warehouses": warehouses} , as_dict=1)
+	warehouses_conditions = f"""WHERE b.warehouse in {warehouses}""" if warehouses else ""
+
+	query = f"""
+		SELECT 
+			b.item_code, i.ifw_retailskusuffix, i.item_name,
+			i.asi_item_class, i.variant_of, i.ifw_discontinued, i.creation,
+			i.disabled, country_of_origin,customs_tariff_number, ifw_po_notes,
+			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
+			s.supplier, s.supplier_part_no
+		FROM
+			`tabBin` b
+		LEFT JOIN `tabItem` i ON b.item_code = i.name
+		LEFT JOIN `tabItem Supplier` s ON s.parent = i.name
+		{warehouses_conditions}
+		GROUP BY item_code
+	"""
+
+	data = frappe.db.sql(query, as_dict=1)
 	return data
+
 
 def get_conditions(filters):
 	conditions = ""
@@ -344,6 +346,7 @@ def get_conditions(filters):
 		conditions += " limit {}".format(str(limit))
 	return conditions
 
+
 def get_date_last_received(item, supplier):
 	date = None
 	data= frappe.db.sql("""select max(transaction_date) from `tabPurchase Order` p inner join 
@@ -355,6 +358,7 @@ def get_date_last_received(item, supplier):
 		date = getdate(date)
 		date = date.strftime("%d-%b-%y")
 	return date
+
 
 def get_date_last_sold(item):
 	date = None
@@ -368,11 +372,13 @@ def get_date_last_sold(item):
 		date = date.strftime("%d-%b-%y")
 	return date
 
+
 def get_total_sold(item):
 	data= frappe.db.sql("""select p.posting_date, c.qty from `tabSales Invoice` p inner join 
 		`tabSales Invoice Item` c on p.name = c.parent where c.item_code = %s and p.docstatus = 1
 		""",(item), as_dict=1)
 	return data
+
 
 def get_qty(item, warehouse):
 	qty = 0
@@ -383,12 +389,14 @@ def get_qty(item, warehouse):
 		qty = data[0][0] or 0
 	return qty
 
+
 def get_tags(item):
 	output = ""
 	data = frappe.db.sql("""select tag from `tabTag Link` where document_type='Item' and document_name = %s""",(item))
 	for d in data:
 		output += d[0]+", "
 	return output
+
 
 def get_purchase_orders(item,supplier):
 	output = ""
@@ -401,6 +409,7 @@ def get_purchase_orders(item,supplier):
 		output += d[0]+" ("+str(d[1])+"), "
 	return output
 
+
 def get_last_purchase_orders(item,supplier):
 	output = ""
 	data = frappe.db.sql("""select p.name, c.qty-c.received_qty, c.schedule_date from `tabPurchase Order` p inner join 
@@ -412,6 +421,7 @@ def get_last_purchase_orders(item,supplier):
 		# output = d[0]+" ("+str(d[1])+")"
 	return output
 
+
 def get_open_po_qty(item,supplier):
 	output = ""
 	data = frappe.db.sql("""select SUM(c.qty) - SUM(c.received_qty) from `tabPurchase Order` p inner join 
@@ -421,6 +431,7 @@ def get_open_po_qty(item,supplier):
 	if data:
 		return data[0][0]
 	return 0
+
 
 @frappe.whitelist()
 def get_item_details(item, price_list, list_type="Selling",  supplier=None):
@@ -450,6 +461,7 @@ def get_item_details(item, price_list, list_type="Selling",  supplier=None):
 				if r[0][0]:
 					rate = r[0][0]
 	return rate
+
 
 @frappe.whitelist()
 def get_cost_details(item, list_type="Buying",  supplier=None):
