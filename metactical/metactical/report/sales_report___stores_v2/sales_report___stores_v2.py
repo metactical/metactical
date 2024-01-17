@@ -189,6 +189,8 @@ def get_data(conditions, filters):
 			and is_pos =1
 			and sales_invoice.posting_date = '{filters.get("to_date")}'
 			{conditions}
+		group by sales_invoice_item.item_code, sales_invoice.pos_profile
+		order by sales_invoice_item.item_name, sales_invoice.pos_profile
     """
 
     data = frappe.db.sql(query, as_dict=1)
