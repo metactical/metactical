@@ -34,9 +34,10 @@ def execute(filters=None):
                 {"warehouse": "W01-WHS-Active Stock - ICL", "item_code": d.item_code},
                 "reserved_qty"
             ) or 0.0
+            item_barcodes = d.barcodes.split(',') if d.barcodes else []
             row = {
                 'ifw_retailskusuffix': d.ifw_retailskusuffix, 'item_code': d.item_code,
-                'barcodes': ' | '.join([barcode for barcode in d.barcodes.split(',')]),
+                'barcodes': ' | '.join([barcode for barcode in item_barcodes if barcode]),
                 'ifw_location': d.ifw_location, 'item_name': d.item_name,
                 'supplier_part_number': frappe.db.get_value(
                     "Item Supplier",
@@ -55,7 +56,11 @@ def execute(filters=None):
                 'sale': d.qty,
                 'pos_profile': d.pos_profile,
                 "button": (
-                    '<button onClick="create_material_transfer(\'{}\', \'{}\', \'{}\')">Create Material Transfer</button>'
+                    '''
+                    <button onClick="create_material_transfer(\'{}\', \'{}\', \'{}\')">
+                        Create Material Transfer
+                    </button>
+                    '''
                     .format(filters.get("pos_profile", ""), filters.get("to_date"), filters.get("item_code", ""))
                 )
             }
