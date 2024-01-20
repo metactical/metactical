@@ -34,11 +34,14 @@ def execute(filters=None):
                 {"warehouse": "W01-WHS-Active Stock - ICL", "item_code": d.item_code},
                 "reserved_qty"
             ) or 0.0
-            item_barcodes = d.barcodes.split(',') if d.barcodes else []
+            if d.barcodes:
+                item_barcodes = d.barcodes.replace(",", " | ")
+            else:
+                item_barcodes = ""
             row = {
                 'ifw_retailskusuffix': d.ifw_retailskusuffix,
                 'item_code': d.item_code,
-                'barcodes': " | ".join(item_barcodes) if item_barcodes else "",
+                'barcodes': item_barcodes,
                 'ifw_location': d.ifw_location,
                 'item_name': d.item_name,
                 'supplier_part_number': frappe.db.get_value(
