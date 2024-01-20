@@ -316,7 +316,7 @@ def get_warehouses():
 	
 
 def get_masters(warehouses):
-	warehouses_conditions = f"""WHERE b.warehouse in {warehouses}""" if warehouses else ""
+	warehouses_conditions = f"""WHERE b.warehouse IN ({','.join(['%s'] * len(warehouses))})""" if warehouses else ""
 
 	query = f"""
 		SELECT 
@@ -342,7 +342,7 @@ def get_masters(warehouses):
 		GROUP BY item_code
 	"""
 
-	data = frappe.db.sql(query, as_dict=1)
+	data = frappe.db.sql(query, warehouses or [], as_dict=1)
 	return data
 
 
