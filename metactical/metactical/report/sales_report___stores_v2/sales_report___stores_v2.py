@@ -36,9 +36,11 @@ def execute(filters=None):
             ) or 0.0
             item_barcodes = d.barcodes.split(',') if d.barcodes else []
             row = {
-                'ifw_retailskusuffix': d.ifw_retailskusuffix, 'item_code': d.item_code,
-                'barcodes': ' | '.join([barcode for barcode in item_barcodes if barcode]),
-                'ifw_location': d.ifw_location, 'item_name': d.item_name,
+                'ifw_retailskusuffix': d.ifw_retailskusuffix,
+                'item_code': d.item_code,
+                'barcodes': " | ".join(item_barcodes) if item_barcodes else "",
+                'ifw_location': d.ifw_location,
+                'item_name': d.item_name,
                 'supplier_part_number': frappe.db.get_value(
                     "Item Supplier",
                     {"parent": d.item_code},
@@ -48,7 +50,8 @@ def execute(filters=None):
                     "Bin",
                     {"warehouse": d.warehouse, "item_code": d.item_code},
                     "actual_qty"
-                ) or 0.0, 'stock_levels': wh_actual - wh_res,
+                ) or 0.0,
+                'stock_levels': wh_actual - wh_res,
                 "in_transit": frappe.db.get_value(
                     "Bin", {"warehouse": transit_warehouse, "item_code": d.item_code},
                     "actual_qty"
@@ -154,7 +157,7 @@ def get_column():
 
 def get_transit_warehouse(warehouse):
     # Get transit warehouse
-    w_split = warehouse.split("-")
+    w_split = warehouse.split("-") if warehouse else []
     w_length = len(w_split)
     transit_warehouse = ""
     if w_split[-2] and w_split[-2].strip() == "Active Stock":
