@@ -36,7 +36,12 @@ def execute(filters=None):
 		row["rate_camo"] = get_item_details(i.get("item_code"), "RET - Camo", "Selling" )
 		row["rate_gpd"] = get_item_details(i.get("item_code"), "RET - GPD", "Selling", )
 
-		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
+		# row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
+		row["date_last_received"] = (
+			getdate(i.get("latest_transaction_date")).strftime("%d-%b-%y")
+			if i.get("latest_transaction_date") else ""
+		)
+
 		row["item_cost"] = get_cost_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 
 		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
@@ -319,7 +324,16 @@ def get_masters(warehouses):
 			i.asi_item_class, i.variant_of, i.ifw_discontinued, i.creation,
 			i.disabled, country_of_origin,customs_tariff_number, ifw_po_notes,
 			ifw_duty_rate,ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
-			s.supplier, s.supplier_part_no
+			s.supplier, s.supplier_part_no,
+			(
+				select max(transaction_date)
+				from `tabPurchase Order` purchase_order
+				inner join `tabPurchase Order Item` purchase_order_item
+					on purchase_order.name = purchase_order_item.parent
+				where purchase_order_item.item_code = b.item_code
+				and purchase_order.supplier = s.supplier
+				and purchase_order.docstatus = 1
+			) as latest_transaction_date
 		FROM
 			`tabBin` b
 		LEFT JOIN `tabItem` i ON b.item_code = i.name
@@ -349,9 +363,16 @@ def get_conditions(filters):
 
 def get_date_last_received(item, supplier):
 	date = None
-	data= frappe.db.sql("""select max(transaction_date) from `tabPurchase Order` p inner join 
-		`tabPurchase Order Item` c on p.name = c.parent where c.item_code = %s and p.supplier=%s and p.docstatus = 1
-		""",(item,supplier))
+	query = f"""
+		select max(transaction_date)
+		from `tabPurchase Order` purchase_order
+		inner join
+			`tabPurchase Order Item` purchase_order_item on purchase_order.name = purchase_order_item.parent
+		where purchase_order_item.item_code = {item}
+		and purchase_order.supplier = {supplier}
+		and purchase_order.docstatus = 1
+	"""
+	data = frappe.db.sql(query)
 	if data:
 		date = data[0][0]
 	if date:
