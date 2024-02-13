@@ -1,0 +1,221 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "CLOS.####",
+ "creation": "2024-02-10 00:39:29.344377",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "user_name",
+  "pos_profile",
+  "amended_from",
+  "column_break_hfwdm",
+  "closing_date",
+  "closing_time",
+  "section_break_eqkfn",
+  "cash_float",
+  "eod_cash",
+  "total_cash",
+  "section_break_xvab1",
+  "expected_cash",
+  "subtracted_float",
+  "rounding",
+  "total_cash_drop",
+  "section_break_pvj7b",
+  "eod_payments",
+  "mop_total_expected",
+  "mop_total_actual",
+  "mop_total_difference",
+  "invoices_section",
+  "invoices",
+  "section_break_q4f2a",
+  "closing_notes"
+ ],
+ "fields": [
+  {
+   "default": "frappe.session.user",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "closing_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "closing_time",
+   "fieldtype": "Time",
+   "label": "Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "End of Day Closing",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fetch_from": "user.full_name",
+   "fieldname": "user_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "User's Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hfwdm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_eqkfn",
+   "fieldtype": "Section Break",
+   "label": "Cash Totals"
+  },
+  {
+   "default": "0",
+   "fieldname": "cash_float",
+   "fieldtype": "Currency",
+   "label": "Cash Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "eod_cash",
+   "fieldtype": "Table",
+   "options": "EOD Cash"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_cash",
+   "fieldtype": "Currency",
+   "label": "Total Cash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_xvab1",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "expected_cash",
+   "fieldtype": "Currency",
+   "label": "Expected Cash",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "subtracted_float",
+   "fieldtype": "Currency",
+   "label": "Float",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "rounding",
+   "fieldtype": "Currency",
+   "label": "Rounding",
+   "read_only": 1
+  },
+  {
+   "bold": 1,
+   "default": "0",
+   "fieldname": "total_cash_drop",
+   "fieldtype": "Currency",
+   "label": "Total Cash Drop",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_pvj7b",
+   "fieldtype": "Section Break",
+   "label": "Mods of Payment"
+  },
+  {
+   "fieldname": "eod_payments",
+   "fieldtype": "Table",
+   "options": "EOD Payments"
+  },
+  {
+   "default": "0",
+   "fieldname": "mop_total_expected",
+   "fieldtype": "Currency",
+   "label": "Total Expected",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mop_total_actual",
+   "fieldtype": "Currency",
+   "label": "Total Actual",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mop_total_difference",
+   "fieldtype": "Currency",
+   "label": "Difference",
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoices_section",
+   "fieldtype": "Section Break",
+   "label": "Invoices"
+  },
+  {
+   "fieldname": "invoices",
+   "fieldtype": "Table",
+   "options": "EOD Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_q4f2a",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "closing_notes",
+   "fieldtype": "Small Text",
+   "label": "Closing Notes"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-02-13 01:36:32.512234",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "End of Day Closing",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
