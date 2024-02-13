@@ -85,6 +85,7 @@ erpnext.utils.update_child_items = function(opts) {
 	
 	// Metactical Customization: Add picked qty validation in Item Update
 	// pop up so we don't reduce amount by amount already picked
+	// Also add warehouse in pop up
 	if (frm.doc.doctype == 'Sales Order') {
 		fields.push(
 			{
@@ -95,6 +96,15 @@ erpnext.utils.update_child_items = function(opts) {
 				in_list_view: 0,
 				label: __('Picked Qty'),
 				precision: get_precision('picked_qty')
+			},
+			{
+				fieldtype: 'Link',
+				fieldname: 'warehouse',
+				read_only: 0,
+				in_list_view: 1,
+				label: __('Warehouse'),
+				options: "Warehouse",
+				reqd: 1
 			}
 		);
 	}
@@ -110,7 +120,8 @@ erpnext.utils.update_child_items = function(opts) {
 		fields.splice(3, 0, {
 			fieldtype: 'Float',
 			fieldname: "conversion_factor",
-			in_list_view: 1,
+			default: 1,
+			in_list_view: 0,
 			label: __("Conversion Factor"),
 			precision: get_precision('conversion_factor')
 		})
@@ -150,7 +161,8 @@ erpnext.utils.update_child_items = function(opts) {
 							"qty": d.qty,
 							"rate": d.rate,
 							"uom": d.uom,
-							"picked_qty": d.picked_qty
+							"picked_qty": d.picked_qty,
+							"warehouse": d.warehouse
 						});
 						this.data = dialog.fields_dict.trans_items.df.data;
 					}
@@ -168,8 +180,9 @@ erpnext.utils.update_child_items = function(opts) {
 				});
 			}
 			
+			// Metactical Update: Point to custom update child qty rate in Metactical
 			frappe.call({
-				method: 'erpnext.controllers.accounts_controller.update_child_qty_rate',
+				method: 'metactical.custom_scripts.controllers.accounts_controller.update_child_qty_rate',
 				freeze: true,
 				args: {
 					'parent_doctype': frm.doc.doctype,
@@ -201,7 +214,8 @@ erpnext.utils.update_child_items = function(opts) {
 				"qty": d.qty,
 				"rate": d.rate,
 				"uom": d.uom,
-				"picked_qty": d.picked_qty
+				"picked_qty": d.picked_qty,
+				"warehouse": d.warehouse
 			});
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
