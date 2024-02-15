@@ -32,11 +32,9 @@ def execute(filters=None):
 
 		row["asi_item_class"] = i.get("asi_item_class")
 
-		row["rate"] = get_item_details(i.get("item_code"), "Selling")
 		row["rate_camo"] = get_item_details(i.get("item_code"), "RET - Camo", "Selling" )
 		row["rate_gpd"] = get_item_details(i.get("item_code"), "RET - GPD", "Selling", )
 
-		# row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
 		row["date_last_received"] = (
 			getdate(i.get("latest_transaction_date")).strftime("%d-%b-%y")
 			if i.get("latest_transaction_date") else ""
@@ -73,8 +71,6 @@ def execute(filters=None):
 			row["total_actual_qty"] += row.get("wh_gor")
 		
 		row["tag"] = get_tags(i.get("item_code"))
-		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
-		row["expected_pos"] = expected_pos
 		ordered_qty = get_open_po_qty(i.get("item_code"), i.get("supplier"))
 		row["ordered_qty"] = ordered_qty or 0.0
 		
@@ -109,10 +105,8 @@ def execute(filters=None):
 			last12_month_date = today - relativedelta(years=1)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
-
-		total_active = row["wh_whs"] + row["wh_dtn"] + row["wh_queen"] + row["wh_edm"] + row["wh_gor"] + row["wh_vic"]
-		if total_active > 0:
-			data.append(row)
+				
+		data.append(row)
 
 	return columns, data
 
@@ -505,15 +499,3 @@ def get_cost_details(item, list_type="Buying",  supplier=None):
 				if r[0][0]:
 					rate = r[0][0]
 	return rate
-
-
-def test():
-	today = getdate(nowdate())
-	last_month = getdate(str(datetime(today.year-1, 1,1)))
-	print(last_month.year)
-	print(today.year)
-	while last_month < today:
-		month = last_month.strftime("%B")
-		print(last_month.month)
-		print(last_month.year)
-		last_month = last_month + relativedelta(months=1)
