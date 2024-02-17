@@ -191,7 +191,7 @@ def get_data(filters):
 			sales_invoice_item.uom,
 			sales_invoice_item.stock_uom,
 			sales_invoice_item.conversion_factor,
-			GROUP_CONCAT(sales_invoice_item.barcode) as barcodes
+			GROUP_CONCAT(item_barcode.barcode) as barcodes
 		from 
 			`tabSales Invoice Item` sales_invoice_item
 		inner join 
