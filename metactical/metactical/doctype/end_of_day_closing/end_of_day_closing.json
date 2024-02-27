@@ -38,6 +38,7 @@
    "default": "frappe.session.user",
    "fieldname": "user",
    "fieldtype": "Link",
+   "in_standard_filter": 1,
    "label": "User",
    "options": "User",
    "reqd": 1
@@ -46,6 +47,7 @@
    "fieldname": "closing_date",
    "fieldtype": "Date",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Date",
    "reqd": 1
   },
@@ -188,6 +190,7 @@
    "fieldname": "pos_profile",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "POS Profile",
    "options": "POS Profile",
    "reqd": 1
@@ -196,7 +199,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-02-13 01:36:32.512234",
+ "modified": "2024-02-27 04:52:34.017461",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "End of Day Closing",
