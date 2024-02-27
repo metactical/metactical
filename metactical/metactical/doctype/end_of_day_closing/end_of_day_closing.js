@@ -48,7 +48,8 @@ frappe.ui.form.on('End of Day Closing', {
 				args: {
 					"user": frm.doc.user,
 					"pos_profile": frm.doc.pos_profile,
-					"closing_date": frm.doc.closing_date
+					"closing_date": frm.doc.closing_date,
+					"source": frm.doc.lead_source
 				},
 				callback: function(ret){
 					console.log({"ret": ret});
@@ -68,6 +69,7 @@ frappe.ui.form.on('End of Day Closing', {
 						frm.set_value("invoices", []);
 						ret.message.invoices.forEach(function(invoice){
 							var row = frm.add_child("invoices");
+							row.type = invoice.reference_doctype
 							row.invoice = invoice.reference_name;
 							row.amount_paid = invoice.amount_paid;
 							row.owing = invoice.owing;

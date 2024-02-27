@@ -8,12 +8,14 @@ class EndofDayClosing(Document):
 	pass
 
 @frappe.whitelist()
-def get_data(closing_date="2023-01-10", user="whatever", pos_profile="Victoria Operators"):
+def get_data(closing_date, user, pos_profile, source):
 	mode_of_payments = {}
 	invoices = []
 	expected_cash = 0
+	order_payments = []
+	orders = []
 	
-	payments = frappe.db.sql("""
+	invoice_payments = frappe.db.sql("""
 				SELECT
 					SUM(payment_reference.allocated_amount) AS amount_paid,
 					payment_entry.mode_of_payment, mop.type
@@ -47,8 +49,33 @@ def get_data(closing_date="2023-01-10", user="whatever", pos_profile="Victoria O
 				GROUP BY
 					payment.mode_of_payment, type
 				""", {"closing_date": closing_date, "pos_profile": pos_profile}, as_dict=1)
+				
+	if source is not None and source != "":		
+		order_payments = frappe.db.sql("""
+					SELECT
+						SUM(payment_reference.allocated_amount) AS amount_paid,
+						payment_entry.mode_of_payment, mop.type
+					FROM
+						`tabPayment Entry Reference` AS payment_reference
+					LEFT JOIN
+						`tabPayment Entry` AS payment_entry ON payment_reference.parent = payment_entry.name
+					LEFT JOIN
+						`tabSales Order` AS sorder ON sorder.name = payment_reference.reference_name
+					LEFT JOIN
+						`tabMode of Payment` AS mop ON mop.name = payment_entry.mode_of_payment
+					WHERE
+						payment_entry.posting_date = %(closing_date)s AND payment_entry.payment_type = 'Receive'
+						AND payment_reference.reference_doctype = "Sales Order" AND sorder.source = %(source)s
+					GROUP BY 
+						payment_entry.mode_of_payment, type
+					""", {"closing_date": closing_date, "source": source}, as_dict=1)
 	
-	for payment in payments:
+	for payment in invoice_payments:
+		mode_of_payments[payment.mode_of_payment] = mode_of_payments.get(payment.mode_of_payment, 0) + payment.amount_paid
+		if payment.type == "Cash":
+			expected_cash += payment.amount_paid
+			
+	for payment in order_payments:
 		mode_of_payments[payment.mode_of_payment] = mode_of_payments.get(payment.mode_of_payment, 0) + payment.amount_paid
 		if payment.type == "Cash":
 			expected_cash += payment.amount_paid
@@ -91,7 +118,26 @@ def get_data(closing_date="2023-01-10", user="whatever", pos_profile="Victoria O
 					reference_doctype, reference_name, owing, amount_paid
 				""", {"closing_date": closing_date, "pos_profile": pos_profile}, as_dict=1)
 				
-	invoices = invoices + pos_invoices
+	if source is not None and source != "":
+		orders = frappe.db.sql("""
+				SELECT
+					payment_reference.reference_doctype, payment_reference.reference_name, 
+					SUM(payment_reference.allocated_amount) AS amount_paid,
+					(sorder.grand_total - sorder.advance_paid) AS owing
+				FROM
+					`tabPayment Entry Reference` AS payment_reference
+				LEFT JOIN
+					`tabPayment Entry` AS payment_entry ON payment_reference.parent = payment_entry.name
+				LEFT JOIN
+					`tabSales Order` AS sorder ON sorder.name = payment_reference.reference_name
+				WHERE
+					payment_entry.posting_date = %(closing_date)s AND payment_entry.payment_type = 'Receive'
+					AND payment_reference.reference_doctype = "Sales Order" AND sorder.source = %(source)s
+				GROUP BY
+					reference_doctype, reference_name, owing
+				""", {"closing_date": closing_date, "source": source}, as_dict=1)
+				
+	invoices = invoices + pos_invoices + orders
 	
 	return {"payments": mode_of_payments, "invoices": invoices, "expected_cash": expected_cash}
 				

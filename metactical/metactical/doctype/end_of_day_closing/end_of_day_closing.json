@@ -10,6 +10,7 @@
   "user",
   "user_name",
   "pos_profile",
+  "lead_source",
   "amended_from",
   "column_break_hfwdm",
   "closing_date",
@@ -194,12 +195,20 @@
    "label": "POS Profile",
    "options": "POS Profile",
    "reqd": 1
+  },
+  {
+   "fetch_from": "pos_profile.ifw_default_lead_source",
+   "fieldname": "lead_source",
+   "fieldtype": "Link",
+   "label": "Lead Source",
+   "options": "Lead Source",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-02-27 04:52:34.017461",
+ "modified": "2024-02-27 05:06:41.998169",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "End of Day Closing",
