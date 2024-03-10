@@ -13,15 +13,22 @@ def execute(filters=None):
 def get_columns():
 	columns = [
 		{
+			"fieldtype": "Link",
+			"fieldname": "item_code",
+			"label": "Item Code",
+			"options": "Item",
+			"width": 150
+		},
+		{
 			"fieldtype": "Data",
 			"fieldname": "retail_sku",
-			"label": "Retail SKU",
+			"label": "Product Name",
 			"width": 150
 		},
 		{
 			"fieldtype": "Data",
 			"fieldname": "item_name",
-			"label": "Retail SKU",
+			"label": "Item name",
 			"width": 150
 		},
 		{
@@ -55,6 +62,13 @@ def get_columns():
 			"width": 150
 		},
 		{
+			"fieldtype": "Link",
+			"fieldname": "price_list",
+			"label": "Price List",
+			"options": "Price List",
+			"width": 150
+		},
+		{
 			"fieldtype": "Data",
 			"fieldname": "user_name",
 			"label": "User",
@@ -69,10 +83,10 @@ def get_data(filters):
 	
 	versions = frappe.db.sql("""
 				SELECT
-					item.ifw_retailskusuffix AS retail_sku, item.item_name, 
+					item.item_code, item.ifw_retailskusuffix AS retail_sku, item.item_name, 
 					MAX(item_barcode.barcode) AS barcode, item.last_purchase_rate AS cost,
 					CAST(version.creation AS DATE) AS date, user.full_name AS user_name,
-					version.data
+					version.data, item_price.price_list
 				FROM
 					`tabVersion` AS version
 				LEFT JOIN
