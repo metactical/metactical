@@ -17,6 +17,7 @@ import datetime
 from pytz import timezone
 from pathlib import Path
 import shutil
+from itertools import groupby
 
 class CustomPickList(PickList):
 	def update_sales_order_item(self, item, picked_qty, item_code):
@@ -83,6 +84,9 @@ class CustomPickList(PickList):
 					frappe.msgprint('Warning: Sales Order <a href="/desk#Form/Sales Order/{0}">{0}</a> has credit due.'.format(item.sales_order))
 
 	def on_submit(self):
+		if self.do_not_create_delivery:
+			return
+		
 		pick_list = frappe.get_doc('Pick List', self.name)
 		validate_item_locations(pick_list)
 
