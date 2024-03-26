@@ -815,7 +815,7 @@ def get_us_data(filters):
 	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
 		us_request = requests.get(item_search_settings.get("sales_report_url"), 
 						auth=(item_search_settings.api_key, item_search_settings.api_secret),
-									params=filters, verify=False)
+									params=filters)
 		if us_request.status_code == 200:
 			return us_request.json().get("message", {})
 	else:

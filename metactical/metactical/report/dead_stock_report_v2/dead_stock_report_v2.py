@@ -14,7 +14,7 @@ def execute(filters=None):
 	data = []
 	columns = get_columns()
 	warehouses = get_warehouses()
-	masters = get_masters(warehouses)
+	data = get_masters(warehouses)
 	combo_dict = {}
 	total = 0
 	for i in masters:
@@ -41,14 +41,14 @@ def execute(filters=None):
 		#row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 		row["item_cost"] = get_cost_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 
-		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
-		row["wh_dtn"] = get_qty(i.get("item_code"), "R05-DTN-Active Stock - ICL") or 0
-		row["wh_queen"] = get_qty(i.get("item_code"), "R07-Queen-Active Stock - ICL") or 0
-		row["wh_amb"] = get_qty(i.get("item_code"), "R06-AMB-Active Stock - ICL") or 0
-		row["wh_mon"] = get_qty(i.get("item_code"), "R04-Mon-Active Stock - ICL") or 0
-		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
-		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
-		row["wh_gor"] = get_qty(i.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
+		row["wh_whs"] = get_qty(row.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
+		row["wh_dtn"] = get_qty(row.get("item_code"), "R05-DTN-Active Stock - ICL") or 0
+		row["wh_queen"] = get_qty(row.get("item_code"), "R07-Queen-Active Stock - ICL") or 0
+		row["wh_amb"] = get_qty(row.get("item_code"), "R06-AMB-Active Stock - ICL") or 0
+		row["wh_mon"] = get_qty(row.get("item_code"), "R04-Mon-Active Stock - ICL") or 0
+		row["wh_vic"] = get_qty(row.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
+		row["wh_edm"] = get_qty(row.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
+		row["wh_gor"] = get_qty(row.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
 
 		row["total_actual_qty"] = 0
 		
@@ -75,8 +75,8 @@ def execute(filters=None):
 		ordered_qty = get_open_po_qty(i.get("item_code"), i.get("supplier"))
 		row["ordered_qty"] = ordered_qty or 0.0
 		
-		row["last_sold_date"] = get_date_last_sold(i.get("item_code"))
-		sales_data = get_total_sold(i.get("item_code"))
+		row["last_sold_date"] = get_date_last_sold(row.get("item_code"))
+		sales_data = get_total_sold(row.get("item_code"))
 		row["previous_year_sale"] = 0
 		row["total"] = 0
 		row["last_twelve_months"] = 0

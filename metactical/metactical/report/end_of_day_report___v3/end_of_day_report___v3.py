@@ -199,7 +199,7 @@ def get_us_data(filters):
 	if item_search_settings.get("daily_report_url") is not None and item_search_settings.get("daily_report_url") != "":
 		us_request = requests.get(item_search_settings.get("daily_report_url"), 
 						auth=(item_search_settings.api_key, item_search_settings.api_secret),
-									params={"date": filters.get("date")}, verify=False)
+									params={"date": filters.get("date")})
 		if us_request.status_code == 200:
 			for row in us_request.json().get("message", {}):
 				us_data.append(row)
