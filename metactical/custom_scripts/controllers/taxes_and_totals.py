@@ -3,7 +3,6 @@ from erpnext.controllers.taxes_and_totals import calculate_taxes_and_totals
 
 class custom_calculate_taxes_and_totals(calculate_taxes_and_totals):
 	def set_total_amount_to_default_mop(self, total_amount_to_pay):
-		frappe.msgprint("IN here custome")
 		total_paid_amount = 0
 		for payment in self.doc.get("payments"):
 			total_paid_amount += (
@@ -13,7 +12,6 @@ class custom_calculate_taxes_and_totals(calculate_taxes_and_totals):
 		pending_amount = total_amount_to_pay - total_paid_amount
 		
 		if self.doc.get("is_return") and pending_amount > 0:
-			frappe.msgprint("In here custome 2")
 			default_mode_of_payment = frappe.db.get_value(
 				"POS Payment Method",
 				{"parent": self.doc.pos_profile, "default": 1},
@@ -32,7 +30,6 @@ class custom_calculate_taxes_and_totals(calculate_taxes_and_totals):
 					},
 				)
 		elif pending_amount > 0:
-			frappe.msgprint("IN here custome 3")
 			default_mode_of_payment = frappe.db.get_value(
 				"POS Payment Method",
 				{"parent": self.doc.pos_profile, "default": 1},
@@ -50,7 +47,3 @@ class custom_calculate_taxes_and_totals(calculate_taxes_and_totals):
 						"default": 1,
 					},
 				)
-		frappe.msgprint(f"""paid: {self.doc.paid_amount}, 
-				  pending: {pending_amount}, 
-				  grand_total: {self.doc.get('grand_total')}
-				  write_off_amount: {self.doc.write_off_amount}""")

@@ -39,7 +39,6 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 
 	def calculate_taxes_and_totals(self):
 		from metactical.custom_scripts.controllers.taxes_and_totals import custom_calculate_taxes_and_totals
-		frappe.msgprint(_("Custom Taxes and Totals"))
 		custom_calculate_taxes_and_totals(self)
 
 		if self.doctype in (
