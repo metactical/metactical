@@ -8,9 +8,11 @@ from erpnext.setup.doctype.company.company import update_company_current_month_s
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import unlink_inter_company_doc
 from erpnext.healthcare.utils import manage_invoice_submit_cancel
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
+from erpnext.controllers.selling_controller import SellingController
+from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
 
-class CustomSalesInvoice(SalesInvoice):
+class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
 	def on_cancel(self):
 		# Metactical Customization: Relink payment entries to sales orders when sales invoice is cancelled
 		if self.doctype in ["Sales Invoice", "Purchase Invoice"]:
@@ -34,6 +36,20 @@ class CustomSalesInvoice(SalesInvoice):
 		_barcode.get('code128', self.name).write(rv)
 		bstring = rv.getvalue()
 		self.ais_barcode = bstring.decode('ISO-8859-1')
+
+	def calculate_taxes_and_totals(self):
+		from metactical.custom_scripts.controllers.taxes_and_totals import custom_calculate_taxes_and_totals
+		frappe.msgprint(_("Custom Taxes and Totals"))
+		custom_calculate_taxes_and_totals(self)
+
+		if self.doctype in (
+			"Sales Order",
+			"Delivery Note",
+			"Sales Invoice",
+			"POS Invoice",
+		):
+			self.calculate_commission()
+			self.calculate_contribution()
 
 def unlink_ref_doc_from_payment_entries(ref_doc):	
 	#Check for sales order
