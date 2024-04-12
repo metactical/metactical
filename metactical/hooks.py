@@ -45,11 +45,14 @@ doctype_js = {
 	"Customer": "custom_scripts/customer/customer.js",
 	"Shipment": "custom_scripts/shipment/shipment.js",
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
+	"Project": "custom_scripts/project/project.js",
+	"Task": "custom_scripts/task/task.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
+	"Task": "custom_scripts/task/task_list.js"
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
