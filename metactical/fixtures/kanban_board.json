@@ -1,0 +1,83 @@
+[
+ {
+  "columns": [
+   {
+    "column_name": "Open",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   },
+   {
+    "column_name": "Working",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   },
+   {
+    "column_name": "Pending Review",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   },
+   {
+    "column_name": "Overdue",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   },
+   {
+    "column_name": "Template",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   },
+   {
+    "column_name": "Completed",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   },
+   {
+    "column_name": "Cancelled",
+    "indicator": "darkgrey",
+    "order": "[]",
+    "parent": "Buying Board",
+    "parentfield": "columns",
+    "parenttype": "Kanban Board",
+    "status": "Active"
+   }
+  ],
+  "docstatus": 0,
+  "doctype": "Kanban Board",
+  "field_name": "status",
+  "fields": null,
+  "filters": null,
+  "kanban_board_name": "Buying Board",
+  "modified": "2024-04-13 20:19:16.667058",
+  "name": "Buying Board",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "private": 0,
+  "reference_doctype": "Task",
+  "show_labels": 0
+ }
+]
