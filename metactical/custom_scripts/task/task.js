@@ -210,7 +210,6 @@ let show_edit_modal = function(subitem_html, frm, subitem) {
                     label: __("Assign To"),
                     fieldtype: "Link",
                     options: "User",
-                    reqd: 1,
                     default: subitem.assign_to
                 }
             ],
@@ -245,8 +244,11 @@ let show_edit_modal = function(subitem_html, frm, subitem) {
                                 subitem_html.find(".checklist-item-name").text(values.title);
                                 if (r.first_name){
                                     subitem_html.find(".checklist-item-assignee").text(r.first_name[0].toUpperCase());
-                                    subitem_html.find(".checklist-item-assignee").css("title", r.first_name);
+                                    subitem_html.find(".checklist-item-assignee").attr("title", r.first_name);
                                     subitem_html.find(".checklist-item-assignee").css("background", get_random_color());
+                                }
+                                else{
+                                    subitem_html.find(".checklist-item-assignee").text("")
                                 }
                                 frm.refresh_field("checklist");
                                 frm.save()
@@ -377,7 +379,6 @@ let add_new_item_action = function(checklist_html, parent, frm) {
                 {
                     fieldname: "assign_to",
                     label: __("Assign To"),
-                    reqd: 1,
                     fieldtype: "Link",
                     options: "User"
                 }
