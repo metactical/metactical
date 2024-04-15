@@ -15,7 +15,7 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = "/assets/css/metactical.css"
+app_include_css = ["/assets/css/metactical.css", "/assets/metactical/css/metactical_task.css"]
 app_include_js = "/assets/js/metactical.min.js"
 
 # include js, css files in header of web template
