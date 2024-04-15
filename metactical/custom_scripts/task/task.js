@@ -5,7 +5,6 @@ frappe.ui.form.on('Task', {
         }, 10);
     }, 
     refresh: function(frm) {
-        
         show_checklists(frm);
     }
 });
@@ -13,7 +12,7 @@ frappe.ui.form.on('Task', {
 let show_checklists = function(frm) {
     $(".form-dashboard-section.form-links").hide();
     var check_list_html = frm.fields_dict.checklists_html.$wrapper;
-    check_list_html.closest(".form-section").hide();
+    // check_list_html.closest(".form-section").hide();
 
     var checklist_items = frm.doc.checklist;
     var grouped_checklist_items = get_grouped_checklist_items(checklist_items);
@@ -21,7 +20,7 @@ let show_checklists = function(frm) {
     
     if (checklist_items) {
         check_list_html.empty();
-        check_list_html.closest(".form-section").show();
+        // check_list_html.closest(".form-section").show();
         check_list_html.append(`
             <div class="row">
                 <div class="col-md-8  border-right">
