@@ -206,12 +206,19 @@ override_whitelisted_methods = {
 
 #Fixtures
 fixtures = [{
-    "dt": "Custom Field",
-    "filters": [["name", "in", [
-        'Stock Settings-ais_default_price_list',
-        'Stock Settings-ais_sales_report_settings'
-    ]]]
-}]
+		"dt": "Custom Field",
+		"filters": [["name", "in", [
+			'Stock Settings-ais_default_price_list',
+			'Stock Settings-ais_sales_report_settings'
+		]]]
+	},
+	{
+		"dt": "Kanban Board",
+		"filters": [["name", "in", [
+			"Buying Board"
+		]]]
+	}
+]
 
 #For using in print format
 jenv = {
