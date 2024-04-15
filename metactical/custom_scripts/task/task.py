@@ -52,16 +52,19 @@ def update_checklist_item_status(name, value):
         frappe.response["error"] = str(e)
 
 @frappe.whitelist()
-def update_checklist_item(name, title, assign_to, due_date=None):
+def update_checklist_item(name, title, assign_to=None, due_date=None):
     try:
         task_checklist = frappe.get_doc("Task Checklist", name)
         task_checklist.title = title
         task_checklist.due_date = due_date
         task_checklist.assign_to = assign_to
+        if not assign_to:
+            task_checklist.first_name = ""
+            
         task_checklist.save()
         frappe.db.commit()
         frappe.response["success"] = True
-        frappe.response["first_name"] = task_checklist.first_name
+        frappe.response["first_name"] = task_checklist.first_name if assign_to else ""
     except Exception as e:
         frappe.db.rollback()
         frappe.response["success"] = False
