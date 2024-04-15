@@ -1,0 +1,28 @@
+.checklist-item-main, .checklist-item, .checklist-new {
+    cursor: pointer;
+    list-style-type: none;
+}
+
+.checklist-item:hover {
+    background-color: #f0f0f0;
+}
+
+.checklist input {
+    vertical-align: middle;
+}
+
+.checklist-header-section{
+    height: 25px;
+    padding: 3px
+}
+
+.checklist svg{
+    fill: #595958;
+}
+
+.checklist-item-assignee{
+    border-radius: 50% !important;
+    width: 20px;
+    text-align: center;
+    color: white;
+}
