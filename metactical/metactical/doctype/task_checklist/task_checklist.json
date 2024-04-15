@@ -10,7 +10,10 @@
   "start_date",
   "due_date",
   "is_completed",
-  "convert_to_task"
+  "assign_to",
+  "first_name",
+  "is_parent",
+  "parent_checklist"
  ],
  "fields": [
   {
@@ -39,15 +42,34 @@
    "label": "Is Completed?"
   },
   {
-   "fieldname": "convert_to_task",
-   "fieldtype": "Button",
-   "label": "Convert To Task"
+   "default": "0",
+   "fieldname": "is_parent",
+   "fieldtype": "Check",
+   "label": "Is Parent"
+  },
+  {
+   "fieldname": "parent_checklist",
+   "fieldtype": "Link",
+   "label": "Parent Checklist",
+   "options": "Task Checklist"
+  },
+  {
+   "fieldname": "assign_to",
+   "fieldtype": "Link",
+   "label": "Assign To",
+   "options": "User"
+  },
+  {
+   "fetch_from": "assign_to.first_name",
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "label": "Assigne First Name"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-04-12 12:42:18.758848",
+ "modified": "2024-04-15 14:56:52.533028",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Task Checklist",
