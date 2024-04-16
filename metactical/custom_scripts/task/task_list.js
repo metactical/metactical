@@ -6,3 +6,5 @@ frappe.listview_settings['Task'].refresh = function(listview) {
         frappe.set_route("task/view/kanban/Buying Board");
     }
 }; 
+
+// dummy comment to trigger ci/cd for the dev server
