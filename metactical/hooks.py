@@ -16,7 +16,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 app_include_css = ["/assets/css/metactical.css", "/assets/metactical/css/metactical_task.css"]
-app_include_js = "/assets/js/metactical.min.js"
+app_include_js = ["/assets/js/metactical.min.js", "/assets/metactical/js/metactical_kanban_custom.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -133,6 +133,9 @@ doc_events = {
 	},
 	"Task": {
 		"before_insert": "metactical.custom_scripts.task.task.set_start_date"
+	}, 
+	"Project": {
+		"on_update": "metactical.custom_scripts.project.project.on_update"
 	}
 }
 
