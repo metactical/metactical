@@ -69,3 +69,6 @@ def update_checklist_item(name, title, assign_to=None, due_date=None):
         frappe.db.rollback()
         frappe.response["success"] = False
         frappe.response["error"] = str(e)
+
+def set_start_date(doc, method):
+    doc.exp_start_date = frappe.utils.today()

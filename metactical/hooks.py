@@ -52,7 +52,8 @@ doctype_js = {
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
-	"Task": "custom_scripts/task/task_list.js"
+	"Task": "custom_scripts/task/task_list.js",
+	"Project": "custom_scripts/project/project_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -129,6 +130,9 @@ doc_events = {
 	"Shipment": {
 		"validate": "metactical.custom_scripts.shipment.shipment.validate",
 		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
+	},
+	"Task": {
+		"before_insert": "metactical.custom_scripts.task.task.set_start_date"
 	}
 }
 
@@ -215,7 +219,8 @@ fixtures = [{
 	{
 		"dt": "Kanban Board",
 		"filters": [["name", "in", [
-			"Buying Board"
+			"Buying Board",
+			"Projects Status"
 		]]]
 	}
 ]
