@@ -14,7 +14,7 @@ let show_checklists = function(frm) {
     var check_list_html = frm.fields_dict.checklists_html.$wrapper;
     check_list_html.closest(".form-section").hide();
 
-    var checklist_items = frm.doc.checklist;
+    var checklist_items = frm.doc.checklists;
     var grouped_checklist_items = get_grouped_checklist_items(checklist_items);
     var parent_checklists = get_parent_name_title_combinations(checklist_items);
     
@@ -158,13 +158,13 @@ let delete_checklist_item = function(subitem_html, subitem, checklist_subitems, 
             me.parents(".checklist-item").remove();
             
             // update the child table
-            $.each(frm.doc.checklist, function(i, item) {
+            $.each(frm.doc.checklists, function(i, item) {
                 if (item.name == subitem.name) {
                     frappe.model.clear_doc("Task Checklist", item.name);
                     return false;
                 }
             })
-            frm.refresh_field("checklist");
+            frm.refresh_field("checklists");
 
             // update the progress bar
             var progress = get_progress(checklist_subitems.find(".checklist-item-status"))
@@ -231,7 +231,7 @@ let show_edit_modal = function(subitem_html, frm, subitem) {
                                 subitem.assign_to = values.assign_to
                                 
                                 // update child table
-                                $(frm.doc.checklist).each(function(i, item) {
+                                $(frm.doc.checklists).each(function(i, item) {
                                     if (item.name == subitem.name) {
                                         item.title = values.title;
                                         item.due_date = values.due_date;
@@ -250,7 +250,7 @@ let show_edit_modal = function(subitem_html, frm, subitem) {
                                 else{
                                     subitem_html.find(".checklist-item-assignee").text("")
                                 }
-                                frm.refresh_field("checklist");
+                                frm.refresh_field("checklists");
                                 frm.save()
                                 dialog.hide();
                             }
@@ -277,13 +277,13 @@ let updadate_status_on_change = function(subitem_html, checklist_subitems, paren
             },
             callback: function(r) {
                 if (r.success) {
-                    $(frm.doc.checklist).each(function(i, item) {
+                    $(frm.doc.checklists).each(function(i, item) {
                         if (item.name == me.attr("data-target")) {
                             item.is_completed = status ? 1 : 0;
                             return false;
                         }
                     })
-                    frm.refresh_field("checklist")
+                    frm.refresh_field("checklists")
                 }
                 else{
                     frappe.show_alert(r.error)
@@ -329,10 +329,10 @@ let add_checklist_group_action = function(check_list_html, frm) {
             primary_action: function() {
                 var values = dialog.get_values();
                 if (values) {
-                    var checklist_item = frappe.model.add_child(frm.doc, "Task Checklist", "checklist");
+                    var checklist_item = frappe.model.add_child(frm.doc, "Task Checklist", "checklists");
                     checklist_item.title = values.title;
                     checklist_item.is_parent = 1;
-                    frm.refresh_field("checklist");
+                    frm.refresh_field("checklists");
                     frm.save()
                     dialog.hide();
                 }
@@ -386,13 +386,13 @@ let add_new_item_action = function(checklist_html, parent, frm) {
             primary_action: function() {
                 var values = dialog.get_values();
                 if (values) {
-                    var checklist_item = frappe.model.add_child(frm.doc, "Task Checklist", "checklist");
+                    var checklist_item = frappe.model.add_child(frm.doc, "Task Checklist", "checklists");
                     checklist_item.title = values.title;
                     checklist_item.assign_to = values.assign_to;
                     checklist_item.due_date = values.due_date;
                     checklist_item.is_parent = 0;
                     checklist_item.parent_checklist = parent;
-                    frm.refresh_field("checklist");
+                    frm.refresh_field("checklists");
                     frm.save()
                     dialog.hide();
                 }
@@ -417,7 +417,7 @@ let checklist_delete_action = function(checklist_html, parent, parent_checklists
                     if (r.success){
                         me.parents(".checklist-item-main").remove();
                         
-                        $.each(frm.doc.checklist, function(i, item) {
+                        $.each(frm.doc.checklists, function(i, item) {
                             if (item.name == parent) {
                                 frappe.model.clear_doc("Task Checklist", item.name);
                             }
@@ -426,7 +426,7 @@ let checklist_delete_action = function(checklist_html, parent, parent_checklists
                             }
                         })
 
-                        frm.refresh_field("checklist");
+                        frm.refresh_field("checklists");
                     }
                 }
             })
