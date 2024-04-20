@@ -36,12 +36,6 @@ def execute(filters=None):
 		row["rate_camo"] = get_item_details(i.get("item_code"), "RET - Camo", "Selling" )
 		row["rate_gpd"] = get_item_details(i.get("item_code"), "RET - GPD", "Selling", )
 
-
-		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
-		#row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
-		row["item_cost"] = get_cost_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
-
-
 		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
 		#row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 		row["item_cost"] = get_cost_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
@@ -198,7 +192,7 @@ def get_columns():
 			{
 				"label": _("DateLastReceived"),
 				"fieldname": "date_last_received",
-				"fieldtype": "DateTime",
+				"fieldtype": "Date",
 				"width": 200,
 				"align": "center",
 			},
@@ -351,9 +345,14 @@ def get_conditions(filters):
 
 def get_date_last_received(item, supplier):
 	date = None
-	data= frappe.db.sql("""select max(transaction_date) from `tabPurchase Order` p inner join 
-		`tabPurchase Order Item` c on p.name = c.parent where c.item_code = %s and p.supplier=%s and p.docstatus = 1
-		""",(item,supplier))
+	data= frappe.db.sql("""select 
+							max(transaction_date) 
+						from `tabPurchase Order` p 
+						inner join 
+							`tabPurchase Order Item` c on p.name = c.parent 
+						where 
+							c.item_code = %s and p.docstatus = 1
+		""",(item))
 	if data:
 		date = data[0][0]
 	if date:
