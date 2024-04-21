@@ -26,7 +26,7 @@ def execute(filters=None):
 		
 
 		row["ifw_discontinued"] = int(i.get("ifw_discontinued"))
-		row["supplier_sku"] = i.get("supplier_part_no")		
+		row["supplier_sku"] = i.get("supplier_part_no")
 		row["supplier_name"] = i.get("supplier")
 		row["date_created"] = (i.get("creation")).strftime("%d-%b-%y")
 
