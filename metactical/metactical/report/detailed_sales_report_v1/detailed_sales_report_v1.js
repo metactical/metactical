@@ -34,6 +34,13 @@ frappe.query_reports["Detailed Sales Report V1"] = {
 			"fieldtype": "Select",
 			"options": ["20", "500", "1000", "5000", "10000", "All"],
 			"default": "20"
+		},
+		{
+			"fieldname": "sales_data_period",
+			"fieldtype": "Select",
+			"label": "Sales Data Period(Months)",
+			"options": "12\n24",
+			"default": "12",
 		}
 	]
 };

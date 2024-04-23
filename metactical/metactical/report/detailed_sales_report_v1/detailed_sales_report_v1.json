@@ -14,7 +14,7 @@
  "module": "Metactical",
  "name": "Detailed Sales Report V1",
  "owner": "Administrator",
- "prepared_report": 0,
+ "prepared_report": 1,
  "ref_doctype": "Sales Invoice",
  "report_name": "Detailed Sales Report V1",
  "report_type": "Script Report",
