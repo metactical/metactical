@@ -61,8 +61,8 @@ def create_tasks(tasks_list, project, doc):
 		project = project if type(project) == str else project.name
 		if row.get("Card Name") and not frappe.db.exists("Task", {"subject": row.get("Card Name"), "project": project}):
 			task = frappe.new_doc("Task")
-			if len(row["Card Name"]) > 140:
-				task.subject = row["Card Name"][:140]
+			if len(row["Card Name"]) > 137:
+				task.subject = row["Card Name"][:137]+"..."
 			else:
 				task.subject = row["Card Name"]
 			
@@ -75,12 +75,21 @@ def create_tasks(tasks_list, project, doc):
 			elif not row.get("start_date"):
 				row["Start Date"] = row.get("Due Date")
 
+			list_name = row.get("List Name").lower().replace(" ", "_")
+			status_mapping = get_status_mapping()
+			if list_name not in status_mapping:
+				task.status = "Open"
+			else:
+				task.status = status_mapping[list_name]
+
 			task.exp_start_date = frappe.utils.getdate(row.get("Start Date")) if row.get("Start Date") else None
 			task.exp_end_date = frappe.utils.getdate(row.get("Due Date")) if row.get("Due Date") else None
 			task.description = (row['Card Name'] if len(row["Card Name"]) > 0 else "") + row.get("Card Description")
+			task.flags.ignore_validate = True
 			task.save()
+			frappe.db.commit()
 			log_message += f"Task {row.get('Card Name')} created\n"
-
+		
 			if row.get("Attachment Links"):
 				# create attachment for each attachment
 				# get the last item from attachments list
@@ -91,7 +100,7 @@ def create_tasks(tasks_list, project, doc):
 				attachment_doc.attached_to_doctype = "Task"
 				attachment_doc.attached_to_name = task.name
 				attachment_doc.save()
-
+				frappe.db.commit()
 			
 			if row.get("Members"):
 				# create todo for each member
@@ -107,6 +116,7 @@ def create_tasks(tasks_list, project, doc):
 					todo.assigned_by = frappe.session.user
 					todo.save()
 					log_message += f"Task {task.subject} assigned to {todo.owner}\n"
+					frappe.db.commit()
 
 	frappe.db.set_value("Trello Data Import", doc.name, "log",  log_message, update_modified=False)
 	frappe.db.commit()
@@ -147,3 +157,17 @@ def csv_to_json(csvFilePath):
 				jsonArray.append(row)
 
 		return jsonArray
+
+def get_status_mapping():
+	# reverse key and values of ab
+	return {
+		"todo": "Open",
+		"doing": "Working",
+		"under_review": "Pending Review",
+		"backlog": "Template",
+		"completed": "Completed",
+		"done": "Completed",
+		"review": "Pending Review",
+		"pending": "Pending Review"
+	}
+	
