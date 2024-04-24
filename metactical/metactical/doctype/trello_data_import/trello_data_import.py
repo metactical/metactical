@@ -44,7 +44,9 @@ def import_csv(doc_name):
 	tasks_list = []
 	# create queue for 50 tasks at a time
 	for row in csv_json:
-		tasks_list.append(row)
+		if row["Archived"] != "true":
+			tasks_list.append(row)
+
 		if len(tasks_list) == 50:
 			frappe.enqueue("metactical.metactical.doctype.trello_data_import.trello_data_import.create_tasks", queue="short", tasks_list=tasks_list, project=project, doc=doc)
 			tasks_list = []
