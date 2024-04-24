@@ -77,10 +77,13 @@ def create_tasks(tasks_list, project, doc):
 			elif not row.get("start_date"):
 				row["Start Date"] = row.get("Due Date")
 
-			list_name = row.get("List Name").lower().replace(" ", "_")
+			list_name = frappe.scrub(row.get("List Name").lower().replace(" ", "_"))
 			status_mapping = get_status_mapping()
 			if list_name not in status_mapping:
-				task.status = "Open"
+				if list_name.startswith("doing"):
+					task.status == "Working"
+				else:
+					task.status = "Open"
 			else:
 				task.status = status_mapping[list_name]
 
@@ -170,6 +173,6 @@ def get_status_mapping():
 		"completed": "Completed",
 		"done": "Completed",
 		"review": "Pending Review",
-		"pending": "Pending Review"
+		"pending": "Pending Review",
 	}
 	
