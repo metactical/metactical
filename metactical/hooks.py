@@ -225,6 +225,10 @@ fixtures = [{
 			"Buying Board",
 			"Projects Status"
 		]]]
+	},
+	{
+		"dt": "Warehouse",
+
 	}
 ]
 
