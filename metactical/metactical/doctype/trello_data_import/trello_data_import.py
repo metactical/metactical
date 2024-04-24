@@ -81,7 +81,7 @@ def create_tasks(tasks_list, project, doc):
 			status_mapping = get_status_mapping()
 			if list_name not in status_mapping:
 				if list_name.startswith("doing"):
-					task.status == "Working"
+					task.status = "Working"
 				else:
 					task.status = "Open"
 			else:
