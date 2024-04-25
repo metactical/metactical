@@ -1,5 +1,6 @@
 // Copyright (c) 2024, Techlift Technologies and contributors
 // For license information, please see license.txt
+var total_queues_completed = 0;
 
 frappe.ui.form.on('Trello Data Import', {
 	refresh: function(frm) {
@@ -27,5 +28,6 @@ frappe.ui.form.on('Trello Data Import', {
 });
 
 frappe.realtime.on("trello_data_import", function(data){
-	frappe.show_alert('total_queues_completed');
+	var message = "Total Batches Imported: "+ (++total_queues_completed);
+	frappe.show_alert(message);
 });
