@@ -6,8 +6,9 @@ frappe.ui.form.on('Trello Data Import', {
 		
 	},
 	start_import: function(frm){
-		// frm.save();
-
+		if (frm.__unsaved || ) {
+			frm.save();
+		}
 		setTimeout(() => {
 			frappe.call({
 				method: "metactical.metactical.doctype.trello_data_import.trello_data_import.import_csv",

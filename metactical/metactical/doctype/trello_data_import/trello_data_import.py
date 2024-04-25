@@ -24,14 +24,17 @@ def import_csv(doc_name):
 
 	log_message = ""
 	members_list = []
+	board_name = ""
 
 	for row in csv_json:
-		members = row.get("Members").split(",") if row.get("Members") else []
-		members_list.extend(members)
-	
-	# unique members
-	members_list = list(set(members_list))
-	project = frappe.db.exists("Project", {"project_name": row.get("Board Name")})
+		if not board_name and row.get("Board Name"):
+			board_name = row.get("Board Name")
+			break
+		
+	if not board_name:
+		frappe.throw("Board name not found in the file")
+
+	project = frappe.db.exists("Project", {"project_name": board_name})
 
 	if not project:
 		project = frappe.new_doc("Project")
@@ -82,6 +85,8 @@ def create_tasks(tasks_list, project, doc):
 			if list_name not in status_mapping:
 				if list_name.startswith("doing"):
 					task.status = "Working"
+				elif list_name.startswith("done"):
+					task.status = "Completed"
 				else:
 					task.status = "Open"
 			else:
