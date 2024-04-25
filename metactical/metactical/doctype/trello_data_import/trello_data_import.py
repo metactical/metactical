@@ -43,7 +43,7 @@ def import_csv(doc_name):
 		frappe.db.commit()
 	
 		log_message += f"Project {row.get('Board Name')} created\n"
-
+	
 	tasks_list = []
 	# create queue for 50 tasks at a time
 	for row in csv_json:
@@ -102,7 +102,6 @@ def create_tasks(tasks_list, project, doc):
 		
 			if row.get("Attachment Links"):
 				# create attachment for each attachment
-				# get the last item from attachments list
 				attachment_doc = frappe.new_doc("File")
 				attachment_doc.file_url = row["Attachment Links"]
 				attachment_doc.folder = "Home/Attachments"
@@ -127,6 +126,10 @@ def create_tasks(tasks_list, project, doc):
 					todo.save()
 					log_message += f"Task {task.subject} assigned to {todo.owner}\n"
 					frappe.db.commit()
+
+	existing_log_message = frappe.db.get_value("Trello Data Import", doc.name, "log") 
+	if existing_log_message:
+		log_message = existing_log_message + log_message
 
 	frappe.db.set_value("Trello Data Import", doc.name, "log",  log_message, update_modified=False)
 	frappe.db.commit()
