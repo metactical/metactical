@@ -26,7 +26,7 @@ def execute(filters=None):
 		
 
 		row["ifw_discontinued"] = int(i.get("ifw_discontinued"))
-		row["supplier_sku"] = i.get("supplier_part_no")		
+		row["supplier_sku"] = i.get("supplier_part_no")
 		row["supplier_name"] = i.get("supplier")
 		row["date_created"] = (i.get("creation")).strftime("%d-%b-%y")
 
@@ -193,7 +193,7 @@ def get_columns():
 			{
 				"label": _("DateLastReceived"),
 				"fieldname": "date_last_received",
-				"fieldtype": "DateTime",
+				"fieldtype": "Date",
 				"width": 200,
 				"align": "center",
 			},
@@ -346,9 +346,14 @@ def get_conditions(filters):
 
 def get_date_last_received(item, supplier):
 	date = None
-	data= frappe.db.sql("""select max(transaction_date) from `tabPurchase Order` p inner join 
-		`tabPurchase Order Item` c on p.name = c.parent where c.item_code = %s and p.supplier=%s and p.docstatus = 1
-		""",(item,supplier))
+	data= frappe.db.sql("""select 
+							max(transaction_date) 
+						from `tabPurchase Order` p 
+						inner join 
+							`tabPurchase Order Item` c on p.name = c.parent 
+						where 
+							c.item_code = %s and p.docstatus = 1
+		""",(item))
 	if data:
 		date = data[0][0]
 	if date:
