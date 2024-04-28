@@ -19,11 +19,11 @@
   "cash_float",
   "eod_cash",
   "total_cash",
-  "section_break_xvab1",
-  "expected_cash",
   "subtracted_float",
   "rounding",
   "total_cash_drop",
+  "section_break_xvab1",
+  "expected_cash",
   "section_break_pvj7b",
   "eod_payments",
   "mop_total_expected",
@@ -100,18 +100,19 @@
    "default": "0",
    "fieldname": "total_cash",
    "fieldtype": "Currency",
-   "label": "Total Cash",
+   "label": "Total Cash Including Float",
    "read_only": 1
   },
   {
    "fieldname": "section_break_xvab1",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "hidden": 1
   },
   {
    "default": "0",
    "fieldname": "expected_cash",
    "fieldtype": "Currency",
-   "label": "Expected Cash",
+   "label": "Expected Cash (Without Float)",
    "read_only": 1
   },
   {
@@ -208,7 +209,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-02-27 05:06:41.998169",
+ "modified": "2024-04-28 09:07:50.335707",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "End of Day Closing",
