@@ -147,7 +147,6 @@ class CanadaPost():
 				})
 				for link in response['shipment-info']['links']['link']:
 					rel = 'tracking' if link['@rel'] == "self" else link['@rel']
-					frappe.errprint(rel)
 					row.set(
 						f'{rel}_url', f"""<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>""")
 					if link['@rel'] == "label":
@@ -333,7 +332,7 @@ class CanadaPost():
 			link['@href'], None, {'Accept': link['@media-type'], 'Content-Type': link['@media-type']}, True, 'GET')
 		if res.status_code == 200:
 			file = self.write_file(
-				row, res, f"{fieldname}_{row.name}.pdf", fieldname)
+				row, res, f"{fieldname}_{row.shipment_id}.pdf", fieldname)
 			row.set(fieldname, file.file_url)
 			files.append(file.file_url)
 
