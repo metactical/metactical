@@ -191,7 +191,7 @@ def get_data(filters):
 			sales_invoice_item.uom,
 			sales_invoice_item.stock_uom,
 			sales_invoice_item.conversion_factor,
-			GROUP_CONCAT(item_barcode.barcode) as barcodes
+			barcodes.barcodes
 		from 
 			`tabSales Invoice Item` sales_invoice_item
 		inner join 
@@ -200,21 +200,74 @@ def get_data(filters):
 		inner join 
 			`tabItem` item 
 				on sales_invoice_item.item_code = item.name
-		Left Join 
-			`tabItem Barcode` item_barcode
-				on item_barcode.parent = item.name
+		Left join 
+			(SELECT parent, GROUP_CONCAT(barcode) as barcodes
+				FROM `tabItem Barcode`
+				GROUP BY parent) barcodes
+				on barcodes.parent = item.name
 		where
 			sales_invoice.docstatus = 1
 			and is_pos =1
 			and is_return = 0
 			and sales_invoice.posting_date = '{filters.get("to_date")}'
 			{conditions}
-		group by sales_invoice_item.item_code, sales_invoice.pos_profile
+		group by 
+			sales_invoice_item.item_code, sales_invoice_item.item_name,
+			item.ifw_retailskusuffix, item.ifw_location,
+			sales_invoice_item.warehouse, sales_invoice.pos_profile,
+			sales_invoice.company, sales_invoice_item.uom,
+			sales_invoice_item.uom,
+			sales_invoice_item.conversion_factor,
+			barcodes.barcodes
 		order by sales_invoice_item.item_name, sales_invoice.pos_profile
 	"""
+	stock_items = frappe.db.sql(query, as_dict=1)
 
-	data = frappe.db.sql(query, as_dict=1)
-
+	product_bundles = frappe.db.sql(f"""
+					SELECT
+						sales_invoice_item.item_code,
+						sales_invoice_item.item_name,
+						item.ifw_retailskusuffix,
+						item.ifw_location,
+						sales_invoice_item.warehouse,
+						SUM(sales_invoice_item.qty) as qty,
+						sales_invoice.pos_profile,
+						sales_invoice.company,
+						sales_invoice_item.uom,
+						sales_invoice_item.uom AS stock_uom,
+						sales_invoice_item.conversion_factor,
+						barcodes.barcodes
+					from 
+						`tabPacked Item` sales_invoice_item
+					inner join 
+						`tabSales Invoice` sales_invoice 
+							on sales_invoice.name = sales_invoice_item.parent	   
+					inner join 
+						`tabItem` item 
+							on sales_invoice_item.item_code = item.name
+					left join 
+						(SELECT parent, GROUP_CONCAT(barcode) as barcodes
+						 FROM `tabItem Barcode`
+						 GROUP BY parent) barcodes
+							on barcodes.parent = item.name
+					where
+						sales_invoice.docstatus = 1
+						and is_pos =1
+						and is_return = 0
+						and sales_invoice.posting_date = '{filters.get("to_date")}'
+						{conditions}
+					group by 
+						sales_invoice_item.item_code, sales_invoice_item.item_name,
+						item.ifw_retailskusuffix, item.ifw_location,
+						sales_invoice_item.warehouse, sales_invoice.pos_profile,
+						sales_invoice.company, sales_invoice_item.uom,
+						sales_invoice_item.uom,
+						sales_invoice_item.conversion_factor,
+						barcodes.barcodes
+					order by sales_invoice_item.item_name, sales_invoice.pos_profile
+					""", as_dict=1)
+	
+	data = stock_items + product_bundles
 	return data
 
 @frappe.whitelist()
