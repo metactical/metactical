@@ -7,6 +7,44 @@ from frappe.model.document import Document
 class EndofDayClosing(Document):
 	pass
 
+def get_permission_query_conditions(user):
+	return_condition = ""
+	if not user: user = frappe.session.user
+	
+	roles = frappe.get_roles(user)
+	if "System Manager" in roles:
+		return ""
+	
+	pos_profiles = frappe.get_all("POS Profile User", filters={"user": user}, fields=["parent"])
+	if len(pos_profiles) > 0:
+		#pos_profiles = [x["parent"] for x in pos_profiles]
+		where_clause = ""
+		for row in pos_profiles:
+			where_clause += f"'{row.parent}',"
+		return_condition = f""" `tabEnd of Day Closing`.pos_profile IN ({where_clause[:-1]})"""
+	else:
+		return_condition = """ `tabEnd of Day Closing`.user = '{0}'""".format(user)
+	
+	return return_condition
+
+def has_permission(doc, user):
+	if not user: user = frappe.session.user
+	
+	roles = frappe.get_roles(user)
+	if "System Manager" in roles:
+		return True
+	
+	pos_profiles = frappe.get_all("POS Profile User", filters={"user": user}, fields=["parent"])
+	if len(pos_profiles) > 0:
+		pos_profiles = [x["parent"] for x in pos_profiles]
+		if doc.pos_profile in pos_profiles:
+			return True
+	else:
+		if doc.user == user:
+			return True
+	
+	return False
+
 @frappe.whitelist()
 def get_data(closing_date, user, pos_profile, source):
 	mode_of_payments = {}
@@ -35,7 +73,7 @@ def get_data(closing_date, user, pos_profile, source):
 				SELECT
 					"Sales Invoice" AS reference_doctype, invoice.name AS reference_name,
 					invoice.outstanding_amount AS owing, 
-					invoice.paid_amount AS amount_paid, payment.mode_of_payment,
+					payment.amount AS amount_paid, payment.mode_of_payment,
 					invoice.change_amount,
 					change_account.account_type AS change_account_type
 				FROM
