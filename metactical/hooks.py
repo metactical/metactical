@@ -94,13 +94,14 @@ home_page = "login"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
+permission_query_conditions = {
+	"End of Day Closing": "metactical.metactical.doctype.end_of_day_closing.end_of_day_closing.get_permission_query_conditions"
+}
+
 #
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+has_permission = {
+	"End of Day Closing": "metactical.metactical.doctype.end_of_day_closing.end_of_day_closing.has_permission"
+}
 
 
 # Document Events
