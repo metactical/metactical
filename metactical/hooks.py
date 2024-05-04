@@ -99,9 +99,9 @@ permission_query_conditions = {
 }
 
 #
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+has_permission = {
+	"End of Day Closing": "metactical.metactical.doctype.end_of_day_closing.end_of_day_closing.has_permission"
+}
 
 
 # Document Events
