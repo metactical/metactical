@@ -68,7 +68,8 @@ class EmployeeSignUp(Document):
 			'create_user_permission': 1,
 			'permanent_address': address,
 			'ais_state': self.state,
-			'bio': self.comments
+			'bio': self.comments,
+			'branch': self.branch
 		})
 		employee.insert(ignore_permissions=True)
 		
