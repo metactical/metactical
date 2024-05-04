@@ -13,6 +13,7 @@
   "column_break_3",
   "date_of_birth",
   "hire_date",
+  "branch",
   "section_address",
   "address1",
   "address2",
@@ -224,6 +225,13 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "Inteli Phone No"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
   },
   {
    "fieldname": "bank_document",
