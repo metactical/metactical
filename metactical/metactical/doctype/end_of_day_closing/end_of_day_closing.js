@@ -55,7 +55,23 @@ frappe.ui.form.on('End of Day Closing', {
 					console.log({"ret": ret});
 					if(Object.keys(ret.message.payments).length > 0){
 						frm.set_value("eod_payments", []);
+						//Set cash as the first row
 						for(var mop in ret.message.payments){
+							if(mop == "Cash"){
+								var row = frm.add_child("eod_payments");
+								row.mode_of_payment = mop;
+								row.expected = ret.message.payments[mop];
+								row.actual = 0;
+								row.difference = ret.message.payments[mop];
+							}
+						}
+						
+						//Set other modes of payment
+						for(var mop in ret.message.payments){
+							if(mop == "Cash"){
+								continue;
+							}
+
 							var row = frm.add_child("eod_payments");
 							row.mode_of_payment = mop;
 							row.expected = ret.message.payments[mop];
@@ -71,6 +87,7 @@ frappe.ui.form.on('End of Day Closing', {
 							var row = frm.add_child("invoices");
 							row.type = invoice.reference_doctype
 							row.invoice = invoice.reference_name;
+							row.mode_of_payment = invoice.mode_of_payment;
 							row.amount_paid = invoice.amount_paid;
 							row.owing = invoice.owing;
 						});
@@ -105,7 +122,7 @@ frappe.ui.form.on('End of Day Closing', {
 		});
 		frm.set_value("mop_total_expected", expected_total);
 		frm.set_value("mop_total_actual", actual_total);
-		frm.set_value("mop_total_difference", expected_total - actual_total);
+		frm.set_value("mop_total_difference", actual_total - expected_total);
 	}
 });
 
@@ -139,7 +156,7 @@ frappe.ui.form.on("EOD Cash", {
 frappe.ui.form.on("EOD Payments", {
 	actual: function(frm, cdt, cdn){
 		var row = locals[cdt][cdn];
-		var diff = row.expected - row.actual
+		var diff = row.actual - row.expected
 		frappe.model.set_value(cdt, cdn, "difference", diff);
 		frm.events.calculate_totals(frm);
 	}
