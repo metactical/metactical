@@ -55,12 +55,13 @@
   {
    "fieldname": "reason_for_adjustment",
    "fieldtype": "Small Text",
-   "label": "Reason for Adjustment"
+   "label": "Reason for Adjustment",
+   "reqd": 1
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2022-11-15 03:12:14.433783",
+ "modified": "2024-05-05 14:05:54.129774",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Cycle Count",

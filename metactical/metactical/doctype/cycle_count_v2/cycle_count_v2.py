@@ -33,7 +33,9 @@ def get_expected_qty(item_code, warehouse):
 		ret = {"actual_qty": expected[0].actual_qty, "valuation_rate": expected[0].valuation_rate}
 		return ret
 	else:
-		return {"actual_qty": 0, "valuation_rate": 0}
+		# Get valuation rate from Item
+		valuation_rate = frappe.db.get_value("Item", item_code, "valuation_rate")
+		return {"actual_qty": 0, "valuation_rate": valuation_rate}
 		
 @frappe.whitelist()
 def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters):
