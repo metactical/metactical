@@ -20,7 +20,7 @@
  "is_standard": 1,
  "login_required": 0,
  "max_attachment_size": 0,
- "modified": "2024-05-03 07:27:52.664017",
+ "modified": "2024-05-03 10:01:25.675134",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "sign-up",
@@ -117,6 +117,19 @@
    "label": "Hire Date",
    "max_length": 0,
    "max_value": 0,
+   "read_only": 0,
+   "reqd": 1,
+   "show_in_filter": 0
+  },
+  {
+   "allow_read_on_all_link_options": 0,
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "hidden": 0,
+   "label": "Branch",
+   "max_length": 0,
+   "max_value": 0,
+   "options": "Branch",
    "read_only": 0,
    "reqd": 1,
    "show_in_filter": 0
@@ -243,6 +256,7 @@
   },
   {
    "allow_read_on_all_link_options": 0,
+   "depends_on": "eval:doc.branch != \"Online\"",
    "fieldname": "",
    "fieldtype": "Section Break",
    "hidden": 0,
@@ -304,6 +318,18 @@
   {
    "allow_read_on_all_link_options": 0,
    "fieldname": "",
+   "fieldtype": "Column Break",
+   "hidden": 0,
+   "max_length": 0,
+   "max_value": 0,
+   "read_only": 0,
+   "reqd": 0,
+   "show_in_filter": 0
+  },
+  {
+   "allow_read_on_all_link_options": 0,
+   "depends_on": "eval:doc.branch != \"Online\"",
+   "fieldname": "",
    "fieldtype": "Section Break",
    "hidden": 0,
    "label": "Extra Information",
@@ -359,6 +385,18 @@
    "max_value": 0,
    "read_only": 0,
    "reqd": 0,
+   "show_in_filter": 0
+  },
+  {
+   "allow_read_on_all_link_options": 0,
+   "fieldname": "phone_no",
+   "fieldtype": "Data",
+   "hidden": 0,
+   "label": "Phone No",
+   "max_length": 0,
+   "max_value": 0,
+   "read_only": 0,
+   "reqd": 1,
    "show_in_filter": 0
   }
  ]
