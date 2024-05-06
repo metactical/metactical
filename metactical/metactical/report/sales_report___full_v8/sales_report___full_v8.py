@@ -121,6 +121,8 @@ def execute(filters=None):
 		row["sold_last_sixty_days"] = 0
 		row["sold_online"] = 0
 		row["sold_in_store"] = 0
+		row["sold_last_36_months"] = 0
+		row["sold_last_24_months"] = 0
 		for d in sales_data:
 			posting_date = getdate(d.get("posting_date"))
 			qty = d.get("qty")
@@ -131,10 +133,16 @@ def execute(filters=None):
 			elif posting_date.year == current_year:
 				row["total"] += qty
 				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
-			# if row.get(frappe.scrub("sold"+month+str(posting_date.year))):
-			# 	row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
-			# row[frappe.scrub("soldjanuary2021")] += qty
+				
+
 			last12_month_date = today - relativedelta(years=1)
+			sold_last_24_months = today - relativedelta(years=2)
+			sold_last_36_months = today - relativedelta(years=3)
+			if posting_date >= sold_last_36_months:
+				row["sold_last_36_months"] += qty
+				if posting_date >= sold_last_24_months:
+					row["sold_last_24_months"] += qty
+
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
 				#For sold online and in store
@@ -321,19 +329,6 @@ def get_column(filters,conditions):
 				"fieldtype": "Currency",
 				"width": 140 	
 			},
-			# {
-			# 	"label": _("Discointinued"),
-			# 	"fieldname": "item_discontinued",
-			# 	"fieldtype": "Boolean",
-			# 	"width": 100,
-			# 	"default": False,
-			# },
-			# {
-			# 	"label": _("ETA"),
-			# 	"fieldname": "eta",
-			# 	"fieldtype": "Date",
-			# 	"width": 100,
-			# },
 			{
 				"label": _("DateLastReceived"),
 				"fieldname": "date_last_received",
@@ -540,6 +535,20 @@ def get_column(filters,conditions):
             "width": 140,
             "default": False,
         },
+		{
+			"label": _("Sold Last 24 Months"),
+			"fieldname": "sold_last_24_months",
+			"fieldtype": "Int",
+			"width": 140,
+			"default": 0
+		},
+		{
+			"label": _("Sold Last 36 Months"),
+			"fieldname": "sold_last_36_months",
+			"fieldtype": "Int",
+			"width": 140,
+			"default": 0
+		},
         {
             "label": _("DateLastSold"),
             "fieldname": "last_sold_date",
