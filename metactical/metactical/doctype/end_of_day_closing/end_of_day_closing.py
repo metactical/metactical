@@ -67,6 +67,7 @@ def get_data(closing_date, user, pos_profile, source):
 				WHERE
 					payment_entry.posting_date = %(closing_date)s AND payment_entry.payment_type = 'Receive'
 					AND payment_reference.reference_doctype = "Sales Invoice" AND invoice.pos_profile = %(pos_profile)s
+					AND payment_entry.docstatus = 1
 				""", {"closing_date": closing_date, "pos_profile": pos_profile}, as_dict=1)
 				
 	pos_invoices = frappe.db.sql("""
@@ -84,6 +85,7 @@ def get_data(closing_date, user, pos_profile, source):
 					`tabAccount` AS change_account ON change_account.name = invoice.account_for_change_amount
 				WHERE
 					invoice.posting_date = %(closing_date)s AND invoice.pos_profile = %(pos_profile)s
+					AND invoice.docstatus = 1
 				""", {"closing_date": closing_date, "pos_profile": pos_profile}, as_dict=1)
 				
 	if source is not None and source != "":
@@ -101,6 +103,7 @@ def get_data(closing_date, user, pos_profile, source):
 				WHERE
 					payment_entry.posting_date = %(closing_date)s AND payment_entry.payment_type = 'Receive'
 					AND payment_reference.reference_doctype = "Sales Order" AND sorder.source = %(source)s
+					AND payment_entry.docstatus = 1
 				""", {"closing_date": closing_date, "source": source}, as_dict=1)
 	
 	for payment in invoices:
