@@ -515,6 +515,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Detailed Sales Report - V1",
+   "link_to": "Detailed Sales Report V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -711,7 +720,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-02-27 07:00:04.952215",
+ "modified": "2024-05-06 07:37:26.612806",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

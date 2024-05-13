@@ -15,12 +15,6 @@ def execute(filters=None):
 			"width": 150
 		},
 		{
-			"label": "Customer Purchase Order Number",
-			"fieldname": "po_no",
-			"fieldtype": "Data",
-			"width": 150
-		},
-		{
 			"label": "Date",
 			"fieldname": "transaction_date",
 			"fieldtype": "Date",
@@ -29,7 +23,13 @@ def execute(filters=None):
 		{
 			"label": "Pick List Printed",
 			"fieldname": "pick_list_print",
-			"fieldtype": "Datetime",
+			"fieldtype": "Check",
+			"width": 150
+		},
+		{
+			"label": "Province",
+			"fieldname": "province",
+			"fieldtype": "Data",
 			"width": 150
 		},
 		{
@@ -40,8 +40,14 @@ def execute(filters=None):
 			"width": 150
 		},
 		{
+			"label": "In store pick up",
+			"fieldname": "in_store_pickup",
+			"fieldtype": "Check",
+			"width": 150
+		},
+		{
 			"label": "Status",
-			"fieldname": "STATUS",
+			"fieldname": "status",
 			"fieldtype": "Data",
 			"width": 150
 		},
@@ -88,14 +94,18 @@ def get_data(filters):
 								so.name AS sales_order,
 								so.po_no,
 								so.transaction_date,
-								so.STATUS,
+								so.status,
 								(select GROUP_CONCAT(tag SEPARATOR ', ') from `tabTag Link` tl where tl.parent = so.name) as tag,
 								so.source,
-								so.customer
+								so.customer,
+					   			address.state AS province,
+					   			IFNULL(so.ifw_store_pickup, 0) as in_store_pickup
 							FROM
 								`tabSales Order` so
+					   		LEFT JOIN
+					   			`tabAddress` AS address ON so.customer_address = address.name
 							WHERE
-								(so.STATUS = "To Deliver" OR so.STATUS = "To Deliver and Bill" OR so.STATUS = "Draft")'''
+								(so.status = "To Deliver" OR so.status = "To Deliver and Bill" OR so.status = "Draft")'''
 								+ where, where_filter, as_dict=1)
 	init_data = get_print_date(query)
 	warehouses = ['R01-Gor-Active Stock - ICL', 'R02-Edm-Active Stock - ICL', 'R03-Vic-Active Stock - ICL', 
@@ -135,8 +145,7 @@ def get_print_date(data):
 										`tabPick List` pl ON pl.name = pli.parent
 									WHERE pl.docstatus  = 1 AND pli.sales_order = %(sales_order)s
 									LIMIT 1''', {"sales_order": row.sales_order}, as_dict=1)
-			if query:
-				row.update({"pick_list_print": query[0].print_date_time})
+			row["pick_list_print"] = True if len(query) > 0 else False
 	return data
 								
 
