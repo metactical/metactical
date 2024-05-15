@@ -76,7 +76,8 @@ def get_data(closing_date, user, pos_profile, source):
 					invoice.outstanding_amount AS owing, 
 					payment.amount AS amount_paid, payment.mode_of_payment,
 					invoice.change_amount,
-					change_account.account_type AS change_account_type
+					change_account.account_type AS change_account_type,
+					invoice.is_return
 				FROM
 					`tabSales Invoice Payment` AS payment
 				LEFT JOIN
@@ -85,7 +86,7 @@ def get_data(closing_date, user, pos_profile, source):
 					`tabAccount` AS change_account ON change_account.name = invoice.account_for_change_amount
 				WHERE
 					invoice.posting_date = %(closing_date)s AND invoice.pos_profile = %(pos_profile)s
-					AND invoice.docstatus = 1
+					AND invoice.docstatus = 1 AND invoice.is_pos = 1
 				""", {"closing_date": closing_date, "pos_profile": pos_profile}, as_dict=1)
 				
 	if source is not None and source != "":
@@ -117,6 +118,8 @@ def get_data(closing_date, user, pos_profile, source):
 			expected_cash += payment.amount_paid
 	
 	for payment in pos_invoices:
+		if payment.is_return == 1:
+			continue
 		# if there is chenge amount, remove it from cash
 		if payment.change_account_type == "Cash" and payment.mode_of_payment == "Cash":
 			payment.amount_paid -= payment.change_amount
