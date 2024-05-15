@@ -84,14 +84,26 @@ frappe.ui.form.on('End of Day Closing', {
 					if(ret.message.invoices.length > 0){
 						frm.set_value("invoices", []);
 						ret.message.invoices.forEach(function(invoice){
-							var row = frm.add_child("invoices");
-							row.type = invoice.reference_doctype
-							row.invoice = invoice.reference_name;
-							row.mode_of_payment = invoice.mode_of_payment;
-							row.amount_paid = invoice.amount_paid;
-							row.owing = invoice.owing;
+							// if it's not return
+							if(invoice.is_return != 1){
+								var row = frm.add_child("invoices");
+								row.type = invoice.reference_doctype
+								row.invoice = invoice.reference_name;
+								row.mode_of_payment = invoice.mode_of_payment;
+								row.amount_paid = invoice.amount_paid;
+								row.owing = invoice.owing;
+							}
+							else{
+								var row = frm.add_child("return_invoices");
+								row.type = invoice.reference_doctype
+								row.invoice = invoice.reference_name;
+								row.mode_of_payment = invoice.mode_of_payment;
+								row.amount_paid = Math.abs(invoice.amount_paid);
+								row.owing = invoice.owing;
+							}
 						});
 						frm.refresh_field("invoices");
+						frm.refresh_field("return_invoices");
 					}
 					frm.set_value("expected_cash", ret.message.expected_cash);
 					frm.events.calculate_totals(frm);

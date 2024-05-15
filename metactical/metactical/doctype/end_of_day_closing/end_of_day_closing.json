@@ -31,6 +31,8 @@
   "mop_total_difference",
   "invoices_section",
   "invoices",
+  "section_break_chtkt",
+  "return_invoices",
   "section_break_q4f2a",
   "closing_notes"
  ],
@@ -204,12 +206,24 @@
    "label": "Lead Source",
    "options": "Lead Source",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_chtkt",
+   "fieldtype": "Section Break",
+   "label": "Return Invoices/ Credit Notes"
+  },
+  {
+   "description": "Sales Returns / Credit Notes are not included in cash calculations. They're just for reference",
+   "fieldname": "return_invoices",
+   "fieldtype": "Table",
+   "options": "EOD Return Invoice",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-04-28 09:07:50.335707",
+ "modified": "2024-05-14 17:31:13.145799",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "End of Day Closing",
