@@ -2,6 +2,20 @@ import frappe
 from metactical.api.shipstation import create_shipstation_orders, delete_order
 from erpnext.stock.doctype.delivery_note.delivery_note import DeliveryNote
 from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
+from frappe import _, msgprint
+from metactical.custom_scripts.utils.metactical_utils import queue_action
+
+class DeliveryNoteCustom(DeliveryNote):
+	def submit(self):
+		if len(self.items) > 25:
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			self._submit()
 
 def on_update(self, method):
 	if self.docstatus == 0:
