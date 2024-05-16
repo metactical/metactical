@@ -12,7 +12,7 @@ def export_inventory(warehouse):
 
 		bins = frappe.db.sql("""
 			SELECT 
-				ifw_retailskusuffix as retail_sku, item_name, actual_qty, reserved_qty, `tabBin`.item_code
+				ifw_retailskusuffix as retail_sku, item_name, actual_qty, reserved_qty, `tabBin`.item_code, `tabItem`.name
 			FROM 
 				`tabBin`
 				join `tabItem` on `tabItem`.item_code = `tabBin`.item_code
@@ -20,16 +20,16 @@ def export_inventory(warehouse):
 				warehouse = %s
 		""", warehouse, as_dict=1)
 
-		data = [["Retail SKU", "Item Name", "QOH", "Cost", "Supplier SKU"]]
+		data = [["ERP SKU", "Retail SKU", "Item Name", "QOH", "Cost", "Supplier SKU"]]
 
 		for d in bins:
 			# default supplier 
 			supplier = frappe.db.get_list("Item Supplier", {"parent": d.get("item_code")}, ["supplier", "supplier_part_no"], limit=1, order_by="idx asc")
 			if supplier:
 				item_cost = get_item_details(d.get("item_code"), supplier=supplier[0].get("supplier"))
-				data.append([d.retail_sku, d.item_name, d.actual_qty - d.reserved_qty, item_cost, supplier[0].get("supplier_part_no")])
+				data.append([d.name, d.retail_sku, d.item_name, d.actual_qty - d.reserved_qty, item_cost, supplier[0].get("supplier_part_no")])
 			else:
-				data.append([d.retail_sku, d.item_name, d.actual_qty - d.reserved_qty, "N/A", "N/A"])
+				data.append([d.name, d.retail_sku, d.item_name, d.actual_qty - d.reserved_qty, "N/A", "N/A"])
 
 		xlsx_file = make_xlsx(data, warehouse + " inventory").getvalue()
 

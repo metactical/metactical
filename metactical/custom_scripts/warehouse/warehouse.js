@@ -7,15 +7,7 @@ frappe.ui.form.on("Warehouse", {
           warehouse: frm.doc.name,
         },
         callback: function (r) {
-          var file_url = r.message;
-          if (file_url) {
-            frappe.msgprint(
-              __(
-                "Warehouse data exported successfully. Please click on the link to download."
-              )
-            );
-            window.open(file_url, "_blank");
-          }
+          
         },
       });
     });
