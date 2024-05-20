@@ -27,10 +27,15 @@ def queue_action(self, action, **kwargs):
         
 def post_to_rocket_chat(doc, msg, failed=False):
     try:
+        rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
+        if not rocket_chat_settings.rocket_notification:
+            return
+
+        channel_name = rocket_chat_settings.channel_name
         headers = {
-            'Content-type': 'application/json',
-            'X-Auth-Token': "KOXg-d6VD2oA4itXY9Ch_dWbSqm-3fYWNQcUtK5s7mT",
-            'X-User-Id': "jzu7voEDrRcbKnn27"
+            'Content-type': rocket_chat_settings.content_type or 'application/json',
+            'X-Auth-Token': rocket_chat_settings.auth_token,
+            'X-User-Id': rocket_chat_settings.user_id
         }
 
         url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
@@ -42,11 +47,11 @@ def post_to_rocket_chat(doc, msg, failed=False):
                         \n[{0}]({1})'.format(get_url(url), get_url(url))
 
         payload = {
-            'channel': "#ERP-Document-Submission-Errors",
+            'channel': "#"+channel_name,
             'text': message
         }
 
-        response = requests.post(f'https://chat.metactical.com/api/v1/chat.postMessage', 
+        response = requests.post(rocket_chat_settings.url, 
                                 headers=headers, 
                                 data=json.dumps(payload))
 
