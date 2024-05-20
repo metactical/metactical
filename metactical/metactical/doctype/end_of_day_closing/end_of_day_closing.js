@@ -83,6 +83,7 @@ frappe.ui.form.on('End of Day Closing', {
 					
 					if(ret.message.invoices.length > 0){
 						frm.set_value("invoices", []);
+						frm.set_value("return_invoices", []);
 						ret.message.invoices.forEach(function(invoice){
 							// if it's not return
 							if(invoice.is_return != 1){
