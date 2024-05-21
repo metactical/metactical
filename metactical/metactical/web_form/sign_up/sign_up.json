@@ -12,6 +12,7 @@
  "button_label": "Submit Information",
  "creation": "2022-09-26 10:24:42.415043",
  "currency": "CAD",
+ "custom_css": ".footer-powered{\n    display: none !important;\n}",
  "doc_type": "Employee Sign Up",
  "docstatus": 0,
  "doctype": "Web Form",
@@ -20,7 +21,7 @@
  "is_standard": 1,
  "login_required": 0,
  "max_attachment_size": 0,
- "modified": "2024-05-03 10:01:25.675134",
+ "modified": "2024-05-21 09:51:08.833143",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "sign-up",
@@ -33,7 +34,8 @@
  "show_in_grid": 0,
  "show_sidebar": 0,
  "sidebar_items": [],
- "success_url": "/sign-up",
+ "success_message": "Thank you for signing up. We will be in touch with you shortly.",
+ "success_url": "/login",
  "title": "Employee Self Sign Up",
  "web_form_fields": [
   {
@@ -185,11 +187,12 @@
   {
    "allow_read_on_all_link_options": 0,
    "fieldname": "state",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "hidden": 0,
    "label": "Province/State",
    "max_length": 0,
    "max_value": 0,
+   "options": "",
    "read_only": 0,
    "reqd": 1,
    "show_in_filter": 0
@@ -214,11 +217,12 @@
    "max_length": 0,
    "max_value": 0,
    "read_only": 0,
-   "reqd": 0,
+   "reqd": 1,
    "show_in_filter": 0
   },
   {
    "allow_read_on_all_link_options": 0,
+   "default": "Canada",
    "fieldname": "country",
    "fieldtype": "Link",
    "hidden": 0,
@@ -235,7 +239,7 @@
    "fieldname": "inteli_phone_no",
    "fieldtype": "Data",
    "hidden": 0,
-   "label": "Phone Number",
+   "label": "Mobile Number",
    "max_length": 0,
    "max_value": 0,
    "read_only": 0,
@@ -270,7 +274,7 @@
   {
    "allow_read_on_all_link_options": 0,
    "fieldname": "bank_institution_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "hidden": 0,
    "label": "Bank Institution No.",
    "max_length": 3,
@@ -282,7 +286,7 @@
   {
    "allow_read_on_all_link_options": 0,
    "fieldname": "bank_transit_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "hidden": 0,
    "label": "Bank Transit No.",
    "max_length": 5,
@@ -385,18 +389,6 @@
    "max_value": 0,
    "read_only": 0,
    "reqd": 0,
-   "show_in_filter": 0
-  },
-  {
-   "allow_read_on_all_link_options": 0,
-   "fieldname": "phone_no",
-   "fieldtype": "Data",
-   "hidden": 0,
-   "label": "Phone No",
-   "max_length": 0,
-   "max_value": 0,
-   "read_only": 0,
-   "reqd": 1,
    "show_in_filter": 0
   }
  ]
