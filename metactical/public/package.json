@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "intl-tel-input": "^17.0.19",
+    "jquery-mask-plugin": "^1.14.16"
+  }
+}
