@@ -1,0 +1,19 @@
+/* .main-section{
+    padding: 20px;
+    background-color: #56b45b;
+}
+*/
+
+/* #page-manage-store-credit{
+    background-color: #fff;
+}  */
+
+.list-group-item{
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid rgb(0, 0, 0, 0.05);
+}
+
+.list-group-item, .table td{
+    padding: 0.5rem 0.75rem;
+}
