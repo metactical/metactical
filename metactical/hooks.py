@@ -156,7 +156,8 @@ override_doctype_class = {
 	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
-	"Company": "metactical.custom_scripts.company.company.CustomCompany"
+	"Company": "metactical.custom_scripts.company.company.CustomCompany",
+	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
 }
 
 # Scheduled Tasks

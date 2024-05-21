@@ -31,6 +31,7 @@ frappe.ui.form.on('Employee Sign Up', {
 		if (!/^\d+$/.test(frm.doc.bank_transit_no)){
 			show_tooltip("bank_transit_no", "Transit number should be a number")
 		}
+	}
 });
 
 function show_tooltip(fieldname, message){
