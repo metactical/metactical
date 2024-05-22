@@ -4,4 +4,8 @@
 *.swp
 tags
 metactical/docs/current
+<<<<<<< HEAD
 node_modules
+=======
+metactical/public/node_modules
+>>>>>>> e30eab9b7c91cb7f4206748c65f7fe962145012f
