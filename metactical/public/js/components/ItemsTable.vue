@@ -14,13 +14,13 @@
             </thead>
             <tbody>
                 <tr v-for="item in items" :key="item.id">
-                    <td> <a href="#" class="text-danger">Delete</a></td>
+                    <td> <a href="#" @click="deleteItem(item.name)" class="text-danger">Delete</a></td>
                     <td>{{ item.retail_sku }}</td>
                     <td>{{ item.item_name }}</td>
-                    <td>{{ item.returned_qty }}</td>
-                    <td>{{ item.unit_price }}</td>
+                    <td>{{ item.qty }}</td>
+                    <td>- {{ item.rate }}</td>
                     <td>{{ item.discount }}</td>
-                    <td>{{ item.ttl_price }}</td>
+                    <td>{{ item.amount }}</td>
                 </tr>
             </tbody>
         </table>
@@ -28,6 +28,16 @@
 </template>
 <script>
     export default {
-        props: ['items']
+        props: ['items'],
+        methods: {
+            deleteItem(item_name){
+                var me = this
+                $.each(me.items, (key, value)=> {
+                    if (item_name === value.name){
+                        me.items.splice(key, 1);
+                    }
+                })
+            }
+        }
     }
 </script>
