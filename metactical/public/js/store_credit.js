@@ -17,95 +17,40 @@ metactical.store_credit.StoreCredit = class {
                 Taxes
             },
             data: {
-                si_items : [
-                    {
-                        "retail_sku": "SKU-001",
-                        "item_name": "Item 1",
-                        "returned_qty": 1,
-                        "unit_price": "$ 10.00",
-                        "discount": "",
-                        "ttl_price": "$ 10.00"
-                    },
-                    {
-                        "retail_sku": "SKU-002",
-                        "item_name": "Item 2",
-                        "returned_qty": 1,
-                        "unit_price": "$ 20.00",
-                        "discount": "",
-                        "ttl_price": "$ 20.00"
-                    },
-                    {
-                        "retail_sku": "SKU-003",
-                        "item_name": "Item 3",
-                        "returned_qty": 1,
-                        "unit_price": "$ 30.00",
-                        "discount": "",
-                        "ttl_price": "$ 30.00"
-                    },
-                    {
-                        "retail_sku": "SKU-004",
-                        "item_name": "Item 4",
-                        "returned_qty": 1,
-                        "unit_price": "$ 40.00",
-                        "discount": "",
-                        "ttl_price": "$ 40.00"
-                    },
-                    {
-                        "retail_sku": "SKU-005",
-                        "item_name": "Item 5",
-                        "returned_qty": 1,
-                        "unit_price": "$ 50.00",
-                        "discount": "",
-                        "ttl_price": "$ 50.00"
-                    }
-                ],
-                taxes: [
-                    {
-                        "name": "On Net Total",
-                        "amount": "$ 2.00"
-                    },
-                    {
-                        "name": "On Net Total",
-                        "amount": "$ 1.00"
-                    },
-                    {
-                        "name": "TTL Tax",
-                        "amount": "$ 3.00"
-                    },
-                    {
-                        "name": "Discount",
-                        "amount": "$ 0.00"
-                    },
-                    {
-                        "name": "TTL Store Credit",
-                        "amount": "$ 153.00"
-                    }, 
-                    {
-                        "name": "Total Qty Returned",
-                        "amount": "5"
-                    }
-                ],
+                current_sales_invoice: "",
+                selected_customer: "",
+                customer: {
+                    first_name: "",
+                    last_name: "",
+                    email: "",
+                    phone_number: "",
+                    company: "",
+                },
+                si_items : [],
+                taxes: [],
+                item_area: "d-none",
+                process_payment_button: "d-none"
             },
             el: "#store-credit-root",
             template: `
                 <div>
-                    <SearchForm @search="search"/>
+                    <SearchForm @search="search" @clearCustomer="clearCustomer" :customer="customer" :item_area="item_area"/>
                     <hr>
-                    <div class="row">
+                    <div class="row" :class="item_area">
                         <div class="col-md-4">
-                            <input type="text"  class="form-control" placeholder="Sales Invoice" readonly>
+                            <input type="text"  class="form-control" placeholder="Sales Invoice" v-model="current_sales_invoice">
                         </div>
                         <div class="col-md-4">
-                            <input type="text"  class="form-control" placeholder="Customer Name" readonly>
+                            <input type="text"  class="form-control" placeholder="Customer Name" readonly v-model="selected_customer">
                         </div>
                         <div class="col-md-4">
-                            <button class="btn btn-primary">Load SI</button>
-                            <button class="btn btn-primary">Edit Price</button>
-                            <button class="btn btn-primary">Clear SI</button>
+                            <button class="btn btn-primary" @click="loadSI">Load SI</button>
+                            <button class="btn btn-primary" >Edit Price</button>
+                            <button class="btn btn-primary" @click="clearSI">Clear SI</button>
                         </div>
                     </div>
 
-                    <div class="row">
+                    <div class="row" :class="item_area">
                         <div class="col-md-7">
                             <div class="row">
                                 <div class="col-12">
@@ -117,7 +62,7 @@ metactical.store_credit.StoreCredit = class {
                                 </div>
 
                                 <div class="col-12 mt-4">
-                                    <button class="btn btn-primary btn-block btn-lg">Process Store Credit</button>
+                                    <button class="btn btn-primary btn-block btn-lg" :class="process_payment_button">Process Store Credit</button>
                                 </div>
                             </div>
                         </div>
@@ -132,7 +77,25 @@ metactical.store_credit.StoreCredit = class {
             `,
             methods: {
                 search() {
-                    console.log("test")
+                    var me = this
+                    frappe.call({
+                        method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.search_customer',
+                        args: {
+                            phone_number: this.customer.phone_number,
+                            email: this.customer.email
+                        },
+                        callback: function(r) {
+                            if (r.message) {
+                                me.customer.first_name = r.message[0].first_name
+                                me.customer.last_name = r.message[0].last_name
+                                me.customer.email = r.message[0].ifw_email
+                                // this.customer.phone_number = r.message.phone_number
+                                me.customer.company = r.message[0].company
+                                me.item_area = ""
+                            }
+
+                        }
+                    })
                 },
                 submit() {
                     frappe.call({
@@ -145,6 +108,67 @@ metactical.store_credit.StoreCredit = class {
                         callback: function(r) {
                             if (r.message) {
                                 frappe.msgprint(r.message)
+                            }
+                        }
+                    })
+                },
+                clearCustomer(){
+                    this.customer = {
+                        phone_number: '',
+                        email: '',
+                        company: '',
+                        first_name: '',
+                        last_name: ''
+                    }
+
+                    this.item_area = "d-none"
+                    this.selected_customer = ""
+                    this.current_sales_invoice = ""
+                    this.si_items = []
+                    this.taxes = []
+                },
+                clearSI(){
+                    this.si_items = []
+                    this.taxes = []
+                    this.selected_customer = ""
+                    this.process_payment_button = "d-none"
+                },
+                loadSI() {
+                    var me = this
+                    frappe.call({
+                        method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.load_si',
+                        args: {
+                            sales_invoice: this.current_sales_invoice
+                        },
+                        callback: function(r) {
+                            if (r.items.length){
+                                me.selected_customer = r.customer
+                                me.si_items = r.items
+                                me.taxes = []
+                                me.process_payment_button = ""
+
+                                $.each(r.taxes, (key, value)=>{
+                                    if (typeof(value) === "object")
+                                    {
+                                        $.each(value, (ind, tax)=> {
+                                            me.taxes.push({
+                                                "name": tax.name,
+                                                "amount": tax.amount
+                                            })
+                                        })
+                                    }else{
+                                        me.taxes.push({
+                                            "name": key,
+                                            "amount": value
+                                        })
+                                    }
+                                })
+                            }
+                            else{
+                                me.si_items = []
+                                me.taxes = []
+                                me.process_payment_button = "d-none"
+                                frappe.show_alert(`Sales Invoice <b>${me.current_sales_invoice}</b> not found!`)
                             }
                         }
                     })
