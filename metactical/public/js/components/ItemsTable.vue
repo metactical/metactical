@@ -14,7 +14,7 @@
             </thead>
             <tbody>
                 <tr v-for="item in items" :key="item.id">
-                    <td> <a href="#" @click="deleteItem(item.name)" class="text-danger">Delete</a></td>
+                    <td> <span @click="deleteItem(item.name)" class="text-danger cursor-pointer">Delete</span></td>
                     <td>{{ item.retail_sku }}</td>
                     <td>{{ item.item_name }}</td>
                     <td>{{ item.qty }}</td>
@@ -33,10 +33,17 @@
             deleteItem(item_name){
                 var me = this
                 $.each(me.items, (key, value)=> {
+                    console.log(value.name, item_name)
+                    if (!value.name){
+                        return
+                    }
+                    
                     if (item_name === value.name){
                         me.items.splice(key, 1);
                     }
                 })
+
+                this.$emit('updateTotals', me.items)
             }
         }
     }

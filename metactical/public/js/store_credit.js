@@ -11,6 +11,7 @@ metactical.store_credit.StoreCredit = class {
 
     init() {
         this.vue_instance = new Vue({
+            el: "#store-credit-root",
             components: {
                 SearchForm,
                 ItemsTable,
@@ -28,13 +29,17 @@ metactical.store_credit.StoreCredit = class {
                 },
                 si_items : [],
                 taxes: [],
-                item_area: "d-none",
-                process_payment_button: "d-none"
+                item_area: "",
+                process_payment_button: "d-none",
+                freeze_fields: false
             },
-            el: "#store-credit-root",
             template: `
                 <div>
-                    <SearchForm @search="search" @clearCustomer="clearCustomer" :customer="customer" :item_area="item_area"/>
+                    <SearchForm @customerCleared="customerCleared"
+                                @customerFound="customerFound"
+                                :customer="customer" 
+                                :freeze_fields="freeze_fields"
+                                :item_area="item_area"/>
                     <hr>
                     <div class="row" :class="item_area">
                         <div class="col-md-4">
@@ -54,7 +59,7 @@ metactical.store_credit.StoreCredit = class {
                         <div class="col-md-7">
                             <div class="row">
                                 <div class="col-12">
-                                    <ItemsTable :items="si_items"/>
+                                    <ItemsTable :items="si_items" @updateTotals="updateTotals"/>
                                 </div>
                             
                                 <div class="col-12 mt-4">
@@ -76,27 +81,6 @@ metactical.store_credit.StoreCredit = class {
                     </div>
             `,
             methods: {
-                search() {
-                    var me = this
-                    frappe.call({
-                        method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.search_customer',
-                        args: {
-                            phone_number: this.customer.phone_number,
-                            email: this.customer.email
-                        },
-                        callback: function(r) {
-                            if (r.message) {
-                                me.customer.first_name = r.message[0].first_name
-                                me.customer.last_name = r.message[0].last_name
-                                me.customer.email = r.message[0].ifw_email
-                                // this.customer.phone_number = r.message.phone_number
-                                me.customer.company = r.message[0].company
-                                me.item_area = ""
-                            }
-
-                        }
-                    })
-                },
                 submit() {
                     frappe.call({
                         method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.create_store_credit',
@@ -112,26 +96,60 @@ metactical.store_credit.StoreCredit = class {
                         }
                     })
                 },
-                clearCustomer(){
-                    this.customer = {
-                        phone_number: '',
-                        email: '',
-                        company: '',
-                        first_name: '',
-                        last_name: ''
-                    }
-
+                customerCleared(){
                     this.item_area = "d-none"
                     this.selected_customer = ""
                     this.current_sales_invoice = ""
                     this.si_items = []
                     this.taxes = []
+                    this.freeze_fields = false
+                },
+                customerFound(){
+                    this.item_area = ""
+                    this.freeze_fields = true
                 },
                 clearSI(){
                     this.si_items = []
                     this.taxes = []
                     this.selected_customer = ""
                     this.process_payment_button = "d-none"
+                },
+                updateTotals() {
+                    console.log(this.taxes)
+                    var total_amount = 0
+                    var total_tax = 0
+                    var discount = 0
+                    var total_qty_returned = 0
+
+                    $.each(this.si_items, (index, item) => {
+                        console.log(item.amount_with_out_format, typeof(item.amount_with_out_format), total_amount, typeof(total_amount))
+                        total_amount += item.amount_with_out_format
+                        discount +=  item.discount > 0 ? item.discount: 0
+                        total_qty_returned += item.qty
+                    })
+
+                    $.each(this.taxes, (index, tax) => {
+                        if (!["TTL Tax", "Discount", "TTL Store Credit", "Total Qty Returned"].includes(tax.name)){
+                            console.log(total_amount, typeof(total_amount), tax.rate, typeof(tax.rate))
+                            total_tax += total_amount * (tax.rate / 100)
+                            tax.amount = "$ " + Math.round(total_amount * (tax.rate / 100) * 100) / 100
+                        }
+                    })
+
+                    $.each(this.taxes, (index, tax) => {
+                        if (tax.name === "TTL Tax"){
+                            tax.amount = "$ " + Math.round(total_tax * 100) / 100
+                        }
+                        else if (tax.name === "Discount"){
+                            tax.amount = "$ " + Math.round(discount * 100) / 100
+                        }
+                        else if (tax.name === "TTL Store Credit"){
+                            tax.amount = "$ " + Math.round((total_amount - discount + total_tax) * 100) / 100
+                        }
+                        else if (tax.name === "Total Qty Returned"){
+                            tax.amount = Math.round(total_qty_returned * 100) / 100
+                        }
+                    })
                 },
                 loadSI() {
                     var me = this
@@ -153,10 +171,12 @@ metactical.store_credit.StoreCredit = class {
                                         $.each(value, (ind, tax)=> {
                                             me.taxes.push({
                                                 "name": tax.name,
-                                                "amount": tax.amount
+                                                "amount": tax.amount,
+                                                "rate": tax.rate
                                             })
                                         })
-                                    }else{
+                                    }
+                                    else{
                                         me.taxes.push({
                                             "name": key,
                                             "amount": value
@@ -175,8 +195,7 @@ metactical.store_credit.StoreCredit = class {
                 }
             }
         })
-
+        
         return this.vue_instance
     }
-
 }
