@@ -132,13 +132,13 @@
   },
   {
    "fieldname": "bank_institution_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "Bank Institution No.",
    "length": 3
   },
   {
    "fieldname": "bank_transit_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "Bank Transit No.",
    "length": 5
   },
