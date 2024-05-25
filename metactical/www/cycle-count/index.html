@@ -1,0 +1,453 @@
+<html>
+<head>
+	<script>
+		window.frappe = {};
+		frappe.ready_events = [];
+		frappe.ready = function(fn) {
+			frappe.ready_events.push(fn);
+		}
+		window.dev_server = {{ dev_server }};
+		window.socketio_port = {{ (frappe.socketio_port or 'null') }};
+		window.show_language_picker = {{ show_language_picker }};
+	</script>
+	<!--<style>
+		#container {
+			display: flex;
+			justify-content: center;
+			align-items: flex-start;
+			height: 100vh;
+		}
+	</style>-->
+	<style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group select,
+        .form-group textarea,
+        .form-group input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .buttons {
+            text-align: right;
+        }
+        .buttons button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-left: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .buttons button.save {
+            background-color: #28a745;
+            color: white;
+        }
+        .buttons button.new {
+            background-color: #007bff;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+	<div v-if="loading">Loading...</div>
+	<div class="container" v-if="!loading">
+		{% raw %}
+		<h1>Cycle Count</h1>
+		<div class="form-group">
+			<label for="warehouse">Warehouse:</label>
+			<select id="warehouse">
+				<option value=""></option>
+				<option value="R01-Gor-Active Stock - ICL">R01-Gor-Active Stock - ICL</option>
+				<option value="W01-WHS-Active Stock - ICL">W01-WHS-Active Stock - ICL</option>
+				<option value="R05-DTN-Active Stock - ICL">R05-DTN-Active Stock - ICL</option>
+				<option value="R04-Mon-Active Stock - ICL">R04-Mon-Active Stock - ICL</option>
+				<option value="R03-Vic-Active Stock - ICL">R03-Vic-Active Stock - ICL</option>
+				<option value="R02-Edm-Active Stock - ICL">R02-Edm-Active Stock - ICL</option>
+				<option value="US01-ShipCalm-Active Stock - ICL">US01-ShipCalm-Active Stock - ICL</option>
+				<option value="R07-Queen-Active Stock - ICL">R07-Queen-Active Stock - ICL</option>
+				<option value="R06-AMB-Active Stock - ICL">R06-AMB-Active Stock - ICL</option>
+				<option value="US02-Houston - Active Stock - ICL">US02-Houston - Active Stock - ICL</option>
+			</select>
+		</div>
+		<div class="form-group">
+			<label for="reason">Reason for adjustment:</label>
+			<textarea id="reason" rows="4"></textarea>
+		</div>
+		<div class="form-group">
+			<label for="barcode">Barcode:</label>
+			<input type="text" id="barcode" v-model="barcode" @keyup.enter="search_barcode(barcode)">
+		</div>
+		<div class="buttons">
+			<button class="save" @click="save_cycle_count()">Save</button>
+			<button class="new" @click="clear_items()">New Cycle Count</button>
+		</div>
+		<table>
+			<thead>
+				<tr>
+					<th>Item</th>
+					<th>Qty</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr v-for="item in items">
+					<td>{{ item.item_code }}</td>
+					<td>{{ item.qty }}</td>
+				</tr>
+			</tbody>
+		</table>
+		{% endraw %}
+	</div>
+	<!--<div id="container">
+		<div id="app" style="width: 250px; float: left;">
+			{% raw %}
+			<div v-if="!loading" style="width: 100%; float: left;">
+				<h1>Cycle Count</h1>
+				<div style="width: 250px; float: right;">
+					<button @click="clear_items()">New Cycle Count</button>
+					<button @click="save_cycle_count()">Save Cycle Count</button>
+				</div>
+				<div>
+					Warehouse: <select>
+						<option value="Warehouse 1">Warehouse 1</option>
+						<option value="Warehouse 2">Warehouse 2</option>
+					</select>
+					Reason for Adjustment: <input type="text">
+				</div>
+				<div style="width: 500px; float: left;">
+					Barcode: <input type="text" id="barcode" v-model="barcode" @keyup.enter="search_barcode(barcode)">
+				</div>
+			</div>
+			<div v-if="loading">Loading...</div>
+			<div style="width: 500px; float: left;">
+				<div style="width: 50%; float: left;">Item</div>
+				<div style="width: 50%; float: left;">Qty</div>
+				<div id="items" v-for="item in items" style="width: 100%;">
+					<div style="width: 50%; float: left;">{{ item.item_code }}</div>
+					<div style="width: 50%; float: left;">{{ item.qty }}</div>
+				</div>
+			</div>
+			{% endraw %}
+		</div>
+	</div>-->
+</div>
+<!-- js should be loaded in body! -->
+<script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
+<!--<script type="text/javascript" src="/assets/js/libs.min.js"></script>-->
+<script type="text/javascript" src="/assets/js/frappe-web.min.js?ver={{ build_version }}"></script>
+<script type="text/javascript" src="/assets/js/bootstrap-4-web.min.js"></script>
+<script>
+	frappe.boot = {
+		sysdefaults: {
+			float_precision: parseInt("{{ frappe.get_system_settings('float_precision') or 3 }}"),
+			date_format: "{{ frappe.get_system_settings('date_format') or 'yyyy-mm-dd' }}",
+		}
+	};
+	// for backward compatibility of some libs
+	frappe.sys_defaults = frappe.boot.sysdefaults;
+	frappe.provide('metactical.cycleCount');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.0.0/dist/vue.global.prod.js"></script>
+<script>
+	let db;
+
+	async function initialize_database(){
+		// Let us open our database
+		const DBOpenRequest = window.indexedDB.open('cycleCount', 5);
+
+		// Register two event handlers to act on the database being opened successfully, or not
+		DBOpenRequest.onerror = (event) => {
+			console.log("Error loading database.");
+		};
+
+		DBOpenRequest.onsuccess = (event) => {
+			console.log("Database initialized.");
+
+			// Store the result of opening the database in the db variable.
+			db = DBOpenRequest.result;
+		};
+
+		// This event handles the event whereby a new version of the database needs to be created
+		// Either one has not been created before, or a new version number has been submitted via the
+		// window.indexedDB.open line above
+		//it is only implemented in recent browsers
+		DBOpenRequest.onupgradeneeded = (event) => {
+			db = event.target.result;
+
+			db.onerror = (event) => {
+				console.log('Error loading database.');
+			};
+
+			// Create an objectStore for this database
+			if (!db.objectStoreNames.contains('tabBarcode')) {
+				const tabBarcode = db.createObjectStore('tabBarcode', { keyPath: 'barcode' });
+				// Define what data items the objectStore will contain
+				tabBarcode.createIndex('item_code', 'item_code', { unique: false });
+			}
+
+			if (!db.objectStoreNames.contains('tabItems')) {
+				const tabItem = db.createObjectStore('tabItems', { keyPath: 'item_code' });
+				tabItem.createIndex('qty', 'qty', { unique: false });
+				tabItem.createIndex('last_modified', 'last_modified', { unique: false });
+			}
+		};
+	}
+
+	async function save_barcodes(barcodes){
+		let transaction = db.transaction(['tabBarcode'], 'readwrite');
+		let tabBarcode = transaction.objectStore('tabBarcode');
+		
+		for (let barcode of barcodes){
+			let getRequest = tabBarcode.get(barcode.barcode);
+			getRequest.onsuccess = (event) => {
+				let existingBarcode = event.target.result;
+				if (!existingBarcode) {
+					let addRequest = tabBarcode.add(barcode);
+					addRequest.onsuccess = (event) => {
+						console.log('Barcode added to the database');
+					};
+					addRequest.onerror = (event) => {
+						console.log('Error adding barcode to the database');
+					};
+				}
+				else {
+					console.log('Barcode already exists in the database');
+				}
+			};
+		}
+		
+		transaction.oncomplete = (event) => {
+			console.log('Transaction completed: all barcodes inserted.');
+			metactical.cycleCount.app.loading = false;
+			load_items();
+		};
+	}
+
+	function search_barcode(barcode){
+		let transaction = db.transaction(['tabBarcode'], 'readonly');
+		let tabBarcode = transaction.objectStore('tabBarcode');
+
+		let request = tabBarcode.get(barcode);
+		request.onsuccess = (event) => {
+			if(request.result === undefined){
+				console.log('Barcode not found');
+			}
+			else{
+				console.log('Barcode found: ', request.result);
+				metactical.cycleCount.app.barcode = '';
+				add_item(request.result);
+			}
+		};
+	}
+
+	function add_item(item){
+		let transaction = db.transaction(['tabItems'], 'readwrite');
+		let tabItem = transaction.objectStore('tabItems');
+
+		let getRequest = tabItem.get(item.item_code);
+		let row = {
+			item_code: item.item_code,
+			qty: 1,
+			last_modified: new Date()
+		};
+
+		getRequest.onsuccess = (event) => {
+			let existingItem = event.target.result;
+			if (!existingItem) {
+				let addRequest = tabItem.add(row);
+				addRequest.onsuccess = (event) => {
+					console.log('Item added to the database');
+				};
+				addRequest.onerror = (event) => {
+					console.log('Error adding item to the database');
+				};
+			}
+			else {
+				row.qty = existingItem.qty + 1;
+				let updateRequest = tabItem.put(row);
+				updateRequest.onsuccess = (event) => {
+					console.log('Item updated in the database');
+				};
+			}
+			load_items();
+		};
+	}
+
+	function load_items(){
+		metactical.cycleCount.app.items = [];
+		//document.getElementById('items').innerHTML = '';
+		let transaction = db.transaction(['tabItems'], 'readonly');
+		let tabItem = transaction.objectStore('tabItems');
+
+		let cursor = tabItem.openCursor(null, 'prev');
+		let items = [];
+		cursor.onsuccess = (event) => {
+			let cursor = event.target.result;
+			if (cursor) {
+				items.push(cursor.value);
+				//console.log('Item found: ', cursor.value);
+				cursor.continue();
+			}
+			else {
+				items.sort((a, b) => {
+					return b.last_modified - a.last_modified;
+				});
+				metactical.cycleCount.app.items = [...items];
+			}
+		};
+	}
+
+	function clear_items(){
+		let transaction = db.transaction(['tabItems'], 'readwrite');
+		let tabItem = transaction.objectStore('tabItems');
+
+		let clearRequest = tabItem.clear();
+		clearRequest.onsuccess = (event) => {
+			console.log('Items cleared from the database');
+			load_items();
+		};
+	}
+
+	function save_cycle_count(){
+		if(metactical.cycleCount.app.items.length === 0){
+			alert('No items to save');
+			return;
+		}
+
+		if(document.getElementById('warehouse').value === ''){
+			alert('Please select a warehouse');
+			return;
+		}
+
+		if(document.getElementById('reason').value === ''){
+			alert('Please enter a reason for the adjustment');
+			return;
+		}
+
+		let transaction = db.transaction(['tabItems'], 'readonly');
+		let tabItem = transaction.objectStore('tabItems');
+
+		let cursor = tabItem.openCursor(null, 'prev');
+		let items = [];
+		cursor.onsuccess = (event) => {
+			let cursor = event.target.result;
+			if (cursor) {
+				items.push(cursor.value);
+				cursor.continue();
+			}
+			else {
+				frappe.call({
+					type: 'POST',
+					args: {
+						cmd: 'metactical.www.cycle-count.index.save_cycle_count',
+						items: items,
+						warehouse: document.getElementById('warehouse').value,
+						reasons: document.getElementById('reason').value
+					},
+					callback: (r) => {
+						console.log('Cycle count saved: ', r.message);
+						clear_items();
+					}
+				});
+			}
+		};
+	}
+
+	function initialize_app(){
+		metactical.cycleCount.app = Vue.createApp({
+			data() {
+				return {
+					barcodes: [],
+					items: [],
+					loading: true,
+					error: false,
+					barcode: ''
+				}
+			},
+			mounted() {
+				let me = this;
+				console.log('Frappe is ready');
+				frappe.call({
+					type: 'POST',
+					args: {
+						cmd: 'metactical.www.cycle-count.index.get_barcodes',
+						doctype: 'Item Barcode',
+						fields: ['parent', 'barcode']
+					},
+					callback: (r) => {
+						me.barcodes = r.message;
+						console.log({barcodes: r.message});
+						save_barcodes(r.message);
+					}
+				});
+			},
+			methods: {
+				search_barcode(barcode){
+					search_barcode(barcode);
+				},
+
+				save_cycle_count(){
+					save_cycle_count();
+				},
+
+				clear_items(){
+					clear_items();
+				}
+			}
+		}).mount('#app');
+	}
+
+	frappe.ready(() => {
+		frappe.run_serially([
+			async () => {
+				await initialize_database();
+				await initialize_app();
+			}
+		]);
+	});
+</script>
+<!-- csrf_token -->
+{%- block body_include %}{{ body_include or "" }}{% endblock -%}
+</body>
+</html>
