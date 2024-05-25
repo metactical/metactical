@@ -63,14 +63,6 @@ frappe.ready(function () {
 			else{
 				hide_tooltip('bank_transit_no');
 			}	
-	
-
-			if (!/^\d+$/.test(value)) {
-				show_tooltip("bank_transit_no", "Transit number should be a number");
-			}
-			else{
-				hide_tooltip('bank_transit_no')
-			}
       	});
 
 	  frappe.web_form.on("zip_code", (field, value) => {
