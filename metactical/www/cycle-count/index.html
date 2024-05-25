@@ -75,7 +75,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 0px;
         }
         table, th, td {
             border: 1px solid #ccc;
@@ -123,54 +123,24 @@
 			<button class="save" @click="save_cycle_count()">Save</button>
 			<button class="new" @click="clear_items()">New Cycle Count</button>
 		</div>
-		<table>
-			<thead>
-				<tr>
-					<th>Item</th>
-					<th>Qty</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr v-for="item in items">
-					<td>{{ item.item_code }}</td>
-					<td>{{ item.qty }}</td>
-				</tr>
-			</tbody>
-		</table>
+		<div style="height: 40vh; overflow-y: auto; margin-top: 20px;">
+			<table>
+				<thead>
+					<tr>
+						<th>Item</th>
+						<th>Qty</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="item in items">
+						<td>{{ item.item_code }}</td>
+						<td>{{ item.qty }}</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
 		{% endraw %}
 	</div>
-	<!--<div id="container">
-		<div id="app" style="width: 250px; float: left;">
-			{% raw %}
-			<div v-if="!loading" style="width: 100%; float: left;">
-				<h1>Cycle Count</h1>
-				<div style="width: 250px; float: right;">
-					<button @click="clear_items()">New Cycle Count</button>
-					<button @click="save_cycle_count()">Save Cycle Count</button>
-				</div>
-				<div>
-					Warehouse: <select>
-						<option value="Warehouse 1">Warehouse 1</option>
-						<option value="Warehouse 2">Warehouse 2</option>
-					</select>
-					Reason for Adjustment: <input type="text">
-				</div>
-				<div style="width: 500px; float: left;">
-					Barcode: <input type="text" id="barcode" v-model="barcode" @keyup.enter="search_barcode(barcode)">
-				</div>
-			</div>
-			<div v-if="loading">Loading...</div>
-			<div style="width: 500px; float: left;">
-				<div style="width: 50%; float: left;">Item</div>
-				<div style="width: 50%; float: left;">Qty</div>
-				<div id="items" v-for="item in items" style="width: 100%;">
-					<div style="width: 50%; float: left;">{{ item.item_code }}</div>
-					<div style="width: 50%; float: left;">{{ item.qty }}</div>
-				</div>
-			</div>
-			{% endraw %}
-		</div>
-	</div>-->
 </div>
 <!-- js should be loaded in body! -->
 <script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
