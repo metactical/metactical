@@ -1,19 +1,30 @@
-/* .main-section{
-    padding: 20px;
-    background-color: #56b45b;
-}
-*/
-
-/* #page-manage-store-credit{
-    background-color: #fff;
-}  */
-
 .list-group-item{
     background-color: transparent;
     border: none;
-    border-bottom: 1px solid rgb(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .list-group-item, .table td{
     padding: 0.5rem 0.75rem;
+}
+
+.cursor-pointer{
+    cursor: pointer;
+}
+
+.iti__flag {
+    background-image: url('/assets/metactical/img/flags.png') !important;
+    box-shadow: 0px 0px 1px 0px #888;
+    background-repeat: no-repeat;
+    background-color: #DBDBDB;
+}
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .iti__flag {
+      background-image: url("/assets/metactical/img/flags@2x.png") !important; 
+    } 
+}
+
+.iti--allow-dropdown{
+    width: 100%;
 }
