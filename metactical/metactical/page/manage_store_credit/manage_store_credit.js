@@ -1,7 +1,7 @@
 frappe.pages['manage-store-credit'].on_page_load = function(wrapper) {
 	var page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: 'Transfer/Create Store Credit',
+		title: 'Transfer Store Credit',
 		single_column: true
 	});
 
