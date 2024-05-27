@@ -4,26 +4,26 @@
             <div class="row">
                 <div class="col-md-9">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <input type="text" class="form-control" id="search-phone_number" :readonly="freeze_fields" v-input="onPhoneChange" >
                                 <input type="hidden" id="search-country_code" v-model="customer.phone_number">
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <!-- Email -->
                             <div class="form-group">
                                 <input type="text" class="form-control" id="search-email" :readonly="freeze_fields" v-model="customer.email" placeholder="Email">
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
                                 <!-- Company Name -->
                                 <input type="text" class="form-control" id="search-company" :readonly="freeze_fields" v-model="customer.company" placeholder="Company Name">
                             </div>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-4">
                             <!-- First Name -->
                             <div class="form-group">
@@ -36,10 +36,18 @@
                                 <input type="text" class="form-control" id="search-last_name" :readonly="freeze_fields" v-model="customer.last_name" placeholder="Last Name">
                             </div>
                         </div>
+                        <div class="col-md-4">
+                            <!-- Territory -->
+                            <div class="form-group">
+                                <select class="form-control" id="search-territory" :readonly="freeze_fields" v-model="customer.territory">
+                                </select>
+                            </div>
+                        </div>
+                            
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="d-flex ">
+                    <div class="d-flex justify-content-end">
                         <div class="mr-3">
                             <button type="submit" class="btn btn-primary" id="search_customer">Search</button>
                         </div>
@@ -86,6 +94,26 @@
                     });
                 });
             })
+
+            frappe.call({
+                method: 'frappe.client.get_list',
+                args: {
+                    doctype: 'Territory',
+                    filters: {
+                        "is_group": 0,
+                    },
+                    limit_page_length: 1000,
+                    order_by: "name asc"
+                },
+                callback: (r) => {
+                    $.each(r.message, (key, value) => {
+                        $('#search-territory').append(`<option value="${value.name}" >${value.name}</option>`)
+                    })
+
+                    $('#search-territory').val("British Columbia")
+                }
+            })
+
         },
         methods: {
             searchCustomer() {
@@ -115,9 +143,17 @@
                             me.customer.email = r.message[0].email
                             me.phone_no.setNumber(r.message[0].phone_number)
                             me.customer.company = r.message[0].company
+                            me.customer.territory = r.message[0].territory
                             me.$emit('customerFound', r.message[0])
+
+                            // disable all options except British Columbia
+                            $('#search-territory option').each(function(){
+                                if ($(this).val() != me.customer.territory)
+                                    $(this).attr('disabled', true)
+                            })
                         }
                         else{
+                            me.customer.territory = "British Columbia"
                             frappe.msgprint("There is no customer with the provided details!")
                         }
                     }
@@ -131,9 +167,15 @@
                 this.customer.email = ""
                 this.customer.phone_number = ""
                 this.customer.company = ""
+                this.customer.territory = "British Columbia"
                 this.freeze_fields = false
                 this.phone_no.setNumber('')
                 
+                // remove disabled from all options
+                $('#search-territory option').each(function(){
+                    $(this).attr('disabled', false)
+                })
+
                 this.$emit("customerCleared")
             },
             addPhoneMasking(){
