@@ -10,14 +10,6 @@
 		window.socketio_port = {{ (frappe.socketio_port or 'null') }};
 		window.show_language_picker = {{ show_language_picker }};
 	</script>
-	<!--<style>
-		#container {
-			display: flex;
-			justify-content: center;
-			align-items: flex-start;
-			height: 100vh;
-		}
-	</style>-->
 	<style>
         body {
             font-family: Arial, sans-serif;
@@ -26,7 +18,7 @@
             background-color: #f0f0f0;
         }
         .container {
-            max-width: 600px;
+            max-width: 900px;
             margin: auto;
             padding: 20px;
             background-color: #fff;
@@ -69,7 +61,7 @@
             color: white;
         }
         .buttons button.new {
-            background-color: #007bff;
+            background-color: #ff000d;
             color: white;
         }
         table {
@@ -91,9 +83,9 @@
 </head>
 <body>
 <div id="app">
-	<div v-if="loading">Loading...</div>
+	{% raw %}
+	<div v-if="loading">{{ loading_message }}</div>
 	<div class="container" v-if="!loading">
-		{% raw %}
 		<h1>Cycle Count</h1>
 		<div class="form-group">
 			<label for="warehouse">Warehouse:</label>
@@ -120,27 +112,39 @@
 			<input type="text" id="barcode" v-model="barcode" @keyup.enter="search_barcode(barcode)">
 		</div>
 		<div class="buttons">
-			<button class="save" @click="save_cycle_count()">Save</button>
-			<button class="new" @click="clear_items()">New Cycle Count</button>
+			<button class="save" @click="save_cycle_count()">Save Cycle Count</button>
 		</div>
 		<div style="height: 40vh; overflow-y: auto; margin-top: 20px;">
 			<table>
 				<thead>
 					<tr>
 						<th>Item</th>
+						<th>Item Name</th>
 						<th>Qty</th>
+						<th></th>
 					</tr>
 				</thead>
 				<tbody>
 					<tr v-for="item in items">
-						<td>{{ item.item_code }}</td>
-						<td>{{ item.qty }}</td>
+						<td>{{ item.retail_sku }}</td>
+						<td>{{ item.item_name }}</td>
+						<td>
+							<input type="number" v-model="item.qty" @change="edit_item_qty(item.item_code, item.qty)">
+						</td>
+						<td>
+							<button @click="delete_item(item.item_code)" alt="Delete">
+								Delete
+							</button>
+						</td>
 					</tr>
 				</tbody>
 			</table>
 		</div>
-		{% endraw %}
+		<div class="buttons" style="margin-top: 20px;">
+			<button class="new" @click="clear_items(true)">Clear Items</button>
+		</div>
 	</div>
+	{% endraw %}
 </div>
 <!-- js should be loaded in body! -->
 <script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
@@ -162,9 +166,11 @@
 <script>
 	let db;
 
-	async function initialize_database(){
+	async function initialize_database(barcodes){
+		console.log("Start database initialization");
+		metactical.cycleCount.app.loading_message = 'Initializing database...';
 		// Let us open our database
-		const DBOpenRequest = window.indexedDB.open('cycleCount', 5);
+		const DBOpenRequest = window.indexedDB.open('cycleCount', 16);
 
 		// Register two event handlers to act on the database being opened successfully, or not
 		DBOpenRequest.onerror = (event) => {
@@ -172,10 +178,10 @@
 		};
 
 		DBOpenRequest.onsuccess = (event) => {
-			console.log("Database initialized.");
-
 			// Store the result of opening the database in the db variable.
 			db = DBOpenRequest.result;
+			console.log("Database initialized.");
+			save_barcodes(barcodes)
 		};
 
 		// This event handles the event whereby a new version of the database needs to be created
@@ -183,55 +189,91 @@
 		// window.indexedDB.open line above
 		//it is only implemented in recent browsers
 		DBOpenRequest.onupgradeneeded = (event) => {
-			db = event.target.result;
+			initDb = event.target.result;
 
-			db.onerror = (event) => {
+			initDb.onerror = (event) => {
+				metactical.cycleCount.app.loading_message = 'Error loading database.';
 				console.log('Error loading database.');
 			};
 
-			// Create an objectStore for this database
-			if (!db.objectStoreNames.contains('tabBarcode')) {
-				const tabBarcode = db.createObjectStore('tabBarcode', { keyPath: 'barcode' });
-				// Define what data items the objectStore will contain
-				tabBarcode.createIndex('item_code', 'item_code', { unique: false });
+			// Delete the existing objectStores
+			if (initDb.objectStoreNames.contains('tabBarcode')) {
+				console.log('Deleting existing tabBarcode objectStore');
+				initDb.deleteObjectStore('tabBarcode');
 			}
 
-			if (!db.objectStoreNames.contains('tabItems')) {
-				const tabItem = db.createObjectStore('tabItems', { keyPath: 'item_code' });
+			if (initDb.objectStoreNames.contains('tabItems')) {
+				console.log('Deleting existing tabItems objectStore');
+				initDb.deleteObjectStore('tabItems');
+			}
+
+			// Create an objectStore for this database
+			if (!initDb.objectStoreNames.contains('tabBarcode')) {
+				const tabBarcode = initDb.createObjectStore('tabBarcode', { keyPath: 'barcode' });
+				// Define what data items the objectStore will contain
+				tabBarcode.createIndex('item_code', 'item_code', { unique: false });
+				tabBarcode.createIndex('item_name', 'item_name', { unique: false });
+				tabBarcode.createIndex('retail_sku', 'retail_sku', { unique: false });
+			}
+
+			if (!initDb.objectStoreNames.contains('tabItems')) {
+				const tabItem = initDb.createObjectStore('tabItems', { keyPath: 'item_code' });
+				tabItem.createIndex('item_name', 'item_name', { unique: false });
+				tabItem.createIndex('retail_sku', 'retail_sku', { unique: false });
 				tabItem.createIndex('qty', 'qty', { unique: false });
 				tabItem.createIndex('last_modified', 'last_modified', { unique: false });
 			}
-		};
+		}
 	}
 
 	async function save_barcodes(barcodes){
+		console.log("Saving barcodes started");
 		let transaction = db.transaction(['tabBarcode'], 'readwrite');
 		let tabBarcode = transaction.objectStore('tabBarcode');
+		let total = barcodes.length;
+		let count = 0;
 		
-		for (let barcode of barcodes){
-			let getRequest = tabBarcode.get(barcode.barcode);
-			getRequest.onsuccess = (event) => {
-				let existingBarcode = event.target.result;
-				if (!existingBarcode) {
-					let addRequest = tabBarcode.add(barcode);
-					addRequest.onsuccess = (event) => {
-						console.log('Barcode added to the database');
-					};
-					addRequest.onerror = (event) => {
-						console.log('Error adding barcode to the database');
-					};
-				}
-				else {
-					console.log('Barcode already exists in the database');
-				}
-			};
-		}
-		
-		transaction.oncomplete = (event) => {
+		let requests = barcodes.map((barcode, index) => {
+			return new Promise((resolve, reject) => {
+				let getRequest = tabBarcode.get(barcode.barcode);
+				getRequest.onsuccess = (event) => {
+					let existingBarcode = event.target.result;
+					if (!existingBarcode) {
+						let addRequest = tabBarcode.add(barcode);
+						count++;
+						addRequest.onsuccess = (event) => {
+							metactical.cycleCount.app.loading_message = `Loading barcodes: ${count} of ${total}`;
+							console.log('Barcode added to the database');
+							resolve();
+						};
+						addRequest.onerror = (event) => {
+							//console.log('Error adding barcode to the database:', event.target.error);
+							metactical.cycleCount.app.loading_message = `Error loading barcodes: ${count} of ${total}`;
+							reject(event.target.error);
+						};
+					}
+					else {
+						count++;
+						metactical.cycleCount.app.loading_message = `Loading barcodes: ${count} of ${total}`;
+						console.log('Barcode already exists in the database');
+						resolve();
+					}
+				};
+				getRequest.onerror = (event) => {
+					console.log('Error getting barcode from the database:', event.target.error);
+					reject(event.target.error);
+				};
+			});
+		});
+
+		try {
+			await Promise.all(requests);
 			console.log('Transaction completed: all barcodes inserted.');
 			metactical.cycleCount.app.loading = false;
 			load_items();
-		};
+		} catch (error) {
+			console.log('Error in transaction:', error);
+		}
 	}
 
 	function search_barcode(barcode){
@@ -244,7 +286,7 @@
 				console.log('Barcode not found');
 			}
 			else{
-				console.log('Barcode found: ', request.result);
+				//console.log('Barcode found: ', request.result);
 				metactical.cycleCount.app.barcode = '';
 				add_item(request.result);
 			}
@@ -254,10 +296,11 @@
 	function add_item(item){
 		let transaction = db.transaction(['tabItems'], 'readwrite');
 		let tabItem = transaction.objectStore('tabItems');
-
 		let getRequest = tabItem.get(item.item_code);
 		let row = {
 			item_code: item.item_code,
+			item_name: item.item_name,
+			retail_sku: item.retail_sku,
 			qty: 1,
 			last_modified: new Date()
 		};
@@ -265,13 +308,27 @@
 		getRequest.onsuccess = (event) => {
 			let existingItem = event.target.result;
 			if (!existingItem) {
-				let addRequest = tabItem.add(row);
-				addRequest.onsuccess = (event) => {
-					console.log('Item added to the database');
+				// Check the number of items first
+				let countRequest = tabItem.count();
+				let rowCount;
+				countRequest.onsuccess = (event) => {
+					rowCount = countRequest.result;
+					console.log('Number of rows in tabItem:', rowCount);
 				};
-				addRequest.onerror = (event) => {
-					console.log('Error adding item to the database');
-				};
+
+				if (rowCount >= 99) {
+					alert('You have reached the maximum number of items that can be added. Please sae the cycle count first.');
+					return;
+				}
+				else{
+					let addRequest = tabItem.add(row);
+					addRequest.onsuccess = (event) => {
+						console.log('Item added to the database');
+					};
+					addRequest.onerror = (event) => {
+						console.log('Error adding item to the database');
+					};
+				}
 			}
 			else {
 				row.qty = existingItem.qty + 1;
@@ -283,6 +340,44 @@
 			load_items();
 		};
 	}
+
+	function edit_item_qty(itemCode, newQty) {
+		let transaction = db.transaction(['tabItems'], 'readwrite');
+		let tabItem = transaction.objectStore('tabItems');
+
+		let getRequest = tabItem.get(itemCode);
+		getRequest.onsuccess = (event) => {
+			let existingItem = event.target.result;
+			if (existingItem) {
+				existingItem.qty = newQty;
+				let updateRequest = tabItem.put(existingItem);
+				updateRequest.onsuccess = (event) => {
+					console.log('Item quantity updated in the database');
+					load_items();
+				};
+				updateRequest.onerror = (event) => {
+					console.log('Error updating item quantity in the database');
+				};
+			} else {
+				console.log('Item not found in the database');
+			}
+		};
+	}
+
+	function delete_item(itemCode) {
+		let transaction = db.transaction(['tabItems'], 'readwrite');
+		let tabItem = transaction.objectStore('tabItems');
+
+		let deleteRequest = tabItem.delete(itemCode);
+		deleteRequest.onsuccess = (event) => {
+			console.log('Item deleted from the database');
+			load_items();
+		};
+		deleteRequest.onerror = (event) => {
+			console.log('Error deleting item from the database');
+		};
+	}
+	
 
 	function load_items(){
 		metactical.cycleCount.app.items = [];
@@ -308,15 +403,22 @@
 		};
 	}
 
-	function clear_items(){
-		let transaction = db.transaction(['tabItems'], 'readwrite');
-		let tabItem = transaction.objectStore('tabItems');
+	function clear_items(toconfirm = true){
+		// Prompt to confirm before clearing items
+		let confirmation = true;
+		if (toconfirm) {
+			confirmation = confirm('Are you sure you want to clear all items?');
+		}
+		if (confirmation) {
+			let transaction = db.transaction(['tabItems'], 'readwrite');
+			let tabItem = transaction.objectStore('tabItems');
 
-		let clearRequest = tabItem.clear();
-		clearRequest.onsuccess = (event) => {
-			console.log('Items cleared from the database');
-			load_items();
-		};
+			let clearRequest = tabItem.clear();
+			clearRequest.onsuccess = (event) => {
+				console.log('Items cleared from the database');
+				load_items();
+			};
+		}
 	}
 
 	function save_cycle_count(){
@@ -357,7 +459,7 @@
 					},
 					callback: (r) => {
 						console.log('Cycle count saved: ', r.message);
-						clear_items();
+						clear_items(false);
 					}
 				});
 			}
@@ -372,7 +474,8 @@
 					items: [],
 					loading: true,
 					error: false,
-					barcode: ''
+					barcode: '',
+					loading_message: 'Fetching barcodes from server...'
 				}
 			},
 			mounted() {
@@ -388,7 +491,8 @@
 					callback: (r) => {
 						me.barcodes = r.message;
 						console.log({barcodes: r.message});
-						save_barcodes(r.message);
+						initialize_database(r.message);
+						//save_barcodes(r.message);
 					}
 				});
 			},
@@ -403,18 +507,25 @@
 
 				clear_items(){
 					clear_items();
+				},
+
+				initialize_database(barcodes){
+					initialize_database(barcodes);
+				},
+
+				edit_item_qty(itemCode, newQty){
+					edit_item_qty(itemCode, newQty);
+				},
+
+				delete_item(itemCode){
+					delete_item(itemCode);
 				}
 			}
 		}).mount('#app');
 	}
 
 	frappe.ready(() => {
-		frappe.run_serially([
-			async () => {
-				await initialize_database();
-				await initialize_app();
-			}
-		]);
+		initialize_app();
 	});
 </script>
 <!-- csrf_token -->
