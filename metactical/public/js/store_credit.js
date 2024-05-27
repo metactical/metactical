@@ -184,6 +184,10 @@ metactical.store_credit.StoreCredit = class {
                     })
 
                     this.tax_types = tax_types
+                    if (this.si_items.length)
+                        this.process_payment_button = ""
+                    else
+                        this.process_payment_button = "d-none"
                 },
                 processStoreCredit(){
                     var me = this

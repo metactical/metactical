@@ -57,8 +57,11 @@ def load_si(sales_invoice):
     sales_invoice_doc = None
     if frappe.db.exists("Sales Invoice", sales_invoice):
         sales_invoice_doc = frappe.get_doc("Sales Invoice", sales_invoice)
-        if (sales_invoice_doc.docstatus != 1):
+        if (sales_invoice_doc.docstatus > 1):
             frappe.throw("Sales Invoice is "+sales_invoice_doc.get("status"))
+            return
+        elif sales_invoice_doc.docstatus == 0:
+            frappe.throw("Sales Invoice "+sales_invoice+" is a Draft")
             return
 
         for item in sales_invoice_doc.items:
