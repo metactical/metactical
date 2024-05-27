@@ -26,7 +26,4 @@ class StoreCredit {
 			parent: this.wrapper
 		})
 	}
-	
-	
-
 }

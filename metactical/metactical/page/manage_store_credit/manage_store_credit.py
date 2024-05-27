@@ -1,43 +1,51 @@
 import frappe, json
+from frappe.utils.background_jobs import enqueue
 
 @frappe.whitelist()
 def search_customer(*args, **kwargs):
-    phone_number = kwargs.get('phone_number')
-    email = kwargs.get('email')
+    try:
+        phone_number = kwargs.get('phone_number')
+        email = kwargs.get('email')
 
-    filters = {}
-    if phone_number:
-        filters.update({"mobile_no": ["like", "%{}%".format(phone_number)]})
-    if email:
-        filters.update({"email_id": ["like", "%{}%".format(email)]})
+        filters = {}
+        if phone_number:
+            filters.update({"mobile_no": ["like", "%{}%".format(phone_number)]})
+        if email:
+            filters.update({"email_id": ["like", "%{}%".format(email)]})
 
-    contacts = frappe.db.get_list("Contact",
-                filters=filters,
-                fields=["name", "email_id", "phone", "mobile_no"]
-            )
+        contacts = frappe.db.get_list("Contact",
+                    filters=filters,
+                    fields=["name", "email_id", "phone", "mobile_no"]
+                )
 
-    contact_names = [c.get('name') for c in contacts]
-    if not contact_names:
-        return []
+        contact_names = [c.get('name') for c in contacts]
+        if not contact_names:
+            frappe.response["customers"] = []
+            frappe.response["success"] = True
+            return
 
-    customers = frappe.db.sql(""" SELECT
-                                    c.name, c.first_name, c.last_name, c.ais_company as company, dl.parent, c.territory
-                                FROM
-                                    `tabDynamic Link` dl
-                                JOIN `tabCustomer` c on dl.link_name = c.name
-                                WHERE
-                                    dl.link_doctype = 'Customer'
-                                    AND dl.parenttype = 'Contact'
-                                    AND dl.parent IN %(contact_names)s
-                            """, {"contact_names": contact_names}, as_dict=True)
+        customers = frappe.db.sql(""" SELECT
+                                        c.name, c.first_name, c.last_name, c.ais_company as company, dl.parent, c.territory
+                                    FROM
+                                        `tabDynamic Link` dl
+                                    JOIN `tabCustomer` c on dl.link_name = c.name
+                                    WHERE
+                                        dl.link_doctype = 'Customer'
+                                        AND dl.parenttype = 'Contact'
+                                        AND dl.parent IN %(contact_names)s
+                                """, {"contact_names": contact_names}, as_dict=True)
 
-    for customer in customers:
-        for contact in contacts:
-            if customer.parent == contact.name:
-                customer["email"] = contact.email_id
-                customer["phone_number"] = contact.mobile_no
-                        
-    return customers
+        for customer in customers:
+            for contact in contacts:
+                if customer.parent == contact.name:
+                    customer["email"] = contact.email_id
+                    customer["phone_number"] = contact.mobile_no
+                            
+        frappe.response["customers"] = customers
+        frappe.response["success"] = True
+    except Exception as e:
+        frappe.log_error(title="Search Customer Error (Transfer Store Credit Page)", message=frappe.get_traceback())
+        frappe.response["success"] = False
 
 @frappe.whitelist()
 def load_si(sales_invoice):
@@ -46,15 +54,18 @@ def load_si(sales_invoice):
     retail_skus = {}
     credit_notes_grouped = {}
 
-
     sales_invoice_doc = None
     if frappe.db.exists("Sales Invoice", sales_invoice):
         sales_invoice_doc = frappe.get_doc("Sales Invoice", sales_invoice)
+        if (sales_invoice_doc.docstatus != 1):
+            frappe.throw("Sales Invoice is "+sales_invoice_doc.get("status"))
+            return
 
         for item in sales_invoice_doc.items:
             retail_sku = frappe.db.get_value("Item", item.item_code, "ifw_retailskusuffix")
             retail_skus[item.item_code] = retail_sku
             items.append({
+                "name": item.name,
                 "si_name": sales_invoice_doc.name,
                 "retail_sku": retail_sku,
                 "item_name": item.item_name,
@@ -72,6 +83,7 @@ def load_si(sales_invoice):
                 "total_taxes_and_charges": sales_invoice_doc.total_taxes_and_charges,
                 "grand_total": sales_invoice_doc.grand_total,
                 "si_discount_amount": sales_invoice_doc.discount_amount,
+                "original_price": item.rate,
             })
 
         if not sales_invoice_doc.is_return:
@@ -81,6 +93,8 @@ def load_si(sales_invoice):
                     "name": tax.charge_type,
                     "amount": frappe.format_value(tax.tax_amount, {"fieldtype": "Currency"}),
                     "rate": tax.rate,
+                    "account_head": tax.account_head,
+                    "description": tax.description
                 })
             
             taxes["taxes"] = taxes_list
@@ -104,7 +118,7 @@ def load_si(sales_invoice):
                                             WHERE
                                                 return_against = %(sales_invoice)s
                                             ORDER BY
-                                                posting_date DESC, sii.idx ASC
+                                                si.creation DESC, sii.idx ASC
                                         """, {"sales_invoice": sales_invoice_doc.name}, as_dict=True)
 
         # group credit notes by sales invoice
@@ -126,10 +140,84 @@ def load_si(sales_invoice):
     frappe.response["credit_notes"] = credit_notes_grouped
 
 @frappe.whitelist()
+def transfer_store_credit(**kwargs):
+    try:
+        sales_invoice = frappe.form_dict.sales_invoice
+        items = json.loads(kwargs.get('items'))
+        customer = frappe.form_dict.customer
+        tax_types = json.loads(kwargs.get('tax_types'))
+        
+        selected_items = []
+        for item in items:
+            item_doc = frappe.get_doc("Sales Invoice Item", item.get('name'))
+            new_item = {}
+            new_item["item_code"] = item.get('item_code')
+            new_item["rate"] = item.get('rate')
+            new_item["discount_amount"] = item.get('discount_amount')
+            new_item["discount_percentage"] = item.get('discount_percentage')
+            new_item["qty"] = -1 * item.get('qty')
+
+            selected_items.append(new_item)
+
+        taxes = []
+        for tax in tax_types:
+            taxes.append({
+                "charge_type": tax.get('name'),
+                "rate": tax.get('rate'),
+                "account_head": tax.get('account_head'),
+                "description": tax.get('description')
+            })
+
+        sales_invoice = frappe.get_doc({
+            "doctype": "Sales Invoice",
+            "customer": customer,
+            "is_return": 1,
+            "return_against": sales_invoice,
+            "posting_date": frappe.utils.nowdate(),
+            "is_return": 1,
+            "return_against": sales_invoice,
+            "items": selected_items,
+            "taxes_and_charges": frappe.get_value("Sales Invoice", sales_invoice, "taxes_and_charges"),
+            "taxes": taxes
+        })
+
+        enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, queue='long', timeout=1500)
+
+        frappe.response["items"] = [item.get('name') for item in items]
+        frappe.response["success"] = True
+        frappe.response["sales_invoice"] = sales_invoice.name
+        frappe.msgprint("Background Job Started to Transfer Store Credit. You will be notified once it is completed.")
+    except Exception as e:
+        frappe.response["error"] = frappe.get_traceback()
+        frappe.response["success"] = False
+        frappe.log_error(title="Transfer Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
+        frappe.db.rollback()
+
+def save_and_submit_store_credit(sales_invoice):
+    try:
+        sales_invoice.save()
+        sales_invoice.submit()
+        frappe.db.commit()
+        frappe.publish_realtime("transfer_store_credit", 
+                                {
+                                    "sales_invoice": sales_invoice.return_against, 
+                                    "new_sales_invoice": sales_invoice.name,
+                                    "error": ""
+                                }, 
+                                user=frappe.session.user)
+    except Exception as e:
+        frappe.log_error(title="Save and Submit Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
+        frappe.db.rollback()
+        frappe.publish_realtime("transfer_store_credit", {"error": str(e)}, user=frappe.session.user)
+
+@frappe.whitelist()
 def create_customer(**kwargs):
     try:
         customer = json.loads(frappe.form_dict.customer)
         
+        if frappe.db.exists("Contact", {"email_id": customer.get('email'), "mobile_no": customer.get('phone_number')}):
+            frappe.throw("Customer with email <b>{}</b> and <b>{}</b> already exists".format(customer.get('email'), customer.get('phone_number')))
+
         # create customer
         customer_doc = frappe.new_doc("Customer")
         customer_doc.first_name = customer.get('first_name')
@@ -146,7 +234,7 @@ def create_customer(**kwargs):
             "doctype": "Contact",
             "first_name": customer.get('first_name'),
             "last_name": customer.get('last_name'),
-            "email_id": customer.get('ifw_email'),
+            "email_id": customer.get('email'),
             "phone": customer.get('phone'),
             "mobile_no": customer.get('phone'),
             "links": [{

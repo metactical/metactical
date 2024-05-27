@@ -15,10 +15,38 @@
 .table thead th, .table tbody td{
     vertical-align: bottom;
     border-bottom: 2px solid #d2dce7;
+    padding-left: 3px !important;
 }
 
 .table{
     border-radius: 25px;
+}
+
+.store-credits .card-header{
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 10px 5px 0px 10px !important;
+    margin-bottom: 5px;
+}
+
+[data-theme="dark"] .store-credits .card-header{
+    background-color: #1e1e1e;
+}
+
+.grid-add-row{
+    display: none !important;
+}
+
+.grid-body .btn-open-row{
+    display: none !important;
+}
+
+.store-credits .card-body{
+    padding: 10px !important;
+}
+
+.store-credits .table .td:first-child{
+    padding-left: 0px !important;
 }
 
 .table-bg{

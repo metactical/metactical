@@ -123,8 +123,23 @@
                     return
                 }
 
+                var phone_regex = /^\+\d{7,}$/
+                if (this.customer.phone_number && phone_regex.test(this.customer.phone_number) === false){
+                    $(`#search-phone_number`).addClass('is-invalid')
+                    frappe.throw('Please enter a valid phone number')
+                    valid = false
+                }
+                
+                var email_regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                if(this.customer.email && email_regex.test(this.customer.email) === false){
+                    $(`#search-email`).addClass('is-invalid')
+                    frappe.throw('Please enter a valid email')
+                    valid = false
+                }
+
                 // change search button to loading
                 $("#search_customer").html('<i class="fa fa-spinner fa-spin"></i>').attr('disabled', true)
+                $("#create_customer").attr('disabled', true)
 
                 var me = this
                 frappe.call({
@@ -136,25 +151,33 @@
                     callback: function(r) {
                         // change back to search
                         $("#search_customer").html('Search').attr('disabled', false)
+                        $("#create_customer").attr('disabled', false)
+                        
+                        if (r.success){
+                            if (r.customers.length) {
+                                me.customer.first_name = r.customers[0].first_name
+                                me.customer.last_name = r.customers[0].last_name
+                                me.customer.email = r.customers[0].email
+                                me.phone_no.setNumber(r.customers[0].phone_number)
+                                me.customer.company = r.customers[0].company
+                                me.customer.territory = r.customers[0].territory
+                                me.customer.name = r.customers[0].name
 
-                        if (r.message.length) {
-                            me.customer.first_name = r.message[0].first_name
-                            me.customer.last_name = r.message[0].last_name
-                            me.customer.email = r.message[0].email
-                            me.phone_no.setNumber(r.message[0].phone_number)
-                            me.customer.company = r.message[0].company
-                            me.customer.territory = r.message[0].territory
-                            me.$emit('customerFound', r.message[0])
+                                me.$emit('customerFound', r.customers[0])
 
-                            // disable all options except British Columbia
-                            $('#search-territory option').each(function(){
-                                if ($(this).val() != me.customer.territory)
-                                    $(this).attr('disabled', true)
-                            })
+                                // disable all options except British Columbia
+                                $('#search-territory option').each(function(){
+                                    if ($(this).val() != me.customer.territory)
+                                        $(this).attr('disabled', true)
+                                })
+                            }
+                            else{
+                                me.customer.territory = "British Columbia"
+                                frappe.msgprint("There is no customer with the provided details!")
+                            }
                         }
                         else{
-                            me.customer.territory = "British Columbia"
-                            frappe.msgprint("There is no customer with the provided details!")
+                            frappe.msgprint("Unable to search customer. Please try again later") 
                         }
                     }
                 })
@@ -191,6 +214,11 @@
             createCustomer() {
                 var me = this
                 me.customer.phone_number = me.phone_no.getNumber()
+                if (me.customer.phone_number.length < 10){
+                    frappe.msgprint('Please enter a valid phone number')
+                    return
+                }
+
                 var valid = this.validateForm()
                 
                 if (!valid){
@@ -206,6 +234,7 @@
                     callback: (r) => {
                         if (r.success){
                             me.freeze_fields = true
+                            me.customer.name = r.customer
                             me.$emit('customerFound')
                             frappe.show_alert('Customer created successfully')
                         }
@@ -217,8 +246,24 @@
             validateForm(){
                 var valid = true
                 $.each(this.customer, (key, value) => {
+                    if (key === 'name')
+                        return
+                    
+                    // regex to check phone number that starts with + and must more than 8 digits
+                    var phone_regex = /^\+\d{7,}$/
+
                     if (!value){
                         $(`#search-${key}`).addClass('is-invalid')
+                        valid = false
+                    }
+                    else if (key === 'phone_number' && phone_regex.test(value) === false){
+                        $(`#search-${key}`).addClass('is-invalid')
+                        frappe.throw('Please enter a valid phone number')
+                        valid = false
+                    }
+                    else if (key === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)){
+                        $(`#search-${key}`).addClass('is-invalid')
+                        frappe.throw('Please enter a valid email')
                         valid = false
                     }
                     else{
