@@ -2,6 +2,7 @@ frappe.provide('metactical.store_credit');
 import SearchForm from './components/SearchForm.vue'
 import ItemsTable from './components/ItemsTable.vue'
 import Taxes from './components/Taxes.vue'
+import CreditNote from './components/CreditNote.vue'
 
 metactical.store_credit.StoreCredit = class {
     constructor({ parent }) {
@@ -15,7 +16,8 @@ metactical.store_credit.StoreCredit = class {
             components: {
                 SearchForm,
                 ItemsTable,
-                Taxes
+                Taxes,
+                CreditNote
             },
             data: {
                 current_sales_invoice: "",
@@ -26,10 +28,12 @@ metactical.store_credit.StoreCredit = class {
                     email: "",
                     phone_number: "",
                     company: "",
+                    territory: ""
                 },
                 si_items : [],
                 taxes: [],
-                item_area: "",
+                credit_notes: [],
+                item_area: "d-none",
                 process_payment_button: "d-none",
                 freeze_fields: false
             },
@@ -42,13 +46,13 @@ metactical.store_credit.StoreCredit = class {
                                 :item_area="item_area"/>
                     <hr>
                     <div class="row" :class="item_area">
-                        <div class="col-md-4">
+                        <div class="col-md-4 mb-3">
                             <input type="text"  class="form-control" placeholder="Sales Invoice" v-model="current_sales_invoice">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 mb-3">
                             <input type="text"  class="form-control" placeholder="Customer Name" readonly v-model="selected_customer">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 mb-3">
                             <button class="btn btn-primary" @click="loadSI">Load SI</button>
                             <button class="btn btn-primary" >Edit Price</button>
                             <button class="btn btn-primary" @click="clearSI">Clear SI</button>
@@ -56,7 +60,7 @@ metactical.store_credit.StoreCredit = class {
                     </div>
 
                     <div class="row" :class="item_area">
-                        <div class="col-md-7">
+                        <div class="col-lg-7">
                             <div class="row">
                                 <div class="col-12">
                                     <ItemsTable :items="si_items" @updateTotals="updateTotals"/>
@@ -71,10 +75,10 @@ metactical.store_credit.StoreCredit = class {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-5 mt-4">
-                            <div class="card">
-                                <div class="card-body text-center">
-                                    <p>Processed Items will show up here</p>
+                        <div class="col-lg-5 mt-4">
+                            <div class="table-bg">
+                                <div class="card-body">
+                                    <CreditNote :credit_notes="credit_notes"/>
                                 </div>
                             </div>
                         </div>
@@ -102,6 +106,7 @@ metactical.store_credit.StoreCredit = class {
                     this.current_sales_invoice = ""
                     this.si_items = []
                     this.taxes = []
+                    this.credit_notes = []
                     this.freeze_fields = false
                 },
                 customerFound(){
@@ -111,11 +116,11 @@ metactical.store_credit.StoreCredit = class {
                 clearSI(){
                     this.si_items = []
                     this.taxes = []
+                    this.credit_notes = []
                     this.selected_customer = ""
                     this.process_payment_button = "d-none"
                 },
                 updateTotals() {
-                    console.log(this.taxes)
                     var total_amount = 0
                     var total_tax = 0
                     var discount = 0
@@ -152,6 +157,12 @@ metactical.store_credit.StoreCredit = class {
                     })
                 },
                 loadSI() {
+                    if (!this.current_sales_invoice)
+                    {
+                        frappe.show_alert("Please enter a Sales Invoice")
+                        return
+                    }
+
                     var me = this
                     frappe.call({
                         method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.load_si',
@@ -159,11 +170,33 @@ metactical.store_credit.StoreCredit = class {
                             sales_invoice: this.current_sales_invoice
                         },
                         callback: function(r) {
-                            if (r.items.length){
+                            if (r.items.length || Object.keys(r.credit_notes).length){
+                                var existing_store_credit = false
+                                var fully_returned_items = []
+
+                                // remove item form items list if store credit is already processed
+                                $.each(r.items, (index, item) => {
+                                    $.each(r.credit_notes, (sales_invoice, credit_notes) => {
+                                        $.each(credit_notes, (key, credit_note) => {
+                                            if (credit_note.retail_sku === item.retail_sku){
+                                                if (-1 * credit_note.qty === item.qty){
+                                                    fully_returned_items.push(item.retail_sku)
+                                                }
+                                                else{
+                                                    item.qty = item.qty - (credit_note.qty)
+                                                }
+                                                existing_store_credit = true
+                                            }
+                                        })
+                                    })
+                                })
+                                
+                                // remove fully returned items
+                                me.si_items = r.items.filter(item => !fully_returned_items.includes(item.retail_sku))
+                                console.log(me.si_items)
                                 me.selected_customer = r.customer
-                                me.si_items = r.items
                                 me.taxes = []
-                                me.process_payment_button = ""
+                                me.credit_notes = r.credit_notes
 
                                 $.each(r.taxes, (key, value)=>{
                                     if (typeof(value) === "object")
@@ -183,10 +216,20 @@ metactical.store_credit.StoreCredit = class {
                                         })
                                     }
                                 })
+
+                                if (existing_store_credit){
+                                    me.updateTotals()
+                                }
+
+                                if (!r.items.length)
+                                    me.process_payment_button = "d-none"
+                                else
+                                    me.process_payment_button = ""
                             }
                             else{
                                 me.si_items = []
                                 me.taxes = []
+                                me.credit_notes = []
                                 me.process_payment_button = "d-none"
                                 frappe.show_alert(`Sales Invoice <b>${me.current_sales_invoice}</b> not found!`)
                             }
