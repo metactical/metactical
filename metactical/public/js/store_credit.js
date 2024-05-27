@@ -28,14 +28,17 @@ metactical.store_credit.StoreCredit = class {
                     email: "",
                     phone_number: "",
                     company: "",
-                    territory: ""
+                    territory: "",
+                    name: ""
                 },
                 si_items : [],
                 taxes: [],
                 credit_notes: [],
                 item_area: "d-none",
+                tax_types: [],
                 process_payment_button: "d-none",
-                freeze_fields: false
+                freeze_fields: false,
+                items_in_queue: []
             },
             template: `
                 <div>
@@ -47,14 +50,18 @@ metactical.store_credit.StoreCredit = class {
                     <hr>
                     <div class="row" :class="item_area">
                         <div class="col-md-4 mb-3">
-                            <input type="text"  class="form-control" placeholder="Sales Invoice" v-model="current_sales_invoice">
+                            <input type="text"  
+                                    class="form-control" 
+                                    placeholder="Sales Invoice" 
+                                    v-model="current_sales_invoice"
+                                    v-on:keyup.enter="loadSI">
                         </div>
                         <div class="col-md-4 mb-3">
                             <input type="text"  class="form-control" placeholder="Customer Name" readonly v-model="selected_customer">
                         </div>
                         <div class="col-md-4 mb-3">
                             <button class="btn btn-primary" @click="loadSI">Load SI</button>
-                            <button class="btn btn-primary" >Edit Price</button>
+                            <button class="btn btn-primary" @click="editPrice">Edit Price</button>
                             <button class="btn btn-primary" @click="clearSI">Clear SI</button>
                         </div>
                     </div>
@@ -67,11 +74,14 @@ metactical.store_credit.StoreCredit = class {
                                 </div>
                             
                                 <div class="col-12 mt-4">
-                                    <Taxes :taxes="taxes"/>
+                                    <Taxes :taxes="taxes" v-if="si_items.length > 0"/>
                                 </div>
 
                                 <div class="col-12 mt-4">
-                                    <button class="btn btn-primary btn-block btn-lg" :class="process_payment_button">Process Store Credit</button>
+                                    <button class="btn btn-primary btn-block btn-lg" 
+                                            :class="process_payment_button" 
+                                            id="process_payment_button"
+                                            @click="processStoreCredit">Process Store Credit</button>
                                 </div>
                             </div>
                         </div>
@@ -84,6 +94,19 @@ metactical.store_credit.StoreCredit = class {
                         </div>
                     </div>
             `,
+            mounted() {
+                var me = this
+                frappe.realtime.on("transfer_store_credit", (data) => {
+                    if (data.error){
+                        frappe.show_alert("Error: "+ data.error)
+                        me.loadSI()
+                    }
+                    else if (data.sales_invoice == me.current_sales_invoice){
+                        frappe.msgprint("Store Credit Processed Successfully For Sales Invoice " + data.sales_invoice)
+                        me.loadSI()
+                    }
+                })
+            },
             methods: {
                 submit() {
                     frappe.call({
@@ -117,6 +140,7 @@ metactical.store_credit.StoreCredit = class {
                     this.si_items = []
                     this.taxes = []
                     this.credit_notes = []
+                    this.current_sales_invoice = ""
                     this.selected_customer = ""
                     this.process_payment_button = "d-none"
                 },
@@ -125,9 +149,9 @@ metactical.store_credit.StoreCredit = class {
                     var total_tax = 0
                     var discount = 0
                     var total_qty_returned = 0
+                    var tax_types = []
 
                     $.each(this.si_items, (index, item) => {
-                        console.log(item.amount_with_out_format, typeof(item.amount_with_out_format), total_amount, typeof(total_amount))
                         total_amount += item.amount_with_out_format
                         discount +=  item.discount > 0 ? item.discount: 0
                         total_qty_returned += item.qty
@@ -135,9 +159,9 @@ metactical.store_credit.StoreCredit = class {
 
                     $.each(this.taxes, (index, tax) => {
                         if (!["TTL Tax", "Discount", "TTL Store Credit", "Total Qty Returned"].includes(tax.name)){
-                            console.log(total_amount, typeof(total_amount), tax.rate, typeof(tax.rate))
                             total_tax += total_amount * (tax.rate / 100)
                             tax.amount = "$ " + Math.round(total_amount * (tax.rate / 100) * 100) / 100
+                            tax_types.push(tax)
                         }
                     })
 
@@ -153,6 +177,45 @@ metactical.store_credit.StoreCredit = class {
                         }
                         else if (tax.name === "Total Qty Returned"){
                             tax.amount = Math.round(total_qty_returned * 100) / 100
+                        }
+                    })
+
+                    this.tax_types = tax_types
+                },
+                processStoreCredit(){
+                    var me = this
+                    if (!this.customer.name)
+                    {
+                        frappe.msgprint("Please Create/Search a Customer")
+                        return
+                    }
+
+                    // change 'process store credit' button to 'processing'
+                    $("#process_payment_button").html("Processing...").attr("disabled", true)
+
+                    frappe.call({
+                        method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.transfer_store_credit',
+                        args: {
+                            sales_invoice: this.current_sales_invoice,
+                            customer: this.customer.name,
+                            items: this.si_items,
+                            tax_types: this.tax_types
+                        },
+                        callback: function(r) {
+                            if (r.success) {
+                                var items = r.items
+                                for (var i = 0; i < items.length; i++){
+                                    me.items_in_queue.push(items[i])
+                                }
+
+                                me.loadSI()
+                            }
+                            else{
+                                frappe.show_alert(r.error)
+                            }
+                            
+                            $("#process_payment_button").html("Process Store Credit").attr("disabled", false)
+
                         }
                     })
                 },
@@ -174,13 +237,13 @@ metactical.store_credit.StoreCredit = class {
                                 var existing_store_credit = false
                                 var fully_returned_items = []
 
-                                // remove item form items list if store credit is already processed
+                                // remove item form items list if store credit is already processed or it is in the queue
                                 $.each(r.items, (index, item) => {
                                     $.each(r.credit_notes, (sales_invoice, credit_notes) => {
                                         $.each(credit_notes, (key, credit_note) => {
                                             if (credit_note.retail_sku === item.retail_sku){
                                                 if (-1 * credit_note.qty === item.qty){
-                                                    fully_returned_items.push(item.retail_sku)
+                                                    fully_returned_items.push(item.name)
                                                 }
                                                 else{
                                                     item.qty = item.qty - (credit_note.qty)
@@ -189,11 +252,15 @@ metactical.store_credit.StoreCredit = class {
                                             }
                                         })
                                     })
+
+                                    if(me.items_in_queue.includes(item.name)){
+                                        if (!fully_returned_items.includes(item.name))
+                                            fully_returned_items.push(item.name)
+                                    }
                                 })
-                                
+
                                 // remove fully returned items
-                                me.si_items = r.items.filter(item => !fully_returned_items.includes(item.retail_sku))
-                                console.log(me.si_items)
+                                me.si_items = r.items.filter(item => !fully_returned_items.includes(item.name))
                                 me.selected_customer = r.customer
                                 me.taxes = []
                                 me.credit_notes = r.credit_notes
@@ -205,7 +272,9 @@ metactical.store_credit.StoreCredit = class {
                                             me.taxes.push({
                                                 "name": tax.name,
                                                 "amount": tax.amount,
-                                                "rate": tax.rate
+                                                "rate": tax.rate,
+                                                "account_head": tax.account_head,
+                                                "description": tax.description,
                                             })
                                         })
                                     }
@@ -221,7 +290,7 @@ metactical.store_credit.StoreCredit = class {
                                     me.updateTotals()
                                 }
 
-                                if (!r.items.length)
+                                if (!me.si_items.length)
                                     me.process_payment_button = "d-none"
                                 else
                                     me.process_payment_button = ""
@@ -235,6 +304,88 @@ metactical.store_credit.StoreCredit = class {
                             }
                         }
                     })
+                },
+                editPrice(){
+                    var me = this
+                    var items = []
+                    $.each(this.si_items, (index, item) => {
+                        items.push({
+                            "retail_sku": item.retail_sku,
+                            "rate": item.rate,
+                            "item_name": item.item_name,
+                            "iname": item.name
+                        })
+                    })
+
+                    var d = new frappe.ui.Dialog({
+                        title: __("Edit Price"),
+                        fields: [
+                            {
+                                "label": "Items",
+                                "fieldname": "edit_price",
+                                "fieldtype": "Table",
+                                "fields": [
+                                    {
+                                        "label": "",
+                                        "fieldname": "iname",
+                                        "fieldtype": "Data",
+                                        "read_only": 1,
+                                        "hidden": 1
+                                    },
+                                    {
+                                        "label": "Item Name",
+                                        "fieldname": "item_name",
+                                        "fieldtype": "Data",
+                                        "read_only": 1,
+                                        "in_list_view": 1
+                                    },
+                                    {
+                                        "label": "Retail SKU",
+                                        "fieldname": "retail_sku",
+                                        "fieldtype": "Data",
+                                        "read_only": 1,
+                                        "in_list_view": 1
+                                    },
+                                    {
+                                        "label": "Price",
+                                        "fieldname": "rate",
+                                        "fieldtype": "Currency",
+                                        "in_list_view": 1
+                                    }
+                                ],
+                                "data": items
+                            }
+                        ],
+                        primary_action: function(){
+                            var values = d.get_values()
+                            var valid = true
+
+                            $.each(values.edit_price, (index, item) => {
+                                $.each(me.si_items, (ind, si_item) => {
+                                    if (si_item.name === item.iname){
+                                        if (item.rate > si_item.original_price){
+                                            frappe.show_alert("Price cannot be greater than the original price")
+                                            valid = false
+                                            return
+                                        }
+                                        else{
+                                            si_item.rate = item.rate
+                                            si_item.amount_with_out_format = item.rate * si_item.qty
+                                            si_item.amount = "$ " + si_item.amount_with_out_format
+                                        }
+                                    }
+                                })
+
+                                me.updateTotals()
+                            })
+
+                            if (valid)
+                                d.hide()
+                        },
+                        primary_action_label: __("Update")
+                    })
+
+                    d.show()
                 }
             }
         })

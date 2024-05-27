@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2024-05-21 12:12:36.914209",
+ "modified": "2024-05-27 15:39:51.319566",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "manage-store-credit",
@@ -15,5 +15,5 @@
  "standard": "Yes",
  "style": null,
  "system_page": 0,
- "title": "Transfer/Create Store Credit"
+ "title": "Transfer Store Credit"
 }

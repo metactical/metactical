@@ -20,7 +20,7 @@
                         <td>{{ item.qty }}</td>
                         <td>{{ item.rate }}</td>
                         <td>{{ item.discount }}</td>
-                        <td>{{ item.amount }}</td>
+                        <td class="text-nowrap">{{ item.amount }}</td>
                     </tr>
                     <tr v-if="!items.length">
                         <td colspan="7" class="text-center">No items added / All Items are issued to store credit</td>
