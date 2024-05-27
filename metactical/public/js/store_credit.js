@@ -102,8 +102,11 @@ metactical.store_credit.StoreCredit = class {
                         me.loadSI()
                     }
                     else if (data.sales_invoice == me.current_sales_invoice){
-                        frappe.msgprint("Store Credit Processed Successfully For Sales Invoice " + data.sales_invoice)
                         me.loadSI()
+                    }
+
+                    if (!data.error){
+                        frappe.msgprint("Store Credit Processed Successfully For Sales Invoice " + data.sales_invoice)
                     }
                 })
             },
