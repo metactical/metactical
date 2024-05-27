@@ -4,9 +4,12 @@ from metactical.metactical.doctype.cycle_count.cycle_count import get_expected_q
 @frappe.whitelist()
 def get_barcodes():
 	query = """SELECT 
-					ib.barcode, ib.parent AS item_code
+					ib.barcode, ib.parent AS item_code,
+					item.ifw_retailskusuffix AS retail_sku, item.item_name
 				FROM
 					`tabItem Barcode` ib
+				LEFT JOIN
+					`tabItem` item ON item.name = ib.parent
 				WHERE
 					ib.barcode IS NOT NULL
 				GROUP BY
