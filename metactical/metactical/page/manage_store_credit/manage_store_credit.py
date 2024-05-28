@@ -7,17 +7,25 @@ def search_customer(*args, **kwargs):
         phone_number = kwargs.get('phone_number')
         email = kwargs.get('email')
 
-        filters = {}
+        # search by phone number
+        contacts_for_phone_number = []
         if phone_number:
-            filters.update({"mobile_no": ["like", "%{}%".format(phone_number)]})
+            filters = {"mobile_no": ["like", "%{}%".format(phone_number)]}
+            contacts_for_phone_number = frappe.db.get_list("Contact",
+                        filters=filters,
+                        fields=["name", "email_id", "phone", "mobile_no"]
+                    )
+
+        # search by email
+        contacts_for_email = []
         if email:
-            filters.update({"email_id": ["like", "%{}%".format(email)]})
+            filters = {"email_id": ["like", "%{}%".format(email)]}
+            contacts_for_email = frappe.db.get_list("Contact",
+                        filters=filters,
+                        fields=["name", "email_id", "phone", "mobile_no"]
+                    )
 
-        contacts = frappe.db.get_list("Contact",
-                    filters=filters,
-                    fields=["name", "email_id", "phone", "mobile_no"]
-                )
-
+        contacts = contacts_for_phone_number + contacts_for_email
         contact_names = [c.get('name') for c in contacts]
         if not contact_names:
             frappe.response["customers"] = []
@@ -63,6 +71,9 @@ def load_si(sales_invoice):
         elif sales_invoice_doc.docstatus == 0:
             frappe.throw("Sales Invoice "+sales_invoice+" is a Draft")
             return
+        elif sales_invoice_doc.status == "Unpaid":
+            frappe.throw("Sales Invoice "+sales_invoice+" is Unpaid")
+            return
 
         for item in sales_invoice_doc.items:
             retail_sku = frappe.db.get_value("Item", item.item_code, "ifw_retailskusuffix")
@@ -87,6 +98,7 @@ def load_si(sales_invoice):
                 "grand_total": sales_invoice_doc.grand_total,
                 "si_discount_amount": sales_invoice_doc.discount_amount,
                 "original_price": item.rate,
+                "original_qty": item.qty,
             })
 
         if not sales_invoice_doc.is_return:
