@@ -13,6 +13,10 @@ frappe.ui.form.on('End of Day Closing', {
 				}
 			};
 		});
+		
+		if(!frm.doc.user || frm.doc.user == ""){
+			frm.set_value("user", frappe.session.user);
+		}
 	},
 
 	user: function(frm){
