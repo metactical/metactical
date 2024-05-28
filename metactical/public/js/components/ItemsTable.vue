@@ -29,7 +29,6 @@
             </table>
         </div>
 
-    </div>
 </template>
 <script>
     export default {
@@ -38,12 +37,10 @@
             deleteItem(item_name){
                 var me = this
                 $.each(me.items, (key, value)=> {
-                    if (!value.name){
-                        return
-                    }
-                    
-                    if (item_name === value.name){
-                        me.items.splice(key, 1);
+                    if(value){
+                        if (item_name === value.name){
+                            me.items.splice(key, 1);
+                        }
                     }
                 })
 
