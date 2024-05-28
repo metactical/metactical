@@ -5,7 +5,16 @@ frappe.ui.form.on('End of Day Closing', {
 	refresh: function(frm){
 		console.log(frm);
 		frm.events.load_cash_table(frm);
+		frm.set_query("pos_profile", function() {
+			return {
+				query: "metactical.metactical.doctype.end_of_day_closing.end_of_day_closing.get_pos_profiles",
+				filters: {
+					user: frappe.session.user
+				}
+			};
+		});
 	},
+
 	user: function(frm){
 		frm.events.load_data(frm);
 	},
