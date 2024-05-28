@@ -57,12 +57,14 @@ metactical.store_credit.StoreCredit = class {
                                     v-on:keyup.enter="loadSI">
                         </div>
                         <div class="col-md-4 mb-3">
-                            <input type="text"  class="form-control" placeholder="Customer Name" readonly v-model="selected_customer">
+                            <input type="text" class="form-control" placeholder="Customer Name" readonly v-model="selected_customer">
                         </div>
                         <div class="col-md-4 mb-3">
                             <button class="btn btn-primary" @click="loadSI">Load SI</button>
-                            <button class="btn btn-primary" @click="editPrice">Edit Price</button>
+                            <button class="btn btn-primary" @click="editPrice">Edit</button>
                             <button class="btn btn-primary" @click="clearSI">Clear SI</button>
+                            <button class="btn btn-primary" v-if="Object.keys(credit_notes).length" @click="createPDF">PDF</button>
+                            <button class="btn btn-primary" v-if="Object.keys(credit_notes).length" @click="printPDF">Print</button>
                         </div>
                     </div>
 
@@ -111,21 +113,6 @@ metactical.store_credit.StoreCredit = class {
                 })
             },
             methods: {
-                submit() {
-                    frappe.call({
-                        method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.create_store_credit',
-                        args: {
-                            user: this.store_credit.user,
-                            amount: this.store_credit.amount,
-                            action: this.store_credit.action
-                        },
-                        callback: function(r) {
-                            if (r.message) {
-                                frappe.msgprint(r.message)
-                            }
-                        }
-                    })
-                },
                 customerCleared(){
                     this.item_area = "d-none"
                     this.selected_customer = ""
@@ -320,7 +307,8 @@ metactical.store_credit.StoreCredit = class {
                             "retail_sku": item.retail_sku,
                             "rate": item.rate,
                             "item_name": item.item_name,
-                            "iname": item.name
+                            "iname": item.name,
+                            "qty": item.qty
                         })
                     })
 
@@ -358,6 +346,12 @@ metactical.store_credit.StoreCredit = class {
                                         "fieldname": "rate",
                                         "fieldtype": "Currency",
                                         "in_list_view": 1
+                                    },
+                                    {
+                                        "label": "Quantity",
+                                        "fieldname": "qty",
+                                        "fieldtype": "Float",
+                                        "in_list_view": 1
                                     }
                                 ],
                                 "data": items
@@ -375,11 +369,19 @@ metactical.store_credit.StoreCredit = class {
                                             valid = false
                                             return
                                         }
+                                        else if (item.qty > si_item.original_qty){
+                                            frappe.show_alert("Quantity cannot be greater than the original quantity")
+                                            valid = false
+                                            return
+                                        }
                                         else{
                                             si_item.rate = item.rate
+                                            si_item.qty = item.qty
                                             si_item.amount_with_out_format = item.rate * si_item.qty
                                             si_item.amount = "$ " + si_item.amount_with_out_format
                                         }
+
+
                                     }
                                 })
 
@@ -393,10 +395,104 @@ metactical.store_credit.StoreCredit = class {
                     })
 
                     d.show()
+                },
+                printPDF(){
+                    var sales_invoice_to_print = ""
+                    if (Object.keys(this.credit_notes).length > 1){
+                        var prompt_fields = get_prompt_fields(Object.keys(this.credit_notes))
+                        frappe.prompt(prompt_fields, (data) => {
+                                if (data.value){
+                                    sales_invoice_to_print = data.value
+                                    print_pdf(sales_invoice_to_print, "/printview?", data.print_format)
+                                }
+                            }, __("Print Store Credit"), __("Print"))
+                    }else{
+                        var prompt_fields = get_prompt_fields(Object.keys(this.credit_notes), true)
+                        frappe.prompt(prompt_fields, (data) => {
+                            if (data.value){
+                                sales_invoice_to_print = Object.keys(this.credit_notes)[0]
+                                print_pdf(sales_invoice_to_print, "/printview?", data.print_format)
+                            }
+                        }, __("Print Store Credit"), __("Print"))
+                    }
+                },
+                createPDF(){
+                    var sales_invoice_to_print = ""
+                    if (Object.keys(this.credit_notes).length > 1){
+                        var prompt_fields = get_prompt_fields(Object.keys(this.credit_notes))
+                        frappe.prompt(prompt_fields, (data) => {
+                                if (data.value){
+                                    sales_invoice_to_print = data.value
+                                    print_pdf(sales_invoice_to_print, "/api/method/frappe.utils.print_format.download_pdf?", data.print_format)
+                                }
+                            }, __("Download Store Credit"), __("Download"))
+                    }else{
+                        var prompt_fields = get_prompt_fields(Object.keys(this.credit_notes), true)
+                        frappe.prompt(prompt_fields, (data) => {
+                            if (data.value){
+                                sales_invoice_to_print = Object.keys(this.credit_notes)[0]
+                                print_pdf(sales_invoice_to_print, "/api/method/frappe.utils.print_format.download_pdf?", data.print_format)
+                            }
+                        }, __("Download Store Credit"), __("Download"))
+                    }
                 }
             }
         })
         
         return this.vue_instance
     }
+}
+
+let print_pdf = function(sales_invoice, method, print_format="Standard"){
+
+    let w = window.open(
+        frappe.urllib.get_full_url(
+            method +
+                'doctype=' +
+                encodeURIComponent("Sales Invoice") +
+                '&name=' +
+                encodeURIComponent(sales_invoice) +
+                '&trigger_print=1' +
+                '&format=' +
+                encodeURIComponent(print_format) +
+                '&letterhead=' +
+                encodeURIComponent("")
+        )
+    );
+    if (!w) {
+        frappe.msgprint(__('Please enable pop-ups'));
+        return;
+    }
+}
+
+
+
+let get_prompt_fields = function(sales_invoices, single_store_credit = false){
+    var fields = [
+        {
+            "label": __("Sales Invoice"),
+            "fieldtype": "Select",
+            "fieldname": "value",
+            "options": sales_invoices,
+            "default": single_store_credit ? sales_invoices[0] : "",
+            "reqd": 1,
+            "read_only": single_store_credit
+        },
+        {
+            "label": __("Print Format"),
+            "fieldtype": "Link",
+            "fieldname": "print_format",
+            "options": "Print Format",
+            "default": "Custom SI - V1",
+            "get_query": function(){
+                return {
+                    "filters": {
+                        "doc_type": "Sales Invoice"
+                    }
+                }
+            }
+        }
+    ]
+
+    return fields
 }

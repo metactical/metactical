@@ -33,11 +33,11 @@
     background-color: #1e1e1e;
 }
 
-.grid-add-row{
+[data-fieldname="edit_price"] .grid-add-row{
     display: none !important;
 }
 
-.grid-body .btn-open-row{
+[data-fieldname="edit_price"] .grid-body .btn-open-row{
     display: none !important;
 }
 
