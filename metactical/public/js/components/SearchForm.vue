@@ -52,8 +52,8 @@
                             <button type="submit" class="btn btn-primary" id="search_customer">Search</button>
                         </div>
                         <div class="d-flex flex-column">
-                            <button type="button" class="btn btn-secondary mb-2" :class="item_area" @click="clearCustomer">Clear Customer</button>
-                            <button type="button" class="btn btn-secondary" @click="createCustomer">Create Customer</button>
+                            <button type="button" class="btn btn-secondary mb-2" @click="clearCustomer">Clear Customer</button>
+                            <button type="button" class="btn btn-success" @click="createCustomer">Create Customer</button>
                         </div>
                     </div>                    
                 </div>
@@ -117,17 +117,23 @@
         },
         methods: {
             searchCustomer() {
-                this.customer.phone_number =  this.phone_no.getNumber()
+                var valid = true       
+
+                // remove country code from phone number
+                this.customer.phone_number = this.phone_no.getNumber().replace("+"+this.phone_no.getSelectedCountryData().dialCode, '')
                 if (!this.customer.phone_number && !this.customer.email){
                     frappe.msgprint('Please fill the phone number or email to search')
                     return
                 }
 
-                var phone_regex = /^\+\d{7,}$/
+                var phone_regex = /^\d{7,}$/
                 if (this.customer.phone_number && phone_regex.test(this.customer.phone_number) === false){
                     $(`#search-phone_number`).addClass('is-invalid')
                     frappe.throw('Please enter a valid phone number')
                     valid = false
+                }
+                else{
+                    $(`#search-phone_number`).removeClass('is-invalid')
                 }
                 
                 var email_regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -135,6 +141,9 @@
                     $(`#search-email`).addClass('is-invalid')
                     frappe.throw('Please enter a valid email')
                     valid = false
+                }
+                else{
+                    $(`#search-email`).removeClass('is-invalid')
                 }
 
                 // change search button to loading
@@ -154,22 +163,29 @@
                         $("#create_customer").attr('disabled', false)
                         
                         if (r.success){
-                            if (r.customers.length) {
-                                me.customer.first_name = r.customers[0].first_name
-                                me.customer.last_name = r.customers[0].last_name
-                                me.customer.email = r.customers[0].email
-                                me.phone_no.setNumber(r.customers[0].phone_number)
-                                me.customer.company = r.customers[0].company
-                                me.customer.territory = r.customers[0].territory
-                                me.customer.name = r.customers[0].name
-
-                                me.$emit('customerFound', r.customers[0])
-
-                                // disable all options except British Columbia
-                                $('#search-territory option').each(function(){
-                                    if ($(this).val() != me.customer.territory)
-                                        $(this).attr('disabled', true)
-                                })
+                            if (r.customers.length == 1) {
+                                me.updateCustomer(r.customers[0])
+                            }
+                            else if (r.customers.length > 1){
+                                // let the user select customer if more than one customer found by the search
+                                frappe.prompt([
+                                    {
+                                        fieldname: 'customer',
+                                        fieldtype: 'Link',
+                                        options: 'Customer',
+                                        label: 'Select Customer',
+                                        reqd: 1,
+                                        get_query: function(){
+                                            return {
+                                                filters: {
+                                                    name: ['in', r.customers.map(c => c.name)]
+                                                }
+                                            }
+                                        }
+                                    }
+                                ], (values) => {
+                                    me.updateCustomer(r.customers.find(c => c.name == values.customer))
+                                }, 'Search Results', 'Select')
                             }
                             else{
                                 me.customer.territory = "British Columbia"
@@ -183,6 +199,17 @@
                 })
 
                 this.$emit('search', this.customer)
+            },
+            updateCustomer(customer){
+                this.customer.first_name = customer.first_name
+                this.customer.last_name = customer.last_name
+                this.customer.email = customer.email
+                this.phone_no.setNumber(customer.phone_number)
+                this.customer.company = customer.company
+                this.customer.territory = customer.territory
+                this.customer.name = customer.name
+
+                this.$emit('customerFound', customer)
             },
             clearCustomer() {
                 this.customer.first_name = ""
@@ -252,7 +279,7 @@
                     // regex to check phone number that starts with + and must more than 8 digits
                     var phone_regex = /^\+\d{7,}$/
 
-                    if (!value){
+                    if (!value && key !== 'company'){
                         $(`#search-${key}`).addClass('is-invalid')
                         valid = false
                     }
