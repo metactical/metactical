@@ -49,6 +49,7 @@ doctype_js = {
 	"Task": "custom_scripts/task/task.js",
 	"Warehouse": "custom_scripts/warehouse/warehouse.js",
 	"Contact": "custom_scripts/contact/contact.js",
+	"Warehouse": "custom_scripts/warehouse/warehouse.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
