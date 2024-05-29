@@ -277,3 +277,10 @@ def create_customer(**kwargs):
         frappe.response["success"] = False
         frappe.log_error(title="Create Customer Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.db.rollback()
+
+@frappe.whitelist()
+def create_pdf(sales_invoice, print_format="Standard"):
+    pdf = frappe.get_print("Sales Invoice", sales_invoice, print_format, as_pdf=True)
+    frappe.local.response.filename = "{}.pdf".format(sales_invoice)
+    frappe.local.response.filecontent = pdf
+    frappe.local.response.type = "download"
