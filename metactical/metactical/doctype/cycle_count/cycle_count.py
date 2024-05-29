@@ -26,6 +26,13 @@ class CycleCount(Document):
 		if hasattr(doc, "items"):
 			doc.submit()
 
+	def validate(self):
+		for row in self.items:
+			if row.get("expected_qty") is None:
+				expected = get_expected_qty(row.item_code, self.warehouse)
+				row.expected_qty = expected.get("actual_qty")
+				row.valuation_rate = expected.get("valuation_rate")
+
 @frappe.whitelist()
 def get_expected_qty(item_code, warehouse):
 	expected = frappe.db.sql('''SELECT actual_qty, valuation_rate FROM `tabBin` 

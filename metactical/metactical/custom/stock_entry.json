@@ -849,14 +849,14 @@
    "_comments": null,
    "_liked_by": null,
    "_user_tags": null,
-   "creation": "2023-03-24 14:30:52.183115",
+   "creation": "2024-05-08 08:25:02.600679",
    "default_value": null,
    "doc_type": "Stock Entry",
    "docstatus": 0,
    "doctype_or_field": "DocType",
    "field_name": null,
    "idx": 0,
-   "modified": "2023-03-24 14:30:52.183115",
+   "modified": "2024-05-08 08:25:02.600679",
    "modified_by": "Administrator",
    "name": "Stock Entry-main-links_order",
    "owner": "Administrator",
@@ -866,7 +866,7 @@
    "property": "links_order",
    "property_type": "Small Text",
    "row_name": null,
-   "value": "[\"f32ddedbd6\"]"
+   "value": "[\"230ae01550\"]"
   },
   {
    "_assign": null,

@@ -132,13 +132,13 @@
   },
   {
    "fieldname": "bank_institution_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "Bank Institution No.",
    "length": 3
   },
   {
    "fieldname": "bank_transit_no",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "Bank Transit No.",
    "length": 5
   },
@@ -242,7 +242,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-05-03 09:43:23.356417",
+ "modified": "2024-05-03 07:26:48.690951",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Employee Sign Up",
