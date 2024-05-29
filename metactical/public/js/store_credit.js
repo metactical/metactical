@@ -423,7 +423,7 @@ metactical.store_credit.StoreCredit = class {
                         frappe.prompt(prompt_fields, (data) => {
                                 if (data.value){
                                     sales_invoice_to_print = data.value
-                                    print_pdf(sales_invoice_to_print, "/api/method/frappe.utils.print_format.download_pdf?", data.print_format)
+                                    create_pdf(sales_invoice_to_print, data.print_format)
                                 }
                             }, __("Download Store Credit"), __("Download"))
                     }else{
@@ -431,7 +431,7 @@ metactical.store_credit.StoreCredit = class {
                         frappe.prompt(prompt_fields, (data) => {
                             if (data.value){
                                 sales_invoice_to_print = Object.keys(this.credit_notes)[0]
-                                print_pdf(sales_invoice_to_print, "/api/method/frappe.utils.print_format.download_pdf?", data.print_format)
+                                create_pdf(sales_invoice_to_print, data.print_format)
                             }
                         }, __("Download Store Credit"), __("Download"))
                     }
@@ -442,6 +442,15 @@ metactical.store_credit.StoreCredit = class {
         return this.vue_instance
     }
 }
+
+let create_pdf = function(sales_invoice, print_format="Standard"){
+    open_url_post("/api/method/metactical.metactical.page.manage_store_credit.manage_store_credit.create_pdf",{
+        sales_invoice: sales_invoice,
+        print_format: print_format
+    
+    })
+}
+
 
 let print_pdf = function(sales_invoice, method, print_format="Standard"){
 
