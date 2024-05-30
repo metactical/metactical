@@ -24,5 +24,5 @@ frappe.ui.form.on("Warehouse", {
       });
     }, __("Export"));
   },
-  
+
 });

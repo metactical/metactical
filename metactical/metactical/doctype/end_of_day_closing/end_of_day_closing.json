@@ -38,7 +38,6 @@
  ],
  "fields": [
   {
-   "default": "frappe.session.user",
    "fieldname": "user",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -223,7 +222,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-05-14 17:31:13.145799",
+ "modified": "2024-05-28 12:00:20.645015",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "End of Day Closing",
