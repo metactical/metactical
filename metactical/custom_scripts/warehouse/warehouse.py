@@ -114,9 +114,6 @@ def get_item_details2(item, suppliers=None):
 	currency = "N/A"
 	suppliers_list = [supplier.get("supplier") for supplier in suppliers]
 
-	if len(suppliers) > 1:
-		print(item)
-
 	if suppliers:
 		# get price list for the supplier
 		for supplier in suppliers:
