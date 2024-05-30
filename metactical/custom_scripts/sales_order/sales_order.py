@@ -12,6 +12,8 @@ from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from frappe.model.utils import get_fetch_values
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.accounts.party import get_party_account
+from frappe import _, msgprint
+from metactical.custom_scripts.utils.metactical_utils import queue_action
 
 class SalesOrderCustom(SalesOrder):
 	def validate(self):
@@ -26,8 +28,18 @@ class SalesOrderCustom(SalesOrder):
 				reserved_qty = frappe.db.get_value('Bin', {'item_code': row.item_code, 
 					'warehouse': row.warehouse}, 'reserved_qty')
 				row.update({'sal_reserved_qty': reserved_qty})
-			
 
+	def submit(self):
+		if len(self.items) > 25:
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			self._submit()
+			
 @frappe.whitelist()
 def save_cancel_reason(**args):
 	args = frappe._dict(args)

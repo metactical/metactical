@@ -84,6 +84,7 @@ def export_inventory(warehouse):
 				data.append([d.name, d.retail_sku, d.item_name, d.actual_qty - d.reserved_qty, item_cost, supplier[0].get("supplier_part_no")])
 			else:
 				data.append([d.name, d.retail_sku, d.item_name, d.actual_qty - d.reserved_qty, "N/A", "N/A"])
+
 		xlsx_file = make_xlsx(data, warehouse + " inventory").getvalue()
 
 		# save xlsx file
