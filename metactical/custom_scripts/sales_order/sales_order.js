@@ -158,16 +158,20 @@ frappe.ui.form.on('Sales Order', {
 		// confirm item availability
 		var items = cur_frm.doc.items
 		var flag = 0;
-		var item_flag = "";
+		var item_flag = [];
 		var proceed = true;
 		items.forEach(function(row){
+
 			if (row.ais_is_stock_item == 1 && (row.actual_qty - (row.qty + row.sal_reserved_qty)) < 0) {
 				flag = 1;
-				item_flag = row.item_code;
+				item_flag.push(row.item_code);
 				proceed = false;
 			}
 		});
+
+
 		if (flag == 1) {
+			item_flag = item_flag.join(', ');
 			frappe.confirm(
 				'Warning: Insufficient stock for Item ' + item_flag + '. Do you want to proceed anyway?',
 				function(){

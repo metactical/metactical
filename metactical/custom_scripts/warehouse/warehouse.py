@@ -33,6 +33,7 @@ def export_items_with_their_price_list_to_excel(warehouse):
 			for d in bins:
 				# default supplier 
 				qty = d.get("actual_qty") - d.get("reserved_qty")
+
 				suppliers = frappe.db.get_list("Item Supplier", {"parent": d.get("item_code")}, ["supplier", "supplier_part_no"], order_by="idx asc")
 				item_cost = get_item_details2(d.get("item_code"), suppliers)
 
