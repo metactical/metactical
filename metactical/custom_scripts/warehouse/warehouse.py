@@ -15,7 +15,7 @@ def export_items_with_their_price_list_to_excel(warehouse):
 		bins = ["test"]
 
 		# Retail sku | Item name | Supplier price list cost | Supplier price list currency | RET - Camo - FRN
-		data = [["Retail SKU", "Item Name", "Supplier Price List Cost", "Supplier Price List Currency", "RET - CamoFRN"]]
+		data = [["Retail SKU", "Item Name", "Supplier Price List Cost", "Supplier Price List Currency", "RET - CamoFRN - USD", "QOH"]]
 
 		while len(bins) > 0:
 			bins = frappe.db.sql("""
@@ -32,13 +32,15 @@ def export_items_with_their_price_list_to_excel(warehouse):
 
 			for d in bins:
 				# default supplier 
+				qty = d.get("actual_qty") - d.get("reserved_qty")
+
 				suppliers = frappe.db.get_list("Item Supplier", {"parent": d.get("item_code")}, ["supplier", "supplier_part_no"], order_by="idx asc")
 				item_cost = get_item_details2(d.get("item_code"), suppliers)
 
 				if suppliers:
-					data.append([d.retail_sku, d.item_name, item_cost[0], item_cost[1], item_cost[2]])
+					data.append([d.retail_sku, d.item_name, item_cost[0], item_cost[1], item_cost[2], qty])
 				else:
-					data.append([d.retail_sku, d.item_name, "N/A", "N/A", item_cost[2]])
+					data.append([d.retail_sku, d.item_name, "N/A", "N/A", item_cost[2], qty])
 
 			start += limit
 
@@ -146,7 +148,7 @@ def get_item_details2(item, suppliers=None):
 					min_rate_supplier = supplier
 					currency = item_price[0].get("currency")
 
-	camo_frn_price = frappe.db.get_value("Item Price", {"item_code": item, "price_list": "RET - CamoFRN"}, "price_list_rate")
+	camo_frn_price = frappe.db.get_value("Item Price", {"item_code": item, "price_list": "RET - CamoFRN - USD"}, "price_list_rate")
 	if not camo_frn_price:
 		camo_frn_price = "N/A"
 	
