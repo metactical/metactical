@@ -27,7 +27,7 @@ def get_data(filters):
 			LEFT JOIN 
 				`tabItem` ON `tabItem`.item_code = `tabBin`.item_code
 			WHERE 
-				warehouse = %s
+				warehouse = %s AND actual_qty > 0
 			LIMIT %s OFFSET %s
 		""", (warehouse, limit, start), as_dict=1)
 
