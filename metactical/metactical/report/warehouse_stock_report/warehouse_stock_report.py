@@ -27,7 +27,7 @@ def get_data(filters):
 			LEFT JOIN 
 				`tabItem` ON `tabItem`.item_code = `tabBin`.item_code
 			WHERE 
-				warehouse = %s
+				warehouse = %s AND actual_qty > 0
 			LIMIT %s OFFSET %s
 		""", (warehouse, limit, start), as_dict=1)
 
@@ -47,12 +47,12 @@ def get_cycle_counted(warehouse):
 			LEFT JOIN
 				`tabCycle Count` AS cycle ON cycle.name = item.parent
 			WHERE
-				cycle.warehouse = %(warehouse)s AND cycle.modified >= '2024-05-17 00:00:00'
+				cycle.warehouse = %(warehouse)s AND CAST(cycle.creation AS DATE) >= '2024-05-17'
 				AND cycle.docstatus <> 2
 			""", {"warehouse": warehouse}, as_dict=1)
 	for row in data:
 		items.append(row.item_code)
-	return data
+	return items
 	
 
 def get_columns():
