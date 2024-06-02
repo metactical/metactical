@@ -11,12 +11,13 @@ def execute(filters=None):
 
 def get_data(filters):
 	warehouse = filters.get("warehouse")
+	cycle_date = filters.get("cycle_date")
 	limit = 500
 	start = 0
 	bins = ["Start"]
 	data = []
 
-	excluded_items = get_cycle_counted(warehouse)
+	excluded_items = get_cycle_counted(warehouse, cycle_date)
 
 	while len(bins) > 0:
 		bins = frappe.db.sql("""
@@ -37,7 +38,7 @@ def get_data(filters):
 		start += limit
 	return data
 
-def get_cycle_counted(warehouse):
+def get_cycle_counted(warehouse, cycle_date):
 	items = []
 	data = frappe.db.sql("""
 			SELECT
@@ -47,9 +48,9 @@ def get_cycle_counted(warehouse):
 			LEFT JOIN
 				`tabCycle Count` AS cycle ON cycle.name = item.parent
 			WHERE
-				cycle.warehouse = %(warehouse)s AND CAST(cycle.creation AS DATE) >= '2024-05-17'
+				cycle.warehouse = %(warehouse)s AND CAST(cycle.creation AS DATE) >= %(cycle_date)s
 				AND cycle.docstatus <> 2
-			""", {"warehouse": warehouse}, as_dict=1)
+			""", {"warehouse": warehouse, "cycle_date": cycle_date}, as_dict=1)
 	for row in data:
 		items.append(row.item_code)
 	return items
@@ -57,6 +58,13 @@ def get_cycle_counted(warehouse):
 
 def get_columns():
 	columns = [
+		{
+			"fieldname": "item_code",
+			"label": "ERP SKU",
+			"fieldtype": "Link",
+			"options": "Item",
+			"width": 150
+		},
 		{
 			"fieldname": "retail_sku",
 			"label": "Retail SKU",
