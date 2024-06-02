@@ -24,6 +24,16 @@ def import_csv(doc_name):
 
 	log_message = ""
 	members_list = []
+<<<<<<< HEAD
+
+	for row in csv_json:
+		members = row.get("Members").split(",") if row.get("Members") else []
+		members_list.extend(members)
+	
+	# unique members
+	members_list = list(set(members_list))
+	project = frappe.db.exists("Project", {"project_name": row.get("Board Name")})
+=======
 	board_name = ""
 
 	for row in csv_json:
@@ -35,6 +45,7 @@ def import_csv(doc_name):
 		frappe.throw("Board name not found in the file")
 
 	project = frappe.db.exists("Project", {"project_name": board_name})
+>>>>>>> 3dada9aa9d18597fd4f3fd4b5ab2ad9909bed0e6
 
 	if not project:
 		project = frappe.new_doc("Project")
@@ -43,7 +54,11 @@ def import_csv(doc_name):
 		frappe.db.commit()
 	
 		log_message += f"Project {row.get('Board Name')} created\n"
+<<<<<<< HEAD
+
+=======
 	
+>>>>>>> 3dada9aa9d18597fd4f3fd4b5ab2ad9909bed0e6
 	tasks_list = []
 	# create queue for 50 tasks at a time
 	for row in csv_json:
@@ -85,8 +100,11 @@ def create_tasks(tasks_list, project, doc):
 			if list_name not in status_mapping:
 				if list_name.startswith("doing"):
 					task.status = "Working"
+<<<<<<< HEAD
+=======
 				elif list_name.startswith("done"):
 					task.status = "Completed"
+>>>>>>> 3dada9aa9d18597fd4f3fd4b5ab2ad9909bed0e6
 				else:
 					task.status = "Open"
 			else:
@@ -102,6 +120,10 @@ def create_tasks(tasks_list, project, doc):
 		
 			if row.get("Attachment Links"):
 				# create attachment for each attachment
+<<<<<<< HEAD
+				# get the last item from attachments list
+=======
+>>>>>>> 3dada9aa9d18597fd4f3fd4b5ab2ad9909bed0e6
 				attachment_doc = frappe.new_doc("File")
 				attachment_doc.file_url = row["Attachment Links"]
 				attachment_doc.folder = "Home/Attachments"
@@ -127,10 +149,13 @@ def create_tasks(tasks_list, project, doc):
 					log_message += f"Task {task.subject} assigned to {todo.owner}\n"
 					frappe.db.commit()
 
+<<<<<<< HEAD
+=======
 	existing_log_message = frappe.db.get_value("Trello Data Import", doc.name, "log") 
 	if existing_log_message:
 		log_message = existing_log_message + log_message
 
+>>>>>>> 3dada9aa9d18597fd4f3fd4b5ab2ad9909bed0e6
 	frappe.db.set_value("Trello Data Import", doc.name, "log",  log_message, update_modified=False)
 	frappe.db.commit()
 

@@ -1,0 +1,156 @@
+[
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:37:30.598955",
+  "name": "Alberta",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Alberta"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:37:55.434977",
+  "name": "British Columbia",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "British Columbia"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:38:05.184640",
+  "name": "Manitoba",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Manitoba"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:38:13.756027",
+  "name": "New Brunswick",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "New Brunswick"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:38:28.554844",
+  "name": "Newfoundland and Labrador",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Newfoundland and Labrador"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:38:38.830675",
+  "name": "Nova Scotia",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Nova Scotia"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:38:48.888469",
+  "name": "Ontario",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Ontario"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:38:56.803503",
+  "name": "Prince Edward Island",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Prince Edward Island"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:39:04.176807",
+  "name": "Quebec",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Quebec"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:39:09.721834",
+  "name": "Saskatchewan",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Saskatchewan"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:39:19.070281",
+  "name": "Northwest Territories",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Northwest Territories"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:39:26.222730",
+  "name": "Nunavut",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Nunavut"
+ },
+ {
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:39:47.363808",
+  "name": "Yukon",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "Yukon"
+ },
+ {
+  "country": "Australia",
+  "docstatus": 0,
+  "doctype": "Provinces",
+  "modified": "2024-05-21 09:44:34.506208",
+  "name": "aaa",
+  "parent": null,
+  "parentfield": null,
+  "parenttype": null,
+  "province": "aaa"
+ }
+]
