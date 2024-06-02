@@ -16,7 +16,10 @@ frappe.query_reports["Price Lists - V1"] = {
 						frappe.query_report.set_filter_value('purchase_order', []);
 						frappe.query_report.set_filter_value('supplier', frappe.query_report.get_filter_value('supplier'));
 					}
+
 				}
+				
+				frappe.query_report.refresh();
 			}
 		},
 		{
@@ -29,6 +32,9 @@ frappe.query_reports["Price Lists - V1"] = {
 				if (frappe.query_report.get_filter_value('purchase_order')){
 					if (frappe.query_report.get_filter_value('supplier'))
 						frappe.query_report.set_filter_value('supplier', "");
+
+					if (!frappe.query_report.get_filter_value('supplier'))
+						frappe.query_report.refresh();
 				}
 			},
 			get_data: function(txt) {
@@ -45,7 +51,6 @@ frappe.query_reports["Price Lists - V1"] = {
 					"name": ["like", "RET%"]
 				});
 			},
-			on_change: () => {}
 		}
 	]
 };
