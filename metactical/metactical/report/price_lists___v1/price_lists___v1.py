@@ -23,7 +23,6 @@ def execute(filters=None):
 
 			# remove duplicates from supplier_price_list
 			supplier_price_list = list(set(supplier_price_list)) 
-
 			price_lists += supplier_price_list
 
 	columns = get_columns(price_lists, supplier_price_list)
@@ -83,12 +82,7 @@ def get_data(supplier, purchase_orders, price_lists, supplier_price_list=None):
 		if item["item_code"] in item_prices_dict:
 			for price_list in price_lists:			
 				price_list_column = price_list.lower().replace("-", "").replace("  ", "_").replace(" ", "_")
-
 				data[-1][price_list_column] = item_prices_dict[item["item_code"]].get(price_list, "")
-
-		# Add supplier price list if not present
-		if not supplier_price_list:
-			data[-1]["sup_supplier_price_list"] = item_prices_dict[item["item_code"]].get(supplier_price_list, "")
 
 	return data
 

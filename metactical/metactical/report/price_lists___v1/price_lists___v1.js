@@ -45,9 +45,7 @@ frappe.query_reports["Price Lists - V1"] = {
 					"name": ["like", "RET%"]
 				});
 			},
-			on_change: () => {
-				
-			}
+			on_change: () => {}
 		}
 	]
 };
