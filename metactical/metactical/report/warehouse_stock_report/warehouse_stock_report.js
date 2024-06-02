@@ -10,6 +10,13 @@ frappe.query_reports["Warehouse Stock Report"] = {
 			"fieldtype": "Link",
 			"options": "Warehouse",
 			"reqd": 1
+		},
+		{
+			"fieldname": "cycle_date",
+			"fieldtype": "Date",
+			"label": __("From Cycle Count Date"),
+			"default": frappe.datetime.get_today(),
+			"reqd": 1
 		}
 	]
 };
