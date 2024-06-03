@@ -113,8 +113,9 @@ def execute(filters=None):
 			suggested_item_class = "N"
 		elif i.get("item_code") in zero_sales:
 			suggested_item_class = "D"
-		elif i.get("item_code") in item_classes:
-			suggested_item_class = item_classes.get(i.get("item_code"))
+		elif i.get("supplier") in item_classes:
+			if i.get("item_code") in item_classes.get(i.get("supplier")):
+				suggested_item_class = item_classes.get(i.get("supplier")).get(i.get("item_code"))
 
 		row["suggested_item_class"] = suggested_item_class
 		row["previous_year_sale"] = 0
@@ -144,7 +145,7 @@ def execute(filters=None):
 		row["sold_online"] = 0
 		row["sold_in_store"] = 0
 
-		two_years_ago = today - relativedelta(years=2)
+		years_ago = today - relativedelta(years=years_to_subtract)
 		for d in sales_data:
 			posting_date = getdate(d.get("posting_date"))
 			qty = d.get("qty")
@@ -155,13 +156,12 @@ def execute(filters=None):
 			elif posting_date.year == current_year:
 				row["total"] += qty
 
-			if posting_date >= two_years_ago:
-				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
-
-			last12_month_date = today - relativedelta(years=years_to_subtract)
-			
+			last12_month_date = today - relativedelta(years=1)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
+			
+			if posting_date >= years_ago:
+				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
 				#For sold online and in store
 				if d.get("source") is not None and d.get("source") != "" and d.get('source').split()[0].strip() == "Website":
 					row["sold_online"] += qty
@@ -281,31 +281,6 @@ def get_inventory_turnover(beginning_inventory, ending_inventory, start_date, sa
 			total += d.get("net_amount")
 
 	return ((total / average_inventory) if average_inventory > 0 else 0 ) * 100 / 100
-
-# def get_suggested_item_class(item_code, sales_data, warehouse=None):
-# 	filters = {"item_code": item_code}
-
-# 	if warehouse:
-# 		filters["warehouse"] = warehouse
-
-# 	# get last month start date
-# 	today = getdate(nowdate())
-# 	month_before = today - relativedelta(months=1)
-	
-# 	beginning_inventory, ending_inventory = get_begining_ending_inventory(item_code, warehouse, month_before, today)
-# 	inventory_turnover = get_inventory_turnover(beginning_inventory, ending_inventory, month_before, sales_data)
-	
-# 	if inventory_turnover < 1:
-# 		return "A"
-# 	elif inventory_turnover < 2:
-# 		return "B"
-# 	elif inventory_turnover < 3:
-# 		return "C"
-# 	elif inventory_turnover < 4:
-# 		return "D"
-# 	else:
-# 		return "E"
-	
 
 def get_stock_out_days(item_code, years_before, filters):
 	warehouse_filter = ""
@@ -968,6 +943,7 @@ def generate_item_clases(suppliers):
 	overall_total_sales = 0
 	zero_sell_items = []
 	items_with_sales = {}
+	supplier_item_class = {}
 	items_classification = {}
 
 	for s in suppliers:
@@ -998,8 +974,8 @@ def generate_item_clases(suppliers):
 		# D: 0% of the total sales
 
 		items_classification = classify_items(items_with_sales, overall_total_sales)
-	
-	return items_classification, zero_sell_items
+		supplier_item_class[s] = items_classification
+	return supplier_item_class, zero_sell_items
 
 def classify_items(items_with_sales, overall_total_sales):
 	# sort items by total sales
