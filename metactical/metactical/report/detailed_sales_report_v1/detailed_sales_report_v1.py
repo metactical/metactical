@@ -10,6 +10,7 @@ from frappe.utils import getdate, nowdate
 from dateutil.relativedelta import relativedelta
 from datetime import timedelta, datetime
 from operator import itemgetter
+from frappe.desk.query_report import generate_report_result, get_report_doc
 import requests
 
 def execute(filters=None):
@@ -20,6 +21,7 @@ def execute(filters=None):
 	columns = get_column(filters,conditions)
 	data = []
 
+	item_classes, zero_sales = generate_item_clases(filters.supplier)
 	master = get_master(conditions,filters)
 	
 	#Get US data
@@ -31,6 +33,8 @@ def execute(filters=None):
 	total = 0
 	for i in master:		
 		row = {}
+		warehouse = None if filters.get('reference_warehouse') == 'Total QOH' else filters.get('reference_warehouse')
+
 		row["ifw_retailskusuffix"] = i.get("ifw_retailskusuffix")
 		row["item_name"] = i.get("item_name")
 		row["item_code"] = i.get("item_code")
@@ -54,7 +58,6 @@ def execute(filters=None):
 		row["barcode"] = frappe.db.get_value("Item Barcode", {"parent": i.get("item_code")}, "barcode")
 
 		row["asi_item_class"] = i.get("asi_item_class")
-
 		row["item_image"] =  "<a target="+str("_blank")+" href = "+str(i.get("image"))+"> "+str(i.get("image"))+" </a>"   
 
 		row["rate"] = get_item_details(i.get("item_code"), "Selling")
@@ -91,7 +94,7 @@ def execute(filters=None):
 			row["total_actual_qty"] += row.get("wh_edm")
 		if row.get("wh_gor") > 0:
 			row["total_actual_qty"] += row.get("wh_gor")
-		warehouse = None if filters.get('reference_warehouse') == 'Total QOH' else filters.get('reference_warehouse')
+
 		row["material_request"], row['mr_status'], row['mr_total_qty'] = get_open_material_request(i.get("item_code"), warehouse)
 		row["tag"] = get_tags(i.get("item_code"))
 		expected_pos = get_purchase_orders(i.get("item_code"), i.get("supplier"))
@@ -101,7 +104,19 @@ def execute(filters=None):
 		ordered_qty = get_open_po_qty(i.get("item_code"), i.get("supplier"), warehouse)
 		row["ordered_qty"] = ordered_qty or 0.0
 		row["last_sold_date"], row['olast_sold_date'] = get_date_last_sold(i.get("item_code"))
+
 		sales_data = get_total_sold(i.get("item_code"))
+
+		suggested_item_class = ""
+		# if item is created in the last 1 month and has no sales, class is "N"
+		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=1):
+			suggested_item_class = "N"
+		elif i.get("item_code") in zero_sales:
+			suggested_item_class = "D"
+		elif i.get("item_code") in item_classes:
+			suggested_item_class = item_classes.get(i.get("item_code"))
+
+		row["suggested_item_class"] = suggested_item_class
 		row["previous_year_sale"] = 0
 		row["total"] = 0
 		row["last_twelve_months"] = 0
@@ -183,22 +198,18 @@ def execute(filters=None):
 		row["no_cust_l12m"] = get_unique_customers_bought_an_item(i.get("item_code"), years_before)
 
 		# beginning and ending inventory
-		row["beginning_inventory"] = get_inventory(i.get("item_code"), filters.reference_warehouse, "beginning")
-		row["ending_inventory"] = get_inventory(i.get("item_code"), filters.reference_warehouse, "ending")
+		row["beginning_inventory"], row["ending_inventory"] = get_inventory(i.get("item_code"), warehouse)
 
-		# inventory turnover		
-		average_inventory = (row["beginning_inventory"] + row["ending_inventory"]) / 2
-		fromdate = str(today.year)+"-"+str(today.month)+"-01"
-		for sd in sales_data:
-			if getdate(sd.get("posting_date")) >= getdate(fromdate):
-				total += sd.get("net_amount")
+		# inventory turnover	
+		# # get january 1st of the year
+		start_date = getdate(str(datetime(today.year, 1, 1)))	
+		row["inventory_turnover"] = get_inventory_turnover(row["beginning_inventory"], row["ending_inventory"], start_date, sales_data)
+
+		row["lead_time_in_days"] = frappe.db.get_value("Supplier", i.get("supplier"), "lead_time_in_days")
+
+		# order frequencies
+		order_frqs, ordered_quantities = get_order_frequency(i.get("item_code"), years_before)
 		
-		row["inventory_turnover"] = total / average_inventory if average_inventory > 0 else 0
-
-		row["lead_time_in_days"] = i.get("lead_time_days")
-
-		# order frequency for the last 12 months
-		order_frqs = get_order_frequency(i.get("item_code"), years_before)
 		today = getdate(nowdate())
 		last_month = getdate(str(datetime(today.year-years_to_subtract, today.month,today.day)))
 		while last_month <= today:
@@ -210,20 +221,24 @@ def execute(filters=None):
 					row[frappe.scrub("ord_freq"+month+str(last_month.year))] = d[1]
 			last_month = last_month + relativedelta(months=1)
 
-		# get list of order frequency for the last 12 months
-		order_freq_list = [d[1] for d in order_frqs]
+		# remove the biggest and smallest values from the list then get the average
+		order_frqs = sorted(order_frqs, key=itemgetter(1))
+		if len(order_frqs) <= 2:
+			row["average_order_frequency"] = 0
+		else:
+			order_frqs = order_frqs[1:-1]
+			row["average_order_frequency"] = round(sum([d[1] for d in order_frqs])/len(order_frqs), 0)
 
-		if len(order_freq_list) < 12:
-			# fill the missing months with 0
-			for n in range(12 - len(order_freq_list)):
-				order_freq_list.append(0)
-
+		
 		# remove the biggest and smallest values from the list 
 		# if the biggest and smallest values appear more than once, remove only one of them
-		order_freq_list = sorted(order_freq_list)
-		order_freq_list = order_freq_list[1:-1]
-	
-		row["average_order_qty_last_twelve_months"] = round(sum(order_freq_list)/12, 2) if len(order_frqs) > 0 else 0
+		# calucuation is based on months that have order only
+		if len(ordered_quantities) <= 2:
+			row["average_order_qty_last_twelve_months"] = 0
+		elif len(ordered_quantities) > 2:
+			ordered_quantities = sorted(ordered_quantities)
+			ordered_quantities = ordered_quantities[1:-1]
+			row["average_order_qty_last_twelve_months"] = round(sum(ordered_quantities)/len(ordered_quantities), 0) 
 		
 		discount_percentages = get_discount_percentages(i.get("item_code"), years_before)
 		row["average_discount_last_twelve_months"] = sum(discount_percentages) / len(discount_percentages) if len(discount_percentages) > 0 else 0
@@ -237,10 +252,10 @@ def execute(filters=None):
 		row["erpnext_template"] = i.get("variant_of")
 
 		# motnhly stock
-		monthly_consumption = get_monthly_consumption(i.get("item_code"), filters, sales_data)
-		
-		average_montly_consumption = sum(monthly_consumption) / len(monthly_consumption) if len(monthly_consumption) > 0 else 0
-		row["monthly_stock"] = (row["total_actual_qty"] + row["us_qoh"])/average_montly_consumption if average_montly_consumption > 0 else row["total_actual_qty"]
+		average_monthly_consumption_12, average_monthly_consumption_24 = get_monthly_consumption(i.get("item_code"), filters, sales_data)
+
+		row["monthly_stock_12m"] = (row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_12 if average_monthly_consumption_12 > 0 else row["total_actual_qty"]
+		row["monthly_stock_24m"] = (row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24 if average_monthly_consumption_24 > 0 else row["total_actual_qty"]
 
 		# NoStockOut12M
 		row["no_stock_out_12m"] = get_stock_out_days(i.get("item_code"), years_before, filters)
@@ -257,6 +272,41 @@ def execute(filters=None):
 	data = sorted(data, key=itemgetter("olast_sold_date"), reverse=True)
 
 	return columns, data
+
+def get_inventory_turnover(beginning_inventory, ending_inventory, start_date, sales_data):
+	average_inventory = (beginning_inventory + ending_inventory) / 2
+
+	total = 0
+	for d in sales_data:
+		if d.get("posting_date") >= start_date:
+			total += d.get("net_amount")
+
+	return ((total / average_inventory) if average_inventory > 0 else 0 ) * 100 / 100
+
+# def get_suggested_item_class(item_code, sales_data, warehouse=None):
+# 	filters = {"item_code": item_code}
+
+# 	if warehouse:
+# 		filters["warehouse"] = warehouse
+
+# 	# get last month start date
+# 	today = getdate(nowdate())
+# 	month_before = today - relativedelta(months=1)
+	
+# 	beginning_inventory, ending_inventory = get_begining_ending_inventory(item_code, warehouse, month_before, today)
+# 	inventory_turnover = get_inventory_turnover(beginning_inventory, ending_inventory, month_before, sales_data)
+	
+# 	if inventory_turnover < 1:
+# 		return "A"
+# 	elif inventory_turnover < 2:
+# 		return "B"
+# 	elif inventory_turnover < 3:
+# 		return "C"
+# 	elif inventory_turnover < 4:
+# 		return "D"
+# 	else:
+# 		return "E"
+	
 
 def get_stock_out_days(item_code, years_before, filters):
 	warehouse_filter = ""
@@ -304,7 +354,7 @@ def has_stock_out(date, warehouse, item_code):
 	# check if the item has stock out on other warehouses too
 	# the code below checks the final entry of the item in other warehouses before the stock out date including the stock out date
 	# if the final entry has a positive quantity, then the item was not stock out
-	# if the final entry has a zero quantity, then the item was stock out 
+	# if the final entry has a zero quantity, then the item was stock out
 
 	data = frappe.db.sql("""
 			SELECT t.* 
@@ -387,6 +437,13 @@ def get_column(filters,conditions):
 			{
 				"label": _("ItemClass"),
 				"fieldname": "asi_item_class",
+				"fieldtype": "Data",
+				"width": 150,
+				"align": "left",
+			},
+			{
+				"label": _("SuggestedClass"),
+				"fieldname": "suggested_item_class",
 				"fieldtype": "Data",
 				"width": 150,
 				"align": "left",
@@ -742,20 +799,23 @@ def get_column(filters,conditions):
 		{
 			"label": _("BegInvt"),
 			"fieldname": "beginning_inventory",
-			"fieldtype": "Int",
-			"width": 140
+			"fieldtype": "Float",
+			"width": 140,
+			"precision": 2
 		},
 		{
 			"label": _("EndInvt"),
 			"fieldname": "ending_inventory",
-			"fieldtype": "Int",
-			"width": 140
+			"fieldtype": "Float",
+			"width": 140,
+			"precision": 2
 		},
 		{
 			"label": _("InvtTOV"),
 			"fieldname": "inventory_turnover",
-			"fieldtype": "Int",
-			"width": 140
+			"fieldtype": "Float",
+			"width": 140,
+			"precision": 1
 		},
 		{
 			"label": _("LT"),
@@ -779,9 +839,16 @@ def get_column(filters,conditions):
 
 	columns.extend([
 		{
+			"label": _(f"AverageOrderFreq{filters.sales_data_period}M"),
+			"fieldname": "average_order_frequency",
+			"fieldtype": "Int",
+			"width": 140,
+			"precision": 2
+		},
+		{
 			"label": _(f"AvrgOrderQty{filters.sales_data_period}M"),
 			"fieldname": "average_order_qty_last_twelve_months",
-			"fieldtype": "Float",
+			"fieldtype": "Int",
 			"precision": 2,
 			"width": 140
 		},
@@ -813,8 +880,15 @@ def get_column(filters,conditions):
 
 		},
 		{
-			"label": "MthStck",
-			"fieldname": "monthly_stock",
+			"label": "MthStck12M",
+			"fieldname": "monthly_stock_12m",
+			"fieldtype": "Float",
+			"width": 100,
+			"precision": 2
+		},
+		{
+			"label": "MthStck24M",
+			"fieldname": "monthly_stock_24m",
 			"fieldtype": "Float",
 			"width": 100,
 			"precision": 2
@@ -865,7 +939,7 @@ def get_master(conditions="", filters={}):
 				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
 				s.ifw_supplier_qoh, i.stock_uom, i.purchase_uom, i.lead_time_days,
 				i.min_order_qty, i.safety_stock, i.variant_of, i.ais_poreorderqty,
-				i.ais_poreorderlevel
+				i.ais_poreorderlevel, i.creation
 			from 
 				`tabItem Supplier` s 
 			inner join 
@@ -888,92 +962,150 @@ def get_conditions(filters):
 		conditions += " limit {}".format(str(limit))
 	return conditions
 
+def generate_item_clases(suppliers):
+	if not suppliers:
+		return {}, []
+
+	overall_total_sales = 0
+	zero_sell_items = []
+	items_with_sales = {}
+	items_classification = {}
+
+	for s in suppliers:
+		# get all items from the supplier
+		items = frappe.db.get_list("Item Supplier", filters={"supplier": s}, fields=["parent"])
+		for i in items:
+			# get the date one months before the current date
+			today = getdate(nowdate())
+			one_month_before = getdate(today) - relativedelta(months=1)
+
+			# get total sold quantity of the item
+			sales_data = get_total_sold(i.get("parent"), one_month_before)
+
+			# get sum of net_amount from sales_data if there is any
+			total_sales = sum([d.get("net_amount") for d in sales_data]) if sales_data else 0
+			if total_sales == 0:
+				zero_sell_items.append(i.get("parent"))
+				continue
+			else:
+				items_with_sales[i.get("parent")] = total_sales
+
+			overall_total_sales += total_sales
+
+		# classify items using ABC analysis
+		# A: 80% of the total sales
+		# B: 15% of the total sales
+		# C: 5% of the total sales
+		# D: 0% of the total sales
+
+		items_classification = classify_items(items_with_sales, overall_total_sales)
+	
+	return items_classification, zero_sell_items
+
+def classify_items(items_with_sales, overall_total_sales):
+	# sort items by total sales
+	sorted_items = sorted(items_with_sales.items(), key=lambda x: x[1], reverse=True)
+	item_with_class = {}
+
+	# calculate the percentage of the total sales
+	percentage = 0
+	for i in sorted_items:
+		percentage += i[1] / overall_total_sales
+
+		# top 80% of the total sales
+		if percentage <= 0.8:
+			# classify the item as A
+			item_with_class[i[0]] = "A"
+
+		# top 20% of the total sales
+		elif percentage <= 0.95:
+			# classify the item as B
+			item_with_class[i[0]] = "B"
+
+		# top 5% of the total sales
+		elif percentage <= 1:
+			# classify the item as C
+			item_with_class[i[0]] = "C"
+
+	return item_with_class
+
 def get_monthly_consumption(item_code, filters, sales_data):
-	monthly_consumption = {}
-	for sd in sales_data:
-		# get month and year from sd posting_date
-		month = getdate(sd.posting_date).month
-		year = getdate(sd.posting_date).year
-
-		key = f"{month}{year}"
-		if key in monthly_consumption:
-			monthly_consumption[key] += sd.qty
-		else:
-			monthly_consumption[key] = sd.qty
-
-	# get the date of first stock ledger entry created
-	conditions = {
-		"item_code": item_code,
-	}
-
-	if filters.warehouse:
-		conditions["warehouse"] = filters.warehouse
-
-	first_sle_date = frappe.db.get_list(
-		"Stock Ledger Entry",
-		filters=conditions,
-		page_length=1,
-		order_by="creation asc",
-		fields=["posting_date"]
-	)
-
-	# convert the monthly consumption dictionary to a list
-	monthly_consumption = list(monthly_consumption.values())
-
-	total_months = 1
-	if first_sle_date:
-		first_sle_date = first_sle_date[0].posting_date
-		# get total months passed from the first stock ledger entry date to today
-		total_months = (getdate(nowdate()) - getdate(first_sle_date)).days // 30
-		
-	if len(monthly_consumption) < total_months:
-		# fill the missing months with 0
-		for n in range(total_months - len(monthly_consumption)):
-			monthly_consumption.append(0)
-
-	return monthly_consumption
-
-def get_inventory(item_code, warehouse, period):
+	average_monthly_consumption_12 = 0
+	average_monthly_consumption_24 = 0
 	today = getdate(nowdate())
-	current_month_first_date = str(today.year)+"-"+str(today.month)+"-01"
 
+	for i in range(1, 3):
+		total_months = i * 12
+		last_date = getdate(str(datetime(today.year-i, today.month, today.day)))
+		monthly_consumption = {}
+
+		for sd in sales_data:
+			if sd.posting_date < last_date:
+				continue
+
+			# get month and year from sd posting_date
+			month = getdate(sd.posting_date).month
+			year = getdate(sd.posting_date).year
+
+			key = f"{month}{year}"
+			if key in monthly_consumption:
+				monthly_consumption[key] += sd.qty
+			else:
+				monthly_consumption[key] = sd.qty
+
+		# convert monthly_consumption to list
+		monthly_consumption = list(monthly_consumption.values())
+
+		if len(monthly_consumption) < total_months:
+			# fill the missing months with 0
+			for n in range(total_months - len(monthly_consumption)):
+				monthly_consumption.append(0)
+
+		average_monthly_consumption = sum(monthly_consumption) / (len(monthly_consumption) if len(monthly_consumption) < total_months else total_months)
+
+		if i == 1:
+			average_monthly_consumption_12 = average_monthly_consumption
+		elif i == 2:
+			average_monthly_consumption_24 = average_monthly_consumption
+
+	return average_monthly_consumption_12, average_monthly_consumption_24
+
+def get_inventory(item_code, warehouse):
+	today = getdate(nowdate())
+	start_date = str(today.year)+"-01-01"
 	last_date = today
 
-	if period == "beginning":
-		last_date = getdate(current_month_first_date) - timedelta(days=1)
-	elif period == "ending":
-		last_date = today
+	return get_begining_ending_inventory(item_code, warehouse, start_date, last_date)
 
-	warehouse_filter = ""
-	if warehouse != "Total QOH":
-		data = frappe.db.sql("""
-			select qty_after_transaction 
-			from `tabStock Ledger Entry`
-			where item_code = %s and posting_date <= %s and warehouse = %s
-			order by posting_date desc, creation desc
-			limit 1
-		""", (item_code, last_date, warehouse), as_dict=1)
+def get_begining_ending_inventory(item_code, warehouse, start_date, last_date):
+	beginning_inventory = 0
+	ending_inventory = 0
+	
+	# get stock balance report from the january 1st of the current year to the current date 
+	filters = {
+		"company": "International Camouflage Ltd",
+		"item_code": item_code,
+		"from_date": start_date,
+		"to_date": last_date,
+	}
 
-	else: 
-		data = frappe.db.sql("""
-			SELECT t.* 
-				FROM (
-					SELECT 
-						warehouse,
-						qty_after_transaction,
-						ROW_NUMBER() OVER (PARTITION BY warehouse ORDER BY posting_date, creation DESC) AS row_num
-					FROM `tabStock Ledger Entry`
-					WHERE 
-						item_code = %s AND 
-						posting_date <= %s and 
-						warehouse <> 'US02-Houston - Active Stock - ICL'
-				) AS t
-				WHERE t.row_num = 1;
-		""", (item_code, last_date), as_dict=1)
+	if warehouse:
+		filters["warehouse"] = warehouse
 
-	total_qty = sum([d.get("qty_after_transaction") for d in data])
+	report = get_report_doc("Stock Balance")
+	report_result = generate_report_result(report, filters)
+	
+	result = report_result.get("result")
 
-	return total_qty
+	if result:
+		for r in result:
+			if type(r) == list:
+				continue
+
+			beginning_inventory += r.get("opening_val")
+			ending_inventory += r.get("bal_val")
+
+	return (beginning_inventory * 100)/ 100,  (ending_inventory * 100) / 100
 	
 def get_gpd_sales(item_code, years_before):
 	data = frappe.db.sql("""select sum(net_amount), sum(qty)
@@ -1014,7 +1146,7 @@ def get_discount_percentages(item_code, years_before):
 
 def get_order_frequency(item_code, years_before):	
 	# get total number of received purchase receipts
-	data = frappe.db.sql("""select Month(posting_date), count(distinct pr.name), Year(posting_date)
+	data = frappe.db.sql("""select Month(posting_date), pr.name, Year(posting_date), pri.qty
 							from
 								`tabPurchase Receipt Item` pri
 							join
@@ -1023,11 +1155,35 @@ def get_order_frequency(item_code, years_before):
 								pri.item_code = %s and 
 								pr.docstatus = 1 and 
 								pr.posting_date >= %s and 
+								pr.status = "Completed" and
 								pri.warehouse <> 'US02-Houston - Active Stock - ICL'
 								group by Month(posting_date)
 		""",(item_code, years_before.strftime("%Y-%m-%d")))
 
-	return data
+	order_freq = {}
+	ordered_qty = {}
+	
+	for d in data:
+		if d[0] in order_freq:
+			ordered_qty[d[0]] += d[3]
+			order_freq[d[0]] += 1
+		else:
+			ordered_qty[d[0]] = d[3]
+			order_freq[d[0]] = 1
+
+	order_frequency = tuple()
+	for key, value in order_freq.items():
+		temp = ()
+		for d in data:
+			if d[0] == key:
+				temp += (key, value, d[2])
+				break
+		order_frequency += (temp,)	
+		
+	# convert ordered_qty to list
+	ordered_qty = list(ordered_qty.values())
+
+	return order_frequency, ordered_qty
 
 def get_unique_customers_bought_an_item(item_code, years_before):
 	data = frappe.db.sql("""
@@ -1106,8 +1262,14 @@ def get_date_last_sold(item):
 		date = getdate('1930-01-01')
 	return rdate, date
 
-def get_total_sold(item):
-	data= frappe.db.sql("""select 
+def get_total_sold(item, date_from=""):
+	date_filter = ""
+	if date_from:
+		date_filter = f" and posting_date >= date('{date_from}')"
+	else:
+		date_filter = ""
+
+	data= frappe.db.sql(f"""select 
 							p.posting_date, c.qty, p.source, c.net_amount
 						from 
 							`tabSales Invoice Item` c 
@@ -1116,6 +1278,7 @@ def get_total_sold(item):
 						where 
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
+							{date_filter}
 						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
