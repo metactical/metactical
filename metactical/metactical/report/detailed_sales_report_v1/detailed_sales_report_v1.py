@@ -129,7 +129,7 @@ def execute(filters=None):
 		elif filters.get("sales_data_period") == '24':
 			years_to_subtract = 2
 
-		last_year = today.year-years_to_subtract
+		last_year = today.year-1
 		current_year = today.year
 
 		last_month = getdate(str(datetime(today.year-years_to_subtract, 1,1)))
@@ -144,19 +144,19 @@ def execute(filters=None):
 		row["sold_online"] = 0
 		row["sold_in_store"] = 0
 
+		two_years_ago = today - relativedelta(years=2)
 		for d in sales_data:
 			posting_date = getdate(d.get("posting_date"))
 			qty = d.get("qty")
 			month = posting_date.strftime("%B")
+			
 			if posting_date.year == last_year:
 				row["previous_year_sale"] += qty
-				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
 			elif posting_date.year == current_year:
 				row["total"] += qty
+
+			if posting_date >= two_years_ago:
 				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
-			# if row.get(frappe.scrub("sold"+month+str(posting_date.year))):
-			# 	row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
-			# row[frappe.scrub("soldjanuary2021")] += qty
 
 			last12_month_date = today - relativedelta(years=years_to_subtract)
 			
@@ -203,7 +203,7 @@ def execute(filters=None):
 		# inventory turnover	
 		# # get january 1st of the year
 		start_date = getdate(str(datetime(today.year, 1, 1)))	
-		row["inventory_turnover"] = get_inventory_turnover(row["beginning_inventory"], row["ending_inventory"], start_date, sales_data)
+		row["inventory_turnover"] = (get_inventory_turnover(row["beginning_inventory"], row["ending_inventory"], start_date, sales_data)) * 100 / 100
 
 		row["lead_time_in_days"] = frappe.db.get_value("Supplier", i.get("supplier"), "lead_time_in_days")
 
@@ -252,10 +252,9 @@ def execute(filters=None):
 		row["erpnext_template"] = i.get("variant_of")
 
 		# motnhly stock
-		average_monthly_consumption_12, average_monthly_consumption_24 = get_monthly_consumption(i.get("item_code"), filters, sales_data)
-
-		row["monthly_stock_12m"] = (row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_12 if average_monthly_consumption_12 > 0 else row["total_actual_qty"]
-		row["monthly_stock_24m"] = (row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24 if average_monthly_consumption_24 > 0 else row["total_actual_qty"]
+		average_monthly_consumption_12, average_monthly_consumption_24 = get_monthly_consumption(i.get("item_code"), i.get("creation"), filters, sales_data)
+		row["monthly_stock_12m"] = ((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_12 if average_monthly_consumption_12 > 0 else row["total_actual_qty"]) * 100 / 100
+		row["monthly_stock_24m"] = ((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24 if average_monthly_consumption_24 > 0 else row["total_actual_qty"]) * 100 / 100
 
 		# NoStockOut12M
 		row["no_stock_out_12m"] = get_stock_out_days(i.get("item_code"), years_before, filters)
@@ -750,39 +749,39 @@ def get_column(filters,conditions):
 	while last_month <= today:
 		month = last_month.strftime("%B")
 		columns.append({
-        		"label": _(str(last_month.year) + "_Sold" + month),
-                "fieldname": frappe.scrub("sold"+month+str(last_month.year)),
-                "fieldtype": "Int",
-                "width": 140,
+				"label": _(str(last_month.year) + "_Sold" + month),
+				"fieldname": frappe.scrub("sold"+month+str(last_month.year)),
+				"fieldtype": "Int",
+				"width": 140,
 		})
 
 		last_month = last_month + relativedelta(months=1)
 
 	columns.extend([
-    	{
-            "label": _("SoldLast10Days"),
-            "fieldname": "sold_last_ten_days",
-            "fieldtype": "Int",
-            "width": 140,
-        },
-        {
-            "label": _("SoldLast30Days"),
-            "fieldname": "sold_last_thirty_days",
-            "fieldtype": "Int",
-            "width": 140,
-        },
-        {
-            "label": _("SoldLast60Days"),
-            "fieldname": "sold_last_sixty_days",
-            "fieldtype": "Int",
-            "width": 140,
-            "default": False,
-        },
-        {
-            "label": _("DateLastSold"),
-            "fieldname": "last_sold_date",
-            "fieldtype": "Data",
-            "width": 100,
+		{
+			"label": _("SoldLast10Days"),
+			"fieldname": "sold_last_ten_days",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _("SoldLast30Days"),
+			"fieldname": "sold_last_thirty_days",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _("SoldLast60Days"),
+			"fieldname": "sold_last_sixty_days",
+			"fieldtype": "Int",
+			"width": 140,
+			"default": False,
+		},
+		{
+			"label": _("DateLastSold"),
+			"fieldname": "last_sold_date",
+			"fieldtype": "Data",
+			"width": 100,
 		},
 		{
 			"label": _(f"SaleRev{filters.sales_data_period}LM"),
@@ -829,10 +828,10 @@ def get_column(filters,conditions):
 	while last_month <= today:
 		month = last_month.strftime("%B")
 		columns.append({
-        		"label": _(str(last_month.year) + "_OrdFreq" + month),
-                "fieldname": frappe.scrub("ord_freq"+month+str(last_month.year)),
-                "fieldtype": "Int",
-                "width": 140,
+				"label": _(str(last_month.year) + "_OrdFreq" + month),
+				"fieldname": frappe.scrub("ord_freq"+month+str(last_month.year)),
+				"fieldtype": "Int",
+				"width": 140,
 		})
 
 		last_month = last_month + relativedelta(months=1)
@@ -1029,10 +1028,13 @@ def classify_items(items_with_sales, overall_total_sales):
 
 	return item_with_class
 
-def get_monthly_consumption(item_code, filters, sales_data):
+def get_monthly_consumption(item_code, created_at,filters, sales_data):
 	average_monthly_consumption_12 = 0
 	average_monthly_consumption_24 = 0
 	today = getdate(nowdate())
+
+	# get months passed since the item was created
+	months_passed = (today.year - created_at.year) * 12 + today.month - getdate(created_at).month
 
 	for i in range(1, 3):
 		total_months = i * 12
@@ -1056,13 +1058,12 @@ def get_monthly_consumption(item_code, filters, sales_data):
 		# convert monthly_consumption to list
 		monthly_consumption = list(monthly_consumption.values())
 
-		if len(monthly_consumption) < total_months:
-			# fill the missing months with 0
-			for n in range(total_months - len(monthly_consumption)):
-				monthly_consumption.append(0)
+		if len(monthly_consumption) == 0:
+			average_monthly_consumption = 0
+		else:
+			average_monthly_consumption = sum(monthly_consumption) / (months_passed if months_passed < total_months else total_months)
 
-		average_monthly_consumption = sum(monthly_consumption) / (len(monthly_consumption) if len(monthly_consumption) < total_months else total_months)
-
+		average_monthly_consumption = (average_monthly_consumption * 100) / 100
 		if i == 1:
 			average_monthly_consumption_12 = average_monthly_consumption
 		elif i == 2:
