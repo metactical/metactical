@@ -1092,9 +1092,10 @@ def get_begining_ending_inventory(item_code, warehouse, start_date, last_date):
 	if warehouse:
 		filters["warehouse"] = warehouse
 
-	report = get_report_doc("Stock Balance")
+	report = frappe.get_doc("Report", "Stock Balance")
+	report.custom_columns = []
+
 	report_result = generate_report_result(report, filters)
-	
 	result = report_result.get("result")
 
 	if result:
