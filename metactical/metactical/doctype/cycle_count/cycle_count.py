@@ -22,8 +22,16 @@ class CycleCount(Document):
 					"qty": row.qty,
 					"valuation_rate": row.valuation_rate
 				})
+		doc.save()
 		if hasattr(doc, "items"):
 			doc.submit()
+
+	def validate(self):
+		for row in self.items:
+			if row.get("expected_qty") is None:
+				expected = get_expected_qty(row.item_code, self.warehouse)
+				row.expected_qty = expected.get("actual_qty")
+				row.valuation_rate = expected.get("valuation_rate")
 
 @frappe.whitelist()
 def get_expected_qty(item_code, warehouse):
@@ -56,3 +64,6 @@ def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
+
+
+
