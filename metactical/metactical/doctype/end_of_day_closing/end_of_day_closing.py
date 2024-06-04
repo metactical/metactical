@@ -7,6 +7,19 @@ from frappe.model.document import Document
 class EndofDayClosing(Document):
 	pass
 
+@frappe.whitelist()
+def get_pos_profiles(doctype, txt, searchfield, start, page_len, filters):
+	user = filters.get("user")
+	pos_profiles = []
+	if user:
+		pos_profiles = frappe.db.sql("""SELECT parent FROM `tabPOS Profile User` 
+						WHERE parent LIKE %(txt)s AND user = %(user)s""", 
+						{
+							'txt': "%%%s%%" % txt,
+							'user': user
+						})
+	return pos_profiles
+
 def get_permission_query_conditions(user):
 	return_condition = ""
 	if not user: user = frappe.session.user

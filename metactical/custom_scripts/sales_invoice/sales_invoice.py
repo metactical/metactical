@@ -1,5 +1,5 @@
 import frappe
-from frappe import _
+from frappe import _, msgprint
 import barcode as _barcode
 from io import BytesIO
 from frappe.model.mapper import get_mapped_doc, map_child_doc
@@ -11,6 +11,7 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.controllers.selling_controller import SellingController
 from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
+from metactical.custom_scripts.utils.metactical_utils import queue_action
 
 class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
 	def on_cancel(self):
@@ -49,6 +50,17 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 		):
 			self.calculate_commission()
 			self.calculate_contribution()
+
+	def submit(self):
+		if len(self.items) > 25:
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			self._submit()
 
 def unlink_ref_doc_from_payment_entries(ref_doc):	
 	#Check for sales order
