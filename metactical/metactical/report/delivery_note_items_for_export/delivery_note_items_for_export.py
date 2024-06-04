@@ -68,13 +68,13 @@ def get_data(filters):
 			dni.item_code,
 			dni.item_name,
 			dni.qty,
-			dni.base_rate,
+			dni.base_rate AS rate,
 			dni.warehouse
 		FROM 
 			`tabDelivery Note Item` dni
 		LEFT JOIN 
 			`tabDelivery Note` dn ON dn.name = dni.parent
-		WHERE dn.docstatus = 0 AND dni.warehouse = %(warehouse)s
+		WHERE dn.docstatus = 1 AND dni.warehouse = %(warehouse)s
 		AND dn.posting_date = %(transaction_date)s
 		AND dn.customer = %(customer)s
 		{where_clause}
