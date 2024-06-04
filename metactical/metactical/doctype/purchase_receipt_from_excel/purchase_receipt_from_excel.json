@@ -9,7 +9,6 @@
   "supplier",
   "warehouse",
   "excel_file",
-  "amended_from",
   "amended_from"
  ],
  "fields": [
@@ -41,7 +40,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Purchase Order From Excel",
+   "options": "Purchase Receipt From Excel",
    "print_hide": 1,
    "read_only": 1
   },
@@ -58,7 +57,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-06-04 01:32:45.963657",
+ "modified": "2024-06-04 01:43:42.901584",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt From Excel",
