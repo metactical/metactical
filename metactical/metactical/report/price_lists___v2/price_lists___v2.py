@@ -27,14 +27,16 @@ def execute(filters=None):
 			price_lists += supplier_price_list
 	
 	elif sales_orders:
-		selling_price_list = frappe.db.get_values("Sales Order", {"name": ['in', sales_orders]}, "selling_price_list")
-		if (selling_price_list):
-			selling_price_list = [item[0] for item in selling_price_list]
-
-			# remove duplicates from supplier_price_list
-			selling_price_list = list(set(selling_price_list)) 
-			price_lists += selling_price_list
-			supplier_price_list = selling_price_list
+		supplier_price_list = []
+		for so in sales_orders:
+			items = frappe.get_doc("Sales Order", so).items
+			for item in items:
+				suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
+				for s in suppliers:
+					spl = frappe.db.get_value("Supplier", s.supplier, "default_price_list")
+					if spl and spl not in supplier_price_list:
+						price_lists.append(spl)
+						supplier_price_list.append(spl)
 
 	columns = get_columns(price_lists, supplier_price_list, sales_orders, purchase_orders)
 	data = get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list)
