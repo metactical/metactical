@@ -6,10 +6,10 @@ import frappe
 def execute(filters=None):
 	purchase_orders = filters.get("purchase_order") if filters.get("purchase_order") else None
 	supplier = filters.get("supplier") if filters.get("supplier") else None
-	sales_orders = filters.get("sales_order") if filters.get("sales_order") else None
+	sales_order = filters.get("sales_order") if filters.get("sales_order") else None
 	price_lists = filters.get("price_list") if filters.get("price_list") else []
 
-	if not supplier and not purchase_orders and not sales_orders:
+	if not supplier and not purchase_orders and not sales_order:
 		return [], []
 
 	if supplier:
@@ -26,46 +26,45 @@ def execute(filters=None):
 			supplier_price_list = list(set(supplier_price_list)) 
 			price_lists += supplier_price_list
 	
-	elif sales_orders:
+	elif sales_order:
 		supplier_price_list = []
-		for so in sales_orders:
-			items = frappe.get_doc("Sales Order", so).items
-			for item in items:
-				suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
-				for s in suppliers:
-					spl = frappe.db.get_value("Supplier", s.supplier, "default_price_list")
-					if spl and spl not in supplier_price_list:
-						price_lists.append(spl)
-						supplier_price_list.append(spl)
+		items = frappe.get_doc("Sales Order", sales_order).items
+		for item in items:
+			suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
+			for s in suppliers:
+				spl = frappe.db.get_value("Supplier", s.supplier, "default_price_list")
+				if spl and spl not in supplier_price_list:
+					price_lists.append(spl)
+					supplier_price_list.append(spl)
 
-	columns = get_columns(price_lists, supplier_price_list, sales_orders, purchase_orders)
-	data = get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list)
+	columns = get_columns(price_lists, supplier_price_list, sales_order, purchase_orders)
+	data = get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list)
 	return columns, data
 
-def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list=None):
+def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list=None):
 	items_list = []
 	items = []
 
 	if supplier:
-		items = frappe.db.sql(""" SELECT item_code, variant_of, ifw_retailskusuffix, item_name
+		items = frappe.db.sql(""" SELECT item_code, variant_of, ifw_retailskusuffix, item_name, ifw_duty_rate
 									FROM `tabItem Supplier`
 									JOIN `tabItem` on item_code = `tabItem Supplier`.parent
 									WHERE supplier = %s """, supplier, as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 	elif purchase_orders:
-		items = frappe.db.sql(""" SELECT poi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, poi.parent
+		items = frappe.db.sql(""" SELECT poi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, poi.parent, i.ifw_duty_rate
 									FROM `tabPurchase Order Item` poi
 									JOIN `tabItem` i on i.name = poi.item_code
 									WHERE poi.parent IN %s """, (purchase_orders,), as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 
-	elif sales_orders:
-		items = frappe.db.sql(""" SELECT soi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, soi.parent
+	elif sales_order:
+		items = frappe.db.sql(""" SELECT soi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, soi.parent, i.ifw_duty_rate
 									FROM `tabSales Order Item` soi
 									JOIN `tabItem` i on i.name = soi.item_code
-									WHERE soi.parent IN %s """, (sales_orders,), as_dict=True)
+									WHERE soi.parent = %s """, sales_order, as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 	
@@ -97,6 +96,7 @@ def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_pric
 			"templatesku": item["variant_of"],
 			"retail_sku": item["ifw_retailskusuffix"],
 			"item_name": item["item_name"],
+			"ifw_duty_rate": item["ifw_duty_rate"],
 			"sup_supplier_price_list": supplier_price_list if supplier_price_list else "",
 			"alc": ""
 		})
@@ -109,15 +109,15 @@ def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_pric
 	return data
 
 
-def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders):
+def get_columns(price_lists, supplier_price_lists, sales_order, purchase_orders):
 	# ERPSKU | TemplateSKU | Retail SKU | Item Name | SUP - Supplier Price List | ALC | RET - CamoFRN - CAD | RET - Camo | RET - Gorilla
 	columns = []
 	if type(supplier_price_lists) == list and len(supplier_price_lists) > 0:
 		columns.append({
-			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else "",
+			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_order else "",
 			"fieldtype": "Link",
 			"fieldname": "purchase_order",
-			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else ""
+			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_order else ""
 		})
 
 	columns.extend([{
@@ -142,6 +142,12 @@ def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders
 		"label": "Item Name",
 		"fieldtype": "Data",
 		"fieldname": "item_name",
+		"width": 120
+	},
+	{
+		"label": "Duty Rate",
+		"fieldtype": "Float",
+		"fieldname": "ifw_duty_rate",
 		"width": 120
 	}])
 
