@@ -2,12 +2,14 @@
 # For license information, please see license.txt
 
 import frappe
+from metactical.custom_scripts.warehouse.warehouse import get_item_details2
 
 def execute(filters=None):
 	purchase_orders = filters.get("purchase_order") if filters.get("purchase_order") else None
 	supplier = filters.get("supplier") if filters.get("supplier") else None
 	sales_order = filters.get("sales_order") if filters.get("sales_order") else None
 	price_lists = filters.get("price_list") if filters.get("price_list") else []
+	costs = {}
 
 	if not supplier and not purchase_orders and not sales_order:
 		return [], []
@@ -31,17 +33,15 @@ def execute(filters=None):
 		items = frappe.get_doc("Sales Order", sales_order).items
 		for item in items:
 			suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
-			for s in suppliers:
-				spl = frappe.db.get_value("Supplier", s.supplier, "default_price_list")
-				if spl and spl not in supplier_price_list:
-					price_lists.append(spl)
-					supplier_price_list.append(spl)
+			
+			cost, currrency, camfrn = get_item_details2(item.item_code, suppliers)
+			costs[item.item_code] = cost
 
-	columns = get_columns(price_lists, supplier_price_list, sales_order, purchase_orders)
-	data = get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list)
+	columns = get_columns(price_lists, supplier_price_list, sales_order, purchase_orders, costs)
+	data = get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list, costs)
 	return columns, data
 
-def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list=None):
+def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list=None, costs=None):
 	items_list = []
 	items = []
 
@@ -97,7 +97,7 @@ def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price
 			"retail_sku": item["ifw_retailskusuffix"],
 			"item_name": item["item_name"],
 			"ifw_duty_rate": item["ifw_duty_rate"],
-			"sup_supplier_price_list": supplier_price_list if supplier_price_list else "",
+			"cost": costs[item['item_code']] if item["item_code"] in costs else "",
 			"alc": ""
 		})
 
@@ -109,7 +109,7 @@ def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price
 	return data
 
 
-def get_columns(price_lists, supplier_price_lists, sales_order, purchase_orders):
+def get_columns(price_lists, supplier_price_lists, sales_order, purchase_orders, cost):
 	# ERPSKU | TemplateSKU | Retail SKU | Item Name | SUP - Supplier Price List | ALC | RET - CamoFRN - CAD | RET - Camo | RET - Gorilla
 	columns = []
 	if type(supplier_price_lists) == list and len(supplier_price_lists) > 0:
@@ -151,7 +151,14 @@ def get_columns(price_lists, supplier_price_lists, sales_order, purchase_orders)
 		"width": 120
 	}])
 
-	if supplier_price_lists:
+	if cost:
+		columns.append({
+			"label": "Cost",
+			"fieldtype": "Data",
+			"fieldname": "cost",
+			"width": 120
+		})
+	elif supplier_price_lists:
 		if type(supplier_price_lists) == str:
 			supplier_price_lists = [supplier_price_lists]
 
@@ -185,6 +192,5 @@ def get_columns(price_lists, supplier_price_lists, sales_order, purchase_orders)
 			"default": ""
 		}
 		columns.append(column)
-
 
 	return columns
