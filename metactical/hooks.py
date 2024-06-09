@@ -47,7 +47,7 @@ doctype_js = {
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
-	"Warehouse": "custom_scripts/warehouse/warehouse.js",
+	"Warehouse": "custom_scripts/warehouse/warehouse.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -138,6 +138,9 @@ doc_events = {
 	}, 
 	"Project": {
 		"on_update": "metactical.custom_scripts.project.project.on_update"
+	},
+	"Item Price": {
+		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	}
 }
 
