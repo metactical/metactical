@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-06-09 13:37:38.180836",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "price_list",
+  "replace_existing",
+  "excel_file",
+  "amended_from",
+  "section_queus",
+  "ais_queue_failed",
+  "ais_queue_status",
+  "ais_queue_comment",
+  "column_break_jx87a",
+  "ais_queued_date",
+  "ais_queued_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "excel_file",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "Excel File",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Item Price From Excel",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_queus",
+   "fieldtype": "Section Break",
+   "label": "Queue"
+  },
+  {
+   "default": "0",
+   "fieldname": "ais_queue_failed",
+   "fieldtype": "Check",
+   "label": "Queue Failed"
+  },
+  {
+   "fieldname": "ais_queue_status",
+   "fieldtype": "Select",
+   "label": "Queue Status",
+   "options": "Not Queued\nQueued\nFailed"
+  },
+  {
+   "fieldname": "ais_queue_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error"
+  },
+  {
+   "fieldname": "column_break_jx87a",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ais_queued_date",
+   "fieldtype": "Datetime",
+   "label": "Queue Date"
+  },
+  {
+   "fieldname": "ais_queued_by",
+   "fieldtype": "Link",
+   "label": "Queued By",
+   "options": "User"
+  },
+  {
+   "default": "0",
+   "fieldname": "replace_existing",
+   "fieldtype": "Check",
+   "label": "Replace Existing Prices"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-06-09 15:53:23.531419",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Price From Excel",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
