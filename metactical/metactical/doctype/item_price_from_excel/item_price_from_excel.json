@@ -10,10 +10,12 @@
   "replace_existing",
   "excel_file",
   "amended_from",
+  "section_break_i8qkd",
+  "error_log",
   "section_queus",
   "ais_queue_failed",
   "ais_queue_status",
-  "ais_queue_comment",
+  "ais_queueu_comment",
   "column_break_jx87a",
   "ais_queued_date",
   "ais_queued_by"
@@ -48,48 +50,69 @@
    "label": "Queue"
   },
   {
+   "allow_on_submit": 1,
    "default": "0",
    "fieldname": "ais_queue_failed",
    "fieldtype": "Check",
-   "label": "Queue Failed"
+   "label": "Queue Failed",
+   "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "ais_queue_status",
    "fieldtype": "Select",
    "label": "Queue Status",
-   "options": "Not Queued\nQueued\nFailed"
-  },
-  {
-   "fieldname": "ais_queue_comment",
-   "fieldtype": "Small Text",
-   "label": "Queue Error"
+   "options": "Not Queued\nQueued\nFailed",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_jx87a",
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "ais_queued_date",
    "fieldtype": "Datetime",
-   "label": "Queue Date"
+   "label": "Queue Date",
+   "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "ais_queued_by",
    "fieldtype": "Link",
    "label": "Queued By",
-   "options": "User"
+   "options": "User",
+   "read_only": 1
   },
   {
    "default": "0",
    "fieldname": "replace_existing",
    "fieldtype": "Check",
    "label": "Replace Existing Prices"
+  },
+  {
+   "fieldname": "section_break_i8qkd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Table",
+   "label": "Errors",
+   "options": "Item Price From Excel Error",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queueu_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-06-09 15:53:23.531419",
+ "modified": "2024-06-09 20:29:57.868407",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Price From Excel",

@@ -56,7 +56,7 @@ class ItemPriceFromExcel(Document):
 
 	def create_price_entries(self, data):
 		for row in data:
-			if row[0] == "ItemCode" or row[4] is None:
+			if row[0] in ["ItemCode", "ERPSKU"] or row[4] is None:
 				continue
 			
 			item_code = row[0]
@@ -78,3 +78,13 @@ class ItemPriceFromExcel(Document):
 						doc.save()
 					except Exception as e:
 						frappe.log_error(frappe.get_traceback())
+						error_log = frappe.new_doc("Item Price From Excel Error"), 
+						error_log.update({
+							"error": e,
+							"item_code": item_code,
+							"rate": row[4],
+							"parenttype": self.doctype,
+							"parent": self.name,
+							"parentfield": "error_log"
+						})
+						error_log.insert()
