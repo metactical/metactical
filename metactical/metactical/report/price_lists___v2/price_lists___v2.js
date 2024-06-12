@@ -41,7 +41,7 @@ frappe.query_reports["Price Lists - V2"] = {
 				}
 			},
 			get_data: function(txt) {
-				return frappe.db.get_link_options("Purchase Order");
+				return frappe.db.get_link_options("Purchase Order", txt);
 			}
 		},
 		{
@@ -65,7 +65,7 @@ frappe.query_reports["Price Lists - V2"] = {
 				}
 			},
 			get_data: function(txt) {
-				return frappe.db.get_link_options("Sales Order");
+				return frappe.db.get_link_options("Sales Order", txt);
 			}
 		},
 		{
