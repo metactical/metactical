@@ -7,11 +7,11 @@ from metactical.custom_scripts.warehouse.warehouse import get_item_details2
 def execute(filters=None):
 	purchase_orders = filters.get("purchase_order") if filters.get("purchase_order") else None
 	supplier = filters.get("supplier") if filters.get("supplier") else None
-	sales_order = filters.get("sales_order") if filters.get("sales_order") else None
+	sales_orders = filters.get("sales_order") if filters.get("sales_order") else None
 	price_lists = filters.get("price_list") if filters.get("price_list") else []
 	costs = {}
 
-	if not supplier and not purchase_orders and not sales_order:
+	if not supplier and not purchase_orders and not sales_orders:
 		return [], []
 
 	if supplier:
@@ -28,20 +28,21 @@ def execute(filters=None):
 			supplier_price_list = list(set(supplier_price_list)) 
 			price_lists += supplier_price_list
 	
-	elif sales_order:
+	elif sales_orders:
 		supplier_price_list = []
-		items = frappe.get_doc("Sales Order", sales_order).items
-		for item in items:
-			suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
-			
-			cost, currrency, camfrn = get_item_details2(item.item_code, suppliers)
-			costs[item.item_code] = cost
+		for so in sales_orders:
+			items = frappe.get_doc("Sales Order", so).items
+			for item in items:
+				suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
+				
+				cost, currrency, camfrn = get_item_details2(item.item_code, suppliers)
+				costs[item.item_code] = cost
 
-	columns = get_columns(price_lists, supplier_price_list, sales_order, purchase_orders, costs)
-	data = get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list, costs)
+	columns = get_columns(price_lists, supplier_price_list, sales_orders, purchase_orders, costs)
+	data = get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list, costs)
 	return columns, data
 
-def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price_list=None, costs=None):
+def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list=None, costs=None):
 	items_list = []
 	items = []
 
@@ -60,11 +61,11 @@ def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price
 
 		items_list = [item["item_code"] for item in items]
 
-	elif sales_order:
+	elif sales_orders:
 		items = frappe.db.sql(""" SELECT soi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, soi.parent, i.ifw_duty_rate
 									FROM `tabSales Order Item` soi
 									JOIN `tabItem` i on i.name = soi.item_code
-									WHERE soi.parent = %s """, sales_order, as_dict=True)
+									WHERE soi.parent IN %s """, (sales_orders,), as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 	
@@ -109,15 +110,15 @@ def get_data(supplier, purchase_orders, sales_order, price_lists, supplier_price
 	return data
 
 
-def get_columns(price_lists, supplier_price_lists, sales_order, purchase_orders, cost):
+def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders, cost):
 	# ERPSKU | TemplateSKU | Retail SKU | Item Name | SUP - Supplier Price List | ALC | RET - CamoFRN - CAD | RET - Camo | RET - Gorilla
 	columns = []
 	if type(supplier_price_lists) == list and len(supplier_price_lists) > 0:
 		columns.append({
-			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_order else "",
+			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else "",
 			"fieldtype": "Link",
 			"fieldname": "purchase_order",
-			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_order else ""
+			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else ""
 		})
 
 	columns.extend([{
