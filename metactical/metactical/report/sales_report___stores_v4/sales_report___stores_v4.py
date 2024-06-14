@@ -142,7 +142,7 @@ def get_data(conditions, filters):
 			`tabItem` i ON c.item_code = i.name 
 		WHERE 
 			p.docstatus = 1 AND p.is_pos =1 AND p.posting_date = '{}' 
-			AND p.is_return = 0 
+			AND p.is_return <> 1 AND i.ais_blockfrmstoresale <> 1 {}
 		GROUP BY 
 			c.item_code, p.pos_profile
 		ORDER BY 
