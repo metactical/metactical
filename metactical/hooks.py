@@ -114,12 +114,6 @@ doc_events = {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
 	},
-	"Delivery Note": {
-		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
-		"on_trash": "metactical.custom_scripts.delivery_note.delivery_note.on_trash",
-		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel",
-		"on_submit": "metactical.custom_scripts.delivery_note.delivery_note.on_submit"
-	},
 	"Material Request": {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
 	},
