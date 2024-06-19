@@ -185,18 +185,16 @@ def transfer_store_credit(**kwargs):
 
         sales_invoice = frappe.get_doc({
             "doctype": "Sales Invoice",
-            "customer": customer,
+            "customer": frappe.db.get_value("Sales Invoice", sales_invoice, "customer"),
             "is_return": 1,
             "return_against": sales_invoice,
             "posting_date": frappe.utils.nowdate(),
-            "is_return": 1,
-            "return_against": sales_invoice,
             "items": selected_items,
             "taxes_and_charges": frappe.get_value("Sales Invoice", sales_invoice, "taxes_and_charges"),
             "taxes": taxes
         })
 
-        enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, queue='long', timeout=1500)
+        enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, customer=customer, queue='long', timeout=1500)
 
         frappe.response["items"] = [item.get('name') for item in items]
         frappe.response["success"] = True
@@ -208,10 +206,11 @@ def transfer_store_credit(**kwargs):
         frappe.log_error(title="Transfer Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.db.rollback()
 
-def save_and_submit_store_credit(sales_invoice):
+def save_and_submit_store_credit(sales_invoice, customer):
     try:
         sales_invoice.save()
         sales_invoice.submit()
+        create_journal_entry(sales_invoice, customer)
         frappe.db.commit()
         frappe.publish_realtime("transfer_store_credit", 
                                 {
@@ -224,6 +223,37 @@ def save_and_submit_store_credit(sales_invoice):
         frappe.log_error(title="Save and Submit Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.db.rollback()
         frappe.publish_realtime("transfer_store_credit", {"error": str(e)}, user=frappe.session.user)
+
+def create_journal_entry(sales_invoice, customer):
+    store_credit_account = frappe.db.get_single_value("Metactical Settings", "store_credit_account")
+    if not store_credit_account:
+        frappe.throw("Store Credit Account not set in Metactical Settings. Please create the Journal Entry manually.")
+
+    main_sales_invoice = frappe.db.get_values("Sales Invoice", {"name": sales_invoice.return_against}, ["debit_to", "company", "customer"], as_dict=True)[0]
+    
+    je = frappe.new_doc("Journal Entry")
+    je.voucher_type = "Journal Entry"
+    je.posting_date = frappe.utils.nowdate()
+    je.company = main_sales_invoice.company
+    je.user_remark = "Store Credit Transfer from Sales Invoice {} to Customer {}".format(sales_invoice.return_against, customer)
+    je.append("accounts", {
+        "account": store_credit_account,
+        "party_type": "Customer",
+        "party": customer,
+        "credit_in_account_currency": -1 * sales_invoice.grand_total,
+        "is_advance": "No"
+    })
+    je.append("accounts", {
+        "account": main_sales_invoice.debit_to,
+        "debit_in_account_currency": -1 * sales_invoice.grand_total,
+        "reference_type": "Sales Invoice",
+        "reference_name": main_sales_invoice.name,
+        "party_type": "Customer",
+        "party": main_sales_invoice.customer,
+        "is_advance": "No"
+    })
+    je.insert()
+    je.submit()
 
 @frappe.whitelist()
 def create_customer(**kwargs):
