@@ -21,7 +21,7 @@ def execute(filters=None):
 	columns = get_column(filters,conditions)
 	data = []
 
-	item_classes, zero_sales, item_class_sold_qty, item_class_gross_margin = generate_item_clases(filters.supplier)
+	item_classes, zero_sales = generate_item_clases(filters.supplier)
 	master = get_master(conditions,filters)
 	
 	#Get US data
@@ -101,24 +101,17 @@ def execute(filters=None):
 
 		sales_data = get_total_sold(i.get("item_code"))
 
-		suggested_item_class = ""
-		suggested_item_class_qty = ""
-		suggested_item_class_gross_margin = ""
-
+		suggested_item_class = ""		
 		# if item is created in the last 1 month and has no sales, class is "N"
-		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=1):
+		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=10):
 			suggested_item_class = "N"
 		elif i.get("item_code") in zero_sales:
 			suggested_item_class = "D"
 		elif i.get("supplier") in item_classes:
 			if i.get("item_code") in item_classes.get(i.get("supplier")):
 				suggested_item_class = item_classes.get(i.get("supplier")).get(i.get("item_code"))
-				suggested_item_class_qty = item_class_sold_qty.get(i.get("supplier")).get(i.get("item_code"))
-				suggested_item_class_gross_margin = item_class_gross_margin.get(i.get("supplier")).get(i.get("item_code"))
 
 		row["suggested_item_class"] = suggested_item_class
-		row["suggested_item_class_qty"] = suggested_item_class_qty if suggested_item_class_qty else suggested_item_class
-		row["suggested_item_class_gross_margin"] = suggested_item_class_gross_margin if suggested_item_class_gross_margin else suggested_item_class
 		row["previous_year_sale"] = 0
 		row["total"] = 0
 		row["last_twelve_months"] = 0
@@ -400,22 +393,8 @@ def get_column(filters,conditions):
 				"align": "left",
 			},
 			{
-				"label": _("SgtdCLSSalesRev"),
+				"label": _("Suggested Item Class"),
 				"fieldname": "suggested_item_class",
-				"fieldtype": "Data",
-				"width": 150,
-				"align": "left",
-			},
-			{
-				"label": _("SgtdCLSoldQty"),
-				"fieldname": "suggested_item_class_qty",
-				"fieldtype": "Data",
-				"width": 150,
-				"align": "left",
-			},
-			{
-				"label": _("SgtdCLGrossMargin"),
-				"fieldname": "suggested_item_class_gross_margin",
 				"fieldtype": "Data",
 				"width": 150,
 				"align": "left",
@@ -926,15 +905,10 @@ def generate_item_clases(suppliers):
 		return {}, [], {}
 
 	zero_sell_items = []
-
-	items_classification_qty = {}
 	items_classification = {}
-	items_classification_gross_margin = {}
 
 	for s in suppliers:
-		overall_total_sales = 0
-		overall_total_sales_qty = 0
-		overall_gross_margin = 0
+		total_sold_qty = 0
 		
 		items_with_sales = {}
 		items_with_sold_qty = {}
@@ -953,14 +927,13 @@ def generate_item_clases(suppliers):
 			# get sum of net_amount from sales_data if there is any
 			total_sales = sum([d.get("net_amount") for d in sales_data]) if sales_data else 0
 			total_qty_sold = sum([d.get("qty") for d in sales_data]) if sales_data else 0
-			supplier_cost = get_item_details(i.get("parent"), "Buying", s)
 			
 			# calculate gross margin of an item
 			# gross margin = (total sales - supplier cost of sold items) / total sales
-
+			supplier_cost = get_item_details(i.get("parent"), "Buying", s)
 			supplier_cost_of_sold_items = supplier_cost * total_qty_sold
 			gross_profit = total_sales - supplier_cost_of_sold_items
-			gross_margin = ((gross_profit * 100) / total_sales if total_sales > 0 else 0) * 100 / 100
+			gross_margin = (((gross_profit * 100) / total_sales) if total_sales > 0 else 0) * 100 / 100
 
 			if total_sales == 0:
 				zero_sell_items.append(i.get("parent"))
@@ -969,10 +942,8 @@ def generate_item_clases(suppliers):
 				items_with_sales[i.get("parent")] = total_sales
 				items_with_sold_qty[i.get("parent")] = total_qty_sold
 				items_gross_margin[i.get("parent")] = gross_margin
-
-			overall_total_sales += total_sales
-			overall_total_sales_qty += total_qty_sold
-			overall_gross_margin += gross_margin
+			
+			total_sold_qty += total_qty_sold
 
 		# classify items using ABC analysis
 		# A: 80% of the total sales
@@ -980,16 +951,25 @@ def generate_item_clases(suppliers):
 		# C: 5% of the total sales
 		# D: 0% of the total sales
 
-		if overall_total_sales_qty == 0:
+		if total_sold_qty == 0:
 			continue
 
-		items_classification[s] = classify_items(items_with_sales, overall_total_sales)
-		items_classification_qty[s] = classify_items(items_with_sold_qty, overall_total_sales_qty)
-		items_classification_gross_margin[s] = classify_items(items_gross_margin, overall_gross_margin)
-	
-	return items_classification, zero_sell_items, items_classification_qty, items_classification_gross_margin
+		# Assign weights
+		weights = {
+			'sales_revenue': 0.5,
+			'gross_margin': 0.3,
+			'sold_qty': 0.2
+		}
 
-def classify_items(items_with_sales, overall_total_sales):
+		for item in items_with_sales:
+			items_with_sales[item] = items_with_sales[item] * weights['sales_revenue'] + items_gross_margin[item] * weights['gross_margin'] + items_with_sold_qty[item] * weights['sold_qty']
+		
+		total = sum(items_with_sales.values())
+		items_classification[s] = classify_items(items_with_sales, total)
+
+	return items_classification, zero_sell_items
+
+def classify_items(items_with_sales, total):
 	# sort items by total sales
 	sorted_items = sorted(items_with_sales.items(), key=lambda x: x[1], reverse=True)
 	item_with_class = {}
@@ -997,20 +977,20 @@ def classify_items(items_with_sales, overall_total_sales):
 	# calculate the percentage of the total sales
 	percentage = 0
 	for i in sorted_items:
-		percentage += float(i[1]) / overall_total_sales
+		percentage += float(i[1]) / total
 
 		# top 80% of the total sales
 		if percentage <= 0.8:
 			# classify the item as A
 			item_with_class[i[0]] = "A"
 
-		# top 20% of the total sales
+		# top 15% of the total sales
 		elif percentage <= 0.95:
 			# classify the item as B
 			item_with_class[i[0]] = "B"
 
 		# top 5% of the total sales
-		elif percentage <= 1:
+		else:
 			# classify the item as C
 			item_with_class[i[0]] = "C"
 
