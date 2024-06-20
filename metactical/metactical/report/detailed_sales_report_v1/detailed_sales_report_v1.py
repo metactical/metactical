@@ -103,7 +103,7 @@ def execute(filters=None):
 
 		suggested_item_class = ""		
 		# if item is created in the last 1 month and has no sales, class is "N"
-		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=10):
+		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=1):
 			suggested_item_class = "N"
 		elif i.get("item_code") in zero_sales:
 			suggested_item_class = "D"
@@ -902,7 +902,7 @@ def get_conditions(filters):
 
 def generate_item_clases(suppliers):
 	if not suppliers:
-		return {}, [], {}
+		return {}, []
 
 	zero_sell_items = []
 	items_classification = {}
