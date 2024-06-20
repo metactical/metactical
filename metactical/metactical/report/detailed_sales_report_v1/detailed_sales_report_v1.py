@@ -945,7 +945,7 @@ def generate_item_clases(suppliers):
 		for i in items:
 			# get the date one months before the current date
 			today = getdate(nowdate())
-			one_month_before = getdate(today) - relativedelta(months=6)
+			one_month_before = getdate(today) - relativedelta(months=1)
 
 			# get total sold quantity of the item
 			sales_data = get_total_sold(i.get("parent"), one_month_before)
