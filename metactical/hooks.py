@@ -230,6 +230,14 @@ fixtures = [{
 			"Buying Board",
 			"Projects Status"
 		]]]
+	},
+	{
+		"dt": "Account",
+		"filters": [["name", "in", [
+			"Store Credits - ICL",
+			"Store Credit - CAD - ICL",
+			"Store Credit - USD - ICL"
+		]]]
 	}
 ]
 

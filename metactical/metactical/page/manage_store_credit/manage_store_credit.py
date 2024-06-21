@@ -225,9 +225,13 @@ def save_and_submit_store_credit(sales_invoice, customer):
         frappe.publish_realtime("transfer_store_credit", {"error": str(e)}, user=frappe.session.user)
 
 def create_journal_entry(sales_invoice, customer):
-    store_credit_account = frappe.db.get_single_value("Metactical Settings", "store_credit_account")
+    if sales_invoice.currency == "CAD":
+        store_credit_account = frappe.db.get_single_value("Metactical Settings", "store_credit_account_cad")
+    elif sales_invoice.currency == "USD":
+        store_credit_account = frappe.db.get_single_value("Metactical Settings", "store_credit_account_usd")
+        
     if not store_credit_account:
-        frappe.throw("Store Credit Account not set in Metactical Settings. Please create the Journal Entry manually.")
+        frappe.publish_realtime("transfer_store_credit", {"error": "Store Credit Account not set in Metactical Settings. Please create the Journal Entry manually."}, user=frappe.session.user)
 
     main_sales_invoice = frappe.db.get_values("Sales Invoice", {"name": sales_invoice.return_against}, ["debit_to", "company", "customer"], as_dict=True)[0]
     
@@ -241,7 +245,7 @@ def create_journal_entry(sales_invoice, customer):
         "party_type": "Customer",
         "party": customer,
         "credit_in_account_currency": -1 * sales_invoice.grand_total,
-        "is_advance": "No"
+        "is_advance": "Yes"
     })
     je.append("accounts", {
         "account": main_sales_invoice.debit_to,
