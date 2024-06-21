@@ -163,7 +163,7 @@ metactical.store_credit.StoreCredit = class {
                             tax.amount = "$ " + Math.round(discount * 100) / 100
                         }
                         else if (tax.name === "TTL Store Credit"){
-                            tax.amount = "$ " + Math.round((total_amount - discount + total_tax) * 100) / 100
+                            tax.amount = "$ " + Math.round((total_amount + total_tax) * 100) / 100
                         }
                         else if (tax.name === "Total Qty Returned"){
                             tax.amount = Math.round(total_qty_returned * 100) / 100
