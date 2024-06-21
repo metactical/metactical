@@ -71,10 +71,10 @@ def load_si(sales_invoice):
         elif sales_invoice_doc.docstatus == 0:
             frappe.throw("Sales Invoice "+sales_invoice+" is a Draft")
             return
-        elif sales_invoice_doc.status == "Unpaid":
-            frappe.throw("Sales Invoice "+sales_invoice+" is Unpaid")
+        elif sales_invoice_doc.status not in ["Paid", "Credit Note Issued"]:
+            frappe.throw("Sales Invoice "+sales_invoice+" is "+sales_invoice_doc.get("status"))
             return
-
+        
         for item in sales_invoice_doc.items:
             retail_sku = frappe.db.get_value("Item", item.item_code, "ifw_retailskusuffix")
             retail_skus[item.item_code] = retail_sku
