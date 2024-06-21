@@ -16,11 +16,11 @@ class ItemPriceFromExcel(Document):
 		queue_action(self, "submit", timeout=2000)
 
 	def on_submit(self):
-		file_content = self.check_file()
-		self.create_item_prices(file_content)
+		self.check_file()
 
 	def validate(self):
-		self.check_file()
+		file_content = self.check_file()
+		self.create_price_entries(file_content)
 
 	def check_file(self):
 		file_content, extn = self.read_file()
@@ -45,16 +45,78 @@ class ItemPriceFromExcel(Document):
 
 		return file_content, extn
 
-	def create_item_prices(self, data):
-		#enqueue(self.create_order_entries(data))
-		limit = 500
-		start = 0
-		while start < len(data):
-			end = start + limit
-			self.create_price_entries(data[start:end])
-			start = end
-
 	def create_price_entries(self, data):
+		item_code_col = None
+		item_sku_col = None
+		price_lists = []
+
+		for col in data[0]:
+			if col in ["ItemCode", "ERPSKU"]:
+				item_code_col = data[0].index(col)
+			elif col in ["Retail SKU"]:
+				item_sku_col = data[0].index(col)
+			else:
+				# Check if it's a price list
+				price_list = frappe.db.exists("Price List", {"name": col})
+				if price_list:
+					price_lists.append(col)
+					
+		if price_lists == []:
+			frappe.throw("No price list found in the file")
+
+		for row in data[1:]:
+			if row[item_code_col] in ["ItemCode", "ERPSKU"]:
+				continue
+				
+			item_code = row[item_code_col]
+			item_sku = row[item_sku_col]
+			for price_list in price_lists:
+				price = row[data[0].index(price_list)]
+				if item_code is not None and item_code != "" and self.import_based_on == "Item Code":
+					exists = frappe.db.exists("Item Price", {"item_code": item_code, "price_list": price_list})
+				elif item_sku is not None and item_sku != "" and self.import_based_on == "Item SKU":
+					query = frappe.db.sql("""SELECT 
+						   						item_price.name 
+						   					FROM 
+						   						`tabItem Price` item_price
+						   					LEFT JOIN
+						   						`tabItem` AS item ON item.name = item_price.item_code
+						   					WHERE
+						   						item.ifw_retailskusuffix = %(item_sku)s AND item_price.price_list = %(price_list)s""", 
+											{"item_sku": item_sku, "price_list": price_list}, as_dict=1)
+					if query and len(query) > 0:
+						exists = query[0]["name"]
+					else:
+						exists = False
+						
+				if not self.replace_existing and exists:
+					continue
+				else:
+					if exists:
+						doc = frappe.get_doc("Item Price", exists)
+					else:
+						doc = frappe.new_doc("Item Price")
+					doc.update({
+						"item_code": item_code,
+						"price_list": price_list,
+						"price_list_rate": price,
+					})
+					try:
+						doc.save()
+					except Exception as e:
+						frappe.log_error(frappe.get_traceback())
+						error_log = frappe.new_doc("Item Price From Excel Error"), 
+						error_log.update({
+							"error": e,
+							"item_code": item_code,
+							"rate": price,
+							"parenttype": self.doctype,
+							"parent": self.name,
+							"parentfield": "error_log"
+						})
+						error_log.insert()
+						
+		'''	
 		for row in data:
 			if row[0] in ["ItemCode", "ERPSKU"] or row[4] is None:
 				continue
@@ -87,4 +149,4 @@ class ItemPriceFromExcel(Document):
 							"parent": self.name,
 							"parentfield": "error_log"
 						})
-						error_log.insert()
+						error_log.insert()'''
