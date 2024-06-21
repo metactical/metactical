@@ -233,7 +233,7 @@ def create_journal_entry(sales_invoice, customer):
     if not store_credit_account:
         frappe.publish_realtime("transfer_store_credit", {"error": "Store Credit Account not set in Metactical Settings. Please create the Journal Entry manually."}, user=frappe.session.user)
 
-    main_sales_invoice = frappe.db.get_values("Sales Invoice", {"name": sales_invoice.return_against}, ["debit_to", "company", "customer"], as_dict=True)[0]
+    main_sales_invoice = frappe.db.get_values("Sales Invoice", {"name": sales_invoice.return_against}, ["debit_to", "company", "customer", "name"], as_dict=True)[0]
     
     je = frappe.new_doc("Journal Entry")
     je.voucher_type = "Journal Entry"
@@ -256,6 +256,7 @@ def create_journal_entry(sales_invoice, customer):
         "party": main_sales_invoice.customer,
         "is_advance": "No"
     })
+
     je.insert()
     je.submit()
 
