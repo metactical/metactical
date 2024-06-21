@@ -6,7 +6,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "price_list",
+  "import_based_on",
   "replace_existing",
   "excel_file",
   "amended_from",
@@ -21,13 +21,6 @@
   "ais_queued_by"
  ],
  "fields": [
-  {
-   "fieldname": "price_list",
-   "fieldtype": "Link",
-   "label": "Price List",
-   "options": "Price List",
-   "reqd": 1
-  },
   {
    "fieldname": "excel_file",
    "fieldtype": "Attach",
@@ -107,12 +100,20 @@
    "fieldtype": "Small Text",
    "label": "Queue Error",
    "read_only": 1
+  },
+  {
+   "description": "To import based on Item Code, there should be a column with \"ERPSKU\" heading. To import based on Item SKU, there should be a column with \"Retail SKU\" heading ",
+   "fieldname": "import_based_on",
+   "fieldtype": "Select",
+   "label": "Import Based On",
+   "options": "Item Code\nItem SKU",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-06-09 20:29:57.868407",
+ "modified": "2024-06-20 22:15:32.006732",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Price From Excel",

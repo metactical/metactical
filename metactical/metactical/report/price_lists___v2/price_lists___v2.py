@@ -7,11 +7,11 @@ from metactical.custom_scripts.warehouse.warehouse import get_item_details2
 def execute(filters=None):
 	purchase_orders = filters.get("purchase_order") if filters.get("purchase_order") else None
 	supplier = filters.get("supplier") if filters.get("supplier") else None
-	sales_orders = filters.get("sales_order") if filters.get("sales_order") else None
+	sales_order = filters.get("sales_order") if filters.get("sales_order") else None
 	price_lists = filters.get("price_list") if filters.get("price_list") else []
 	costs = {}
 
-	if not supplier and not purchase_orders and not sales_orders:
+	if not supplier and not purchase_orders and not sales_order:
 		return [], []
 
 	if supplier:
@@ -65,7 +65,7 @@ def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_pric
 		items = frappe.db.sql(""" SELECT soi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, soi.parent, i.ifw_duty_rate
 									FROM `tabSales Order Item` soi
 									JOIN `tabItem` i on i.name = soi.item_code
-									WHERE soi.parent IN %s """, (sales_orders,), as_dict=True)
+									WHERE soi.parent = %s """, sales_order, as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 	
@@ -115,10 +115,10 @@ def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders
 	columns = []
 	if type(supplier_price_lists) == list and len(supplier_price_lists) > 0:
 		columns.append({
-			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else "",
+			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_order else "",
 			"fieldtype": "Link",
 			"fieldname": "purchase_order",
-			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else ""
+			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_order else ""
 		})
 
 	columns.extend([{

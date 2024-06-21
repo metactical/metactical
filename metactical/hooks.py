@@ -133,6 +133,9 @@ doc_events = {
 	}, 
 	"Project": {
 		"on_update": "metactical.custom_scripts.project.project.on_update"
+	},
+	"Item Price": {
+		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	}
 }
 
