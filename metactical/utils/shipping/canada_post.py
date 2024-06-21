@@ -154,6 +154,7 @@ class CanadaPost():
 					elif link['@rel'] == "price":
 						self.set_price(row, link)
 				row.db_insert()
+		doc.ais_shipment_status = "Shipped"
 		doc.save()
 		# Merger PDFs.
 		if files:

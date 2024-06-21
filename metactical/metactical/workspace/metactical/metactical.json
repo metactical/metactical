@@ -123,6 +123,33 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Unreconciled Stock report",
+   "link_to": "Warehouse Stock Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Price Lists - V1",
+   "link_to": "Price Lists - V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Price Lists - V2",
+   "link_to": "Price Lists - V2",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
@@ -720,7 +747,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-05-06 07:37:26.612806",
+ "modified": "2024-06-04 10:05:13.325612",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

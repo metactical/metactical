@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-06-09 13:37:38.180836",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "import_based_on",
+  "replace_existing",
+  "excel_file",
+  "amended_from",
+  "section_break_i8qkd",
+  "error_log",
+  "section_queus",
+  "ais_queue_failed",
+  "ais_queue_status",
+  "ais_queueu_comment",
+  "column_break_jx87a",
+  "ais_queued_date",
+  "ais_queued_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "excel_file",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "Excel File",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Item Price From Excel",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_queus",
+   "fieldtype": "Section Break",
+   "label": "Queue"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "ais_queue_failed",
+   "fieldtype": "Check",
+   "label": "Queue Failed",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queue_status",
+   "fieldtype": "Select",
+   "label": "Queue Status",
+   "options": "Not Queued\nQueued\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_jx87a",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queued_date",
+   "fieldtype": "Datetime",
+   "label": "Queue Date",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queued_by",
+   "fieldtype": "Link",
+   "label": "Queued By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "replace_existing",
+   "fieldtype": "Check",
+   "label": "Replace Existing Prices"
+  },
+  {
+   "fieldname": "section_break_i8qkd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Table",
+   "label": "Errors",
+   "options": "Item Price From Excel Error",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queueu_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error",
+   "read_only": 1
+  },
+  {
+   "description": "To import based on Item Code, there should be a column with \"ERPSKU\" heading. To import based on Item SKU, there should be a column with \"Retail SKU\" heading ",
+   "fieldname": "import_based_on",
+   "fieldtype": "Select",
+   "label": "Import Based On",
+   "options": "Item Code\nItem SKU",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-06-20 22:15:32.006732",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Price From Excel",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
