@@ -6,20 +6,33 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "store_credit_account"
+  "store_credit_section",
+  "store_credit_account_cad",
+  "store_credit_account_usd"
  ],
  "fields": [
   {
-   "fieldname": "store_credit_account",
+   "fieldname": "store_credit_account_cad",
    "fieldtype": "Link",
-   "label": "Account for Store Credits",
+   "label": "CAD Account for Store Credits",
    "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_account_usd",
+   "fieldtype": "Link",
+   "label": "USD Account for Store Credit",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_section",
+   "fieldtype": "Section Break",
+   "label": "Store Credit"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-06-18 09:40:42.445614",
+ "modified": "2024-06-21 03:19:31.542323",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",

@@ -37,6 +37,22 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 		_barcode.get('code128', self.name).write(rv)
 		bstring = rv.getvalue()
 		self.ais_barcode = bstring.decode('ISO-8859-1')
+		self.check_pay_with_store_credit()
+
+	def check_pay_with_store_credit(self):
+		if self.pay_with_store_credit and not self.advances:
+			self.pay_with_store_credit = 0
+			frappe.msgprint(f"Customer <b>{self.customer}</b> does not have store credit to pay this invoice.")
+		
+		store_credit_account = get_store_credit_account(self.currency)
+		if self.pay_with_store_credit:
+			if store_credit_account:
+				if store_credit_account != self.debit_to:
+					self.debit_to = store_credit_account
+					self.set_missing_values()
+			else:
+				self.pay_with_store_credit = 0
+				frappe.msgprint(f"Store credit account not set for <b>{self.currency}</b> currency in Metactical Settings.")
 
 	def calculate_taxes_and_totals(self):
 		from metactical.custom_scripts.controllers.taxes_and_totals import custom_calculate_taxes_and_totals
@@ -299,3 +315,17 @@ def si_mode_of_payment(name):
 	if len(mode) > 0:
 		payment_mode = mode[0].mode_of_payment
 	return payment_mode
+
+@frappe.whitelist()
+def get_store_credit_account(currency):
+	field = None
+	if currency == 'CAD':
+		field = "store_credit_account_cad"
+	elif currency == 'USD':
+		field = "store_credit_account_usd"
+
+	if field:
+		account = frappe.db.get_single_value("Metactical Settings", field)
+		return account
+	else:
+		return None
