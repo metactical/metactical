@@ -106,14 +106,14 @@
    "fieldname": "import_based_on",
    "fieldtype": "Select",
    "label": "Import Based On",
-   "options": "Item Code\nItem SKU",
+   "options": "ERP SKU\nRetail SKU",
    "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-06-20 22:15:32.006732",
+ "modified": "2024-06-22 01:44:34.201026",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Price From Excel",

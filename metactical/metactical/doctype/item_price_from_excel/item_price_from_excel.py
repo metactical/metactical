@@ -16,11 +16,11 @@ class ItemPriceFromExcel(Document):
 		queue_action(self, "submit", timeout=2000)
 
 	def on_submit(self):
-		self.check_file()
-
-	def validate(self):
 		file_content = self.check_file()
 		self.create_price_entries(file_content)
+
+	def validate(self):
+		self.check_file()
 
 	def check_file(self):
 		file_content, extn = self.read_file()
@@ -65,18 +65,23 @@ class ItemPriceFromExcel(Document):
 			frappe.throw("No price list found in the file")
 
 		for row in data[1:]:
-			if row[item_code_col] in ["ItemCode", "ERPSKU"]:
-				continue
-				
-			item_code = row[item_code_col]
-			item_sku = row[item_sku_col]
+			item_code = None
+			item_sku = None
+
+			if item_code_col is not None:
+				item_code = row[item_code_col]
+
+			if item_sku_col is not None:
+				item_sku = row[item_sku_col]
+			
 			for price_list in price_lists:
 				price = row[data[0].index(price_list)]
-				if item_code is not None and item_code != "" and self.import_based_on == "Item Code":
+				if item_code is not None and item_code != "" and self.import_based_on == "ERP SKU":
 					exists = frappe.db.exists("Item Price", {"item_code": item_code, "price_list": price_list})
-				elif item_sku is not None and item_sku != "" and self.import_based_on == "Item SKU":
+				elif item_sku is not None and item_sku != "" and self.import_based_on == "Retail SKU":
+					item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item_sku}, "name")
 					query = frappe.db.sql("""SELECT 
-						   						item_price.name 
+						   						item_price.name
 						   					FROM 
 						   						`tabItem Price` item_price
 						   					LEFT JOIN
@@ -90,6 +95,8 @@ class ItemPriceFromExcel(Document):
 						exists = False
 						
 				if not self.replace_existing and exists:
+					continue
+				elif item_code is None or item_code == "":
 					continue
 				else:
 					if exists:
@@ -105,7 +112,7 @@ class ItemPriceFromExcel(Document):
 						doc.save()
 					except Exception as e:
 						frappe.log_error(frappe.get_traceback())
-						error_log = frappe.new_doc("Item Price From Excel Error"), 
+						error_log = frappe.new_doc("Item Price From Excel Error")
 						error_log.update({
 							"error": e,
 							"item_code": item_code,
@@ -115,38 +122,3 @@ class ItemPriceFromExcel(Document):
 							"parentfield": "error_log"
 						})
 						error_log.insert()
-						
-		'''	
-		for row in data:
-			if row[0] in ["ItemCode", "ERPSKU"] or row[4] is None:
-				continue
-			
-			item_code = row[0]
-			exists = frappe.db.exists("Item Price", {"item_code": item_code, "price_list": self.price_list})
-			if not self.replace_existing and exists:
-				continue
-			else:
-				if item_code is not None and item_code != "":
-					if exists:
-						doc = frappe.get_doc("Item Price", exists)
-					else:
-						doc = frappe.new_doc("Item Price")
-					doc.update({
-						"item_code": item_code,
-						"price_list": self.price_list,
-						"price_list_rate": row[4],
-					})
-					try:
-						doc.save()
-					except Exception as e:
-						frappe.log_error(frappe.get_traceback())
-						error_log = frappe.new_doc("Item Price From Excel Error"), 
-						error_log.update({
-							"error": e,
-							"item_code": item_code,
-							"rate": row[4],
-							"parenttype": self.doctype,
-							"parent": self.name,
-							"parentfield": "error_log"
-						})
-						error_log.insert()'''
