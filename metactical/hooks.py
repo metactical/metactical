@@ -119,9 +119,6 @@ doc_events = {
 		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel",
 		"on_submit": "metactical.custom_scripts.delivery_note.delivery_note.on_submit"
 	},
-	"Material Request": {
-		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
-	},
 	"Address": {
 		"validate": "metactical.custom_scripts.address.address.validate"
 	},
@@ -154,7 +151,8 @@ override_doctype_class = {
 	"Purchase Order": "metactical.custom_scripts.purchase_order.purchase_order.CustomPurchaseOrder",
 	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
-	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry"
+	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
 }
 
 # Scheduled Tasks
