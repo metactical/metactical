@@ -141,15 +141,6 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 1,
-   "label": "Price Lists - V2",
-   "link_to": "Price Lists - V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
@@ -305,6 +296,33 @@
    "label": " Employee Roll Report",
    "link_to": "Employee Roll Report",
    "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bulk Updates",
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order Import Tool",
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Price Import Tool",
+   "link_to": "Item Price From Excel",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -747,7 +765,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-06-02 15:50:27.928277",
+ "modified": "2024-06-25 09:27:08.394797",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
