@@ -3,16 +3,16 @@ frappe.ui.form.on('Sales Invoice', {
 		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	validate: function(frm){
-		if (frm.doc.pay_with_store_credit && !frm.doc.advances.length){
+		if (frm.doc.neb_pay_with_store_credit && !frm.doc.advances.length){
 			frappe.msgprint(__("Please select advances to pay with store credit."));
 			frm.trigger("customer");
 			frappe.validated = false;
 		}
 	},
-	pay_with_store_credit: function(frm){
-		if (frm.doc.pay_with_store_credit){
+	neb_pay_with_store_credit: function(frm){
+		if (frm.doc.neb_pay_with_store_credit){
 			if (!frm.doc.customer){
-				frm.set_value("pay_with_store_credit", 0);
+				frm.set_value("neb_pay_with_store_credit", 0);
 				frappe.msgprint(__("Please select a customer first."));
 				return;
 			}
@@ -25,12 +25,12 @@ frappe.ui.form.on('Sales Invoice', {
 		}
 	},
 	customer: function(frm){
-		if (frm.doc.pay_with_store_credit){
+		if (frm.doc.neb_pay_with_store_credit){
 			frm.trigger('get_store_credit_account');
 		}
 	},
 	currency: function(frm){
-		if (frm.doc.pay_with_store_credit){
+		if (frm.doc.neb_pay_with_store_credit){
 			frm.trigger('get_store_credit_account');
 		}
 	},
@@ -54,7 +54,7 @@ frappe.ui.form.on('Sales Invoice', {
 	},
 
 	debit_to: function(frm){
-		if (frm.doc.pay_with_store_credit){
+		if (frm.doc.neb_pay_with_store_credit){
 			// if debit does not starts with "Store Credit" then set it to store credit
 			if (!frm.doc.debit_to.startsWith("Store Credit")){
 				frm.trigger("get_store_credit_account");

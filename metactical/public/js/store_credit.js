@@ -186,7 +186,7 @@ metactical.store_credit.StoreCredit = class {
 
                     // change 'process store credit' button to 'processing'
                     $("#process_payment_button").html("Processing...").attr("disabled", true)
-
+                    
                     frappe.call({
                         method: 'metactical.metactical.page.manage_store_credit.manage_store_credit.transfer_store_credit',
                         args: {
@@ -212,6 +212,8 @@ metactical.store_credit.StoreCredit = class {
 
                         }
                     })
+
+                    me.clearSI()
                 },
                 loadSI() {
                     if (!this.current_sales_invoice)
@@ -313,7 +315,7 @@ metactical.store_credit.StoreCredit = class {
                     })
 
                     var d = new frappe.ui.Dialog({
-                        title: __("Edit Price"),
+                        title: __("Edit Price & Quantity"),
                         fields: [
                             {
                                 "label": "Items",
@@ -395,6 +397,10 @@ metactical.store_credit.StoreCredit = class {
                     })
 
                     d.show()
+
+                    setTimeout(() => {
+                        $(`[data-route="manage-store-credit"] [data-fieldname="edit_price"] .row-index`).remove()
+                    }, 200);
                 },
                 printPDF(){
                     var sales_invoice_to_print = ""
@@ -492,11 +498,11 @@ let get_prompt_fields = function(sales_invoices, single_store_credit = false){
             "fieldtype": "Link",
             "fieldname": "print_format",
             "options": "Print Format",
-            "default": "Custom SI - V1",
+            "default": "Credit Note POS - V1",
             "get_query": function(){
                 return {
                     "filters": {
-                        "doc_type": "Sales Invoice"
+                        "name": ["in", ["Credit Note POS - V1", "Custom Store Credit - V1"]],
                     }
                 }
             }
