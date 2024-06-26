@@ -10,7 +10,7 @@
 
                 <div class="collapse" :id="'collapse'+ sales_invoice" >
                     <div class="card-body">
-                        <p>Customer: <b>{{ credit_note[0].customer }}</b></p>
+                        <p>Customer: <b>{{ credit_note[0].neb_store_credit_beneficiary ? credit_note[0].neb_store_credit_beneficiary : "-" }}</b></p>
                         <div class="table-responsive">
                             <table class="table mt-0">
                                 <thead>
@@ -24,7 +24,7 @@
                                     <tr v-for="item in credit_note" :key="item.id">
                                         <td>{{ item.item_name }}</td>
                                         <td>{{ item.qty }}</td>
-                                        <td>{{ item.rate }} {{ item.retail_sku }}</td>
+                                        <td>{{ item.rate }}</td>
                                         <td>{{ item.discount_amount }}</td>
                                         <td class="text-nowrap">{{ item.amount }}</td>
                                     </tr>

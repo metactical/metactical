@@ -1,4 +1,5 @@
 import frappe
+import functools
 from frappe import _, msgprint
 import barcode as _barcode
 from io import BytesIO
@@ -40,18 +41,18 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 		self.check_pay_with_store_credit()
 
 	def check_pay_with_store_credit(self):
-		if self.pay_with_store_credit and not self.advances:
-			self.pay_with_store_credit = 0
+		if self.neb_pay_with_store_credit and not self.advances:
+			self.neb_pay_with_store_credit = 0
 			frappe.msgprint(f"Customer <b>{self.customer}</b> does not have store credit to pay this invoice.")
 		
 		store_credit_account = get_store_credit_account(self.currency)
-		if self.pay_with_store_credit:
+		if self.neb_pay_with_store_credit:
 			if store_credit_account:
 				if store_credit_account != self.debit_to:
 					self.debit_to = store_credit_account
 					self.set_missing_values()
 			else:
-				self.pay_with_store_credit = 0
+				self.neb_pay_with_store_credit = 0
 				frappe.msgprint(f"Store credit account not set for <b>{self.currency}</b> currency in Metactical Settings.")
 
 	def calculate_taxes_and_totals(self):
@@ -329,3 +330,52 @@ def get_store_credit_account(currency):
 		return account
 	else:
 		return None
+
+@frappe.whitelist()
+def get_customer_info(doc):
+	if doc.neb_store_credit_beneficiary:
+		customer = frappe.get_doc("Customer", doc.neb_store_credit_beneficiary)
+		address = load_address(customer)
+		contact = load_contact(customer)
+
+		return {
+			"contact": contact[0] if len(contact) > 0 else {},
+			"address": address[0] if len(address) > 0 else {}
+		}
+
+
+def load_address(doc, key=None):
+	"""Loads address list and contact list in `__onload`"""
+	from frappe.contacts.doctype.address.address import get_address_display, get_condensed_address
+
+	filters = [
+		["Dynamic Link", "link_doctype", "=", doc.doctype],
+		["Dynamic Link", "link_name", "=", doc.name],
+		["Dynamic Link", "parenttype", "=", "Address"],
+	]
+	address_list = frappe.get_list("Address", 
+									filters=filters, 
+									fields=["city", "county", "state", "country", "pincode", "creation", "modified", "address_line1"], 
+									order_by="creation desc")
+	address_list = [a.update({"display": get_address_display(a)}) for a in address_list]
+
+	address_list = sorted(
+		address_list,
+		key=functools.cmp_to_key(
+			lambda a, b: (int(a.is_primary_address - b.is_primary_address))
+			or (1 if a.modified - b.modified else 0)
+		),
+		reverse=True,
+	)
+
+	return address_list
+
+def load_contact(doc):
+	contact_list = []
+	filters = [
+		["Dynamic Link", "link_doctype", "=", doc.doctype],
+		["Dynamic Link", "link_name", "=", doc.name],
+		["Dynamic Link", "parenttype", "=", "Contact"],
+	]
+	contact_list = frappe.get_all("Contact", filters=filters, fields=["email_id", "phone", "mobile_no"])
+	return contact_list
