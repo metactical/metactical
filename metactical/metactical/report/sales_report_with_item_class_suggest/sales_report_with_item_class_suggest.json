@@ -1,0 +1,23 @@
+{
+ "add_total_row": 1,
+ "columns": [],
+ "creation": "2024-06-27 05:28:10.962159",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": "International Camouflage LTD 888 Granville Street Vancouver, British Columbia Canada - V6Z 1K3",
+ "modified": "2024-06-27 05:28:10.962159",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Sales Report with Item Class Suggest",
+ "owner": "Administrator",
+ "prepared_report": 1,
+ "ref_doctype": "Sales Invoice",
+ "report_name": "Sales Report with Item Class Suggest",
+ "report_type": "Script Report",
+ "roles": []
+}
