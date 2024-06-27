@@ -68,8 +68,6 @@ def execute(filters=None):
 		row["wh_whs"] = get_qty(i.get("item_code"), "W01-WHS-Active Stock - ICL") or 0
 		row["wh_dtn"] = get_qty(i.get("item_code"), "R05-DTN-Active Stock - ICL") or 0
 		row["wh_queen"] = get_qty(i.get("item_code"), "R07-Queen-Active Stock - ICL") or 0
-		row["wh_amb"] = get_qty(i.get("item_code"), "R06-AMB-Active Stock - ICL") or 0
-		row["wh_mon"] = get_qty(i.get("item_code"), "R04-Mon-Active Stock - ICL") or 0
 		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
 		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
 		row["wh_gor"] = get_qty(i.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
@@ -83,10 +81,6 @@ def execute(filters=None):
 			row["total_actual_qty"] += row.get("wh_dtn")
 		if row.get("wh_queen") > 0:
 			row["total_actual_qty"] += row.get("wh_queen")
-		if row.get("wh_amb") > 0:
-			row["total_actual_qty"] += row.get("wh_amb")
-		if row.get("wh_mon") > 0:
-			row["total_actual_qty"] += row.get("wh_mon")
 		if row.get("wh_vic") > 0:
 			row["total_actual_qty"] += row.get("wh_vic")
 		if row.get("wh_edm") > 0:
@@ -182,7 +176,9 @@ def execute(filters=None):
 		row["sales_revenue_last_twelve_months"] = get_sold_amount_in_dollars(i.get("item_code"), years_before)
 
 		# no of customers bought an item in the last 12 months
-		row["no_cust_l12m"] = get_unique_customers_bought_an_item(i.get("item_code"), years_before)
+		customers_12, customers_24 = get_unique_customers_bought_an_item(i.get("item_code"), today)
+		row["no_cust_l12m"] = customers_12
+		row["no_cust_l24m"] = customers_24
 
 		# beginning and ending inventory
 		row["beginning_inventory"], row["ending_inventory"] = get_inventory(i.get("item_code"), warehouse)
@@ -195,26 +191,9 @@ def execute(filters=None):
 		row["lead_time_in_days"] = frappe.db.get_value("Supplier", i.get("supplier"), "lead_time_in_days")
 
 		# order frequencies
-		order_frqs, ordered_quantities = get_order_frequency(i.get("item_code"), years_before)
-		
-		today = getdate(nowdate())
-		last_month = getdate(str(datetime(today.year-years_to_subtract, today.month,today.day)))
-		while last_month <= today:
-			month = last_month.strftime("%B")
-			row[frappe.scrub("ord_freq"+month+str(last_month.year))] = 0
-
-			for d in order_frqs:
-				if last_month.month == d[0] and last_month.year == d[2]:
-					row[frappe.scrub("ord_freq"+month+str(last_month.year))] = d[1]
-			last_month = last_month + relativedelta(months=1)
-
-		# remove the biggest and smallest values from the list then get the average
-		order_frqs = sorted(order_frqs, key=itemgetter(1))
-		if len(order_frqs) <= 2:
-			row["average_order_frequency"] = 0
-		else:
-			order_frqs = order_frqs[1:-1]
-			row["average_order_frequency"] = round(sum([d[1] for d in order_frqs])/len(order_frqs), 0)
+		order_frqs, ordered_quantities = get_order_frequency(i.get("item_code"), today)
+		row["average_order_frequency_12"] = order_frqs["12"]
+		row["average_order_frequency_24"] = order_frqs["24"]
 
 		
 		# remove the biggest and smallest values from the list 
@@ -240,8 +219,8 @@ def execute(filters=None):
 
 		# motnhly stock
 		average_monthly_consumption_12, average_monthly_consumption_24 = get_monthly_consumption(i.get("item_code"), i.get("creation"), filters, sales_data)
-		row["monthly_stock_12m"] = ((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_12 if average_monthly_consumption_12 > 0 else row["total_actual_qty"]) * 100 / 100
-		row["monthly_stock_24m"] = ((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24 if average_monthly_consumption_24 > 0 else row["total_actual_qty"]) * 100 / 100
+		row["monthly_stock_12m"] = (((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_12) if average_monthly_consumption_12 > 0 else row["total_actual_qty"] + row["us_qoh"]) * 100 / 100
+		row["monthly_stock_24m"] = (((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24) if average_monthly_consumption_24 > 0 else row["total_actual_qty"] + row["us_qoh"]) * 100 / 100
 
 		# NoStockOut12M
 		row["no_stock_out_12m"] = get_stock_out_days(i.get("item_code"), years_before, filters)
@@ -352,8 +331,6 @@ def get_reference_warehouse(filters):
 		"W01-WHS-Active Stock - ICL": "wh_whs",
 		"R05-DTN-Active Stock - ICL": "wh_dtn",
 		"R07-Queen-Active Stock - ICL": "wh_queen",
-		"R06-AMB-Active Stock - ICL": "wh_amb",
-		"R04-Mon-Active Stock - ICL": "wh_mon",
 		"R03-Vic-Active Stock - ICL": "wh_vic",
 		"R02-Edm-Active Stock - ICL": "wh_edm",
 		"R01-Gor-Active Stock - ICL": "wh_gor"
@@ -566,18 +543,6 @@ def get_column(filters,conditions):
 				"width": 200,
 			},
 			{
-				"label": _("R06-AMB-Active Stock - ICL"),
-				"fieldname": "wh_amb",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
-				"label": _("R04-Mon-Active Stock - ICL"),
-				"fieldname": "wh_mon",
-				"fieldtype": "Int",
-				"width": 200,
-			},
-			{
 				"label": _("R03-Vic-Active Stock - ICL"),
 				"fieldname": "wh_vic",
 				"fieldtype": "Int",
@@ -744,8 +709,14 @@ def get_column(filters,conditions):
 			"width": 140
 		},
 		{
-			"label": _(f"NoCustL{filters.sales_data_period}M"),
+			"label": _(f"NoCustL12M"),
 			"fieldname": "no_cust_l12m",
+			"fieldtype": "Int",
+			"width": 140,
+		}, 
+		{
+			"label": _(f"NoCustL24M"),
+			"fieldname": "no_cust_l24m",
 			"fieldtype": "Int",
 			"width": 140,
 		}, 
@@ -778,22 +749,17 @@ def get_column(filters,conditions):
 		}
 	])
 
-	last_month = getdate(str(datetime(today.year-years_to_subtract, today.month,1)))
-	while last_month <= today:
-		month = last_month.strftime("%B")
-		columns.append({
-				"label": _(str(last_month.year) + "_OrdFreq" + month),
-				"fieldname": frappe.scrub("ord_freq"+month+str(last_month.year)),
-				"fieldtype": "Int",
-				"width": 140,
-		})
-
-		last_month = last_month + relativedelta(months=1)
-
 	columns.extend([
 		{
-			"label": _(f"AverageOrderFreq{filters.sales_data_period}M"),
-			"fieldname": "average_order_frequency",
+			"label": _(f"AvgOrderFreq12M"),
+			"fieldname": "average_order_frequency_12",
+			"fieldtype": "Int",
+			"width": 140,
+			"precision": 2
+		},
+		{
+			"label": _(f"AvgOrderFreq24M"),
+			"fieldname": "average_order_frequency_24",
 			"fieldtype": "Int",
 			"width": 140,
 			"precision": 2
@@ -907,8 +873,6 @@ def get_conditions(filters):
 	limit = filters.get("limit")
 	if filters.get('supplier'):
 		suppliers = frappe.parse_json(filters.get("supplier"))
-		suppliers.append("asa")
-		suppliers.append("asaa")
 		# format_strings = ','.join(['%s'] * len(suppliers))
 		conditions += " and s.supplier IN %(supplier)s"
 	if limit != "All":
@@ -1033,9 +997,16 @@ def get_discount_percentages(item_code, years_before):
 
 	return discount_percentages
 
-def get_order_frequency(item_code, years_before):	
+def get_order_frequency(item_code, today):	
+	year_before = getdate(str(datetime(today.year-1, today.month, today.day)))
+	two_years_before = getdate(str(datetime(today.year-2, today.month, today.day)))
+	six_months_before = today - relativedelta(months=6)
+
+	order_freq_in_12_months = 0
+	order_freq_in_24_months = 0
+
 	# get total number of received purchase receipts
-	data = frappe.db.sql("""select Month(posting_date), pr.name, Year(posting_date), pri.qty
+	data = frappe.db.sql("""select Month(posting_date) as month, pr.name, Year(posting_date) as year, pri.qty, pr.posting_date
 							from
 								`tabPurchase Receipt Item` pri
 							join
@@ -1045,38 +1016,39 @@ def get_order_frequency(item_code, years_before):
 								pr.docstatus = 1 and 
 								pr.posting_date >= %s and 
 								pr.status = "Completed" and
-								pri.warehouse <> 'US02-Houston - Active Stock - ICL'
-								group by Month(posting_date)
-		""",(item_code, years_before.strftime("%Y-%m-%d")))
+								pri.warehouse not in ('US02-Houston - Active Stock - ICL', 'R04-Mon-Active Stock - ICL', 'R06-Reg-Active Stock - ICL')
+		""",(item_code, two_years_before.strftime("%Y-%m-%d")), as_dict=1)
 
-	order_freq = {}
+	order_frequency = {}
 	ordered_qty = {}
 	
+	# group data by month
 	for d in data:
-		if d[0] in order_freq:
-			ordered_qty[d[0]] += d[3]
-			order_freq[d[0]] += 1
-		else:
-			ordered_qty[d[0]] = d[3]
-			order_freq[d[0]] = 1
+		if d.posting_date >= year_before:
+			order_freq_in_12_months += 1
 
-	order_frequency = tuple()
-	for key, value in order_freq.items():
-		temp = ()
-		for d in data:
-			if d[0] == key:
-				temp += (key, value, d[2])
-				break
-		order_frequency += (temp,)	
-		
+		order_freq_in_24_months += 1
+
+		if d.month in ordered_qty:
+			ordered_qty[d.month] += d.qty
+		else:
+			ordered_qty[d.month] = d.qty
+
+	# calculate average order frequency per month for the last 12 months and 24 months
+	order_frequency["12"] = order_freq_in_12_months / 12 
+	order_frequency["24"] = order_freq_in_24_months / 2  # This shows the average order frequency per year
+	
 	# convert ordered_qty to list
 	ordered_qty = list(ordered_qty.values())
 
 	return order_frequency, ordered_qty
 
-def get_unique_customers_bought_an_item(item_code, years_before):
+def get_unique_customers_bought_an_item(item_code, today):
+	year_before = getdate(str(datetime(today.year-1, today.month, today.day)))
+	two_years_before = getdate(str(datetime(today.year-2, today.month, today.day)))
+
 	data = frappe.db.sql("""
-		select customer
+		select customer, `tabSales Invoice`.posting_date
 		from 
 			`tabSales Invoice Item` 
 		join 
@@ -1084,14 +1056,38 @@ def get_unique_customers_bought_an_item(item_code, years_before):
 		where 
 			item_code = %s and 
 			`tabSales Invoice`.docstatus = 1 and 
+			`tabSales Invoice`.status = "Paid" and
 			posting_date >= %s
 			and `tabSales Invoice Item`.warehouse <> 'US02-Houston - Active Stock - ICL'
 			""",
-	(item_code, years_before.strftime("%Y-%m-%d")))
+	(item_code, two_years_before.strftime("%Y-%m-%d")))
+
+	# each pos customers are counted as one and other customers are counted using set
+
+	number_of_pos_customer_12 = 0
+	unique_customers_12 = set()
+
+	number_of_pos_customer_24 = 0
+	unique_customers_24 = set()
+
+	for d in data:
+		if d[1] >= year_before:
+			if d[0].startswith("DefaultPOS"):
+				number_of_pos_customer_12 += 1
+			else:
+				unique_customers_12.add(d[0])
+
+		if d[0].startswith("DefaultPOS"):
+			number_of_pos_customer_24 += 1
+		else:
+			unique_customers_24.add(d[0])		
+
+	total_unique_customers_12 = len(unique_customers_12) + number_of_pos_customer_12
+	total_unique_customers_24 = len(unique_customers_24) + number_of_pos_customer_24
 
 	if data:
-		return len(set(data))
-	return 0
+		return total_unique_customers_12, total_unique_customers_24
+	return 0, 0
 
 def get_sold_amount_in_dollars(item_code, years_before):
 	amount = 0

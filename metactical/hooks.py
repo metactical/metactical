@@ -115,15 +115,6 @@ doc_events = {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
 	},
-	"Delivery Note": {
-		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
-		"on_trash": "metactical.custom_scripts.delivery_note.delivery_note.on_trash",
-		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel",
-		"on_submit": "metactical.custom_scripts.delivery_note.delivery_note.on_submit"
-	},
-	"Material Request": {
-		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
-	},
 	"Address": {
 		"validate": "metactical.custom_scripts.address.address.validate"
 	},
@@ -139,6 +130,9 @@ doc_events = {
 	}, 
 	"Project": {
 		"on_update": "metactical.custom_scripts.project.project.on_update"
+	},
+	"Item Price": {
+		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	}
 }
 
@@ -159,6 +153,7 @@ override_doctype_class = {
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
 }
 
 # Scheduled Tasks
@@ -231,8 +226,16 @@ fixtures = [{
 			"Projects Status"
 		]]]
 	},
-	{
+  	{
 		"dt": "Provinces"
+	},
+	{
+		"dt": "Account",
+		"filters": [["name", "in", [
+			"Store Credits - ICL",
+			"Store Credit - CAD - ICL",
+			"Store Credit - USD - ICL"
+		]]]
 	}
 ]
 
@@ -242,7 +245,8 @@ jenv = {
 		"get_po_items:metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"get_pr_items:metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"get_barcode:metactical.barcode_generator.get_barcode",
-		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment"
+		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
+		"get_customer_info:metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
 	]
 }
 

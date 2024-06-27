@@ -6,6 +6,8 @@ def search_customer(*args, **kwargs):
     try:
         phone_number = kwargs.get('phone_number')
         email = kwargs.get('email')
+        first_name = kwargs.get('first_name')
+        last_name = kwargs.get('last_name')
 
         # search by phone number
         contacts_for_phone_number = []
@@ -27,33 +29,79 @@ def search_customer(*args, **kwargs):
 
         contacts = contacts_for_phone_number + contacts_for_email
         contact_names = [c.get('name') for c in contacts]
-        if not contact_names:
+
+        # search by last name and first name
+        customer_names = ""
+        if first_name or last_name:
+            filters = {
+                "first_name": ["like", "%{}%".format(first_name)],
+                "last_name": ["like", "%{}%".format(last_name)]
+            }
+            
+            customer_names = frappe.db.get_list("Customer",
+                        filters=filters,
+                        fields=["name"]
+                    )
+            customer_names = [c.get('name') for c in customer_names]
+
+        if not contact_names and not customer_names:
             frappe.response["customers"] = []
             frappe.response["success"] = True
             return
 
-        customers = frappe.db.sql(""" SELECT
-                                        c.name, c.first_name, c.last_name, c.ais_company as company, dl.parent, c.territory
+        search_filter = get_search_filter(contact_names, customer_names)
+        customers = frappe.db.sql(f""" SELECT
+                                        c.name, c.first_name, c.last_name, c.ais_company as company, dl.parent, c.territory, ct.email_id, ct.mobile_no, ct.phone
                                     FROM
                                         `tabDynamic Link` dl
                                     JOIN `tabCustomer` c on dl.link_name = c.name
+                                    JOIN `tabContact` ct on dl.parent = ct.name
                                     WHERE
                                         dl.link_doctype = 'Customer'
                                         AND dl.parenttype = 'Contact'
-                                        AND dl.parent IN %(contact_names)s
-                                """, {"contact_names": contact_names}, as_dict=True)
+                                        AND ({search_filter})
+                                """, as_dict=True)
 
         for customer in customers:
-            for contact in contacts:
-                if customer.parent == contact.name:
-                    customer["email"] = contact.email_id
-                    customer["phone_number"] = contact.mobile_no
+            customer["phone_number"] = customer.mobile_no
+            if not customer.mobile_no and not customer.phone:
+                customer["phone_number"] = customer.phone
+            
+            customer["email"] = customer.email_id
                             
         frappe.response["customers"] = customers
         frappe.response["success"] = True
     except Exception as e:
         frappe.log_error(title="Search Customer Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.response["success"] = False
+
+def get_search_filter(contact_names, customer_names):
+    contact_filter_query = ""
+    # contact_names = list(set(contact_names))
+    if contact_names:
+        formatted_tuple = str(tuple(contact_names))
+        if formatted_tuple.endswith(",)"):
+            formatted_tuple = formatted_tuple[1:-2]
+        else:
+            formatted_tuple = formatted_tuple[1:-1]
+
+        contact_filter_query = f"dl.parent IN ({formatted_tuple})"
+
+    customer_filter_query = ""
+    if customer_names:
+        formatted_tuple = str(tuple(customer_names))[1:-2]
+        customer_filter_query = f"c.name IN ({formatted_tuple})"
+
+    search_filter = ""
+    if customer_filter_query and contact_filter_query:
+        search_filter = f"({contact_filter_query} or {customer_filter_query})"
+    elif customer_filter_query:
+        search_filter = customer_filter_query
+    elif contact_filter_query:
+        search_filter = contact_filter_query
+
+    return search_filter
+
 
 @frappe.whitelist()
 def load_si(sales_invoice):
@@ -71,10 +119,10 @@ def load_si(sales_invoice):
         elif sales_invoice_doc.docstatus == 0:
             frappe.throw("Sales Invoice "+sales_invoice+" is a Draft")
             return
-        elif sales_invoice_doc.status == "Unpaid":
-            frappe.throw("Sales Invoice "+sales_invoice+" is Unpaid")
+        elif sales_invoice_doc.status not in ["Paid", "Credit Note Issued"]:
+            frappe.throw("Sales Invoice "+sales_invoice+" is "+sales_invoice_doc.get("status"))
             return
-
+        
         for item in sales_invoice_doc.items:
             retail_sku = frappe.db.get_value("Item", item.item_code, "ifw_retailskusuffix")
             retail_skus[item.item_code] = retail_sku
@@ -125,6 +173,7 @@ def load_si(sales_invoice):
             credit_notes = frappe.db.sql(""" SELECT
                                                 si.name as si_name, sii.item_code, sii.item_name, sii.qty, sii.rate, 
                                                 sii.discount_amount, sii.amount, si.posting_date, si.customer,
+                                                si.neb_store_credit_beneficiary,
                                                 si.total_taxes_and_charges, si.grand_total, si.discount_amount as si_discount_amount,
                                                 sii.discount_percentage
                                             FROM
@@ -185,18 +234,17 @@ def transfer_store_credit(**kwargs):
 
         sales_invoice = frappe.get_doc({
             "doctype": "Sales Invoice",
-            "customer": customer,
+            "customer": frappe.db.get_value("Sales Invoice", sales_invoice, "customer"),
             "is_return": 1,
+            "neb_store_credit_beneficiary": customer,
             "return_against": sales_invoice,
             "posting_date": frappe.utils.nowdate(),
-            "is_return": 1,
-            "return_against": sales_invoice,
             "items": selected_items,
             "taxes_and_charges": frappe.get_value("Sales Invoice", sales_invoice, "taxes_and_charges"),
             "taxes": taxes
         })
 
-        enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, queue='long', timeout=1500)
+        enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, customer=customer, queue='long', timeout=1500)
 
         frappe.response["items"] = [item.get('name') for item in items]
         frappe.response["success"] = True
@@ -208,10 +256,11 @@ def transfer_store_credit(**kwargs):
         frappe.log_error(title="Transfer Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.db.rollback()
 
-def save_and_submit_store_credit(sales_invoice):
+def save_and_submit_store_credit(sales_invoice, customer):
     try:
         sales_invoice.save()
         sales_invoice.submit()
+        create_journal_entry(sales_invoice, customer)
         frappe.db.commit()
         frappe.publish_realtime("transfer_store_credit", 
                                 {
@@ -224,6 +273,42 @@ def save_and_submit_store_credit(sales_invoice):
         frappe.log_error(title="Save and Submit Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.db.rollback()
         frappe.publish_realtime("transfer_store_credit", {"error": str(e)}, user=frappe.session.user)
+
+def create_journal_entry(sales_invoice, customer):
+    if sales_invoice.currency == "CAD":
+        store_credit_account = frappe.db.get_single_value("Metactical Settings", "store_credit_account_cad")
+    elif sales_invoice.currency == "USD":
+        store_credit_account = frappe.db.get_single_value("Metactical Settings", "store_credit_account_usd")
+        
+    if not store_credit_account:
+        frappe.publish_realtime("transfer_store_credit", {"error": "Store Credit Account not set in Metactical Settings. Please create the Journal Entry manually."}, user=frappe.session.user)
+
+    main_sales_invoice = frappe.db.get_values("Sales Invoice", {"name": sales_invoice.return_against}, ["debit_to", "company", "customer", "name"], as_dict=True)[0]
+    
+    je = frappe.new_doc("Journal Entry")
+    je.voucher_type = "Journal Entry"
+    je.posting_date = frappe.utils.nowdate()
+    je.company = main_sales_invoice.company
+    je.user_remark = "Store Credit Transfer from Sales Invoice {} to Customer {}".format(sales_invoice.return_against, customer)
+    je.append("accounts", {
+        "account": store_credit_account,
+        "party_type": "Customer",
+        "party": customer,
+        "credit_in_account_currency": -1 * sales_invoice.grand_total,
+        "is_advance": "Yes"
+    })
+    je.append("accounts", {
+        "account": main_sales_invoice.debit_to,
+        "debit_in_account_currency": -1 * sales_invoice.grand_total,
+        "reference_type": "Sales Invoice",
+        "reference_name": main_sales_invoice.name,
+        "party_type": "Customer",
+        "party": main_sales_invoice.customer,
+        "is_advance": "No"
+    })
+
+    je.insert()
+    je.submit()
 
 @frappe.whitelist()
 def create_customer(**kwargs):

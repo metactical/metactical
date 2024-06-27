@@ -6,31 +6,38 @@ from frappe import _
 
 @frappe.whitelist()
 def get_rate(name, provider='Canada Post', context=None):
-    if provider=="Canada Post":
-        cp = CanadaPost()
-        response = cp.get_rate(name, context)
-        return response
+	if provider=="Canada Post":
+		cp = CanadaPost()
+		response = cp.get_rate(name, context)
+		return response
 
 
 @frappe.whitelist()
 def create_shipping(name, provider='Canada Post', carrier_service=None):
-    if provider=="Canada Post":
-        cp = CanadaPost()
-        response = cp.create_shipping(name, carrier_service)
-        if response:
-            doc = frappe.get_doc('Shipment', name)
-            for d in frappe.get_all('Delivery Note', [['docstatus', '=', 0],['name', 'in',(x.delivery_note for x in doc.shipment_delivery_note)]], pluck="name"):
-                ddoc = frappe.get_doc('Delivery Note', d)
-                ddoc.submit()
-        return response
+	if provider=="Canada Post":
+		cp = CanadaPost()
+		response = cp.create_shipping(name, carrier_service)
+		if response:
+			doc = frappe.get_doc('Shipment', name)
+			
+			delivery_notes = []
+			for row in doc.shipment_delivery_note:
+				if row.delivery_note not in delivery_notes:
+					delivery_notes.append(row.delivery_note)
+
+			for delivery_note in delivery_notes:
+				dn = frappe.get_doc('Delivery Note', delivery_note)
+				if dn.docstatus == 0:
+					dn.submit()
+		return response
 
 
 @frappe.whitelist()
 def avoid_shpment(name, provider='Canada Post', shipments_name=None):
-    if provider=="Canada Post":
-        cp = CanadaPost()
-        response = cp.avoid_shpment(name, shipments_name)
-        return response
+	if provider=="Canada Post":
+		cp = CanadaPost()
+		response = cp.avoid_shpment(name, shipments_name)
+		return response
 
 
 @frappe.whitelist()

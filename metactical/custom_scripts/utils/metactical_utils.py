@@ -19,6 +19,8 @@ def queue_action(self, action, **kwargs):
             title=_('Document Queued'))
     
     frappe.db.set_value(self.doctype, self.name, 'ais_queue_status', 'Queued',  update_modified=False)
+    frappe.db.set_value(self.doctype, self.name, 'ais_queue_failed', 0,  update_modified=False)
+    frappe.db.set_value(self.doctype, self.name, 'ais_queueu_comment', '',  update_modified=False)
     frappe.db.set_value(self.doctype, self.name, 'ais_queued_date', now_datetime(),  update_modified=False)
     frappe.db.set_value(self.doctype, self.name, 'ais_queued_by', frappe.session.user,  update_modified=False)
     self.lock()
