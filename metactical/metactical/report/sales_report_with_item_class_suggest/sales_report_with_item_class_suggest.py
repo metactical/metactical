@@ -21,15 +21,17 @@ def execute(filters=None):
 	columns = get_column(filters,conditions)
 	data = []
 
+	item_classes, zero_sales = generate_item_clases(filters.supplier)
 	master = get_master(conditions,filters)
 	
 	#Get US data
 	us_data = {}
-	us_data = get_us_data(filters)
+	# us_data = get_us_data(filters)
 	
 	# details = get_details(conditions,filters)
 	combo_dict = {}
 	total = 0
+
 	for i in master:		
 		row = {}
 		warehouse = None if filters.get('reference_warehouse') == 'Total QOH' else filters.get('reference_warehouse')
@@ -105,6 +107,18 @@ def execute(filters=None):
 		row["last_sold_date"], row['olast_sold_date'] = get_date_last_sold(i.get("item_code"))
 
 		sales_data = get_total_sold(i.get("item_code"))
+
+		suggested_item_class = ""
+		# if item is created in the last 1 month and has no sales, class is "N"
+		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=1):
+			suggested_item_class = "N"
+		elif i.get("item_code") in zero_sales:
+			suggested_item_class = "D"
+		elif i.get("supplier") in item_classes:
+			if i.get("item_code") in item_classes.get(i.get("supplier")):
+				suggested_item_class = item_classes.get(i.get("supplier")).get(i.get("item_code"))
+
+		row["suggested_item_class"] = suggested_item_class
 		row["previous_year_sale"] = 0
 		row["total"] = 0
 		row["last_twelve_months"] = 0
@@ -403,11 +417,19 @@ def get_column(filters,conditions):
 				"align": "left",
 			},
 			{
+				"label": _("SuggestedClass"),
+				"fieldname": "suggested_item_class",
+				"fieldtype": "Data",
+				"width": 150,
+				"align": "left",
+			},
+			{
 				"label": _("ItemName"),
 				"fieldname": "item_name",
 				"fieldtype": "Data",
 				"width": 300,
 			},
+
 			{
 				"label": _("ItemImage"),
 				"fieldname": "item_image",
@@ -914,6 +936,74 @@ def get_conditions(filters):
 	if limit != "All":
 		conditions += " limit {}".format(str(limit))
 	return conditions
+
+def generate_item_clases(suppliers):
+	if not suppliers:
+		return {}, []
+
+	overall_total_sales = 0
+	zero_sell_items = []
+	items_with_sales = {}
+	supplier_item_class = {}
+	items_classification = {}
+
+	for s in suppliers:
+		# get all items from the supplier
+		items = frappe.db.get_list("Item Supplier", filters={"supplier": s}, fields=["parent"])
+		for i in items:
+			# get the date one months before the current date
+			today = getdate(nowdate())
+			one_month_before = getdate(today) - relativedelta(months=12)
+
+			# get total sold quantity of the item
+			sales_data = get_total_sold(i.get("parent"), one_month_before)
+
+			# get sum of net_amount from sales_data if there is any
+			total_sales = sum([d.get("net_amount") for d in sales_data]) if sales_data else 0
+			if total_sales == 0:
+				zero_sell_items.append(i.get("parent"))
+				continue
+			else:
+				items_with_sales[i.get("parent")] = total_sales
+
+			overall_total_sales += total_sales
+
+		# classify items using ABC analysis
+		# A: 80% of the total sales
+		# B: 15% of the total sales
+		# C: 5% of the total sales
+		# D: 0% of the total sales
+
+		items_classification = classify_items(items_with_sales, overall_total_sales)
+		supplier_item_class[s] = items_classification
+	return supplier_item_class, zero_sell_items
+
+def classify_items(items_with_sales, overall_total_sales):
+	# sort items by total sales
+	sorted_items = sorted(items_with_sales.items(), key=lambda x: x[1], reverse=True)
+	item_with_class = {}
+
+	# calculate the percentage of the total sales
+	percentage = 0
+	for i in sorted_items:
+		percentage += i[1] / overall_total_sales
+
+		# top 80% of the total sales
+		if percentage <= 0.8:
+			# classify the item as A
+			item_with_class[i[0]] = "A"
+
+		# top 20% of the total sales
+		elif percentage <= 0.95:
+			# classify the item as B
+			item_with_class[i[0]] = "B"
+
+		# top 5% of the total sales
+		elif percentage <= 1:
+			# classify the item as C
+			item_with_class[i[0]] = "C"
+
+	return item_with_class
 
 def get_monthly_consumption(item_code, created_at,filters, sales_data):
 	average_monthly_consumption_12 = 0
