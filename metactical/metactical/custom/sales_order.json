@@ -2680,7 +2680,7 @@
    "_liked_by": null,
    "_user_tags": null,
    "creation": "2024-05-20 10:24:19.985027",
-   "default_value": 1,
+   "default_value": null,
    "doc_type": "Sales Order",
    "docstatus": 0,
    "doctype_or_field": "DocField",

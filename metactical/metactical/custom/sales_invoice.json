@@ -5106,7 +5106,7 @@
    "_liked_by": null,
    "_user_tags": null,
    "creation": "2022-05-20 12:19:56.701684",
-   "default_value": 1,
+   "default_value": null,
    "doc_type": "Sales Invoice",
    "docstatus": 0,
    "doctype_or_field": "DocField",
@@ -5122,7 +5122,7 @@
    "property": "default",
    "property_type": "Text",
    "row_name": null,
-   "value": "0"
+   "value": "1"
   },
   {
    "_assign": null,
