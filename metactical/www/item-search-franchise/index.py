@@ -86,10 +86,10 @@ def get_data(search_text="rvx"):
 					"template_sku": item.get("template_sku", ""),
 					"barcode": item.get("barcode"),
 					"ifw_location": item.get("ifw_location"),
-					row["label"]: item.get("actual_qty")
+					row["label"]: int(item.get("actual_qty", 0))
 				}
 			else:
-				ret_data[item["item_code"]][row["label"]] = item["actual_qty"]
+				ret_data[item["item_code"]][row["label"]] = int(item.get("actual_qty", 0))
 
 	data = []
 	for key in ret_data:
