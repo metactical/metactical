@@ -124,6 +124,15 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "Unreconciled Stock report",
+   "link_to": "Warehouse Stock Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },  
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Price Lists - V1",
    "link_to": "Price Lists - V1",
    "link_type": "Report",

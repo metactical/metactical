@@ -100,7 +100,13 @@
 			{% for row in data %}
 				<tr>
 					{% for column in columns %}
-						<td>{{ row[column.fieldname] }}</td>
+						<td>
+							{% if row[column.fieldname] is defined %}
+								{{ row[column.fieldname] }}
+							{% else %}
+								0
+							{% endif %}
+						</td>
 					{% endfor %}
 				</tr>
 			{% endfor %}
