@@ -1,5 +1,7 @@
 frappe.ui.form.on('Sales Invoice', {
 	refresh: function(frm){
+		if (frm.doc.__islocal)
+			frm.set_value("neb_payment_completed_at", null)
 		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	
