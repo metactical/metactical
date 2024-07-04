@@ -3,7 +3,9 @@ var old_tax_template;
 var base_in_words;
 frappe.ui.form.on('Sales Order', {
 	refresh: function(frm){
-		console.log(frm);
+		if (frm.doc.__islocal)
+			frm.set_value("neb_payment_completed_at", null)
+		
 		//Clear update qty and rate button
 		/*if(frm.doc.docstatus === 1 && frm.doc.status !== 'Closed'
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
