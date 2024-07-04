@@ -81,7 +81,7 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
-		print(self.status, self.doctype)
+		
 		# Metactical Customization: Added
 		if self.status == "Paid" and not self.neb_payment_completed_at:
 			self.db_set("neb_payment_completed_at", frappe.utils.getdate(now()), notify=True)

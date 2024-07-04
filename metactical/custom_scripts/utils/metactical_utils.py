@@ -135,7 +135,6 @@ def build_xlsx_data(columns, data, date):
 			for col_idx, column in enumerate(data.columns):
 				if column.get("hidden"):
 					continue
-
 				label = column.get("label")
 				fieldname = column.get("fieldname")
 				cell_value = row.get(fieldname, row.get(label, ""))
@@ -210,10 +209,8 @@ def set_auto_width(ws):
 	for column_cells in ws.columns:
 		max_length = 0
 		col_letter = get_column_letter(column_cells[0].column)  # Get the column letter
-		print(col_letter)
-
+		
 		for cell in column_cells:
-			print(len(str(cell.value)), max_length, col_letter )
 			try:
 				if len(str(cell.value)) > max_length:
 					max_length = len(str(cell.value))
@@ -225,10 +222,10 @@ def set_auto_width(ws):
 
 def set_border(columns, rows, ws):
 	thin_border = Border(
-		left=Side(style='thin', color='f2f2f2'),  # Red color
-		right=Side(style='thin', color='f2f2f2'),  # Red color
-		top=Side(style='thin', color='f2f2f2'),  # Red color
-		bottom=Side(style='thin', color='f2f2f2')  # Red color
+		left=Side(style='thin', color='f2f2f2'),
+		right=Side(style='thin', color='f2f2f2'),
+		top=Side(style='thin', color='f2f2f2'),
+		bottom=Side(style='thin', color='f2f2f2')
 	)
 
 	for row in range(1, rows):
