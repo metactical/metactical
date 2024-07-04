@@ -190,15 +190,22 @@ def make_xlsx(data, sub_headers, sheet_name, wb=None, column_widths=None):
 			for cell in rows:
 				cell.alignment = Alignment(wrap_text=True)
 				cell.alignment = Alignment(vertical="center", horizontal="center")
-				cell.fill = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
+				cell.fill = PatternFill(start_color="ffd966", end_color="ffd966", fill_type="solid")
 
 	set_border(len(row) + 1, len(data), ws)
 	set_auto_width(ws)
 
 	# set font
 	for row in ws.iter_rows(min_row=1, max_row=len(data), min_col=1, max_col=len(data[1])):
-		for cell in row:
-			cell.font = Font(size=10)
+		if row[0].row == 2:
+			for cell in row:
+				cell.font = Font(size=10, bold=True, name="Calibri")
+		elif row[0].row in headers:
+			for cell in row:
+				cell.font = Font(size=11, name="Calibri")
+		else:
+			for cell in row:
+				cell.font = Font(size=10, name="Segoe UI")
 
 	# Auto fit rows to their content
 	for row in ws.iter_rows(min_row=1, max_row=len(data), min_col=1, max_col=len(data[1])):
