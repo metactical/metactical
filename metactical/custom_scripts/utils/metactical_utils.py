@@ -107,7 +107,10 @@ def export_query(data, sub_headers=[]):
 		xlsx_data, column_widths = build_xlsx_data(columns, data, filters.get("date"))
 		xlsx_file = make_xlsx(xlsx_data, sub_headers, "Query Report", column_widths=column_widths)
 
-		frappe.response["filename"] = report_name + ".xlsx"
+		# get current date as string format
+		current_date = now_datetime().strftime('%d-%m-%Y')
+
+		frappe.response["filename"] =  current_date + " " +report_name  + ".xlsx"
 		frappe.response["filecontent"] = xlsx_file.getvalue()
 		frappe.response["type"] = "binary"
 
@@ -217,7 +220,7 @@ def set_auto_width(ws):
 			except:
 				pass
 			
-		adjusted_width = max_length if max_length > 5 else 6  # Adding a little extra space
+		adjusted_width = max_length if max_length > 5 else 6
 		ws.column_dimensions[col_letter].width = adjusted_width
 
 def set_border(columns, rows, ws):
