@@ -62,6 +62,15 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 		else:
 			self._submit()
 
+	def set_status(self, update=False, status=None, update_modified=True):
+		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
+		
+		# Metactical Customization: Added
+		if self.status == "Paid" and not self.neb_payment_completed_at:
+			self.db_set("neb_payment_completed_at", frappe.utils.getdate(now()), notify=True)
+		elif self.status != "Paid" and self.neb_payment_completed_at:
+			self.db_set("neb_payment_completed_at", None, notify=True)
+
 def unlink_ref_doc_from_payment_entries(ref_doc):	
 	#Check for sales order
 	multiple_orders = False
