@@ -39,6 +39,15 @@ class SalesOrderCustom(SalesOrder):
 			queue_action(self, "submit", timeout=2000)
 		else:
 			self._submit()
+	
+	def set_status(self, update=False, status=None, update_modified=True):
+		super(SalesOrderCustom, self).set_status(update, status, update_modified)
+
+		# Metactical Customization: Added
+		if self.billing_status == "Fully Billed" and not self.neb_payment_completed_at:
+			self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
+		elif self.billing_status != "Fully Billed" and self.neb_payment_completed_at:
+			self.db_set("neb_payment_completed_at", None, notify=True)
 			
 @frappe.whitelist()
 def save_cancel_reason(**args):
