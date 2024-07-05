@@ -5,7 +5,20 @@ frappe.ui.form.on('End of Day Closing', {
 	refresh: function(frm){
 		console.log(frm);
 		frm.events.load_cash_table(frm);
+		frm.set_query("pos_profile", function() {
+			return {
+				query: "metactical.metactical.doctype.end_of_day_closing.end_of_day_closing.get_pos_profiles",
+				filters: {
+					user: frappe.session.user
+				}
+			};
+		});
+		
+		if(!frm.doc.user || frm.doc.user == ""){
+			frm.set_value("user", frappe.session.user);
+		}
 	},
+
 	user: function(frm){
 		frm.events.load_data(frm);
 	},
@@ -83,6 +96,7 @@ frappe.ui.form.on('End of Day Closing', {
 					
 					if(ret.message.invoices.length > 0){
 						frm.set_value("invoices", []);
+						frm.set_value("return_invoices", []);
 						ret.message.invoices.forEach(function(invoice){
 							// if it's not return
 							if(invoice.is_return != 1){

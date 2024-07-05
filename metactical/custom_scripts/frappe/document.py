@@ -3,6 +3,7 @@ import json
 from frappe import _, msgprint, is_whitelisted
 from frappe.utils import nowdate, getdate, now_datetime, file_lock, get_url
 from datetime import timedelta
+from metactical.custom_scripts.utils.metactical_utils import post_to_rocket_chat
 
 def execute_action(doctype, name, action, **kwargs):
 	"""Execute an action on a document (called by background worker)"""
@@ -26,6 +27,7 @@ def execute_action(doctype, name, action, **kwargs):
 		frappe.db.set_value(doctype, name, 'ais_queueu_comment', msg, update_modified=False)
 		doc.notify_update()
 		email_submitter(doc, True)
+		post_to_rocket_chat(doc, msg, True)
 		
 def clear_queued_docs():
 	pos = frappe.db.get_all('Purchase Order', filters={'ais_queue_status': 'Queued', 'docstatus': 0}, 
