@@ -1,0 +1,217 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-06-02 14:49:19.597582",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "customer",
+  "currency",
+  "conversion_rate",
+  "column_break_rwvl8",
+  "selling_price_list",
+  "price_list_currency",
+  "plc_conversion_rate",
+  "section_break_vjjo4",
+  "company",
+  "company_address",
+  "warehouse",
+  "column_break_usxwc",
+  "taxes_and_charges",
+  "source",
+  "section_break_lonzk",
+  "import_based_on",
+  "excel_file",
+  "amended_from",
+  "section_queue",
+  "ais_queue_failed",
+  "ais_queue_status",
+  "ais_queueu_comment",
+  "column_break_ncjfv",
+  "ais_queued_date",
+  "ais_queued_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "excel_file",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "Excel File",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Sales Orders From Excel",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "taxes_and_charges",
+   "fieldtype": "Link",
+   "label": "Taxes and Charges Template",
+   "options": "Sales Taxes and Charges Template",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Link",
+   "label": "Source",
+   "options": "Lead Source",
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_rwvl8",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_vjjo4",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "reqd": 1
+  },
+  {
+   "fieldname": "price_list_currency",
+   "fieldtype": "Link",
+   "label": "Price List Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "plc_conversion_rate",
+   "fieldtype": "Float",
+   "label": "Price List Exchange Rate"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company_address",
+   "fieldtype": "Link",
+   "label": "Company Address",
+   "options": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "selling_price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_usxwc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_lonzk",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "To import based on Item Code, there should be a column with \"ERP SKU\" heading. To import based on Item SKU, there should be a column with \"Retail SKU\" heading ",
+   "fieldname": "import_based_on",
+   "fieldtype": "Select",
+   "label": "Import Based On",
+   "options": "ERP SKU\nRetail SKU",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_queue",
+   "fieldtype": "Section Break",
+   "label": "Queue"
+  },
+  {
+   "default": "0",
+   "fieldname": "ais_queue_failed",
+   "fieldtype": "Check",
+   "label": "Queue Failed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ais_queue_status",
+   "fieldtype": "Select",
+   "label": "Queue Status",
+   "options": "Not Queued\nQueued\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ais_queueu_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ncjfv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ais_queued_date",
+   "fieldtype": "Datetime",
+   "label": "Queue Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ais_queued_by",
+   "fieldtype": "Link",
+   "label": "Queued By",
+   "options": "User",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-06-25 09:22:37.941937",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Sales Orders From Excel",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

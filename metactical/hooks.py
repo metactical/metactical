@@ -47,6 +47,7 @@ doctype_js = {
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
+	"Warehouse": "custom_scripts/warehouse/warehouse.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -137,6 +138,9 @@ doc_events = {
 	}, 
 	"Project": {
 		"on_update": "metactical.custom_scripts.project.project.on_update"
+	},
+	"Item Price": {
+		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	}
 }
 
@@ -154,7 +158,9 @@ override_doctype_class = {
 	"Purchase Order": "metactical.custom_scripts.purchase_order.purchase_order.CustomPurchaseOrder",
 	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
-	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry"
+	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
+	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
+	"Company": "metactical.custom_scripts.company.company.CustomCompany"
 }
 
 # Scheduled Tasks
@@ -226,6 +232,9 @@ fixtures = [{
 			"Buying Board",
 			"Projects Status"
 		]]]
+	},
+	{
+		"dt": "Provinces"
 	}
 ]
 

@@ -123,6 +123,24 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Unreconciled Stock report",
+   "link_to": "Warehouse Stock Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },  
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Price Lists - V1",
+   "link_to": "Price Lists - V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
@@ -278,6 +296,33 @@
    "label": " Employee Roll Report",
    "link_to": "Employee Roll Report",
    "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bulk Updates",
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order Import Tool",
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Price Import Tool",
+   "link_to": "Item Price From Excel",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
@@ -524,6 +569,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report with Item Class Suggest",
+   "link_to": "Sales Report with Item Class Suggest",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -720,7 +774,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-05-06 07:37:26.612806",
+ "modified": "2024-06-27 05:38:49.125401",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

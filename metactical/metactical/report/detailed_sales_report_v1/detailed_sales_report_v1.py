@@ -386,19 +386,11 @@ def get_column(filters,conditions):
 				"align": "left",
 			},
 			{
-				"label": _("Suggested Item Class"),
-				"fieldname": "suggested_item_class",
-				"fieldtype": "Data",
-				"width": 150,
-				"align": "left",
-			},
-			{
 				"label": _("ItemName"),
 				"fieldname": "item_name",
 				"fieldtype": "Data",
 				"width": 300,
 			},
-
 			{
 				"label": _("ItemImage"),
 				"fieldname": "item_image",

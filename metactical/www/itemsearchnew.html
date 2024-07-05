@@ -157,7 +157,12 @@
 		function searchItem() {
 			var search_text = document.getElementById("searchinput").value
 			var new_url = `${window.location.origin}/itemsearchnew?searchtext=${search_text}`
-			window.location.href = new_url
+			if(search_text.length > 2){
+				window.location.href = new_url
+			}
+			else{
+				alert("Please enter 3 or more characters to search.")
+			}
 		}
 		
 		//For the item code copy button in header
