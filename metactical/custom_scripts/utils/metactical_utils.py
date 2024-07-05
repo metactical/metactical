@@ -63,3 +63,55 @@ def post_to_rocket_chat(doc, msg, failed=False):
             frappe.log_error(title='Rocket Chat Error', message=response.json())
     except Exception as e:
         frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
+
+def format_json_for_html(data, indent_size=2):
+    try:
+        # Function to recursively format JSON
+        def format_json(data, indent_level):
+            lines = []
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    # Recursively format nested objects
+                    lines.append(f'{" " * indent_level * indent_size}"{key}": {{ <br>')
+                    lines.extend(format_json(value, indent_level + 1))
+                    lines.append(f'{" " * indent_level * indent_size}}}, <br>')
+                elif isinstance(value, list):
+                    # Handle lists of objects
+                    lines.append(f'{" " * indent_level * indent_size}"{key}": [ <br>')
+                    for item in value:
+                        lines.extend(format_json(item, indent_level + 1))
+                    lines.append(f'{" " * indent_level * indent_size}] <br>')
+                else:
+                    # Format primitive types (string, number, etc.)
+                    lines.append(f'{" " * indent_level * indent_size}"{key}": "{value}", <br>')
+            return lines
+        
+        # Start formatting from the top-level object
+        formatted_lines = format_json(data, indent_level=1)
+        
+        # Join all lines with newline characters
+        formatted_json = '\n'.join(formatted_lines)
+        
+        return formatted_json
+    
+    except json.JSONDecodeError as e:
+        return f"Error decoding JSON: {str(e)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def create_usaepay_log(payload, response, doctype, docname, refund_amount, action):
+	
+	if payload.get("creditcard"):
+		payload["creditcard"]["number"] = "****-****" + payload["creditcard"]["number"][-9:]
+
+	frappe.get_doc({
+		"doctype": "USAePay Log",
+		"request": format_json_for_html(payload),
+		"response": format_json_for_html(response),
+		"date": frappe.utils.now(),
+		"reference_docname": docname,
+		"refund_amount": refund_amount,
+		"action": action,
+		"reference_doctype": doctype
+	}).insert()
+

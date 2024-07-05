@@ -7,16 +7,11 @@ import base64
 import time
 from frappe import _
 
-def get_transaction_from_usaepay(usaepay_transaction_key, token_hash):	
+def get_transaction_from_usaepay(usaepay_transaction_key, headers):	
 	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
 
 	if not usaepay_url:
 		frappe.throw(_("USAePay URL not set in Metactical Settings"))
-
-	headers = {
-		"Content-Type": "application/json",
-		"Authorization": token_hash
-	}
 
 	url = usaepay_url + "/transactions/" + usaepay_transaction_key
 	response = requests.get(url, headers=headers)
@@ -27,6 +22,9 @@ def get_transaction_from_usaepay(usaepay_transaction_key, token_hash):
 			frappe.throw(_("Failed to fetch transaction details from USAePay: {0}").format(cstr(transaction.get("error"))))
 
 		return transaction
+	else:
+		response = json.loads(response.text)
+		frappe.throw(_("Failed to fetch transaction details from USAePay: {0}").format(response.get("error")))
 	
 	return None
 
@@ -48,15 +46,27 @@ def get_token_hash(metactical_settings):
 
 	return "Basic " + authKey
 
-def create_refund(transaction, amount, usaepay_url, headers):
+def create_refund(transaction, amount, usaepay_url, headers, refund_full_amount):
 	payload = {
-		"command": "cc:credit",
 		"amount": amount,
 		"trankey": transaction.get("key"),
 	}
 
-	payload["creditcard"] = transaction.get("creditcard")
-	
+	if refund_full_amount:
+		payload["command"] = "refund"
+	else:
+		if (transaction.get("trantype") == "Credit Card Sale"):
+			payload["command"] = "cc:credit"
+			payload["creditcard"] = transaction.get("creditcard")
+		elif (transaction.get("trantype") == "Check Sale"):
+			payload["command"] = "check:credit"
+			payload["check"] = transaction.get("check")
+		elif (transaction.get("trantype") == "Cash Sale"):
+			payload["command"] = "cash:refund"
+
+	if "command" not in payload:
+		frappe.throw(_("Transaction type not supported for refund"))
+
 	url = usaepay_url + "/transactions"
 	response = requests.post(url, headers=headers, data=json.dumps(payload))
 
@@ -67,7 +77,8 @@ def create_refund(transaction, amount, usaepay_url, headers):
 
 		return payload, refund
 	else:
-		frappe.throw(_("Failed to create refund in USAePay"))
+		response = json.loads(response.text)
+		frappe.throw(_("Failed to create refund in USAePay: {0}").format(response.get("error")))
 
 def get_card_token(usaepay_url, transaction_key, headers):
 	payload = {
@@ -75,12 +86,30 @@ def get_card_token(usaepay_url, transaction_key, headers):
 	}
 
 	response = requests.post(usaepay_url + "/tokens", headers=headers, data=json.dumps(payload))
-	print(response.text)
 	if response.status_code == 200:
 		token = json.loads(response.text)
 		if token.get("error"):
 			frappe.throw(_("Failed to get card token from USAePay: {0}").format(cstr(token.get("error"))))
-
 		return token.get("token").get("cardref")
 	else:
-		frappe.throw(_("Failed to get card token from USAePay"))
+		response = json.loads(response.text)
+		frappe.throw(_(f"Failed to get card token from USAePay: {response.error}"))
+
+def adjust_amount(amount, transaction, usaepay_url, headers):
+	payload = {
+		"command": "cc:adjust",
+		"trankey": transaction.get("key"),
+		"amount": amount
+	}
+
+	response = requests.post(usaepay_url + "/transactions", headers=headers, data=json.dumps(payload))
+	if response.status_code == 200:
+		adjustment = json.loads(response.text)
+		if adjustment.get("error"):
+			frappe.throw(_("Failed to make adjustment in USAePay: {0}").format(cstr(adjustment.get("error"))))
+
+		return payload, adjustment
+	else:
+		response = json.loads(response.text)
+		frappe.throw(_("Failed to make adjustment in USAePay: {0}").format(response.get("error")))
+
