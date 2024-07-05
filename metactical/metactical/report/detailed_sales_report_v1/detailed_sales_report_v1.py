@@ -886,7 +886,6 @@ def get_master(conditions="", filters={}):
 			where 1 = 1 %s
 		"""%(conditions), filters, as_dict=1)
 
-	frappe.log_error(title="aa", message=f"{conditions}   {filters}")
 	return data
 
 def get_conditions(filters):
