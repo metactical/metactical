@@ -21,7 +21,6 @@ def execute(filters=None):
 	columns = get_column(filters,conditions)
 	data = []
 
-	item_classes, zero_sales = generate_item_clases(filters.supplier)
 	master = get_master(conditions,filters)
 	
 	#Get US data
@@ -101,20 +100,10 @@ def execute(filters=None):
 
 		sales_data = get_total_sold(i.get("item_code"))
 
-		suggested_item_class = ""		
-		# if item is created in the last 1 month and has no sales, class is "N"
-		if getdate(i.get("creation")) >= getdate(nowdate()) - relativedelta(months=1):
-			suggested_item_class = "N"
-		elif i.get("item_code") in zero_sales:
-			suggested_item_class = "D"
-		elif i.get("supplier") in item_classes:
-			if i.get("item_code") in item_classes.get(i.get("supplier")):
-				suggested_item_class = item_classes.get(i.get("supplier")).get(i.get("item_code"))
-
-		row["suggested_item_class"] = suggested_item_class
 		row["previous_year_sale"] = 0
 		row["total"] = 0
 		row["last_twelve_months"] = 0
+		row["last_24_months"] = 0
 
 		today = getdate(nowdate())
 
@@ -150,9 +139,13 @@ def execute(filters=None):
 			elif posting_date.year == current_year:
 				row["total"] += qty
 
-			last12_month_date = today - relativedelta(years=years_to_subtract)
+			last12_month_date = today - relativedelta(years=1)
+			last24_month_date = today - relativedelta(years=2)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
+			
+			if posting_date >= last24_month_date:
+				row["last_24_months"] += qty
 			
 			if posting_date >= years_ago:
 				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
@@ -639,8 +632,14 @@ def get_column(filters,conditions):
 			"width": 140,
 		},
 		{
-			"label": _(f"TotalSold{filters.sales_data_period}M"),
+			"label": _(f"TotalSold12M"),
 			"fieldname": "last_twelve_months",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _(f"TotalSold24M"),
+			"fieldname": "last_24_months",
 			"fieldtype": "Int",
 			"width": 140,
 		},
@@ -886,6 +885,8 @@ def get_master(conditions="", filters={}):
 				`tabItem` i on i.name = s.parent
 			where 1 = 1 %s
 		"""%(conditions), filters, as_dict=1)
+
+	frappe.log_error(title="aa", message=f"{conditions}   {filters}")
 	return data
 
 def get_conditions(filters):
@@ -899,102 +900,6 @@ def get_conditions(filters):
 	if limit != "All":
 		conditions += " limit {}".format(str(limit))
 	return conditions
-
-def generate_item_clases(suppliers):
-	if not suppliers:
-		return {}, []
-
-	zero_sell_items = []
-	items_classification = {}
-
-	for s in suppliers:
-		total_sold_qty = 0
-		
-		items_with_sales = {}
-		items_with_sold_qty = {}
-		items_gross_margin = {}
-
-		# get all items from the supplier
-		items = frappe.db.get_list("Item Supplier", filters={"supplier": s}, fields=["parent"])
-		for i in items:
-			# get the date one months before the current date
-			today = getdate(nowdate())
-			one_month_before = getdate(today) - relativedelta(months=1)
-
-			# get total sold quantity of the item
-			sales_data = get_total_sold(i.get("parent"), one_month_before)
-
-			# get sum of net_amount from sales_data if there is any
-			total_sales = sum([d.get("net_amount") for d in sales_data]) if sales_data else 0
-			total_qty_sold = sum([d.get("qty") for d in sales_data]) if sales_data else 0
-			
-			# calculate gross margin of an item
-			# gross margin = (total sales - supplier cost of sold items) / total sales
-			supplier_cost = get_item_details(i.get("parent"), "Buying", s)
-			supplier_cost_of_sold_items = supplier_cost * total_qty_sold
-			gross_profit = total_sales - supplier_cost_of_sold_items
-			gross_margin = (((gross_profit * 100) / total_sales) if total_sales > 0 else 0) * 100 / 100
-
-			if total_sales == 0:
-				zero_sell_items.append(i.get("parent"))
-				continue
-			else:
-				items_with_sales[i.get("parent")] = total_sales
-				items_with_sold_qty[i.get("parent")] = total_qty_sold
-				items_gross_margin[i.get("parent")] = gross_margin
-			
-			total_sold_qty += total_qty_sold
-
-		# classify items using ABC analysis
-		# A: 80% of the total sales
-		# B: 15% of the total sales
-		# C: 5% of the total sales
-		# D: 0% of the total sales
-
-		if total_sold_qty == 0:
-			continue
-
-		# Assign weights
-		weights = {
-			'sales_revenue': 0.5,
-			'gross_margin': 0.3,
-			'sold_qty': 0.2
-		}
-
-		for item in items_with_sales:
-			items_with_sales[item] = items_with_sales[item] * weights['sales_revenue'] + items_gross_margin[item] * weights['gross_margin'] + items_with_sold_qty[item] * weights['sold_qty']
-		
-		total = sum(items_with_sales.values())
-		items_classification[s] = classify_items(items_with_sales, total)
-
-	return items_classification, zero_sell_items
-
-def classify_items(items_with_sales, total):
-	# sort items by total sales
-	sorted_items = sorted(items_with_sales.items(), key=lambda x: x[1], reverse=True)
-	item_with_class = {}
-
-	# calculate the percentage of the total sales
-	percentage = 0
-	for i in sorted_items:
-		percentage += float(i[1]) / total
-
-		# top 80% of the total sales
-		if percentage <= 0.8:
-			# classify the item as A
-			item_with_class[i[0]] = "A"
-
-		# top 15% of the total sales
-		elif percentage <= 0.95:
-			# classify the item as B
-			item_with_class[i[0]] = "B"
-
-		# top 5% of the total sales
-		else:
-			# classify the item as C
-			item_with_class[i[0]] = "C"
-
-	return item_with_class
 
 def get_monthly_consumption(item_code, created_at,filters, sales_data):
 	average_monthly_consumption_12 = 0
@@ -1264,13 +1169,7 @@ def get_date_last_sold(item):
 		date = getdate('1930-01-01')
 	return rdate, date
 
-def get_total_sold(item, date_from=""):
-	date_filter = ""
-	if date_from:
-		date_filter = f" and posting_date >= date('{date_from}')"
-	else:
-		date_filter = ""
-
+def get_total_sold(item):
 	data= frappe.db.sql(f"""select 
 							p.posting_date, c.qty, p.source, c.net_amount
 						from 
@@ -1280,7 +1179,6 @@ def get_total_sold(item, date_from=""):
 						where 
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
-							{date_filter}
 						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
