@@ -150,7 +150,7 @@ def execute(filters=None):
 			elif posting_date.year == current_year:
 				row["total"] += qty
 
-			last12_month_date = today - relativedelta(years=1)
+			last12_month_date = today - relativedelta(years=years_to_subtract)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
 			
