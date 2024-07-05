@@ -8,7 +8,11 @@
  "field_order": [
   "store_credit_section",
   "store_credit_account_cad",
-  "store_credit_account_usd"
+  "store_credit_account_usd",
+  "usaepay_settings_section",
+  "usaepay_url",
+  "api_key",
+  "pin"
  ],
  "fields": [
   {
@@ -27,12 +31,33 @@
    "fieldname": "store_credit_section",
    "fieldtype": "Section Break",
    "label": "Store Credit"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "usaepay_settings_section",
+   "fieldtype": "Section Break",
+   "label": "USAepay Settings"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "pin",
+   "fieldtype": "Data",
+   "label": "PIN"
+  },
+  {
+   "fieldname": "usaepay_url",
+   "fieldtype": "Data",
+   "label": "URL"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-06-21 03:19:31.542323",
+ "modified": "2024-07-04 16:48:31.840437",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",

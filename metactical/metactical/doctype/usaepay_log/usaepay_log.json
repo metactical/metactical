@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{action} - {#####}",
+ "creation": "2024-07-04 15:24:41.665897",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "action",
+  "refund_amount",
+  "column_break_wkqox",
+  "reference_doctype",
+  "reference_docname",
+  "section_break_6hrgt",
+  "request",
+  "column_break_9ulhg",
+  "response",
+  "section_break_ycrun",
+  "log"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "request",
+   "fieldtype": "Small Text",
+   "label": "Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "response",
+   "fieldtype": "Small Text",
+   "label": "Response",
+   "read_only": 1
+  },
+  {
+   "fieldname": "log",
+   "fieldtype": "Small Text",
+   "label": "Log",
+   "read_only": 1
+  },
+  {
+   "fieldname": "refund_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Refund Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Doctype",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_9ulhg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_wkqox",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_6hrgt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_ycrun",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Action",
+   "options": "Refund\nAdjustment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_docname",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Name",
+   "options": "reference_doctype",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-07-04 16:46:27.008853",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "USAePay Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

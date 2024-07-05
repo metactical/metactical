@@ -3,14 +3,12 @@ var old_tax_template;
 var base_in_words;
 frappe.ui.form.on('Sales Order', {
 	refresh: function(frm){
-		console.log(frm);
 		//Clear update qty and rate button
 		/*if(frm.doc.docstatus === 1 && frm.doc.status !== 'Closed'
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
 			frm.clear_custom_buttons();
 		}*/
-		
-		
+				
 		setTimeout(() => {
 			
 			frm.remove_custom_button("Pick List", 'Create'); 
@@ -20,6 +18,10 @@ frappe.ui.form.on('Sales Order', {
 			frm.remove_custom_button("Project", 'Create'); 
 			frm.remove_custom_button("Subscription", 'Create'); 
 			
+			if (frm.doc.neb_usaepay_transaction_key){
+				frm.add_custom_button("Refund Payment", () => refund_payment(), __("USAePay"));
+				frm.add_custom_button("Adjust Payment", frm.trigger("adjust_payment"), __("USAePay"));
+			}
 		}, 1000);
 
 		// Add Stock Entry (Transfer material) button
@@ -353,7 +355,23 @@ frappe.ui.form.on("Sales Order Item", {
 	
 	qty(frm) {
         cur_frm.refresh_field("items")
-    }
+    },
+
+	adjust_payment: function(frm){
+		frm.save();
+
+		setTimeout(function(){
+			frappe.call({
+				method: 'metactical.custom_scripts.sales_order.sales_order.adjust_payment',
+				args: {
+					'docname': cur_frm.docname
+				},
+				callback: function(r){
+					console.log(r);
+				}
+			});
+		}, 500);
+	}
 });
 
 erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
@@ -471,6 +489,34 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 });
 
 $.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
+
+let refund_payment = function(frm){
+	frappe.prompt([
+		{'fieldname': 'refund_amount', 'fieldtype': 'Currency', 'label': 'Refund Amount', 'reqd': 1}
+	],
+	function(values){
+		frappe.call({
+			method: 'metactical.custom_scripts.sales_order.sales_order.refund_payment',
+			freeze: true,
+			args: {
+				'docname': cur_frm.docname,
+				'refund_amount': values.refund_amount
+			},
+			callback: function(r){
+				if (r.success){
+					frappe.msgprint(r.message, "Success");
+				}
+				else{
+					frappe.msgprint(r.message, "Error");
+				}
+
+			}
+		});
+	},
+		'Please enter the amount to refund.',
+		'Refund'
+	)	
+}
 
 //Metactical Customization: Replace erpnext.utils.get_party_details
 var get_party_details = function(frm, method, args, callback) {

@@ -14,6 +14,12 @@ from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
 from metactical.custom_scripts.utils.metactical_utils import queue_action
+from metactical.custom_scripts.usaepay.usaepay_api import (
+		get_transaction_from_usaepay, 
+		get_token_hash, 
+		create_refund, 
+		get_card_token
+	)
 
 class SalesOrderCustom(SalesOrder):
 	def validate(self):
@@ -187,3 +193,97 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	doclist.set_onload("ignore_price_list", True)
 
 	return doclist
+
+@frappe.whitelist()
+def refund_payment(docname, refund_amount):
+	message = ""
+	try:
+		sales_order = frappe.get_doc("Sales Order", docname)
+		usaepay_transaction_key = sales_order.get("neb_usaepay_transaction_key")
+		
+		metactical_settings = frappe.get_single("Metactical Settings")
+		usaepay_url = metactical_settings.get("usaepay_url")
+		token_hash = get_token_hash(metactical_settings)
+
+		message += "<br>Token Hash Generated"
+
+		headers = {
+			"Content-Type": "application/json",
+			"Authorization": token_hash
+		}
+
+		transaction = get_transaction_from_usaepay(usaepay_transaction_key, token_hash)
+
+		if transaction:
+			message += "<br>Transaction Found in USAePay"
+			card_token = get_card_token(usaepay_url, transaction.get("key"), headers)
+			message += "<br>Card Token Generated"
+
+			transaction["creditcard"]["number"] = card_token
+
+			payload, refund_response = create_refund(transaction, refund_amount, usaepay_url, headers)
+			message += "<br>Refund Created in USAePay"
+			
+			create_log(payload, refund_response, message, "Sales Order", docname, refund_amount, "Refund")
+
+			card_holder = "for " + refund_response.get("creditcard").get("cardholder") if refund_response.get("creditcard") else ""
+			frappe.response["message"] = f"<b>{refund_response['auth_amount']}</b> is refunded successfully <b>{card_holder}</b>."
+			frappe.response["success"] = True
+		else:
+			frappe.response["success"] = False
+			frappe.response["message"] = "Transaction not found in USAePay"
+
+	except Exception as e:
+		frappe.log_error(title="Refund Payment Error", message=frappe.get_traceback())
+		frappe.msgprint("Unable to refund payment: {0}".format(e), title="Error")
+
+def create_log(payload, refund_response, message, doctype, docname, refund_amount, action):
+	# Mask credit card token
+	payload["creditcard"]["number"] = "****-****" + payload["creditcard"]["number"][-9:]
+
+	frappe.get_doc({
+		"doctype": "USAePay Log",
+		"request": format_json_for_html(payload),
+		"response": format_json_for_html(refund_response),
+		"log": message,
+		"date": frappe.utils.now(),
+		"reference_docname": docname,
+		"refund_amount": refund_amount,
+		"action": action,
+		"reference_doctype": doctype
+	}).insert()
+
+def format_json_for_html(data, indent_size=2):
+    try:
+        # Function to recursively format JSON
+        def format_json(data, indent_level):
+            lines = []
+            for key, value in data.items():
+                if isinstance(value, dict):
+                    # Recursively format nested objects
+                    lines.append(f'{" " * indent_level * indent_size}"{key}": {{ <br>')
+                    lines.extend(format_json(value, indent_level + 1))
+                    lines.append(f'{" " * indent_level * indent_size}}}, <br>')
+                elif isinstance(value, list):
+                    # Handle lists of objects
+                    lines.append(f'{" " * indent_level * indent_size}"{key}": [ <br>')
+                    for item in value:
+                        lines.extend(format_json(item, indent_level + 1))
+                    lines.append(f'{" " * indent_level * indent_size}] <br>')
+                else:
+                    # Format primitive types (string, number, etc.)
+                    lines.append(f'{" " * indent_level * indent_size}"{key}": "{value}", <br>')
+            return lines
+        
+        # Start formatting from the top-level object
+        formatted_lines = format_json(data, indent_level=1)
+        
+        # Join all lines with newline characters
+        formatted_json = '\n'.join(formatted_lines)
+        
+        return formatted_json
+    
+    except json.JSONDecodeError as e:
+        return f"Error decoding JSON: {str(e)}"
+    except Exception as e:
+        return f"Error: {str(e)}"
