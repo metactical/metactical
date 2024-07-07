@@ -75,7 +75,8 @@
 			  <div class="col-6">
 				  <div style="float: left; width: 30%;">
 					  <b id="item-title" style="font-size: 10px; color: #FFF; text-align: left !important;">Item Code</b><br>
-					  <input  class="copy form-control-plaintext white-text" type="text" id="item_code" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" />
+					  <input  class="copy form-control-plaintext white-text" type="text" id="item_code" 
+					  	style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" />
 					  <a class="copy" href="#" onclick="copy_item_code()" id="copy-btn" style="color: red; margin-right: 30px;">Copy</a>
 				  </div>
 				  <div style="float: left;" id="copy-barcode"></div>
@@ -87,22 +88,19 @@
 		  </div>
 		</div>
 	</header>
-	<div>
 	<table id="search_results" class="cell-border order-column hover stripe" style="">
 		<thead class="thead-dark">
 			<tr>
 				{% for column in columns %}
-					<th>{{column}}</th>
+					<th>{{column.label}}</th>
 				{% endfor %}
 			</tr>
 		</thead>
 		<tbody>
 			{% for row in data %}
 				<tr>
-					{% for value in row %}
-						<td>
-							{{value}}
-						</td>
+					{% for column in columns %}
+						<td>{{ row[column.fieldname] }}</td>
 					{% endfor %}
 				</tr>
 			{% endfor %}
@@ -110,7 +108,7 @@
 		<tfoot>
             <tr>
 				{% for column in columns %}
-					<th>{{column}}</th>
+					<th>{{column.label}}</th>
 				{% endfor %}
             </tr>
         </tfoot>
@@ -156,7 +154,7 @@
 		//Called on search button click
 		function searchItem() {
 			var search_text = document.getElementById("searchinput").value
-			var new_url = `${window.location.origin}/itemsearchnew?searchtext=${search_text}`
+			var new_url = `${window.location.origin}/item-search-franchise?searchtext=${search_text}`
 			if(search_text.length > 2){
 				window.location.href = new_url
 			}
@@ -268,8 +266,7 @@
 						barcode = barcodes[0];
 						html = `<input  class="copy form-control-plaintext white-text" type="text" id="${barcode}" style=" width: auto; display: inline; color: #FFF; margin-right: 5px; font-weight: bold;" value="${barcode}" />
 									<a class="copy" href="#" onclick="copy_barcode(\`${barcode}\`)" id="copy-btn" style="color: red; margin-right: 10px;">Copy</a>
-									<a class="copy" href="#" onclick="print_barcode(\`${barcode}\`, \`${retail_sku}\`, \`${item_name}\`)" id="copy-btn" style="color: red; margin-right: 10px;">Print Barcode</a>
-									<a class="copy" href="#" onclick="print_with_price(\`${barcode}\`, \`${retail_sku}\`, \`${item_name}\`, \`${item_code}\`)" id="copy-btn" style="color: red; margin-right: 30px;">Print With Price</a> <br>`;
+									<a class="copy" href="#" onclick="print_barcode(\`${barcode}\`, \`${retail_sku}\`, \`${item_name}\`)" id="copy-btn" style="color: red; margin-right: 10px;">Print Barcode</a>`;
 						barcode_copy = barcode_copy + html;
 						$('#copy-barcode').html(barcode_copy);
 					}
