@@ -129,7 +129,7 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
-  },
+  },  
   {
    "hidden": 0,
    "is_query_report": 1,
@@ -305,6 +305,33 @@
    "label": " Employee Roll Report",
    "link_to": "Employee Roll Report",
    "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bulk Updates",
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order Import Tool",
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Price Import Tool",
+   "link_to": "Item Price From Excel",
+   "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   },
