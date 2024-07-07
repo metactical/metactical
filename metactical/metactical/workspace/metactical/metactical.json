@@ -133,7 +133,7 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Price Lists - V1",
+   "label": "Item Price Excel - V1",
    "link_to": "Price Lists - V1",
    "link_type": "Report",
    "onboard": 0,
@@ -142,8 +142,8 @@
   {
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Price Lists - V2",
-   "link_to": "Price Lists - V2",
+   "label": "Item Price Excel - V2",
+   "link_to": "Item Price Excel - V2",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
@@ -551,6 +551,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report with Item Class Suggest",
+   "link_to": "Sales Report with Item Class Suggest",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -747,7 +756,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-06-04 10:05:13.325612",
+ "modified": "2024-07-07 10:00:10.481933",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
