@@ -11,7 +11,7 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.controllers.selling_controller import SellingController
 from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
-from metactical.custom_scripts.utils.metactical_utils import queue_action
+from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
 
 class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
 	def on_cancel(self):
@@ -61,6 +61,25 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 			queue_action(self, "submit", timeout=2000)
 		else:
 			self._submit()
+
+	def set_status(self, update=False, status=None, update_modified=True):
+		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
+		
+		# Metactical Customization: Added
+		if self.status == "Paid" and not self.neb_payment_completed_at:
+			self.db_set("neb_payment_completed_at", frappe.utils.getdate(now()), notify=True)
+			
+			# Metactical Customization: Check if all invoices for the sales order are paid and update sales order
+			if self.sales_order:
+				billing_status = frappe.db.get_value("Sales Order", self.sales_order, "billing_status")
+				if billing_status == "Fully Billed":
+					all_invoices_paid = check_si_payment_status_for_so(self.sales_order)
+
+					if all_invoices_paid:
+						frappe.db.set_value("Sales Order", self.sales_order, "neb_payment_completed_at", frappe.utils.getdate(now()), update_modified=True)
+				
+		elif self.status != "Paid" and self.neb_payment_completed_at:
+			self.db_set("neb_payment_completed_at", None, notify=True)
 
 def unlink_ref_doc_from_payment_entries(ref_doc):	
 	#Check for sales order
