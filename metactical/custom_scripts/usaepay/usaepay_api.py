@@ -46,23 +46,20 @@ def get_token_hash(metactical_settings):
 
 	return "Basic " + authKey
 
-def create_refund(transaction, amount, usaepay_url, headers, refund_full_amount):
+def create_refund(transaction, amount, usaepay_url, headers):
 	payload = {
 		"amount": amount,
 		"trankey": transaction.get("key"),
 	}
 
-	if refund_full_amount:
-		payload["command"] = "refund"
-	else:
-		if (transaction.get("trantype") == "Credit Card Sale"):
-			payload["command"] = "cc:credit"
-			payload["creditcard"] = transaction.get("creditcard")
-		elif (transaction.get("trantype") == "Check Sale"):
-			payload["command"] = "check:credit"
-			payload["check"] = transaction.get("check")
-		elif (transaction.get("trantype") == "Cash Sale"):
-			payload["command"] = "cash:refund"
+	if (transaction.get("trantype") == "Credit Card Sale"):
+		payload["command"] = "cc:credit"
+		payload["creditcard"] = transaction.get("creditcard")
+	elif (transaction.get("trantype") == "Check Sale"):
+		payload["command"] = "check:credit"
+		payload["check"] = transaction.get("check")
+	elif (transaction.get("trantype") == "Cash Sale"):
+		payload["command"] = "cash:refund"
 
 	if "command" not in payload:
 		frappe.throw(_("Transaction type not supported for refund"))
