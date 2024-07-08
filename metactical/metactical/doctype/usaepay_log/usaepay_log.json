@@ -10,9 +10,12 @@
   "date",
   "action",
   "refund_amount",
+  "transaction_key",
+  "refund_transaction_key",
   "column_break_wkqox",
   "reference_doctype",
   "reference_docname",
+  "reason",
   "section_break_6hrgt",
   "request",
   "column_break_9ulhg",
@@ -91,11 +94,29 @@
    "label": "Reference Name",
    "options": "reference_doctype",
    "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transaction_key",
+   "fieldtype": "Data",
+   "label": "Transaction Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "refund_transaction_key",
+   "fieldtype": "Data",
+   "label": "Refund Transaction Key",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-04 16:46:27.008853",
+ "modified": "2024-07-08 07:11:24.843557",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "USAePay Log",

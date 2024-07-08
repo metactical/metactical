@@ -201,7 +201,7 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	return doclist
 
 @frappe.whitelist()
-def get_usaepay_transaction_detail(transaction):
+def get_usaepay_transaction_detail(transaction, docname):
 	try:
 		metactical_settings = frappe.get_single("Metactical Settings")
 		usaepay_url = metactical_settings.get("usaepay_url")
@@ -213,6 +213,20 @@ def get_usaepay_transaction_detail(transaction):
 		}
 
 		transaction = get_transaction_from_usaepay(transaction, headers)
+
+		# refunds
+		refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
+		print(refunds)
+		if refunds:
+			transaction["refunds"] = refunds
+			
+			total_refund = sum([flt(refund.get("refund_amount")) for refund in refunds])
+			if total_refund:
+				transaction["available_amount"] = float(transaction.get("amount")) - total_refund
+		else:
+			transaction["refunds"] = []
+			transaction["available_amount"] = transaction.get("amount")
+
 		if transaction:
 			frappe.response["transaction"] = transaction
 		else:
@@ -223,7 +237,7 @@ def get_usaepay_transaction_detail(transaction):
 		frappe.msgprint("Unable to get USAePay transaction detail: {0}".format(e), title="Error")
 
 @frappe.whitelist()
-def refund_payment(docname, refund_amount=None, refund_full_amount=False):
+def refund_payment(docname, refund_reason, refund_amount):
 	user_roles = get_usaepay_roles()
 	if not any(role in frappe.get_roles() for role in user_roles.get("refund")):
 		frappe.msgprint("You are not authorized to refund payment", title="Error")
@@ -253,11 +267,11 @@ def refund_payment(docname, refund_amount=None, refund_full_amount=False):
 			transaction["creditcard"]["number"] = card_token
 
 			# process refund
-			payload, refund_response = create_refund(transaction, refund_amount, usaepay_url, headers, refund_full_amount)
-			
+			payload, refund_response = create_refund(transaction, refund_amount, usaepay_url, headers)
+
 			# create USAePay log
-			refunded_amount = refund_amount if refund_amount else transaction.amount
-			create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund")
+			refunded_amount = refund_amount if refund_amount else transaction["amount"]
+			create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund", refund_reason)
 
 			card_holder = "for <b>" + refund_response.get("creditcard").get("cardholder") +"</b>" if refund_response.get("creditcard") else ""
 			frappe.response["message"] = f"<b>{refund_response['auth_amount']}</b> is refunded successfully {card_holder}."

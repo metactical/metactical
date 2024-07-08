@@ -526,77 +526,98 @@ let refund_payment = function(frm){
 		freeze: true,
 		freeze_message: "Fetching transaction details...",
 		args: {
-			"transaction": cur_frm.doc.neb_usaepay_transaction_key
+			"transaction": cur_frm.doc.neb_usaepay_transaction_key,
+			"docname": cur_frm.docname,
 		},
 		callback: function(r){
 			var transaction = r.transaction;
 
 			if (parseFloat(transaction.amount) != cur_frm.doc.grand_total)
 			{
-				frappe.msgprint("The Amount in USAePay is not equal to the Grand Total of the Order. Please Adjust it first")
-			}
-
-			var d = new frappe.ui.Dialog({
-				'title': 'Refund Payment',
-				'fields': [
-					{
-						"fieldtype": "HTML",
-						"fieldname": "transaction_details",
-						"label": "Transaction Details",
-					},
-					{
-						"fieldname": "original_value",
-						"fieldtype": "Currency",
-						"hidden": 1,
-						"default": transaction.amount
-					},
-					{
-						"fieldtype": "Check",
-						"fieldname": "refund_full_amount",
-						"label": "Refund Full Amount",
-					},
-					{
-						"fieldtype": "Currency",
-						"fieldname": "refund_amount",
-						"label": "Refund Amount",
-						"mandatory_depends_on": "eval: !doc.refund_full_amount",
-						"depends_on": "eval: !doc.refund_full_amount"
-					}
-				],
-				primary_action: function(){
-					confirm_refund(d);
+				frappe.confirm(`The amount in USAePay does not match the order's grand total. Do you want to proceed?<br>
+					<br>USAePay Amount: <b>${transaction.amount}</b>
+					<br>Order Grand Total: <b>${cur_frm.doc.grand_total}</b>
+				`, function(){
+					show_refund_dialog(cur_frm, transaction);
 				},
-				primary_action_label: 'Refund'
-			});
-
-			var transaction_details = `<div class="row mt-2">`;
-			transaction_details += `<div class="col-md-6">Transaction ID: <br><b>${transaction.key}</b></div>`;
-			transaction_details += `<div class="col-md-6">Amount Paid: <br><b>${transaction.amount}</b></div></div>`;
-
-			if (transaction.trantype == "Credit Card Sale"){
-				transaction_details += `<div class="row mt-2"><div class="col-md-6">Card Holder: <br><b>${transaction.creditcard.cardholder}</b></div>`;
-				transaction_details += `<div class="col-md-6">Card Number: <br><b>${transaction.creditcard.number}</b></div></div>`;
+				function(){
+					return;
+				});
 			}
-			else if (transaction.trantype == "Check Sale"){
-				transaction_details += `<div class="row mt-2"><div class="col-md-6">Check Holder: <br><b>${transaction.check.accountholder}</b></div>`;
-				transaction_details += `<div class="row mt-2"><div class="col-md-6">Tracking Number: <br><b>${transaction.check.trackingnum}</b></div>`;
-
+			else{
+				show_refund_dialog(cur_frm, transaction);
 			}
-			transaction_details += `<div class="row my-3"><div class="col-md-6">Status: <br><b>${transaction.status}</b></div>`;
-			transaction_details += `</div>`;
-
-			d.fields_dict.transaction_details.$wrapper.html(transaction_details);
-			d.show();
 		}
 	})
 }
 
-let confirm_refund = function(dialog){
-	var values = dialog.get_values();
-	var amount = values.refund_amount ? values.refund_amount : values.original_value
+let show_refund_dialog = function(frm, transaction){
+	if (parseFloat(transaction.available_amount) == 0){
+		frappe.msgprint("Full amount has already been refunded.", "Error");
+		return;
+	}
 
-	if (parseFloat(values.original_value) < values.refund_amount){
-		frappe.msgprint("Refund amount cannot exceed the original value.", "Error");
+	var d = new frappe.ui.Dialog({
+		'title': 'Refund Payment',
+		'fields': [
+			{
+				"fieldtype": "HTML",
+				"fieldname": "transaction_details",
+				"label": "Transaction Details",
+			},
+			{
+				"fieldtype": "Small Text",
+				"fieldname": "refund_reason",
+				"label": "Refund Reason",
+				"reqd": 1
+			},
+			{
+				"fieldtype": "Check",
+				"fieldname": "refund_full_amount",
+				"label": "Refund Full Amount",
+			},
+			{
+				"fieldtype": "Currency",
+				"fieldname": "refund_amount",
+				"label": "Refund Amount",
+				"mandatory_depends_on": "eval: !doc.refund_full_amount",
+				"depends_on": "eval: !doc.refund_full_amount"
+			}
+		],
+		primary_action: function(){
+			confirm_refund(d, transaction.available_amount);
+		},
+		primary_action_label: 'Refund'
+	});
+
+	var transaction_details = `<div class="row mt-2">`;
+	transaction_details += `<div class="col-md-6">Transaction ID: <br><b>${transaction.key}</b></div>`;
+	transaction_details += `<div class="col-md-6">Amount Paid: <br><b>${transaction.amount}</b></div></div>`;
+
+	if (transaction.trantype == "Credit Card Sale"){
+		transaction_details += `<div class="row mt-2"><div class="col-md-6">Card Holder: <br><b>${transaction.creditcard.cardholder}</b></div>`;
+		transaction_details += `<div class="col-md-6">Card Number: <br><b>${transaction.creditcard.number}</b></div></div>`;
+	}
+	else if (transaction.trantype == "Check Sale"){
+		transaction_details += `<div class="row mt-2"><div class="col-md-6">Check Holder: <br><b>${transaction.check.accountholder}</b></div>`;
+		transaction_details += `<div class="row mt-2"><div class="col-md-6">Tracking Number: <br><b>${transaction.check.trackingnum}</b></div>`;
+
+	}
+	transaction_details += `<div class="row my-3"><div class="col-md-6">Status: <br><b>${transaction.status}</b></div>`;
+	transaction_details += `<div class="col-md-6">Availabe: <br><b>${transaction.available_amount}</b></div></div>`;
+	transaction_details += `</div>`;
+
+	d.fields_dict.transaction_details.$wrapper.html(transaction_details);
+	d.show();
+}
+
+let confirm_refund = function(dialog, avl_amount){
+	var values = dialog.get_values();
+	var amount = values.refund_full_amount ? values.avl_amount: values.refund_amount
+
+	console.log(values.avl_amount, amount, parseFloat(values.avl_amount) < parseFloat(amount))
+	if (parseFloat(values.avl_amount) < parseFloat(amount)){
+		frappe.msgprint("Refund amount cannot exceed the amount available.", "Error");
 		return
 	}
 
@@ -609,11 +630,12 @@ let confirm_refund = function(dialog){
 				freeze: true,
 				args: {
 					'docname': cur_frm.docname,
-					'refund_amount': values.refund_amount,
-					"refund_full_amount": values.refund_full_amount
+					'refund_amount': amount,
+					"refund_reason": values.refund_reason
 				},
 				callback: function(r){
 					if (r.success){
+						cur_frm.reload_doc();
 						frappe.msgprint(r.message, "Success");
 					}
 					else{
