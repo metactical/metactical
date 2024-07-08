@@ -25,7 +25,7 @@ def publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message
         channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
-            body=message,
+            body=json.dumps(message),  # Convert message dictionary to JSON string
             properties=pika.BasicProperties(
                 delivery_mode=2,  # Make message persistent
             ))
@@ -40,9 +40,11 @@ def publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message
 def webhook():
     data = frappe.form_dict
 
+    # Known configuration fields
+    config_fields = ['server_ip', 'exchange', 'exchange_type', 'routing_key', 'queue_name', 'username', 'password']
+    
     # Check for missing required fields
-    required_fields = ['server_ip', 'exchange', 'exchange_type', 'routing_key', 'queue_name', 'username', 'password', 'message']
-    missing_fields = [field for field in required_fields if field not in data]
+    missing_fields = [field for field in config_fields if field not in data]
 
     if missing_fields:
         error_message = f"RabbitMQProxy: Missing required fields: {', '.join(missing_fields)}"
@@ -57,12 +59,14 @@ def webhook():
     queue_name = data['queue_name']
     username = data['username']
     password = data['password']
-    message = data['message']
-
+    
+    # Create the message dictionary with all other fields except the configuration fields
+    message_content = {key: value for key, value in data.items() if key not in config_fields}
+    
     # Log received data for debugging
     frappe.logger().info(f"RabbitMQProxy: Received data: {data}")
 
     # Publish to RabbitMQ
-    publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message, username, password, queue_name)
+    publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message_content, username, password, queue_name)
 
     return {'status': 'Message published to RabbitMQ'}
