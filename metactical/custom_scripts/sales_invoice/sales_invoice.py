@@ -29,15 +29,6 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 				if self.doctype == "Sales Order":
 					self.unlink_ref_doc_from_po()
 		super(CustomSalesInvoice, self).on_cancel()
-
-	def set_status(self, update=False, status=None, update_modified=True):
-		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
-
-		# Metactical Customization: Added
-		if self.status == "Paid" and not self.neb_payment_completed_at:
-			self.db_set("neb_payment_completed_at", now(), notify=True)
-		else:
-			self.db_set("neb_payment_completed_at", None, notify=True)
 		
 	def before_save(self):
 		super(CustomSalesInvoice, self).before_save()
