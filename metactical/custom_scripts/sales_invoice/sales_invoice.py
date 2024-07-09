@@ -93,7 +93,7 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 					sales_orders.append(row.sales_order)
 			
 			for sales_order in sales_orders:
-				billing_status = frappe.db.get_value("Sales Order", self.sales_order, "billing_status")
+				billing_status = frappe.db.get_value("Sales Order", sales_order, "billing_status")
 				if billing_status == "Fully Billed":
 					all_invoices_paid = check_si_payment_status_for_so(sales_order)
 					if all_invoices_paid:
