@@ -87,6 +87,16 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 			self.db_set("neb_payment_completed_at", frappe.utils.getdate(now()), notify=True)
 			
 			# Metactical Customization: Check if all invoices for the sales order are paid and update sales order
+			sales_orders = []
+			for row in self.items:
+				if row.sales_order and row.sales_order not in sales_orders:
+					sales_orders.append(row.sales_order)
+			
+			for sales_order in sales_orders:
+				all_invoices_paid = check_si_payment_status_for_so(sales_order)
+				if all_invoices_paid:
+					frappe.db.set_value("Sales Order", sales_order, "neb_payment_completed_at", frappe.utils.getdate(now()), update_modified=True)
+			
 			if self.sales_order:
 				billing_status = frappe.db.get_value("Sales Order", self.sales_order, "billing_status")
 				if billing_status == "Fully Billed":
