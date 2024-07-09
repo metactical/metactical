@@ -22,12 +22,3 @@ def after_migrate():
 		'value': value
 	})
 	doc.insert()
-
-	update_payment_completed_at()
-
-def update_payment_completed_at():
-	# Update neb_payment_completed_at in Sales Invoice
-	frappe.db.sql("""UPDATE `tabSales Invoice` SET neb_payment_completed_at=posting_date WHERE neb_payment_completed_at is NULL and status='Paid'""")
-	
-	# update neb_payment_completed_at in Sales Order
-	frappe.db.sql("""UPDATE `tabSales Order` SET neb_payment_completed_at=transaction_date WHERE neb_payment_completed_at is NULL and billing_status='Fully Paid'""")
