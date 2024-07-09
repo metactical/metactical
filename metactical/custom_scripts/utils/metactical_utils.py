@@ -245,19 +245,29 @@ def set_border(columns, rows, ws):
 
 # check if all sales invoices are paid for a sales order
 def check_si_payment_status_for_so(sales_order):
-	all_invoices_paid = True
-	invoices = frappe.get_all("Sales Invoice", filters={"docstatus": 1, "sales_order": sales_order}, fields=["name"])
+	all_invoices_paid = False
+	
+	invoices = frappe.db.sql("""SELECT
+								invoice.name AS invoice_name, invoice.status, invoice.grand_total
+							FROM
+								`tabSales Invoice Item`  AS item
+							LEFT JOIN
+								`tabSales Invoice` AS invoice ON invoice.name = item.parent
+						  	WHERE
+						  		item.sales_order = %(sales_order)s
+						  GROUP BY invoice.name, invoice.status, invoice.grand_total""", 
+				{"sales_order": sales_order}, as_dict=True)
+	
 	order_grand_total = frappe.db.get_value("Sales Order", sales_order, "grand_total")
 	invoices_total = 0
 
-	if invoices:
+	if invoices and len(invoices) > 0:
 		for invoice in invoices:
-			invoice_status = frappe.db.get_values("Sales Invoice", invoice.name, ["status", "grand_total"])
-			if invoice_status[0][0] != "Paid":	
+			if invoice.status != "Paid":	
 				all_invoices_paid = False
 				break
 			else:
-				invoices_total += invoice_status[0][1]
+				invoices_total += invoice.grand_total
 
 	if not all_invoices_paid and invoices_total == order_grand_total:
 		all_invoices_paid = True
