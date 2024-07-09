@@ -76,18 +76,11 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 					sales_orders.append(row.sales_order)
 			
 			for sales_order in sales_orders:
-				all_invoices_paid = check_si_payment_status_for_so(sales_order)
-				if all_invoices_paid:
-					frappe.db.set_value("Sales Order", sales_order, "neb_payment_completed_at", frappe.utils.getdate(now()), update_modified=True)
-			
-			if self.sales_order:
 				billing_status = frappe.db.get_value("Sales Order", self.sales_order, "billing_status")
 				if billing_status == "Fully Billed":
-					all_invoices_paid = check_si_payment_status_for_so(self.sales_order)
-
+					all_invoices_paid = check_si_payment_status_for_so(sales_order)
 					if all_invoices_paid:
-						frappe.db.set_value("Sales Order", self.sales_order, "neb_payment_completed_at", frappe.utils.getdate(now()), update_modified=True)
-				
+						frappe.db.set_value("Sales Order", sales_order, "neb_payment_completed_at", frappe.utils.getdate(now()), update_modified=True)
 		elif self.status != "Paid" and self.neb_payment_completed_at:
 			self.db_set("neb_payment_completed_at", None, notify=True)
 
