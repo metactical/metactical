@@ -13,19 +13,6 @@ def get_orders(start_date, end_date):
 									filters={"delivery_status": ("in", ("Not Delivered", "Partly Delivered")), "billing_status": "Fully Billed", 
 									"modified": ("between", (start_date, end_date))})
 	return orders
-
-@frappe.whitelist(allow_guest=True)
-def test():
-	'''response = requests.get('https://ssapi.shipstation.com/stores',
-				auth=('', ''))
-	data = {"resource_url": "https://ssapi6.shipstation.com/shipments?batchId=190671332&includeShipmentItems=False", "resource_type": "SHIP_NOTIFY" }
-	response = requests.post('http://deverp.metactical.com/api/method/metactical.api.shipstation.orders_shipped_webhook?settingid=8f3a7e2cac',
-				json=data)				
-	print(response)
-	print(response.json())'''
-	delivery_note = frappe.get_doc('Delivery Note', 'MAT-DN-2023-00001')
-	settings = frappe.get_doc("Shipstation Settings", 'eb788d04eb')
-	return order_json(delivery_note, False, settings)
 	
 	
 @frappe.whitelist()
@@ -80,18 +67,10 @@ def sync_shipping_status():
 					shipstation_settings = frappe.get_doc('Shipstation Settings', row.settings_id)
 					if shipstation_settings.disabled != 1:
 						response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
-							auth=(shipstation_settings.api_key, shipstation_settings.get_password('api_secret')))'''
-
-@frappe.whitelist(allow_guest=True)
-def connect():
-	response = requests.get('https://ssapi.shipstation.com/orders',
-				auth=('', ''))	
-	print(response)
-	print(response.json())
+							auth=(shipstation_settings.api_key, shipstation_settings.get_password('api_secret')))'''	
 	
 @frappe.whitelist()
 def create_shipstation_orders(order_no=None, is_cancelled=False):
-	#order_no = 'MAT-DN-2022-00071'
 	if order_no is not None:
 		order = frappe.get_doc('Delivery Note', order_no)
 		if order.get('is_return') == 1:
@@ -403,6 +382,20 @@ def orders_shipped_webhook():
 								if shipstation_settings.disabled != 1:
 									response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
 										auth=(shipstation_settings.api_key, shipstation_settings.get_password('api_secret')))
+									
+						# Update shipment doctype
+						shipment_details = frappe._dict({
+							'receipt_number': trackingNumber,
+							'receipt_date': shipDate,
+							'transporter': transporter,
+							'weight_uom': weight.get('units'),
+							'length': dimensions.get('length'),
+							'width': dimensions.get('width'),
+							'height': dimensions.get('height'),
+							'weight': weight.get('value'),
+
+						})
+						update_shipment(existing_delivery, shipment_details)
 							
 			new_req.insert(ignore_if_duplicate=True)
 	
@@ -416,23 +409,6 @@ def shipstation_xml():
 	response.charset = "utf-8"
 	response.data = out
 	return response
-	
-@frappe.whitelist()
-def get_shipment():
-	response = requests.get('https://ssapi6.shipstation.com/shipments?batchId=187980859&includeShipmentItems=False',
-				auth=('249b9201157349939742f12101a8cc80', '1d7b6409ba6e41e1aeae73b97384613d'))
-	print(response.status_code)
-	print(response.json())
-	shipments = response.json()
-	for shipment in shipments.get('shipments'):
-		existing_delivery = frappe.db.get_value('Delivery Note', {'po_no': shipment.get('orderNumber'), 'docstatus': 0})
-		if existing_delivery:
-			delivery_note = frappe.get_doc('Delivery Note', existing_delivery)
-			delivery_note.update({
-				'lr_date': shipment.get('shipDate'),
-				'lr_no': shipment.get('trackingNumber')
-			})
-			delivery_note.save()
 			
 def delete_order(order_no):
 	#order_no = 'MAT-DN-2021-00030'
@@ -442,3 +418,25 @@ def delete_order(order_no):
 		if settings.disabled == 0:
 			response = requests.delete('https://ssapi.shipstation.com/orders/' + row.shipstation_order_id,
 				auth=(settings.api_key, settings.get_password('api_secret')))
+			
+def update_shipment(delivey_note, shipment_details):
+	shipment_exists = frappe.db.exists('Shipment Delivery Note', {'delivery_note': delivey_note, 'docstatus': 0})
+	if shipment_exists:
+		shipment = frappe.db.get_value('Shipment Delivery Note', shipment_exists, 'parent')
+		shipment = frappe.get_doc('Shipment', shipment)
+		shipment.update({
+			'ais_shipstation_transporter': shipment_details.get('transporter'),
+			'ais_shipstaion_weight_uom': shipment_details.get('weight_uom'),
+			'ais_shipstation_receipt_no': shipment_details.get('receipt_number'),
+			'ais_shipstation_receipt_date': shipment_details.get('receipt_date'),
+			'ais_shipment_status': 'Shipped'
+		})
+		shipment.shipment_parcel = []
+		shipment.append('shipment_parcel', {
+			'length': shipment_details.get('length'),
+			'width': shipment_details.get('width'),
+			'height': shipment_details.get('height'),
+			'weight': shipment_details.get('weight'),
+			'count': 1
+		})
+		shipment.submit()

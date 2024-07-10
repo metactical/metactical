@@ -149,7 +149,7 @@ def get_data(conditions, filters):
 			c.item_name, p.pos_profile
 		""".format(filters.get("to_date"), conditions), as_dict=1)
 	return data
-
+ 
 def get_conditions(filters, sales_order=None):
 	conditions = ""
 	if filters.get("item_code"):

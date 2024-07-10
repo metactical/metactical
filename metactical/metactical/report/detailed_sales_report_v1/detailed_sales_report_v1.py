@@ -99,9 +99,11 @@ def execute(filters=None):
 		row["last_sold_date"], row['olast_sold_date'] = get_date_last_sold(i.get("item_code"))
 
 		sales_data = get_total_sold(i.get("item_code"))
+
 		row["previous_year_sale"] = 0
 		row["total"] = 0
 		row["last_twelve_months"] = 0
+		row["last_24_months"] = 0
 
 		today = getdate(nowdate())
 
@@ -138,8 +140,12 @@ def execute(filters=None):
 				row["total"] += qty
 
 			last12_month_date = today - relativedelta(years=1)
+			last24_month_date = today - relativedelta(years=2)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
+			
+			if posting_date >= last24_month_date:
+				row["last_24_months"] += qty
 			
 			if posting_date >= years_ago:
 				row[frappe.scrub("sold"+month+str(posting_date.year))] += qty
@@ -618,8 +624,14 @@ def get_column(filters,conditions):
 			"width": 140,
 		},
 		{
-			"label": _(f"TotalSold{filters.sales_data_period}M"),
+			"label": _(f"TotalSold12M"),
 			"fieldname": "last_twelve_months",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _(f"TotalSold24M"),
+			"fieldname": "last_24_months",
 			"fieldtype": "Int",
 			"width": 140,
 		},
@@ -865,6 +877,7 @@ def get_master(conditions="", filters={}):
 				`tabItem` i on i.name = s.parent
 			where 1 = 1 %s
 		"""%(conditions), filters, as_dict=1)
+
 	return data
 
 def get_conditions(filters):
@@ -1147,13 +1160,7 @@ def get_date_last_sold(item):
 		date = getdate('1930-01-01')
 	return rdate, date
 
-def get_total_sold(item, date_from=""):
-	date_filter = ""
-	if date_from:
-		date_filter = f" and posting_date >= date('{date_from}')"
-	else:
-		date_filter = ""
-
+def get_total_sold(item):
 	data= frappe.db.sql(f"""select 
 							p.posting_date, c.qty, p.source, c.net_amount
 						from 
@@ -1163,7 +1170,6 @@ def get_total_sold(item, date_from=""):
 						where 
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
-							{date_filter}
 						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
