@@ -136,11 +136,11 @@ def load_si(sales_invoice):
                 "qty": item.qty,
                 "amount": frappe.format_value(item.net_amount, {"fieldtype": "Currency"}),
                 "amount_with_out_format": item.net_amount,
-                "discount": item.price_list_rate - item.rate,
+                "discount": item.price_list_rate - item.rate if item.price_list_rate else item.rate,
                 "discount_percentage": item.discount_percentage,
                 "total": frappe.format_value(item.amount, {"fieldtype": "Currency"}),
                 "item_code": item.item_code,
-                "discount_amount": item.price_list_rate - item.rate,
+                "discount_amount": item.price_list_rate - item.rate if item.price_list_rate else item.rate,
                 "posting_date": sales_invoice_doc.posting_date,
                 "customer": sales_invoice_doc.customer,
                 "total_taxes_and_charges": sales_invoice_doc.total_taxes_and_charges,
@@ -240,7 +240,8 @@ def transfer_store_credit(**kwargs):
             "posting_date": frappe.utils.nowdate(),
             "items": selected_items,
             "taxes_and_charges": frappe.get_value("Sales Invoice", sales_invoice, "taxes_and_charges"),
-            "taxes": taxes
+            "taxes": taxes, 
+            "disable_rounded_total": 1,
         })
 
         enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, customer=customer, queue='long', timeout=1500)
