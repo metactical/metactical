@@ -139,12 +139,15 @@ metactical.store_credit.StoreCredit = class {
                     var discount = 0
                     var total_qty_returned = 0
                     var tax_types = []
-
+                    
+                    console.log(this.si_items)
                     $.each(this.si_items, (index, item) => {
                         total_amount += item.amount_with_out_format
-                        discount +=  item.discount > 0 ? item.discount: 0
+                        discount +=  item.discount > 0 ? item.discount * item.qty: 0
                         total_qty_returned += item.qty
                     })
+
+                    console.log(total_amount, discount, total_qty_returned)
 
                     $.each(this.taxes, (index, tax) => {
                         if (!["TTL Tax", "Discount", "TTL Store Credit", "Total Qty Returned"].includes(tax.name)){
@@ -226,6 +229,7 @@ metactical.store_credit.StoreCredit = class {
                             if (r.items.length || Object.keys(r.credit_notes).length){
                                 var existing_store_credit = false
                                 var fully_returned_items = []
+                                var total_discount = 0
 
                                 // remove item form items list if store credit is already processed or it is in the queue
                                 $.each(r.items, (index, item) => {
@@ -238,11 +242,26 @@ metactical.store_credit.StoreCredit = class {
                                                 else{
                                                     item.qty = item.qty + (credit_note.qty)
                                                     item.amount = "$ " + (item.qty * item.rate)
+                                                    item.amount_with_out_format = item.qty * item.rate
                                                 }
                                                 existing_store_credit = true
                                             }
                                         })
                                     })
+                                    
+                                    item.discount_amount = item.discount * item.qty
+                                    total_discount += item.discount_amount
+                                })
+
+                                // update discount amount of credit notes
+                                $.each(r.credit_notes, (sales_invoice, credit_notes) => {
+                                    var total_discount = 0
+                                    $.each(credit_notes, (key, credit_note) => {
+                                        total_discount += credit_note.discount_amount * credit_note.qty
+                                        credit_note.discount_amount = credit_note.discount_amount * credit_note.qty
+                                    })
+
+                                    credit_notes[0].si_discount_amount = total_discount + credit_notes[0].si_discount_amount
                                 })
 
                                 // remove fully returned items
@@ -265,10 +284,17 @@ metactical.store_credit.StoreCredit = class {
                                         })
                                     }
                                     else{
-                                        me.taxes.push({
-                                            "name": key,
-                                            "amount": value
-                                        })
+                                        if (key == "Discount"){
+                                            me.taxes.push({
+                                                "name": key,
+                                                "amount": total_discount
+                                            })
+                                        }else{
+                                            me.taxes.push({
+                                                "name": key,
+                                                "amount": value
+                                            })
+                                        }
                                     }
                                 })
 
@@ -300,7 +326,8 @@ metactical.store_credit.StoreCredit = class {
                             "rate": item.rate,
                             "item_name": item.item_name,
                             "iname": item.name,
-                            "qty": item.qty
+                            "qty": item.qty,
+                            "original_qty": item.original_qty
                         })
                     })
 
@@ -314,42 +341,12 @@ metactical.store_credit.StoreCredit = class {
                             }
                         ],
                         primary_action: function(){
-                            var values = d.fields_dict.edit_price.$wrapper.find(".table-body .table-row")
-                            console.log(values)
                             var valid = true
-
-                            
-
-
-                            $.each(values.edit_price, (index, item) => {
-                                $.each(me.si_items, (ind, si_item) => {
-                                    if (si_item.name === item.iname){
-                                        if (item.rate > si_item.original_price){
-                                            frappe.show_alert("Price cannot be greater than the original price")
-                                            valid = false
-                                            return
-                                        }
-                                        else if (item.qty > si_item.original_qty){
-                                            frappe.show_alert("Quantity cannot be greater than the original quantity")
-                                            valid = false
-                                            return
-                                        }
-                                        else{
-                                            si_item.rate = item.rate
-                                            si_item.qty = item.qty
-                                            si_item.amount_with_out_format = item.rate * si_item.qty
-                                            si_item.amount = "$ " + si_item.amount_with_out_format
-                                        }
-                                    }
-                                })
-
-                                me.updateTotals()
-                            })
 
                             if (valid)
                                 d.hide()
                         },
-                        primary_action_label: __("Update")
+                        primary_action_label: __("Close")
                     })
 
                     var html = $(`<div id="editPriceDialog"></div>`)
@@ -372,20 +369,65 @@ metactical.store_credit.StoreCredit = class {
                         var row = $('<div class="table-row" data-target="'+item.retail_sku+'"></div>');
                         row.append('<div class="table-cell">' + item.item_name + '</div>');
                         row.append('<div class="table-cell">' + item.retail_sku + '</div>');
-                        row.append('<div class="table-cell"><input type="number" min=0.1 ste class="price-input form-control" value="' + item.rate + '"></div>');
-                        row.append('<div class="table-cell"><input type="number" min=0.1 class="quantity-input form-control" value="' + item.qty + '"></div>');
+                        row.append('<div class="table-cell"><input type="number" steps=1 class="price-input form-control" value="' + item.rate + '"></div>');
+                        row.append('<div class="table-cell"><input type="number" min=1 max="'+item.original_qty+'" onfocus="this.blur()" onkeydown="return false" class="quantity-input form-control" value="' + item.qty + '"></div>');
                         
                         table_body.append(row);
                     });
-                    
+
+                    me.set_modal_events()
                     html.append(headers)
                     html.append(table_body)
-
-                    console.log(html.html())
 
                     d.fields_dict.edit_price.$wrapper.html($(html).html())
                     d.show()
                 },
+                set_modal_events(){
+                    var me = this
+                    $(document).on("change", ".price-input", function(){
+                        var price = $(this).val()
+                        var retail_sku = $(this).closest(".table-row").data("target")
+                        $.each(me.si_items, (index, item) => {
+                            if (item.retail_sku === retail_sku){
+                                if (parseFloat(price) <= item.original_price){
+                                    item.rate = parseFloat(price)
+                                    item.amount_with_out_format = item.rate * item.qty
+                                    item.discount = item.price_list_rate - item.rate
+                                    item.discount_amount = item.discount * item.qty
+                                    item.amount = "$ " + item.amount_with_out_format
+                                    me.updateTotals()
+                                }
+                                else{
+                                    frappe.show_alert("Price cannot be greater than the original price")
+                                    $(this).val(item.rate)
+                                }
+                            }
+                        })
+
+                    })
+
+                    $(document).on("change", ".quantity-input", function(){
+                        var qty = $(this).val()
+                        var retail_sku = $(this).closest(".table-row").data("target")
+                        $.each(me.si_items, (index, item) => {
+                            if (item.retail_sku === retail_sku){
+                                if (parseFloat(qty) <= item.original_qty){
+                                    item.qty = parseFloat(qty)
+                                    item.discount = item.price_list_rate - item.rate
+                                    item.discount_amount = item.discount * item.qty
+                                    item.amount_with_out_format = item.rate * item.qty
+                                    item.amount = "$ " + item.amount_with_out_format
+                                    me.updateTotals()
+                                }
+                                else{
+                                    frappe.show_alert("Quantity cannot be greater than the original quantity")
+                                    $(this).val(item.qty)
+                                }
+                            }
+                        })
+                    });
+                },
+                
                 printPDF(){
                     var sales_invoice_to_print = ""
                     if (Object.keys(this.credit_notes).length > 1){
