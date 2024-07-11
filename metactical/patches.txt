@@ -8,3 +8,4 @@ execute:frappe.db.sql("UPDATE `tabSales Order` SET project = '' WHERE project IS
 execute:frappe.db.sql("UPDATE `tabPayment Entry` SET project = '' WHERE project IS NOT NULL")
 execute:frappe.db.sql("UPDATE `tabDelivery Note` SET project = '' WHERE project IS NOT NULL")
 execute:frappe.db.sql("UPDATE `tabReport` set disabled = 0, prepared_report = 1 WHERE name = 'Sales Order Trends'")
+metactical.patches.copy_retailsku_item_price
