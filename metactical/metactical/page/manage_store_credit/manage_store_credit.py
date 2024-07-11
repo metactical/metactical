@@ -246,6 +246,13 @@ def transfer_store_credit(**kwargs):
 
         enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, customer=customer, queue='long', timeout=1500)
 
+        # update customer price list if there is no default price list
+        customer_price_list = frappe.db.get_value("Customer", customer, "default_price_list")
+        if not customer_price_list:
+            pos_profile = frappe.db.get_value("Sales Invoice", sales_invoice.return_against, "pos_profile")
+            price_list = get_price_list(pos_profile)
+            frappe.db.set_value("Customer", customer, "default_price_list", price_list)
+
         frappe.response["items"] = [item.get('name') for item in items]
         frappe.response["success"] = True
         frappe.response["sales_invoice"] = sales_invoice.name
@@ -324,6 +331,7 @@ def create_customer(**kwargs):
         customer_doc.last_name = customer.get('last_name')
         customer_doc.ais_company = customer.get('company')
         customer_doc.ifw_email = customer.get('email')
+        customer_doc.customer_group = "Retail"
         customer_doc.customer_name = "{} {}".format(customer.get('first_name'), customer.get('last_name'))
         customer_doc.default_currency = "CAD"
         customer_doc.territory = customer.get('territory')
@@ -369,3 +377,7 @@ def create_pdf(sales_invoice, print_format="Standard"):
     frappe.local.response.filename = "{}.pdf".format(sales_invoice)
     frappe.local.response.filecontent = pdf
     frappe.local.response.type = "download"
+
+def get_price_list(pos_profile):
+    price_list = frappe.db.get_value("POS Profile", pos_profile, "selling_price_list")
+    return price_list
