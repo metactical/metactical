@@ -4,6 +4,10 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+#page-manage-store-credit .iti{
+    width: 100%
+}
+
 #page-manage-store-credit .list-group-item,
 #page-manage-store-credit  .table td {
   padding: 0.5rem 0.75rem;
