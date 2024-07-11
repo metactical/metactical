@@ -140,14 +140,11 @@ metactical.store_credit.StoreCredit = class {
                     var total_qty_returned = 0
                     var tax_types = []
                     
-                    console.log(this.si_items)
                     $.each(this.si_items, (index, item) => {
                         total_amount += item.amount_with_out_format
                         discount +=  item.discount > 0 ? item.discount * item.qty: 0
                         total_qty_returned += item.qty
                     })
-
-                    console.log(total_amount, discount, total_qty_returned)
 
                     $.each(this.taxes, (index, tax) => {
                         if (!["TTL Tax", "Discount", "TTL Store Credit", "Total Qty Returned"].includes(tax.name)){
@@ -199,14 +196,13 @@ metactical.store_credit.StoreCredit = class {
                         },
                         callback: function(r) {
                             if (r.success) {
-                                me.loadSI()
+                                // 
                             }
                             else{
                                 frappe.show_alert(r.error)
                             }
                             
                             $("#process_payment_button").html("Process Store Credit").attr("disabled", false)
-
                         }
                     })
 
@@ -349,6 +345,12 @@ metactical.store_credit.StoreCredit = class {
                         primary_action_label: __("Close")
                     })
 
+                    var html = me.get_modal_content(items)
+                    me.set_modal_events()
+                    d.fields_dict.edit_price.$wrapper.html($(html).html())
+                    d.show()
+                },
+                get_modal_content(items){
                     var html = $(`<div id="editPriceDialog"></div>`)
                     var headers = $(`<div class="table-header">
                                         <div class="table-cell">Item Name</div>
@@ -375,12 +377,10 @@ metactical.store_credit.StoreCredit = class {
                         table_body.append(row);
                     });
 
-                    me.set_modal_events()
                     html.append(headers)
                     html.append(table_body)
 
-                    d.fields_dict.edit_price.$wrapper.html($(html).html())
-                    d.show()
+                    return html
                 },
                 set_modal_events(){
                     var me = this

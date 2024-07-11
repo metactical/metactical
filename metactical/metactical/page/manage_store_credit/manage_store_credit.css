@@ -1,30 +1,30 @@
-.list-group-item {
+#page-manage-store-credit .list-group-item {
   background-color: transparent;
   border: none;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.list-group-item,
-.table td {
+#page-manage-store-credit .list-group-item,
+#page-manage-store-credit  .table td {
   padding: 0.5rem 0.75rem;
 }
 
-.cursor-pointer {
+#page-manage-store-credit  .cursor-pointer {
   cursor: pointer;
 }
 
-.table thead th,
-.table tbody td {
+#page-manage-store-credit .table thead th,
+#page-manage-store-credit .table tbody td {
   vertical-align: bottom;
   border-bottom: 2px solid #d2dce7;
   padding-left: 3px !important;
 }
 
-.table {
+#page-manage-store-credit .table {
   border-radius: 25px;
 }
 
-.store-credits .card-header {
+#page-manage-store-credit .store-credits .card-header {
   background-color: #f8f9fa;
   border-bottom: 1px solid rgba(0, 0, 0, 0.125);
   padding: 10px 5px 0px 10px !important;
@@ -51,15 +51,15 @@
   padding-left: 0px !important;
 }
 
-.table-bg {
+#page-manage-store-credit .table-bg {
   background-color: #fdfdfd;
 }
 
-[data-theme="dark"] .table-bg {
+[data-theme="dark"] #page-manage-store-credit .table-bg {
   background-color: #1e1e1e;
 }
 
-.iti__flag {
+#page-manage-store-credit .iti__flag {
   background-image: url("/assets/metactical/img/flags.png") !important;
   box-shadow: 0px 0px 1px 0px #888;
   background-repeat: no-repeat;
