@@ -34,7 +34,7 @@ metactical.store_credit.StoreCredit = class {
                 si_items : [],
                 taxes: [],
                 credit_notes: [],
-                item_area: "",
+                item_area: "d-none",
                 tax_types: [],
                 process_payment_button: "d-none",
                 freeze_fields: false

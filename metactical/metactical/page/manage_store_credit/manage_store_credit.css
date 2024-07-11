@@ -29,13 +29,16 @@
 }
 
 #page-manage-store-credit .store-credits .card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 10px 5px 0px 10px !important;
+    margin-bottom: 5px;
+}  
+
+#page-manage-store-credit [data-theme="light"] .store-credits .card-header {
   background-color: #f8f9fa;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-  padding: 10px 5px 0px 10px !important;
-  margin-bottom: 5px;
 }
 
-[data-theme="dark"] .store-credits .card-header {
+#page-manage-store-credit [data-theme="dark"] .store-credits .card-header {
   background-color: #1e1e1e;
 }
 
