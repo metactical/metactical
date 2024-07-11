@@ -6,7 +6,7 @@
                         <th>#</th>
                         <th>Retail SKU</th>
                         <th>Item Name</th>
-                        <th>Returned Qty</th>
+                        <th>Returning Qty</th>
                         <th>Unit Price</th>
                         <th>Discount</th>
                         <th>TTL Price</th>

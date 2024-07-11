@@ -69,7 +69,38 @@
       background-image: url("/assets/metactical/img/flags@2x.png") !important; 
     } 
 }
-
-.iti--allow-dropdown{
-    width: 100%;
+.table-header{
+    display: flex;
+    font-weight: bold;
+    background: #3a3a3a;
+    padding: 10px
 }
+
+.table-header .table-cell, .table-body .table-cell{
+    width: 25%
+}
+
+.table-body .table-row{
+    padding: 5px 3px;
+    align-items: center
+}
+
+.table-cell input {
+    width: 60%;
+}
+
+.table-row {
+    border-collapse: collapse;
+    border-bottom: 1px solid gray
+}
+
+.table-row:last-child {
+    border-bottom: none
+}
+
+.table-body .table-row{
+    display: flex;
+}
+
+
+

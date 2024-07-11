@@ -34,11 +34,10 @@ metactical.store_credit.StoreCredit = class {
                 si_items : [],
                 taxes: [],
                 credit_notes: [],
-                item_area: "d-none",
+                item_area: "",
                 tax_types: [],
                 process_payment_button: "d-none",
-                freeze_fields: false,
-                items_in_queue: []
+                freeze_fields: false
             },
             template: `
                 <div>
@@ -197,11 +196,6 @@ metactical.store_credit.StoreCredit = class {
                         },
                         callback: function(r) {
                             if (r.success) {
-                                var items = r.items
-                                for (var i = 0; i < items.length; i++){
-                                    me.items_in_queue.push(items[i])
-                                }
-
                                 me.loadSI()
                             }
                             else{
@@ -242,17 +236,13 @@ metactical.store_credit.StoreCredit = class {
                                                     fully_returned_items.push(item.name)
                                                 }
                                                 else{
-                                                    item.qty = item.qty - (credit_note.qty)
+                                                    item.qty = item.qty + (credit_note.qty)
+                                                    item.amount = "$ " + (item.qty * item.rate)
                                                 }
                                                 existing_store_credit = true
                                             }
                                         })
                                     })
-
-                                    if(me.items_in_queue.includes(item.name)){
-                                        if (!fully_returned_items.includes(item.name))
-                                            fully_returned_items.push(item.name)
-                                    }
                                 })
 
                                 // remove fully returned items
@@ -320,48 +310,16 @@ metactical.store_credit.StoreCredit = class {
                             {
                                 "label": "Items",
                                 "fieldname": "edit_price",
-                                "fieldtype": "Table",
-                                "fields": [
-                                    {
-                                        "label": "",
-                                        "fieldname": "iname",
-                                        "fieldtype": "Data",
-                                        "read_only": 1,
-                                        "hidden": 1
-                                    },
-                                    {
-                                        "label": "Item Name",
-                                        "fieldname": "item_name",
-                                        "fieldtype": "Data",
-                                        "read_only": 1,
-                                        "in_list_view": 1
-                                    },
-                                    {
-                                        "label": "Retail SKU",
-                                        "fieldname": "retail_sku",
-                                        "fieldtype": "Data",
-                                        "read_only": 1,
-                                        "in_list_view": 1
-                                    },
-                                    {
-                                        "label": "Price",
-                                        "fieldname": "rate",
-                                        "fieldtype": "Currency",
-                                        "in_list_view": 1
-                                    },
-                                    {
-                                        "label": "Quantity",
-                                        "fieldname": "qty",
-                                        "fieldtype": "Float",
-                                        "in_list_view": 1
-                                    }
-                                ],
-                                "data": items
+                                "fieldtype": "HTML",
                             }
                         ],
                         primary_action: function(){
-                            var values = d.get_values()
+                            var values = d.fields_dict.edit_price.$wrapper.find(".table-body .table-row")
+                            console.log(values)
                             var valid = true
+
+                            
+
 
                             $.each(values.edit_price, (index, item) => {
                                 $.each(me.si_items, (ind, si_item) => {
@@ -382,8 +340,6 @@ metactical.store_credit.StoreCredit = class {
                                             si_item.amount_with_out_format = item.rate * si_item.qty
                                             si_item.amount = "$ " + si_item.amount_with_out_format
                                         }
-
-
                                     }
                                 })
 
@@ -396,11 +352,39 @@ metactical.store_credit.StoreCredit = class {
                         primary_action_label: __("Update")
                     })
 
-                    d.show()
+                    var html = $(`<div id="editPriceDialog"></div>`)
+                    var headers = $(`<div class="table-header">
+                                        <div class="table-cell">Item Name</div>
+                                        <div class="table-cell">
+                                            Retail SKU
+                                        </div>
+                                        <div class="table-cell">
+                                            Price
+                                        </div>
+                                        <div class="table-cell">
+                                            Quantity
+                                        </div>
+                                    </div>`)
+                                    
+                    var table_body = $(`<div class="table-body"></div>`)
+        
+                    $.each(items, function(index, item) {
+                        var row = $('<div class="table-row" data-target="'+item.retail_sku+'"></div>');
+                        row.append('<div class="table-cell">' + item.item_name + '</div>');
+                        row.append('<div class="table-cell">' + item.retail_sku + '</div>');
+                        row.append('<div class="table-cell"><input type="number" min=0.1 ste class="price-input form-control" value="' + item.rate + '"></div>');
+                        row.append('<div class="table-cell"><input type="number" min=0.1 class="quantity-input form-control" value="' + item.qty + '"></div>');
+                        
+                        table_body.append(row);
+                    });
+                    
+                    html.append(headers)
+                    html.append(table_body)
 
-                    setTimeout(() => {
-                        $(`[data-route="manage-store-credit"] [data-fieldname="edit_price"] .row-index`).remove()
-                    }, 200);
+                    console.log(html.html())
+
+                    d.fields_dict.edit_price.$wrapper.html($(html).html())
+                    d.show()
                 },
                 printPDF(){
                     var sales_invoice_to_print = ""
