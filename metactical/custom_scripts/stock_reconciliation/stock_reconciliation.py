@@ -11,6 +11,8 @@ class CustomStockReconciliation(StockReconciliation):
 					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this Stock Reconciliation and revert to the Draft stage"
 				)
 			)
+
+			print(self.creation)
 			self.queue_action("submit", timeout=2000)
 		else:
 			self._submit()
@@ -25,6 +27,8 @@ class CustomStockReconciliation(StockReconciliation):
 
 		if hasattr(self, '_' + action):
 			action = '_' + action
+
+		frappe.log_error(title="aa", message=self.creation)
 
 		if file_lock.lock_exists(self.get_signature()):
 			frappe.throw(_('This document is currently queued for execution. Please try again'),

@@ -596,6 +596,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Store Credits",
+   "link_to": "Store Credits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -792,7 +801,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-07-08 14:18:04.798249",
+ "modified": "2024-07-10 07:42:13.942710",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
