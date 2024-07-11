@@ -1,110 +1,117 @@
-.list-group-item{
-    background-color: transparent;
-    border: none;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+.list-group-item {
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.list-group-item, .table td{
-    padding: 0.5rem 0.75rem;
+.list-group-item,
+.table td {
+  padding: 0.5rem 0.75rem;
 }
 
-.cursor-pointer{
-    cursor: pointer;
+.cursor-pointer {
+  cursor: pointer;
 }
 
-.table thead th, .table tbody td{
-    vertical-align: bottom;
-    border-bottom: 2px solid #d2dce7;
-    padding-left: 3px !important;
+.table thead th,
+.table tbody td {
+  vertical-align: bottom;
+  border-bottom: 2px solid #d2dce7;
+  padding-left: 3px !important;
 }
 
-.table{
-    border-radius: 25px;
+.table {
+  border-radius: 25px;
 }
 
-.store-credits .card-header{
-    background-color: #f8f9fa;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-    padding: 10px 5px 0px 10px !important;
-    margin-bottom: 5px;
+.store-credits .card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+  padding: 10px 5px 0px 10px !important;
+  margin-bottom: 5px;
 }
 
-[data-theme="dark"] .store-credits .card-header{
-    background-color: #1e1e1e;
+[data-theme="dark"] .store-credits .card-header {
+  background-color: #1e1e1e;
 }
 
-[data-fieldname="edit_price"] .grid-add-row{
-    display: none !important;
+[data-fieldname="edit_price"] .grid-add-row {
+  display: none !important;
 }
 
-[data-fieldname="edit_price"] .grid-body .btn-open-row{
-    display: none !important;
+[data-fieldname="edit_price"] .grid-body .btn-open-row {
+  display: none !important;
 }
 
-.store-credits .card-body{
-    padding: 10px !important;
+.store-credits .card-body {
+  padding: 10px !important;
 }
 
-.store-credits .table .td:first-child{
-    padding-left: 0px !important;
+.store-credits .table .td:first-child {
+  padding-left: 0px !important;
 }
 
-.table-bg{
-    background-color: #fdfdfd;
+.table-bg {
+  background-color: #fdfdfd;
 }
 
-[data-theme="dark"] .table-bg{
-    background-color: #1e1e1e;
+[data-theme="dark"] .table-bg {
+  background-color: #1e1e1e;
 }
 
 .iti__flag {
-    background-image: url('/assets/metactical/img/flags.png') !important;
-    box-shadow: 0px 0px 1px 0px #888;
-    background-repeat: no-repeat;
-    background-color: #DBDBDB;
+  background-image: url("/assets/metactical/img/flags.png") !important;
+  box-shadow: 0px 0px 1px 0px #888;
+  background-repeat: no-repeat;
+  background-color: #dbdbdb;
 }
 
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-    .iti__flag {
-      background-image: url("/assets/metactical/img/flags@2x.png") !important; 
-    } 
+  .iti__flag {
+    background-image: url("/assets/metactical/img/flags@2x.png") !important;
+  }
 }
 
-[data-fieldname="edit_price"] [data-theme="light"] .table-header{
-    background: #3a3a3a;
+[data-theme="light"] [data-fieldname="edit_price"] .table-header {
+  background: #e7e7e7;
 }
 
-[data-fieldname="edit_price"] .table-header{
+[data-theme="dark"] [data-fieldname="edit_price"] .table-header {
+  background: #3a3a3a;
+}
+
+[data-fieldname="edit_price"] .table-header {
     display: flex;
     font-weight: bold;
-    background: #e7e7e7;
-    padding: 10px
+    padding: 10px;
+}
+  
+
+[data-fieldname="edit_price"] .table-header .table-cell,
+.table-body .table-cell {
+  width: 25%;
 }
 
-[data-fieldname="edit_price"] .table-header .table-cell, .table-body .table-cell{
-    width: 25%
-}
-
-[data-fieldname="edit_price"] .table-body .table-row{
-    padding: 5px 3px;
-    align-items: center;
-    display: flex;
+[data-fieldname="edit_price"] .table-body .table-row {
+  padding: 5px 3px;
+  align-items: center;
+  display: flex;
 }
 
 [data-fieldname="edit_price"] .table-cell input {
-    width: 60%;
+  width: 60%;
 }
 
 [data-fieldname="edit_price"] .table-row {
-    border-collapse: collapse;
-    border-bottom: 1px solid gray
+  border-collapse: collapse;
+  border-bottom: 1px solid gray;
 }
 
 [data-fieldname="edit_price"] .table-row:last-child {
-    border-bottom: none
+  border-bottom: none;
 }
 
-input[type=number]:hover::-webkit-inner-spin-button {  
-    width: 20px;
-    height: 40px;
+input[type="number"]:hover::-webkit-inner-spin-button {
+  width: 20px;
+  height: 40px;
 }
