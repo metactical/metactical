@@ -69,38 +69,42 @@
       background-image: url("/assets/metactical/img/flags@2x.png") !important; 
     } 
 }
-.table-header{
+
+[data-fieldname="edit_price"] [data-theme="light"] .table-header{
+    background: #3a3a3a;
+}
+
+[data-fieldname="edit_price"] .table-header{
     display: flex;
     font-weight: bold;
-    background: #3a3a3a;
+    background: #e7e7e7;
     padding: 10px
 }
 
-.table-header .table-cell, .table-body .table-cell{
+[data-fieldname="edit_price"] .table-header .table-cell, .table-body .table-cell{
     width: 25%
 }
 
-.table-body .table-row{
+[data-fieldname="edit_price"] .table-body .table-row{
     padding: 5px 3px;
-    align-items: center
+    align-items: center;
+    display: flex;
 }
 
-.table-cell input {
+[data-fieldname="edit_price"] .table-cell input {
     width: 60%;
 }
 
-.table-row {
+[data-fieldname="edit_price"] .table-row {
     border-collapse: collapse;
     border-bottom: 1px solid gray
 }
 
-.table-row:last-child {
+[data-fieldname="edit_price"] .table-row:last-child {
     border-bottom: none
 }
 
-.table-body .table-row{
-    display: flex;
+input[type=number]:hover::-webkit-inner-spin-button {  
+    width: 20px;
+    height: 40px;
 }
-
-
-

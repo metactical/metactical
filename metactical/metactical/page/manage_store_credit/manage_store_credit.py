@@ -132,14 +132,15 @@ def load_si(sales_invoice):
                 "retail_sku": retail_sku,
                 "item_name": item.item_name,
                 "rate": item.rate,
+                "price_list_rate": item.price_list_rate,
                 "qty": item.qty,
                 "amount": frappe.format_value(item.net_amount, {"fieldtype": "Currency"}),
                 "amount_with_out_format": item.net_amount,
-                "discount": item.discount_amount,
+                "discount": item.price_list_rate - item.rate,
                 "discount_percentage": item.discount_percentage,
                 "total": frappe.format_value(item.amount, {"fieldtype": "Currency"}),
                 "item_code": item.item_code,
-                "discount_amount": item.discount_amount,
+                "discount_amount": item.price_list_rate - item.rate,
                 "posting_date": sales_invoice_doc.posting_date,
                 "customer": sales_invoice_doc.customer,
                 "total_taxes_and_charges": sales_invoice_doc.total_taxes_and_charges,
@@ -193,9 +194,7 @@ def load_si(sales_invoice):
                 # credit_note["discount_amount"] = frappe.format_value(credit_note.discount_amount, {"fieldtype": "Currency"})
                 credit_note["total_taxes_and_charges"] = frappe.format_value(credit_note["total_taxes_and_charges"], {"fieldtype": "Currency"})
                 credit_note["grand_total"] = frappe.format_value(credit_note["grand_total"], {"fieldtype": "Currency"})
-                # credit_note["si_discount_amount"] = frappe.format_value(credit_note.si_discount_amount, {"fieldtype": "Currency"})
-                # credit_note["rate"] = frappe.format_value(credit_note.rate, {"fieldtype": "Currency"})
-
+        
             credit_notes_grouped.setdefault(credit_note["si_name"], []).append(credit_note)
 
     frappe.response["items"] = items
@@ -219,7 +218,7 @@ def transfer_store_credit(**kwargs):
             new_item["rate"] = item.get('rate')
             new_item["discount_amount"] = item.get('discount_amount')
             new_item["discount_percentage"] = item.get('discount_percentage')
-            new_item["qty"] = -1 * item.get('qty')
+            new_item["qty"] = -1 * float(item.get('qty'))
 
             selected_items.append(new_item)
 
