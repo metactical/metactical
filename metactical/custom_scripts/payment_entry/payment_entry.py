@@ -8,7 +8,7 @@ from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_ban
 from frappe.utils import flt, comma_or, nowdate, getdate
 from frappe import _, scrub, ValidationError
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_reference_as_per_payment_terms
-from metactical.custom_scripts.sales_order.sales_order import refund_payment, get_usaepay_transaction_detail
+from metactical.custom_scripts.sales_order.sales_order import refund_payment, get_usaepay_transaction_detail, adjust_payment
 
 def usaepay_refund_request(doc, method):
 	references = doc.references
@@ -20,8 +20,7 @@ def usaepay_refund_request(doc, method):
 				for item in sales_invoice.items:
 					if item.sales_order:
 						sales_order = item.sales_order
-
-				print(sales_order)
+						break
 
 				if sales_invoice.is_return and sales_order and doc.payment_type == "Pay":
 					response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
@@ -30,13 +29,21 @@ def usaepay_refund_request(doc, method):
 						frappe.db.set_value("USAePay Log", log, "payment_entry", doc.name)
 						frappe.db.commit()
 
-				elif sales_order and doc.payment_type == "Receive":
-					so_fields = frappe.db.get_values("Sales Order", sales_order, ["neb_usaepay_transaction_key", "grand_total"])
-					if so_fields:
-						transaction_key = so_fields[0][0]
-						grand_total = so_fields[0][0]
+			elif ref.reference_doctype == "Sales Order":
+				sales_order = ref.reference_name
+
+			if sales_order and doc.payment_type == "Receive":
+				so_fields = frappe.db.get_values("Sales Order", sales_order, ["neb_usaepay_transaction_key", "grand_total", "advance_paid"])
+				if so_fields:
+					result = so_fields[0]
+					if result[0]:
+						transaction_key = result[0]
+						# grand_total = result[1]
+						advance_paid = result[2]
 						transaction = get_usaepay_transaction_detail(transaction_key, sales_order)
 
+						if flt(advance_paid) > flt(transaction["amount"]):
+							adjust_payment(sales_order, advance_paid)
 
 @frappe.whitelist()
 def get_payment_entry(dt, dn, party_amount=None, bank_account=None, bank_amount=None):

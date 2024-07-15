@@ -92,7 +92,7 @@ def get_card_token(usaepay_url, transaction_key, headers):
 		response = json.loads(response.text)
 		frappe.throw(_(f"Failed to get card token from USAePay: {response.error}"))
 
-def adjust_amount(amount, transaction, usaepay_url, headers):
+def adjust_amount(amount, transaction, usaepay_url, headers=None):
 	payload = {
 		"command": "cc:adjust",
 		"trankey": transaction.get("key"),
