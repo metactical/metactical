@@ -32,9 +32,9 @@ frappe.query_reports["Sales Report - Stores V4"] = {
 	] 
 }; 
 
-function create_material_transfer(pos_profile, to_date, item_code){
+function create_material_request(pos_profile, to_date, item_code){
 	frappe.call({
-		method: "metactical.metactical.report.sales_report___stores_v4.sales_report___stores_v4.create_material_transfer",
+		method: "metactical.metactical.report.sales_report___stores_v4.sales_report___stores_v4.create_material_request",
 		args: {
 			"pos_profile": pos_profile,
 			"to_date": to_date,
