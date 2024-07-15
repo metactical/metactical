@@ -33,7 +33,7 @@ def execute(filters=None):
 			row["in_transit"] = frappe.db.get_value("Bin", {"warehouse": transit_warehouse, "item_code": d.item_code}, "actual_qty") or 0
 			row['sale'] = d.qty
 			row['pos_profile'] = d.pos_profile
-			row["button"] = '<button onClick="create_material_transfer(\'{}\', \'{}\', \'{}\')">Create Material Transfer</button>'.format(
+			row["button"] = '<button onClick="create_material_request(\'{}\', \'{}\', \'{}\')">Create Material Request</button>'.format(
 								filters.get("pos_profile", ""), filters.get("to_date"), filters.get("item_code", ""))
 			if row['stock_levels'] > 0:
 				data.append(row)
@@ -148,6 +148,9 @@ def get_data(conditions, filters):
 		ORDER BY 
 			c.item_name, p.pos_profile
 		""".format(filters.get("to_date"), conditions), as_dict=1)
+
+	# sort by ifw_location only if ifw_location is not empty
+	data = sorted(data, key=lambda x: (x['ifw_location'] is None, x['ifw_location']))
 	return data
  
 def get_conditions(filters, sales_order=None):
@@ -182,7 +185,7 @@ def get_item_details(item, list_type="Selling"):
 	return rate
 	
 @frappe.whitelist()
-def create_material_transfer(**args):
+def create_material_request(**args):
 	args = frappe._dict(args)
 	filters = {}
 	if args.pos_profile != "":
@@ -195,10 +198,10 @@ def create_material_transfer(**args):
 	conditions = get_conditions(filters)
 	init_data = get_data(conditions, filters)
 	source_warehouse = "W01-WHS-Active Stock - " + frappe.db.get_value("Company", init_data[0].company, "abbr")
-	doc = frappe.new_doc("Stock Entry")
+	doc = frappe.new_doc("Material Request")
 	doc.update({
-		"stock_entry_type": "Material Transfer",
-		"ais_from_report": 1
+		"material_request_type": "Material Transfer",
+		"schedule_date": now(),
 	})
 	for row in init_data:
 		wh_actual = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "actual_qty") or 0.0
@@ -207,8 +210,8 @@ def create_material_transfer(**args):
 		transit_warehouse = get_transit_warehouse(row.warehouse)
 		if stock_levels > 0 and transit_warehouse != "":
 			doc.append("items", {
-				"s_warehouse": source_warehouse,
-				"t_warehouse": transit_warehouse,
+				"from_warehouse": source_warehouse,
+				"warehouse": transit_warehouse,
 				"item_code": row.item_code,
 				"qty": row.qty,
 				"uom": row.uom,
