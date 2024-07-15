@@ -105,13 +105,13 @@ def create_usaepay_log(payload, response, doctype, docname, refund_amount, actio
 		payload["creditcard"]["number"] = "****-****" + payload["creditcard"]["number"][-9:]
 
 	# Create USAePay Log
-	frappe.get_doc({
+	log = frappe.get_doc({
 		"doctype": "USAePay Log",
 		"request": format_json_for_html(payload),
 		"response": format_json_for_html(response),
 		"date": frappe.utils.now(),
 		"reference_docname": docname,
-		"refund_amount": refund_amount,
+		"amount": refund_amount,
 		"action": action,
 		"refund_reason": refund_reason,
 		"reference_doctype": doctype,
@@ -130,3 +130,5 @@ def create_usaepay_log(payload, response, doctype, docname, refund_amount, actio
 		"published": 1,
 		"content": f"USAePay {action} : $ {refund_amount} <br>Reason: {refund_reason if refund_reason else ''}",
 	}).insert()
+
+	return log.name

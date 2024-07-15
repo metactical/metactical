@@ -216,7 +216,6 @@ def get_usaepay_transaction_detail(transaction, docname):
 
 		# refunds
 		refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
-		print(refunds)
 		if refunds:
 			transaction["refunds"] = refunds
 			
@@ -232,6 +231,8 @@ def get_usaepay_transaction_detail(transaction, docname):
 		else:
 			frappe.throw("Transaction not found in USAePay")
 
+		return transaction
+		
 	except Exception as e:
 		frappe.log_error(title="USAePay Transaction Detail Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to get USAePay transaction detail: {0}".format(e), title="Error")
@@ -271,11 +272,12 @@ def refund_payment(docname, refund_reason, refund_amount):
 
 			# create USAePay log
 			refunded_amount = refund_amount if refund_amount else transaction["amount"]
-			create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund", refund_reason)
+			log = create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund", refund_reason)
 
 			card_holder = "for <b>" + refund_response.get("creditcard").get("cardholder") +"</b>" if refund_response.get("creditcard") else ""
-			frappe.response["message"] = f"<b>{refund_response['auth_amount']}</b> is refunded successfully {card_holder}."
-			frappe.response["success"] = True
+			frappe.msgprint(f"<b>{refund_response['auth_amount']}</b> is refunded successfully {card_holder}.")
+
+			return refund_response, log
 		else:
 			frappe.response["success"] = False
 			frappe.response["message"] = "Transaction not found in USAePay"

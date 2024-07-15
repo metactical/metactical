@@ -133,7 +133,10 @@ doc_events = {
 	},
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
-	}
+	}, 
+	"Payment Entry": {
+		"on_update": "metactical.custom_scripts.payment_entry.payment_entry.usaepay_refund_request"
+	},
 }
 
 # DocType Class
