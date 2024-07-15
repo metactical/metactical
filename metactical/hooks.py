@@ -146,7 +146,10 @@ doc_events = {
 	},
 	"Item": {
 		"on_update": "metactical.custom_scripts.item.item.on_update"
-	}
+	}, 
+	"Payment Entry": {
+		"on_update": "metactical.custom_scripts.payment_entry.payment_entry.usaepay_refund_request"
+	},
 }
 
 # DocType Class

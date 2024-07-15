@@ -8,6 +8,34 @@ from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_ban
 from frappe.utils import flt, comma_or, nowdate, getdate
 from frappe import _, scrub, ValidationError
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_reference_as_per_payment_terms
+from metactical.custom_scripts.sales_order.sales_order import refund_payment, get_usaepay_transaction_detail
+
+def usaepay_refund_request(doc, method):
+	references = doc.references
+	if not doc.reference_no:
+		for ref in references:
+			if ref.reference_doctype == "Sales Invoice":
+				sales_invoice = frappe.get_doc("Sales Invoice", ref.reference_name)
+				sales_order = ""
+				for item in sales_invoice.items:
+					if item.sales_order:
+						sales_order = item.sales_order
+
+				print(sales_order)
+
+				if sales_invoice.is_return and sales_order and doc.payment_type == "Pay":
+					response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
+					if response:
+						frappe.db.set_value("Payment Entry", doc.name, "reference_no", response["key"])
+						frappe.db.set_value("USAePay Log", log, "payment_entry", doc.name)
+						frappe.db.commit()
+
+				elif sales_order and doc.payment_type == "Receive":
+					so_fields = frappe.db.get_values("Sales Order", sales_order, ["neb_usaepay_transaction_key", "grand_total"])
+					if so_fields:
+						transaction_key = so_fields[0][0]
+						grand_total = so_fields[0][0]
+						transaction = get_usaepay_transaction_detail(transaction_key, sales_order)
 
 
 @frappe.whitelist()
