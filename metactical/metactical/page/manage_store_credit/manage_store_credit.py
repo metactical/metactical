@@ -132,14 +132,15 @@ def load_si(sales_invoice):
                 "retail_sku": retail_sku,
                 "item_name": item.item_name,
                 "rate": item.rate,
+                "price_list_rate": item.price_list_rate,
                 "qty": item.qty,
                 "amount": frappe.format_value(item.net_amount, {"fieldtype": "Currency"}),
                 "amount_with_out_format": item.net_amount,
-                "discount": item.discount_amount,
+                "discount": item.price_list_rate - item.rate if item.price_list_rate else item.rate,
                 "discount_percentage": item.discount_percentage,
                 "total": frappe.format_value(item.amount, {"fieldtype": "Currency"}),
                 "item_code": item.item_code,
-                "discount_amount": item.discount_amount,
+                "discount_amount": item.price_list_rate - item.rate if item.price_list_rate else item.rate,
                 "posting_date": sales_invoice_doc.posting_date,
                 "customer": sales_invoice_doc.customer,
                 "total_taxes_and_charges": sales_invoice_doc.total_taxes_and_charges,
@@ -193,9 +194,7 @@ def load_si(sales_invoice):
                 # credit_note["discount_amount"] = frappe.format_value(credit_note.discount_amount, {"fieldtype": "Currency"})
                 credit_note["total_taxes_and_charges"] = frappe.format_value(credit_note["total_taxes_and_charges"], {"fieldtype": "Currency"})
                 credit_note["grand_total"] = frappe.format_value(credit_note["grand_total"], {"fieldtype": "Currency"})
-                # credit_note["si_discount_amount"] = frappe.format_value(credit_note.si_discount_amount, {"fieldtype": "Currency"})
-                # credit_note["rate"] = frappe.format_value(credit_note.rate, {"fieldtype": "Currency"})
-
+        
             credit_notes_grouped.setdefault(credit_note["si_name"], []).append(credit_note)
 
     frappe.response["items"] = items
@@ -219,7 +218,7 @@ def transfer_store_credit(**kwargs):
             new_item["rate"] = item.get('rate')
             new_item["discount_amount"] = item.get('discount_amount')
             new_item["discount_percentage"] = item.get('discount_percentage')
-            new_item["qty"] = -1 * item.get('qty')
+            new_item["qty"] = -1 * float(item.get('qty'))
 
             selected_items.append(new_item)
 
@@ -241,10 +240,18 @@ def transfer_store_credit(**kwargs):
             "posting_date": frappe.utils.nowdate(),
             "items": selected_items,
             "taxes_and_charges": frappe.get_value("Sales Invoice", sales_invoice, "taxes_and_charges"),
-            "taxes": taxes
+            "taxes": taxes, 
+            "disable_rounded_total": 1,
         })
 
         enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, customer=customer, queue='long', timeout=1500)
+
+        # update customer price list if there is no default price list
+        customer_price_list = frappe.db.get_value("Customer", customer, "default_price_list")
+        if not customer_price_list:
+            pos_profile = frappe.db.get_value("Sales Invoice", sales_invoice.return_against, "pos_profile")
+            price_list = get_price_list(pos_profile)
+            frappe.db.set_value("Customer", customer, "default_price_list", price_list)
 
         frappe.response["items"] = [item.get('name') for item in items]
         frappe.response["success"] = True
@@ -324,6 +331,7 @@ def create_customer(**kwargs):
         customer_doc.last_name = customer.get('last_name')
         customer_doc.ais_company = customer.get('company')
         customer_doc.ifw_email = customer.get('email')
+        customer_doc.customer_group = "Retail"
         customer_doc.customer_name = "{} {}".format(customer.get('first_name'), customer.get('last_name'))
         customer_doc.default_currency = "CAD"
         customer_doc.territory = customer.get('territory')
@@ -369,3 +377,7 @@ def create_pdf(sales_invoice, print_format="Standard"):
     frappe.local.response.filename = "{}.pdf".format(sales_invoice)
     frappe.local.response.filecontent = pdf
     frappe.local.response.type = "download"
+
+def get_price_list(pos_profile):
+    price_list = frappe.db.get_value("POS Profile", pos_profile, "selling_price_list")
+    return price_list
