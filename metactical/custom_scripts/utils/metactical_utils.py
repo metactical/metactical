@@ -99,36 +99,38 @@ def format_json_for_html(data, indent_size=2):
 	except Exception as e:
 		return f"Error: {str(e)}"
 
-def create_usaepay_log(payload, response, doctype, docname, refund_amount, action, refund_reason=None):
+def create_usaepay_log(doctype, docname, action):
 	
-	if payload.get("creditcard"):
-		payload["creditcard"]["number"] = "****-****" + payload["creditcard"]["number"][-9:]
 
 	# Create USAePay Log
 	log = frappe.get_doc({
 		"doctype": "USAePay Log",
-		"request": format_json_for_html(payload),
-		"response": format_json_for_html(response),
+		# "request": format_json_for_html(payload) if payload else None,
+		# "response": format_json_for_html(response) if response else None,
 		"date": frappe.utils.now(),
 		"reference_docname": docname,
-		"amount": refund_amount,
+		# "amount": refund_amount,
 		"action": action,
-		"refund_reason": refund_reason,
+		# "refund_reason": refund_reason,
 		"reference_doctype": doctype,
-		"reason": refund_reason,
-		"transaction_key": payload.get("trankey"),
-		"refund_transaction_key": response.get("key") if action == "Refund" else None,
+		# "reason": refund_reason,
+		# "transaction_key": payload.get("trankey"),
+		# "refund_transaction_key": response.get("key") if action == "Refund" else None,
 	}).insert()
+
+		# if payload.get("creditcard"):
+		# payload["creditcard"]["number"] = "****-****" + payload["creditcard"]["number"][-9:]
+
 
 	# create comment
-	frappe.get_doc({
-		"doctype": "Comment",
-		"comment_by": frappe.session.user,
-		"reference_doctype": doctype,
-		"reference_name": docname,
-		"comment_type": "Comment",
-		"published": 1,
-		"content": f"USAePay {action} : $ {refund_amount} <br>Reason: {refund_reason if refund_reason else ''}",
-	}).insert()
+	# frappe.get_doc({
+	# 	"doctype": "Comment",
+	# 	"comment_by": frappe.session.user,
+	# 	"reference_doctype": doctype,
+	# 	"reference_name": docname,
+	# 	"comment_type": "Comment",
+	# 	"published": 1,
+	# 	"content": f"USAePay {action} : $ {refund_amount} <br>Reason: {refund_reason if refund_reason else ''}",
+	# }).insert()
 
-	return log.name
+	return log

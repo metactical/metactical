@@ -232,7 +232,7 @@ def get_usaepay_transaction_detail(transaction, docname):
 			frappe.throw("Transaction not found in USAePay")
 
 		return transaction
-		
+		 
 	except Exception as e:
 		frappe.log_error(title="USAePay Transaction Detail Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to get USAePay transaction detail: {0}".format(e), title="Error")
@@ -286,11 +286,14 @@ def refund_payment(docname, refund_reason, refund_amount):
 		frappe.log_error(title="Refund Payment Error", message=frappe.get_traceback())
 
 @frappe.whitelist()
-def adjust_payment(docname):
+def adjust_payment(docname, advance_paid=None):
 	user_roles = get_usaepay_roles()
 	if not any(role in frappe.get_roles() for role in user_roles.get("adjust")):
 		frappe.msgprint("You are not authorized to refund payment", title="Error")
 		return
+	
+	# create USAePay log
+	log = create_usaepay_log("Sales Order", docname, "Adjustment")
 
 	try:
 		sales_order = frappe.get_doc("Sales Order", docname)
@@ -310,19 +313,33 @@ def adjust_payment(docname):
 		transaction = get_transaction_from_usaepay(usaepay_transaction_key, headers)
 
 		if transaction:
+			# update log
+			frappe.db.set_value("USAePay Log", log.name, "transaction_key", transaction.get("key"))
+
 			# process the adjustment
+			amount = advance_paid if advance_paid else sales_order.grand_total
 			payload, adjust_response = adjust_amount(sales_order.grand_total, transaction, usaepay_url, headers)
 			
-			# create USAePay log
-			create_usaepay_log(payload, adjust_response, "Sales Order", docname, adjust_response.get("auth_amount"), "Adjustment")
+			log.request = format_json_for_html(payload)
+			log.response = format_json_for_html(adjust_response)
+			log.amount = amount
+			log.transaction_key = payload.get("trankey")
+			log.save()
 
 			frappe.response["message"] = f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b>"
 			frappe.response["success"] = True
 		else:
+			log.log = f"Transaction {usaepay_transaction_key} not found in USAePay"
+			log.save()
+
 			frappe.response["success"] = False
 			frappe.response["message"] = "Transaction not found in USAePay"
 	
 	except Exception as e:
+		log = frappe.get_doc("USAePay Log", log.name)
+		log.log = f"Unable to adjust payment: {e}"
+		log.save()
+
 		frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to adjust payment: {0}".format(e), title="Error")
 
