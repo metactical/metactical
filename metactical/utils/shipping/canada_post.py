@@ -52,6 +52,13 @@ class CanadaPost():
 		delivery_address_doc.state = get_state_code(delivery_address_doc.state)
 		pickup_address_doc = frappe.get_doc(
 			'Address', doc.pickup_address_name).as_dict()
+		
+		if pickup_address_doc.state is None or pickup_address_doc.state == "":
+			frappe.throw(f"State needed in billing address {pickup_address_doc.name}.")
+
+		if pickup_address_doc.pincode is None or pickup_address_doc.pincode == "":
+			frappe.throw(f"Postal code needed in billing address {pickup_address_doc.name}")
+
 		if len(pickup_address_doc.state) > 2:
 			pickup_address_doc.state = get_state_code(pickup_address_doc.state)
 		pickup_person_doc = frappe.get_doc(
