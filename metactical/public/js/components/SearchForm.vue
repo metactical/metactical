@@ -6,7 +6,7 @@
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
-                                <input type="text" class="form-control" id="search-phone_number"
+                                <input type="tel" class="form-control" id="search-phone_number"
                                     :readonly="freeze_fields" v-input="onPhoneChange">
                                 <input type="hidden" id="search-country_code" v-model="customer.phone_number">
                             </div>
@@ -221,6 +221,11 @@ export default {
             this.customer.first_name = customer.first_name
             this.customer.last_name = customer.last_name
             this.customer.email = customer.email
+            
+            // remove + from phone number
+            if (customer.phone_number.startsWith('+'))
+                customer.phone_number = customer.phone_number.substring(1)
+            
             this.phone_no.setNumber(customer.phone_number)
             this.customer.company = customer.company
             this.customer.territory = customer.territory
