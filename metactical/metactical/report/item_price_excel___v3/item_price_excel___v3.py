@@ -21,8 +21,8 @@ def execute(filters=None):
 		if not supplier_price_list_filter:
 			spl = frappe.db.get_value("Supplier", supplier, "default_price_list")
 			
-			if (supplier_price_list):
-				price_lists.append(supplier_price_list)
+			if (spl):
+				price_lists.append(spl)
 
 			supplier_price_list = [spl]
 		else:
