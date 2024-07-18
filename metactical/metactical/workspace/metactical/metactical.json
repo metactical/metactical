@@ -150,6 +150,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Price Excel - V3",
+   "link_to": "Item Price Excel - V3",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
@@ -810,7 +819,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-07-17 15:26:53.331931",
+ "modified": "2024-07-18 11:17:32.872857",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
