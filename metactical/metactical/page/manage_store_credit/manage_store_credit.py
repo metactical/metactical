@@ -204,8 +204,14 @@ def load_si(sales_invoice):
 
 @frappe.whitelist()
 def transfer_store_credit(**kwargs):
+    original_sales_invoice = frappe.form_dict.sales_invoice
     try:
         sales_invoice = frappe.form_dict.sales_invoice
+        if frappe.cache().hget("store_credit", sales_invoice):
+            frappe.response["success"] = False
+            frappe.response["error"] = "Store Credit Transfer is already in progress. Please wait for the process to complete."
+            return
+
         items = json.loads(kwargs.get('items'))
         customer = frappe.form_dict.customer
         tax_types = json.loads(kwargs.get('tax_types'))
@@ -244,6 +250,7 @@ def transfer_store_credit(**kwargs):
             "disable_rounded_total": 1,
         })
 
+        frappe.cache().hset("store_credit", sales_invoice.return_against, sales_invoice.return_against)
         enqueue(save_and_submit_store_credit, sales_invoice=sales_invoice, customer=customer, queue='long', timeout=1500)
 
         # update customer price list if there is no default price list
@@ -258,10 +265,11 @@ def transfer_store_credit(**kwargs):
         frappe.response["sales_invoice"] = sales_invoice.name
         frappe.msgprint("Background Job Started to Transfer Store Credit. You will be notified once it is completed.")
     except Exception as e:
+        frappe.db.rollback()
+        frappe.cache().delete_value("store_credit", original_sales_invoice)
         frappe.response["error"] = frappe.get_traceback()
         frappe.response["success"] = False
         frappe.log_error(title="Transfer Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
-        frappe.db.rollback()
 
 def save_and_submit_store_credit(sales_invoice, customer):
     try:
@@ -269,6 +277,8 @@ def save_and_submit_store_credit(sales_invoice, customer):
         sales_invoice.submit()
         create_journal_entry(sales_invoice, customer)
         frappe.db.commit()
+        
+        frappe.cache().delete_value("store_credit", sales_invoice.return_against)
         frappe.publish_realtime("transfer_store_credit", 
                                 {
                                     "sales_invoice": sales_invoice.return_against, 
@@ -277,6 +287,7 @@ def save_and_submit_store_credit(sales_invoice, customer):
                                 }, 
                                 user=frappe.session.user)
     except Exception as e:
+        frappe.cache().delete_value("store_credit", sales_invoice.return_against)
         frappe.log_error(title="Save and Submit Store Credit Error (Transfer Store Credit Page)", message=frappe.get_traceback())
         frappe.db.rollback()
         frappe.publish_realtime("transfer_store_credit", {"error": str(e)}, user=frappe.session.user)
