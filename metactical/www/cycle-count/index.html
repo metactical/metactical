@@ -170,7 +170,7 @@
 		console.log("Start database initialization");
 		metactical.cycleCount.app.loading_message = 'Initializing database...';
 		// Let us open our database
-		const DBOpenRequest = window.indexedDB.open('cycleCount', 16);
+		const DBOpenRequest = window.indexedDB.open('cycleCount', 17);
 
 		// Register two event handlers to act on the database being opened successfully, or not
 		DBOpenRequest.onerror = (event) => {

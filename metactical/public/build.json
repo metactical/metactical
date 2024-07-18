@@ -148,7 +148,8 @@
 		"erpnext_public/js/templates/node_card.html"
 	],
 	"js/metactical.min.js": [
-		"public/js/template/shipment_rate.html"
+		"public/js/template/shipment_rate.html",
+		"public/js/store_credit.js"
 	],
 	"css/metactical.css": [
 		"metactical/page/packing_page/packing_page.scss"
