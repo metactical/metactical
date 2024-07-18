@@ -596,6 +596,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Store Credits",
+   "link_to": "Store Credits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -790,9 +799,18 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Material Request User Permission",
+   "link_to": "Material Request User Permission",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2024-07-08 14:18:04.798249",
+ "modified": "2024-07-17 15:26:53.331931",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
