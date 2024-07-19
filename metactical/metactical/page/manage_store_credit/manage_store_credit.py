@@ -181,7 +181,7 @@ def load_si(sales_invoice):
                                                 `tabSales Invoice` si
                                             JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
                                             WHERE
-                                                return_against = %(sales_invoice)s
+                                                return_against = %(sales_invoice)s and si.docstatus = 1
                                             ORDER BY
                                                 si.creation DESC, sii.idx ASC
                                         """, {"sales_invoice": sales_invoice_doc.name}, as_dict=True)
