@@ -32,7 +32,7 @@ def execute(filters=None):
 	return columns, data
 
 def get_data(customers, sales_invoice):
-	data = []
+	data = []	
 	
 	customer_filter = ""
 	if len(customers) > 0:
@@ -43,25 +43,26 @@ def get_data(customers, sales_invoice):
 	if sales_invoice:
 		sales_invoice_filter = f"AND voucher_no = '{sales_invoice}'"
 		
+	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -1)
 	total_unpaid = frappe._dict(
 		frappe.db.sql(
 			f"""
 				select party, sum(debit_in_account_currency) - sum(credit_in_account_currency) as amount
 				from `tabGL Entry`
-				where party_type = 'Customer' and is_cancelled = 0 
+				where party_type = 'Customer' and is_cancelled = 0 and posting_date >= '{last_two_years}'
 				{customer_filter}
 				{sales_invoice_filter}
 				group by party""",
 		)
 	)
-
+	
 	for customer, amount in total_unpaid.items():
 		sales_invoices = frappe.db.get_list("Sales Invoice", filters={"customer": customer, "status": ["in", ["Overdue", "Unpaid", "Partly Paid"]]}, fields=["name", "outstanding_amount"])
 		if sales_invoices:
 			amount = amount - sum([d.get('outstanding_amount') for d in sales_invoices])
 
 		# if the filter is to fetch all customers, we will only show customers with credit
-		if amount >= -0.01:
+		if amount >= -0.02:
 			if len(customers) > 0:
 				amount = 0
 			else: continue
@@ -69,7 +70,7 @@ def get_data(customers, sales_invoice):
 		credit_docs = get_credit_docs(customer, sales_invoice)
 		row = {
 			"customer": "<a href='/app/customer/{0}' _target='blank'>{0}</a>".format(customer),
-			"credit": amount,
+			"credit": amount, 
 			"store_credit_no": credit_docs
 		}
 
@@ -83,6 +84,8 @@ def get_data(customers, sales_invoice):
 	return data
 
 def get_credit_docs(customer, sales_invoice):
+	logger = frappe.logger("metactical")
+	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -1)
 	sales_invoice_filter = ""
 	if sales_invoice:
 		sales_invoice_filter = f"AND against_voucher = '{sales_invoice}'"
@@ -92,7 +95,7 @@ def get_credit_docs(customer, sales_invoice):
 		FROM `tabGL Entry`
 		WHERE party = '{customer}'
 		{sales_invoice_filter}	
-		AND is_cancelled = 0
+		AND is_cancelled = 0 and posting_date >= '{last_two_years}'
 	""", as_dict=True)
 
 	# group by against_voucher 
@@ -121,27 +124,34 @@ def get_credit_docs(customer, sales_invoice):
 
 	# filter out unpaid docs from documents in the name of the cusotmer
 	unpaid_docs = []
+	logger.info(against_voucher_group)
 	for invoice, vouchers in against_voucher_group.items():
 		if invoice == "None": # gl entries without against voucher (not attached to a sales invoice)
 			for voucher in vouchers:
 				if voucher.credit_in_account_currency > 0:
-					# if voucher.voucher_type == "Journal Entry":
-						# accounts = frappe.get_doc("Journal Entry", voucher.voucher_no).accounts
-						# for account in accounts:
-						# 	if account.debit_in_account_currency > 0 and account.reference_type == "Sales Invoice":
-						# 		return_si = frappe.db.get_value("Sales Invoice", 
-						# 											{
-						# 												"return_against": account.reference_name, 
-						# 												"neb_store_credit_beneficiary": customer,
-						# 												"grand_total": -1 * account.debit_in_account_currency
-						# 											}, "name")
+					if voucher.voucher_type == "Journal Entry":
+						accounts = frappe.get_doc("Journal Entry", voucher.voucher_no).accounts
+						for account in accounts:
+							if account.debit_in_account_currency > 0 and account.reference_type == "Sales Invoice":
+								return_si = frappe.db.get_value("Sales Invoice", 
+																	{
+																		"return_against": account.reference_name, 
+																		"neb_store_credit_beneficiary": customer,
+																		"grand_total": -1 * account.debit_in_account_currency
+																	}, "name")
 
-						# 		if return_si:
-						# 			voucher.voucher_no = return_si
-						# 			voucher.voucher_type = "Sales Invoice"
-						# 			unpaid_docs.append(voucher)
-					# else:
-					unpaid_docs.append(voucher)
+								if return_si:
+									voucher.voucher_no = return_si
+									voucher.voucher_type = "Sales Invoice"
+									unpaid_docs.append(voucher)
+
+					elif voucher.voucher_type == "Payment Entry": # display the linked sales
+						voucher = get_linked_doc_from_payment_entry(voucher)
+						if voucher:
+							unpaid_docs.append(voucher)
+							
+					else:
+						unpaid_docs.append(voucher)
 		else:
 			sum_credit = sum([voucher.credit_in_account_currency for voucher in vouchers])
 			sum_debit = sum([voucher.debit_in_account_currency for voucher in vouchers])
@@ -155,7 +165,10 @@ def get_credit_docs(customer, sales_invoice):
 						unpaid_docs.append(voucher)
 								
 					elif voucher.credit_in_account_currency > 0 and len(vouchers) == 1: # store credit given by a journal entry
-						unpaid_docs.append(voucher)		
+						if voucher.voucher_type == "Payment Entry":
+							voucher = get_linked_doc_from_payment_entry(voucher)
+							if voucher:
+								unpaid_docs.append(voucher)
 
 					elif voucher.credit_in_account_currency > 0 and len(vouchers) > 2: # for return documents and journal entries
 						if voucher.voucher_type in ["Sales Invoice"] and voucher.voucher_no != invoice:
@@ -169,7 +182,9 @@ def get_credit_docs(customer, sales_invoice):
 							elif vouchers[0].debit_in_account_currency == voucher.credit_in_account_currency:
 								continue
 							else:
-								unpaid_docs.append(voucher)
+								voucher = get_linked_doc_from_payment_entry(voucher)
+								if voucher:
+									unpaid_docs.append(voucher)
 
 
 	docs = ""
@@ -190,6 +205,23 @@ def get_credit_docs(customer, sales_invoice):
 			docs = docs[:-2]
 
 	return docs
+
+def get_linked_doc_from_payment_entry(voucher):
+	payment_entry = frappe.get_doc("Payment Entry", voucher.voucher_no)
+	references = payment_entry.references
+
+	if references:
+		if len(references) == 1:
+			if references[0].reference_doctype == "Sales Invoice":
+				voucher.voucher_no = references[0].reference_name
+				voucher.voucher_type = "Sales Invoice"
+
+			elif references[0].reference_doctype == "Sales Order":
+				voucher.voucher_no = references[0].reference_name
+				voucher.voucher_type = "Sales Order"
+
+	return voucher
+			
 
 def get_columns(sales_invoice=False):
 	columns = [
@@ -212,8 +244,14 @@ def get_columns(sales_invoice=False):
 			"width": 150
 		},
 		{
-			"label": "Credit",
+			"label": "Balance Store Credit Left",
 			"fieldname": "credit",
+			"fieldtype": "Currency",
+			"width": 150
+		},
+		{
+			"label": "Original Store Credit amount",
+			"fieldname": "original_credit",
 			"fieldtype": "Currency",
 			"width": 150
 		},
