@@ -166,8 +166,9 @@ def get_data(conditions, filters):
 	data = []
 
 	if digit_rows_with_location:
-		data += sorted(digit_rows_with_location, key=lambda x: int(x['ifw_location'].split("-")[0]))
-
+		# sort by the first part of the location and then by the second part if there is a tie
+		data += sorted(digit_rows_with_location, key=lambda x: (int(x['ifw_location'].split("-")[0]), x['ifw_location'].split("-")[1], x['ifw_location'].split("-")[2]))
+		
 	if non_digit_rows_with_location:
 		data += sorted(non_digit_rows_with_location, key=lambda x: x['ifw_location'])
 
@@ -239,6 +240,7 @@ def create_material_request(**args):
 				"qty": row.qty,
 				"uom": row.uom,
 				"stock_uom": row.stock_uom,
+				"ifw_location": row.ifw_location,
 				"conversion_factor": row.conversion_factor
 			})
 	doc.insert(ignore_permissions=True)
