@@ -12,11 +12,14 @@
 	<div class="col-md-12">
 		<center><span class="start-picking-btn"><a href="#">Start Picking</a></span></center>
 	</div>
-	<div class="pl-multi-barcode"></div>
-	<div class="pl-multi-source"></div>
+	<div class="filters-wrapper col-md-12">
+		<div class="pl-multi-barcode col-md-2"></div>
+		<div class="pl-multi-source col-md-2"></div>
+		<div class="pl-multi-filters"></div>
+	</div>
 	<div class="col-md-12 pl-container">
 		{% for pl in pick_lists %}
-			<div class="pl-list-div col-md-12" data-pick-list="{{pl.name}}">
+			<div class="pl-list-div col-md-12 picklist-box" data-pick-list="{{pl.name}}">
 				<div class="pl-check-div">
 					<input class="pl-check" type="checkbox" id="check-{{pl.name}}" value="{{pl.name}}" data-pick-list="{{pl.name}}" 
 						{% for pick_list in selected_pick_lists %}
@@ -27,12 +30,17 @@
 					/>
 				</div>
 				<div style="float: left;">
+					{% if pl.is_rush == 1 %}
+						<span class="pick-list-rush indicator-pill green ellipsis">Rush</span>
+					{% endif %}
 					<p>
 						<b><span class="pick-list-name">{{pl.name}}</span></b><br>
 						<span class="pick-order-no"><b>{{pl.sales_order}}</b><br></span>
 						<span>
-							{{pl.customer}}
-							{% if pl.is_rush == 1 %}, Rush{% endif %}
+							{{pl.customer}}<br>
+						</span>
+						<span>
+							<b>QtyItems:</b> {{pl.qty_item}}
 						</span>
 					</p>
 				</div>
