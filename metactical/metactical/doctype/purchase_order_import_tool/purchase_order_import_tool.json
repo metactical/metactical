@@ -1,0 +1,208 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:POIT-{####}",
+ "creation": "2024-07-18 09:21:56.828563",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "supplier",
+  "currency",
+  "conversion_rate",
+  "column_break_y1zwz",
+  "buying_price_list",
+  "price_list_currency",
+  "plc_conversion_rate",
+  "amended_from",
+  "section_break_cpeyk",
+  "company",
+  "warehouse",
+  "shipping_address",
+  "taxes_and_charges",
+  "section_break_evaxu",
+  "import_based_on",
+  "excel_file",
+  "section_queue",
+  "ais_queue_failed",
+  "ais_queue_status",
+  "ais_queueu_comment",
+  "column_break_bmos9",
+  "ais_queued_date",
+  "ais_queued_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "supplier.default_currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Exchange Rate",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_y1zwz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "supplier.default_price_list",
+   "fieldname": "buying_price_list",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "price_list_currency",
+   "fieldtype": "Link",
+   "label": "Price List Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "plc_conversion_rate",
+   "fieldtype": "Float",
+   "label": "Price List Exchange Rate"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Purchase Order Import Tool",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_cpeyk",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "shipping_address",
+   "fieldtype": "Link",
+   "label": "Shipping Address",
+   "options": "Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "taxes_and_charges",
+   "fieldtype": "Link",
+   "label": "Purchase Taxes and Charges",
+   "options": "Purchase Taxes and Charges Template"
+  },
+  {
+   "fieldname": "section_break_evaxu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "import_based_on",
+   "fieldtype": "Select",
+   "label": "Import Based On",
+   "options": "ERP SKU\nRetail SKU",
+   "reqd": 1
+  },
+  {
+   "fieldname": "excel_file",
+   "fieldtype": "Attach",
+   "label": "Excel File",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_queue",
+   "fieldtype": "Section Break",
+   "label": "Queue"
+  },
+  {
+   "default": "0",
+   "fieldname": "ais_queue_failed",
+   "fieldtype": "Check",
+   "label": "Queue Failed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ais_queue_status",
+   "fieldtype": "Select",
+   "label": "Queue Status",
+   "options": "Not Queued\nQueued\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ais_queueu_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_bmos9",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ais_queued_date",
+   "fieldtype": "Datetime",
+   "label": "Queue Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ais_queued_by",
+   "fieldtype": "Link",
+   "label": "Queued By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-07-20 09:01:43.449002",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Purchase Order Import Tool",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}
