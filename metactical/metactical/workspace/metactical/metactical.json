@@ -150,6 +150,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Price Excel - V3",
+   "link_to": "Item Price Excel - V3",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",

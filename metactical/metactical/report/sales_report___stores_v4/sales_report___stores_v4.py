@@ -148,9 +148,33 @@ def get_data(conditions, filters):
 		ORDER BY 
 			c.item_name, p.pos_profile
 		""".format(filters.get("to_date"), conditions), as_dict=1)
+	
+	# Sort data by location
+	rows_with_none_location = []
+	digit_rows_with_location = []
+	non_digit_rows_with_location = []
 
-	# sort by ifw_location only if ifw_location is not empty
-	data = sorted(data, key=lambda x: (x['ifw_location'] is None, x['ifw_location']))
+	for row in data:
+		if row['ifw_location'] is None:
+			rows_with_none_location.append(row)
+		else:
+			if row['ifw_location'].split("-")[0].isdigit():
+				digit_rows_with_location.append(row)
+			else:
+				non_digit_rows_with_location.append(row)
+
+	data = []
+
+	if digit_rows_with_location:
+		# sort by the first part of the location and then by the second part if there is a tie
+		data += sorted(digit_rows_with_location, key=lambda x: (int(x['ifw_location'].split("-")[0]), x['ifw_location'].split("-")[1], x['ifw_location'].split("-")[2]))
+		
+	if non_digit_rows_with_location:
+		data += sorted(non_digit_rows_with_location, key=lambda x: x['ifw_location'])
+
+	if rows_with_none_location:
+		data += rows_with_none_location
+
 	return data
  
 def get_conditions(filters, sales_order=None):
@@ -216,6 +240,7 @@ def create_material_request(**args):
 				"qty": row.qty,
 				"uom": row.uom,
 				"stock_uom": row.stock_uom,
+				"ifw_location": row.ifw_location,
 				"conversion_factor": row.conversion_factor
 			})
 	doc.insert(ignore_permissions=True)

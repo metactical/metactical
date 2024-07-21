@@ -206,7 +206,7 @@ metactical.store_credit.StoreCredit = class {
                         }
                     })
 
-                    me.clearSI()
+                    // me.clearSI()
                 },
                 loadSI() {
                     if (!this.current_sales_invoice)
@@ -294,9 +294,7 @@ metactical.store_credit.StoreCredit = class {
                                     }
                                 })
 
-                                if (existing_store_credit){
-                                    me.updateTotals()
-                                }
+                                me.updateTotals()
 
                                 if (!me.si_items.length)
                                     me.process_payment_button = "d-none"
@@ -366,7 +364,6 @@ metactical.store_credit.StoreCredit = class {
                                     </div>`)
                                     
                     var table_body = $(`<div class="table-body"></div>`)
-        
                     $.each(items, function(index, item) {
                         var row = $('<div class="table-row" data-target="'+item.retail_sku+'"></div>');
                         row.append('<div class="table-cell">' + item.item_name + '</div>');
