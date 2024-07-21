@@ -24,7 +24,7 @@ def rename_customers(context):
 		old_name = customer.name
 		new_name = f"CS{getseries('CS', 5)}"
 		try:
-			frappe.rename_doc("Customer", old_name, new_name)
+			frappe.rename_doc("Customer", old_name, new_name, rebuild_search=False)
 			frappe.db.commit()
 		except Exception as e:
 			frappe.log_error(f"Failed to rename {old_name}: {e}")
