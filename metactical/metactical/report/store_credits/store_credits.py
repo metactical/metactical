@@ -109,6 +109,7 @@ def get_credit_info_for_si(customer, sales_invoice):
 
 		return [{
 			"customer": beneficiary,
+			"customer_name": frappe.db.get_value("Customer", beneficiary, "customer_name"),
 			"credit": original_credit + total_credit_used,
 			"original_credit": original_credit,
 			"store_credit_no": f"<a href='/app/sales-invoice/{sales_invoice}'>{sales_invoice}</a>",
@@ -172,7 +173,7 @@ def get_credit_docs(customer, sales_invoice):
 
 	for credit in updated_credits:
 		if credit.voucher_type == "Sales Invoice":
-			original_credit = frappe.db.get_values("Sales Invoice", credit.voucher_no, ["grand_total", "status"], as_dict=True)
+			original_credit = frappe.db.get_values("Sales Invoice", credit.voucher_no, ["grand_total", "status", "customer_name"], as_dict=True)
 			remaining_credit = get_remaining_credit(credit, customer)
 
 			if len(original_credit) == 0:
@@ -191,6 +192,7 @@ def get_credit_docs(customer, sales_invoice):
 				rows.append({
 					"customer": customer,
 					"credit": -1 * remaining_credit,
+					"customer_name": original_credit[0].get('customer_name'),
 					"original_credit": original_credit[0].get('grand_total'),
 					"store_credit_no": "<a href='/app/sales-invoice/" + credit.voucher_no + "'>" + credit.voucher_no + "</a>",
 					"invoice": credit.voucher_no
@@ -221,7 +223,7 @@ def get_credit_docs(customer, sales_invoice):
 							break
 			
 
-			original_credit = frappe.db.get_values("Sales Invoice", credit.return_doc, ["grand_total", "status", "neb_store_credit_beneficiary", "name"], as_dict=True)
+			original_credit = frappe.db.get_values("Sales Invoice", credit.return_doc, ["grand_total", "status", "neb_store_credit_beneficiary", "name", "customer_name"], as_dict=True)
 			remaining_credit = get_remaining_credit(credit, customer)
 			
 			if len(original_credit) == 0:
@@ -244,6 +246,7 @@ def get_credit_docs(customer, sales_invoice):
 			rows.append({
 				"customer": customer,
 				"credit": -1 * remaining_credit,
+				"customer_name": original_credit[0].get('customer_name'),
 				"original_credit": original_credit[0].get('grand_total'),
 				"store_credit_no": "<a href='/app/sales-invoice/" + credit.return_doc + "'>" + credit.return_doc + "</a>",
 				"invoice": credit.return_doc
@@ -338,6 +341,12 @@ def get_columns(sales_invoice=False):
 		{
 			"label": "Customer",
 			"fieldname": "customer",
+			"fieldtype": "Data",
+			"width": 150
+		},
+		{
+			"label": "Customer Name",
+			"fieldname": "customer_name",
 			"fieldtype": "Data",
 			"width": 150
 		},
