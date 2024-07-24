@@ -43,13 +43,13 @@ def get_data(customers, sales_invoice):
 	if sales_invoice:
 		sales_invoice_filter = f"AND voucher_no = '{sales_invoice}'"
 		
-	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -4)
+	years_before = frappe.utils.add_years(frappe.utils.nowdate(), -4)
 	total_unpaid = frappe._dict(
 		frappe.db.sql(
 			f"""
 				select party, sum(debit_in_account_currency) - sum(credit_in_account_currency) as amount
 				from `tabGL Entry`
-				where party_type = 'Customer' and is_cancelled = 0 and posting_date >= '{last_two_years}'
+				where party_type = 'Customer' and is_cancelled = 0 and posting_date >= '{years_before}'
 				{customer_filter}
 				{sales_invoice_filter}
 				group by party""",
@@ -138,7 +138,7 @@ def get_si_credit_docs(customer, sales_invoice):
 	return used_credits
 
 def get_credit_docs(customer, sales_invoice):
-	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -4)
+	years_before = frappe.utils.add_years(frappe.utils.nowdate(), -4)
 	sales_invoice_filter = ""
 
 	if sales_invoice:
@@ -150,7 +150,7 @@ def get_credit_docs(customer, sales_invoice):
 		FROM `tabGL Entry`
 		WHERE party = '{customer}'
 		{sales_invoice_filter}
-		AND is_cancelled = 0 and posting_date >= '{last_two_years}'
+		AND is_cancelled = 0 and posting_date >= '{years_before}'
 		""", as_dict=True)
 
 	updated_credits = []
