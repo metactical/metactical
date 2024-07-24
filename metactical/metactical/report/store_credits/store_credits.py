@@ -173,7 +173,7 @@ def get_credit_docs(customer, sales_invoice):
 
 	for credit in updated_credits:
 		if credit.voucher_type == "Sales Invoice":
-			original_credit = frappe.db.get_values("Sales Invoice", credit.voucher_no, ["grand_total", "status", "customer_name"], as_dict=True)
+			original_credit = frappe.db.get_values("Sales Invoice", credit.voucher_no, ["grand_total", "status", "customer_name", "neb_store_credit_beneficiary"], as_dict=True)
 			remaining_credit = get_remaining_credit(credit, customer)
 
 			if len(original_credit) == 0:
@@ -189,10 +189,15 @@ def get_credit_docs(customer, sales_invoice):
 					duplicate = True
 
 			if not duplicate and remaining_credit > 0:
+				if original_credit[0].get('neb_store_credit_beneficiary'):
+					beneficiary = frappe.db.get_value("Customer", original_credit[0].get('neb_store_credit_beneficiary'), "customer_name")
+				else:
+					beneficiary = original_credit[0].get('customer_name')
+					
 				rows.append({
-					"customer": customer,
+					"customer": original_credit[0].get('neb_store_credit_beneficiary') if original_credit[0].get('neb_store_credit_beneficiary') else customer,
 					"credit": -1 * remaining_credit,
-					"customer_name": original_credit[0].get('customer_name'),
+					"customer_name": beneficiary,
 					"original_credit": original_credit[0].get('grand_total'),
 					"store_credit_no": "<a href='/app/sales-invoice/" + credit.voucher_no + "'>" + credit.voucher_no + "</a>",
 					"invoice": credit.voucher_no
@@ -243,10 +248,15 @@ def get_credit_docs(customer, sales_invoice):
 			if duplicate or remaining_credit <= 0:
 				continue
 
+			if original_credit[0].get('neb_store_credit_beneficiary'):
+				beneficiary = frappe.db.get_value("Customer", original_credit[0].get('neb_store_credit_beneficiary'), "customer_name")
+			else:
+				beneficiary = original_credit[0].get('customer_name')
+
 			rows.append({
-				"customer": customer,
+				"customer": original_credit[0].get('neb_store_credit_beneficiary') if original_credit[0].get('neb_store_credit_beneficiary') else customer,
 				"credit": -1 * remaining_credit,
-				"customer_name": original_credit[0].get('customer_name'),
+				"customer_name": beneficiary,
 				"original_credit": original_credit[0].get('grand_total'),
 				"store_credit_no": "<a href='/app/sales-invoice/" + credit.return_doc + "'>" + credit.return_doc + "</a>",
 				"invoice": credit.return_doc
