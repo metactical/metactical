@@ -33,8 +33,8 @@ def execute(filters=None):
 
 def get_data(customers, sales_invoice):
 	data = []	
-	
 	customer_filter = ""
+
 	if len(customers) > 0:
 		customers = ", ".join([f"'{customer}'" for customer in customers])
 		customer_filter = f"AND party IN ({customers})"
@@ -43,7 +43,7 @@ def get_data(customers, sales_invoice):
 	if sales_invoice:
 		sales_invoice_filter = f"AND voucher_no = '{sales_invoice}'"
 		
-	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -1)
+	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -4)
 	total_unpaid = frappe._dict(
 		frappe.db.sql(
 			f"""
@@ -66,23 +66,81 @@ def get_data(customers, sales_invoice):
 			if len(customers) > 0:
 				amount = 0
 			else: continue
+		
+		if customer.startswith("DefaultPOS"):
+			data.append({
+				"customer": customer,
+				"credit": amount,
+				"original_credit": 0,
+				"store_credit_no": "POS",
+				"invoice": ""
+			})
 
-		rows = get_credit_docs(customer, sales_invoice)
+			continue
+		
+		if sales_invoice:
+			rows = get_credit_info_for_si(customer, sales_invoice)
+		else:
+			rows = get_credit_docs(customer, sales_invoice)
 
 		contact = get_customer_email_and_phone(customer)
+		
 		if contact:
 			for row in rows:
+				if sales_invoice and sales_invoice != row.get('invoice'):
+					continue
+
 				row["email"] = contact[0].get('email_id')
 				row["mobile"] = contact[0].get('mobile_no') if contact[0].get('mobile_no') else contact[0].get('phone')
 
-		data += rows
+				data.append(row)
 	
 	return data
 
+def get_credit_info_for_si(customer, sales_invoice):
+	si = frappe.db.get_values("Sales Invoice", sales_invoice, ["customer", "neb_store_credit_beneficiary", "return_against"], as_dict=True)
+	if not si:
+		return []
+
+	beneficiary = si[0].get('neb_store_credit_beneficiary')
+	if beneficiary and beneficiary != customer:
+		total_credit_used = get_si_credit_docs(beneficiary, si)
+		original_credit = frappe.db.get_value("Sales Invoice", sales_invoice, "grand_total")
+
+		return [{
+			"customer": beneficiary,
+			"credit": original_credit + total_credit_used,
+			"original_credit": original_credit,
+			"store_credit_no": f"<a href='/app/sales-invoice/{sales_invoice}'>{sales_invoice}</a>",
+			"invoice": sales_invoice
+		}]
+
+	else:
+		credit_docs = get_credit_docs(customer, si[0].return_against)
+		return credit_docs
+
+def get_si_credit_docs(customer, sales_invoice):
+	sales_invoice = sales_invoice[0]
+
+	gl_entries = frappe.db.get_list("GL Entry", filters={"against_voucher": sales_invoice.return_against, "is_cancelled": 0, "voucher_type": "Journal Entry"}, fields=["voucher_no", "debit_in_account_currency", "credit_in_account_currency", "party"])
+	if not gl_entries:
+		return []
+
+	credit_docs = []
+	je_entry_names = [ge.get('voucher_no') for ge in gl_entries]
+	je_account_entires = frappe.db.get_list("Journal Entry Account", filters={"parent": ["in", je_entry_names], "party": customer}, fields=["parent", "reference_name", "debit_in_account_currency", "credit_in_account_currency"])
+	
+	used_credits = 0
+	for je in je_account_entires:
+		if je.get('reference_name') and je.get("credit_in_account_currency") > 0:
+			used_credits += je.get("credit_in_account_currency")
+
+	return used_credits
+
 def get_credit_docs(customer, sales_invoice):
-	logger = frappe.logger("metactical")
-	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -1)
+	last_two_years = frappe.utils.add_years(frappe.utils.nowdate(), -4)
 	sales_invoice_filter = ""
+
 	if sales_invoice:
 		sales_invoice_filter = f"AND against_voucher = '{sales_invoice}'"
 
@@ -95,124 +153,168 @@ def get_credit_docs(customer, sales_invoice):
 		AND is_cancelled = 0 and posting_date >= '{last_two_years}'
 		""", as_dict=True)
 
-	# group by against_voucher
-	against_voucher_group = {}
+	updated_credits = []
+	credits_copy = credits.copy()
 	for credit in credits:
-		if credit.against_voucher not in against_voucher_group:
-			against_voucher_group[credit.against_voucher] = []
+		if credit.voucher_type == "Sales Invoice":
+			if credit.voucher_no == credit.against_voucher:
+				updated_credits = check_and_remove_match(credit, credits_copy, same_voucher=True)
+			elif credit.voucher_no != credit.against_voucher:
+				updated_credits = check_and_remove_match(credit, credits_copy, same_voucher=False)
+		elif credit.voucher_type == "Journal Entry":
+			updated_credits = check_and_remove_match(credit, credits_copy, same_voucher=False)
 
-		against_voucher_group[credit.against_voucher].append(credit)
-
-	# move journal entries without against voucher but voucher_no matches with sales invoice
 	rows = []
-	docs_without_against_voucher = []
-	if None in against_voucher_group:
-		for v in against_voucher_group[None]:
-			if v.voucher_no in against_voucher_group:
-				against_voucher_group[v.voucher_no].append(v)
-			else:
-				docs_without_against_voucher.append(v)
 
-		if len(docs_without_against_voucher) > 0:
-			against_voucher_group["None"] = docs_without_against_voucher
-			# remove the None key
-			against_voucher_group.pop(None)
+	for credit in updated_credits:
+		if credit.credit_in_account_currency == 0:
+			updated_credits.remove(credit)
 
-	# filter out unpaid docs from documents in the name of the customer
-	unpaid_docs = []
-	logger.info(against_voucher_group)
-	for invoice, vouchers in against_voucher_group.items():
-		if invoice == "None":  # gl entries without against voucher (not attached to a sales invoice)
-			for voucher in vouchers:
-				if voucher.credit_in_account_currency > 0:
-					if voucher.voucher_type == "Journal Entry":
-						accounts = frappe.get_doc("Journal Entry", voucher.voucher_no).accounts
-						for account in accounts:
-							if account.debit_in_account_currency > 0 and account.reference_type == "Sales Invoice":
-								return_si = frappe.db.get_value(
-									"Sales Invoice",
-									{
-										"return_against": account.reference_name,
-										"neb_store_credit_beneficiary": customer,
-										"grand_total": -1 * account.debit_in_account_currency,
-									},
-									"name",
-								)
+	for credit in updated_credits:
+		if credit.voucher_type == "Sales Invoice":
+			original_credit = frappe.db.get_values("Sales Invoice", credit.voucher_no, ["grand_total", "status"], as_dict=True)
+			remaining_credit = get_remaining_credit(credit, customer)
 
-								if return_si:
-									voucher.voucher_no = return_si
-									voucher.voucher_type = "Sales Invoice"
-									unpaid_docs.append(voucher)
+			if len(original_credit) == 0:
+				continue
+			elif original_credit[0].get('status') != "Return":
+				continue
+			elif frappe.db.get_value("Sales Invoice", credit.voucher_no, "is_pos"):
+				continue
+			
+			duplicate = False
+			for row in rows:
+				if row.get('invoice') == credit.voucher_no:
+					duplicate = True
 
-					elif voucher.voucher_type == "Payment Entry":  # display the linked sales
-						voucher = get_linked_doc_from_payment_entry(voucher)
-						if voucher:
-							unpaid_docs.append(voucher)
+			if not duplicate and remaining_credit > 0:
+				rows.append({
+					"customer": customer,
+					"credit": -1 * remaining_credit,
+					"original_credit": original_credit[0].get('grand_total'),
+					"store_credit_no": "<a href='/app/sales-invoice/" + credit.voucher_no + "'>" + credit.voucher_no + "</a>",
+					"invoice": credit.voucher_no
+				})
 
-					else:
-						unpaid_docs.append(voucher)
-		else:
-			sum_credit = sum([voucher.credit_in_account_currency for voucher in vouchers])
-			sum_debit = sum([voucher.debit_in_account_currency for voucher in vouchers])
+		elif credit.voucher_type == "Journal Entry":
+			if not credit.return_doc:
+				gl_entries = frappe.db.get_values("GL Entry", {"voucher_no": credit.voucher_no, "debit_in_account_currency": [">", "0"]}, ["against_voucher"], as_dict=True)
+				
+				if len(gl_entries) == 0:
+					continue
+				else:
+					return_sales_invoices = frappe.db.get_values("Sales Invoice", {"return_against": gl_entries[0].get('against_voucher'), "is_return": 1, "docstatus": 1, "is_pos": 0}, ["name", "grand_total", "neb_store_credit_beneficiary", "status"], as_dict=True)
+					original_credit_amount = frappe.db.get_value("Journal Entry Account", {"parent": credit.voucher_no, "reference_type": "Sales Invoice", "reference_name": gl_entries[0].get('against_voucher')}, "debit_in_account_currency")
 
-			if sum_credit == sum_debit:
+					if len(return_sales_invoices) == 0:
+						continue
+
+					for rs in return_sales_invoices:
+						if rs.get('status') != "Return":
+							continue
+
+						if rs.get('neb_store_credit_beneficiary') and rs.get('neb_store_credit_beneficiary') != customer:
+							continue
+						
+						if -1 * rs.get('grand_total') == original_credit_amount:
+							credit.return_doc = rs.get('name')
+							break
+			
+
+			original_credit = frappe.db.get_values("Sales Invoice", credit.return_doc, ["grand_total", "status", "neb_store_credit_beneficiary", "name"], as_dict=True)
+			remaining_credit = get_remaining_credit(credit, customer)
+			
+			if len(original_credit) == 0:
+				continue
+			elif original_credit[0].get('status') != "Return":
 				continue
 
-			elif sum_credit > sum_debit:
-				for voucher in vouchers:
-					if voucher.credit_in_account_currency > 0 and len(vouchers) == 2:  # the amount paid is greater than invoice amount
-						unpaid_docs.append(voucher)
+			if original_credit[0].get('neb_store_credit_beneficiary') != customer:
+				continue
+			
+			duplicate = False
+			for row in rows:
+				if row.get('invoice') == credit.return_doc:
+					duplicate = True
+					continue
+			
+			if duplicate or remaining_credit <= 0:
+				continue
 
-					elif voucher.credit_in_account_currency > 0 and len(vouchers) == 1:  # store credit given by a journal entry
-						if voucher.voucher_type == "Payment Entry":
-							voucher = get_linked_doc_from_payment_entry(voucher)
-							if voucher:
-								unpaid_docs.append(voucher)
-
-					elif voucher.credit_in_account_currency > 0 and len(vouchers) > 2:  # for return documents and journal entries
-						if voucher.voucher_type in ["Sales Invoice"] and voucher.voucher_no != invoice:
-							unpaid_docs.append(voucher)
-						elif voucher.voucher_type in ["Journal Entry"]:
-							unpaid_docs.append(voucher)
-						elif voucher.voucher_type in ["Payment Entry"]:
-							sum_of_payment_entries = sum(
-								[voucher.credit_in_account_currency for voucher in vouchers if voucher.voucher_type == "Payment Entry" and voucher.credit_in_account_currency > 0]
-							)
-							if sum_of_payment_entries == vouchers[0].debit_in_account_currency:
-								continue
-							elif vouchers[0].debit_in_account_currency == voucher.credit_in_account_currency:
-								continue
-							else:
-								voucher = get_linked_doc_from_payment_entry(voucher)
-								if voucher:
-									unpaid_docs.append(voucher)
-
-	if sales_invoice:
-		rows.append(
-			{
+			rows.append({
 				"customer": customer,
-				"credit": sum([ud.credit_in_account_currency for ud in unpaid_docs]),
-				"original_credit": sum([ud.debit_in_account_currency for ud in unpaid_docs]),
-				"store_credit_no": f"<a href='/app/sales-invoice/{sales_invoice}' _target='blank'>{sales_invoice}</a>",
-			}
-		)
-	else:
-		for ud in unpaid_docs:
-			if ud.voucher_type == "Sales Invoice":
-				link = f"<a href='/app/sales-invoice/{ud.voucher_no}' _target='blank'>{ud.voucher_no}</a>"
-				
-				original_store_credit = frappe.db.get_value("Sales Invoice", ud.voucher_no, "grand_total")
-
-				rows.append(
-					{
-						"customer": customer,
-						"credit": ud.credit_in_account_currency,
-						"original_credit": original_store_credit,
-						"store_credit_no": link,
-					}
-				)
+				"credit": -1 * remaining_credit,
+				"original_credit": original_credit[0].get('grand_total'),
+				"store_credit_no": "<a href='/app/sales-invoice/" + credit.return_doc + "'>" + credit.return_doc + "</a>",
+				"invoice": credit.return_doc
+			})
 
 	return rows
+
+def get_remaining_credit(credit, customer):
+	# check in gl entries if there is a credit entry is linked with an invoice
+	if credit.voucher_type == "Journal Entry":
+		linked_doc = frappe.db.get_list("Journal Entry Account", filters={"parent": credit.voucher_no, "credit_in_account_currency": [">", 0]}, fields=["reference_name", "reference_type", "debit_in_account_currency", "credit_in_account_currency"])
+		credit.credit_in_account_currency = 0
+		if linked_doc:
+			for ld in linked_doc:
+				if not ld.get("reference_name"):
+					credit.credit_in_account_currency += ld.get("credit_in_account_currency")
+
+	elif credit.voucher_type == "Sales Invoice":
+		# check if the credit is used in a payment entry
+		used_credits = frappe.db.get_values("GL Entry", {"against_voucher": credit.against_voucher, "party": customer, "voucher_type": "Payment Entry", "debit_in_account_currency": [">", 0]}, ["voucher_no"], as_dict=True)
+		if used_credits:
+			pes_used_for_credit_transfer = [uc.get('voucher_no') for uc in used_credits]
+
+			# get all the payments made with the credit using the payment entry
+			transfered_credits = frappe.db.get_list("GL Entry", {"voucher_no": ["in", pes_used_for_credit_transfer], "credit_in_account_currency": [">", 0], "party": customer, "against_voucher": ["is", "set"]}, ["credit_in_account_currency"])
+			total_used = sum([tc.get('credit_in_account_currency') for tc in transfered_credits])
+			credit.credit_in_account_currency -= total_used
+
+	return credit.credit_in_account_currency
+
+def check_and_remove_match(credit, credits, same_voucher=False):
+	if credit.voucher_type == "Sales Invoice":
+		for credit_entry in credits:
+			if same_voucher:
+				if credit_entry.voucher_type == "Payment Entry" and credit_entry.against_voucher == credit.voucher_no:
+					if credit_entry.credit_in_account_currency == credit.debit_in_account_currency:
+						credits.remove(credit_entry)
+						credits.remove(credit)
+						return credits
+						
+			elif not same_voucher:
+				if credit_entry.against_voucher == credit.against_voucher:
+					if (credit_entry.debit_in_account_currency == credit.credit_in_account_currency and 
+						credit_entry.voucher_type == "Journal Entry"):
+						credit_entry.return_doc = credit.voucher_no
+
+						# find credit in credits and delete
+						for c in credits:
+							if c == credit:
+								credits.remove(c)
+								break
+
+						return credits
+					
+					elif credit_entry.voucher_type == "Payment Entry" and credit_entry.debit_in_account_currency == credit.credit_in_account_currency:
+						credits.remove(credit_entry)
+						credits.remove(credit)
+						
+						return credits
+	elif credit.voucher_type == "Journal Entry":
+		if len(credits) == 1:
+			if credit.credit_in_account_currency == 0:
+				credits.remove(credit)
+			return credits
+
+		for credit_entry in credits:
+			if (credit_entry.voucher_no == credit.voucher_no and credit_entry.voucher_type == "Journal Entry"):
+				if credit_entry.credit_in_account_currency == 0:
+					credits.remove(credit_entry)
+
+	return credits
 
 def get_linked_doc_from_payment_entry(voucher):
 	payment_entry = frappe.get_doc("Payment Entry", voucher.voucher_no)
@@ -224,11 +326,11 @@ def get_linked_doc_from_payment_entry(voucher):
 				voucher.voucher_no = references[0].reference_name
 				voucher.voucher_type = "Sales Invoice"
 
-			elif references[0].reference_doctype == "Sales Order":
-				voucher.voucher_no = references[0].reference_name
-				voucher.voucher_type = "Sales Order"
+			# elif references[0].reference_doctype == "Sales Order":
+			# 	voucher.voucher_no = references[0].reference_name
+			# 	voucher.voucher_type = "Sales Order"
 
-	return voucher
+	return None
 			
 
 def get_columns(sales_invoice=False):
