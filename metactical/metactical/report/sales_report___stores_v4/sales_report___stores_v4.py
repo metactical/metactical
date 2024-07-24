@@ -130,7 +130,7 @@ def get_transit_warehouse(warehouse):
 	return transit_warehouse
 
 def get_data(conditions, filters):
-	data = frappe.db.sql("""
+	stock_items = frappe.db.sql("""
 		SELECT 
 			c.item_code, c.item_name, i.ifw_retailskusuffix, i.ifw_location, c.warehouse, sum(c.qty) as qty,
 			p.pos_profile, p.company, c.uom, c.stock_uom, c.conversion_factor
@@ -148,6 +148,27 @@ def get_data(conditions, filters):
 		ORDER BY 
 			c.item_name, p.pos_profile
 		""".format(filters.get("to_date"), conditions), as_dict=1)
+	
+	product_bundles = frappe.db.sql(f"""
+		SELECT 
+			c.item_code, c.item_name, i.ifw_retailskusuffix, i.ifw_location, c.warehouse, sum(c.qty) as qty,
+			p.pos_profile, p.company, c.uom, c.uom AS stock_uom, c.conversion_factor
+		FROM
+			`tabPacked Item` c 
+		INNER JOIN
+			`tabSales Invoice` p ON p.name = c.parent
+		INNER JOIN 
+			`tabItem` i ON c.item_code = i.name 
+		WHERE 
+			p.docstatus = 1 AND p.is_pos =1 AND p.posting_date = '{filters.get("to_date")}' 
+			AND p.is_return <> 1 AND i.ais_blockfrmstoresale <> 1 {conditions}
+		GROUP BY 
+			c.item_code, p.pos_profile
+		ORDER BY 
+			c.item_name, p.pos_profile
+		""", as_dict=1)
+	
+	data = stock_items + product_bundles
 	
 	# Sort data by location
 	rows_with_none_location = []
