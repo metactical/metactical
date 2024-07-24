@@ -189,9 +189,13 @@ def get_credit_docs(customer, sales_invoice):
 					duplicate = True
 
 			if not duplicate and remaining_credit > 0:
-				beneficiary = original_credit[0].get('neb_store_credit_beneficiary') if original_credit[0].get('neb_store_credit_beneficiary') else original_credit[0].get('customer_name')
+				if original_credit[0].get('neb_store_credit_beneficiary'):
+					beneficiary = frappe.db.get_value("Customer", original_credit[0].get('neb_store_credit_beneficiary'), "customer_name")
+				else:
+					beneficiary = original_credit[0].get('customer_name')
+					
 				rows.append({
-					"customer": customer,
+					"customer": original_credit[0].get('neb_store_credit_beneficiary') if original_credit[0].get('neb_store_credit_beneficiary') else customer,
 					"credit": -1 * remaining_credit,
 					"customer_name": beneficiary,
 					"original_credit": original_credit[0].get('grand_total'),
@@ -244,9 +248,13 @@ def get_credit_docs(customer, sales_invoice):
 			if duplicate or remaining_credit <= 0:
 				continue
 
-			beneficiary = original_credit[0].get('neb_store_credit_beneficiary') if original_credit[0].get('neb_store_credit_beneficiary') else original_credit[0].get('customer_name')
+			if original_credit[0].get('neb_store_credit_beneficiary'):
+				beneficiary = frappe.db.get_value("Customer", original_credit[0].get('neb_store_credit_beneficiary'), "customer_name")
+			else:
+				beneficiary = original_credit[0].get('customer_name')
+
 			rows.append({
-				"customer": customer,
+				"customer": original_credit[0].get('neb_store_credit_beneficiary') if original_credit[0].get('neb_store_credit_beneficiary') else customer,
 				"credit": -1 * remaining_credit,
 				"customer_name": beneficiary,
 				"original_credit": original_credit[0].get('grand_total'),
