@@ -55,8 +55,6 @@ def get_data(customers, sales_invoice):
 				group by party""",
 		)
 	)
-
-	pos_customers = frappe.db.get_list("Customer", )
 	
 	for customer, amount in total_unpaid.items():
 		sales_invoices = frappe.db.get_list("Sales Invoice", filters={"customer": customer, "status": ["in", ["Overdue", "Unpaid", "Partly Paid"]]}, fields=["name", "outstanding_amount"])
