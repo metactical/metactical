@@ -226,7 +226,7 @@ def get_us_data(filters):
 @frappe.whitelist()
 def export_to_excel(date):
 	from metactical.custom_scripts.utils.metactical_utils import export_query
-	
+
 	dates = {
 		"date": date,
 		"end_date": (datetime.strptime(date, "%Y-%m-%d") + relativedelta(days=1)).strftime("%Y-%m-%d")
@@ -239,7 +239,6 @@ def export_to_excel(date):
 	}
 
 	sub_headers = ["Stores", "Online", "USA"]
-
 	export_query(data, sub_headers)
 
 	
