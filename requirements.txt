@@ -1,3 +1,5 @@
 frappe
 python-barcode
 xmltodict
+pika
+tqdm

@@ -150,6 +150,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Price Excel - V3",
+   "link_to": "Item Price Excel - V3",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
@@ -331,6 +340,15 @@
    "is_query_report": 0,
    "label": "Item Price Import Tool",
    "link_to": "Item Price From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": " Purchase Order Import Tool",
+   "link_to": "Purchase Order Import Tool",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -596,6 +614,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Store Credits",
+   "link_to": "Store Credits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -790,9 +817,18 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Material Request User Permission",
+   "link_to": "Material Request User Permission",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2024-07-08 14:18:04.798249",
+ "modified": "2024-07-21 08:55:37.534107",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

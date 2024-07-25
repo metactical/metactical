@@ -17,6 +17,10 @@ def get_columns():
 		{
 			"fieldname": "item_name",
 			"label": "Item Name"
+		},
+		{
+			"fieldname": "WHSQOH",
+			"label": "WHSQOH"
 		}
 	]
 
@@ -47,12 +51,20 @@ def get_columns():
 	])
 	return columns
 
-def get_data(search_text="rvx"):
+def get_data(search_text):
 	data = []
 	franchises = frappe.db.get_all("Item Search Settings Franchise", fields=["franchise_url", "label", "api_key", "api_secret"])
 
 	if not franchises:
 		frappe.throw("No Franchise settings found. Please create a Franchise setting first.")
+
+	local_data = get_local(search_text)
+
+	if len(local_data) > 0:
+		data.append({
+			"label": "WHSQOH",
+			"items": local_data
+		})
 
 	for franchise in franchises:
 		url = franchise.franchise_url
@@ -86,12 +98,38 @@ def get_data(search_text="rvx"):
 					"template_sku": item.get("template_sku", ""),
 					"barcode": item.get("barcode"),
 					"ifw_location": item.get("ifw_location"),
-					row["label"]: item.get("actual_qty")
+					row["label"]: int(item.get("actual_qty", 0))
 				}
 			else:
-				ret_data[item["item_code"]][row["label"]] = item["actual_qty"]
+				ret_data[item["item_code"]][row["label"]] = int(item.get("actual_qty", 0))
 
 	data = []
 	for key in ret_data:
 		data.append(ret_data[key])
+	return data
+
+def get_local(search_text):
+	data =  frappe.db.sql(f"""
+			SELECT
+				bin.item_code, item.item_name, SUM(bin.actual_qty) AS actual_qty,
+				item.ifw_retailskusuffix AS retail_sku, item.ifw_location,
+				barcode_grouped.barcodes AS barcode,
+				item.variant_of AS template_sku
+			FROM 
+				`tabBin` AS bin
+			LEFT JOIN
+				`tabItem` AS item ON item.item_code = bin.item_code
+			LEFT JOIN
+				(
+					SELECT parent, GROUP_CONCAT(DISTINCT barcode SEPARATOR '<br>') AS barcodes
+					FROM `tabItem Barcode`
+					GROUP BY parent
+				) AS barcode_grouped ON barcode_grouped.parent = item.name 
+			WHERE
+				bin.warehouse = 'W01-WHS-Active Stock - ICL' AND (barcode_grouped.barcodes LIKE '%{search_text}%' or 
+				item.ifw_retailskusuffix like '%{search_text}%') AND item.disabled = 0
+				AND item.has_variants = 0 AND item.is_sales_item = 1
+			GROUP BY
+				item_code, item_name, retail_sku, template_sku, ifw_location
+			""", as_dict=1)
 	return data

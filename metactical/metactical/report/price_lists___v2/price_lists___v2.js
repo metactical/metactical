@@ -19,7 +19,7 @@ frappe.query_reports["Price Lists - V2"] = {
 
 					frappe.query_report.set_filter_value('supplier', frappe.query_report.get_filter_value('supplier'));
 				}
-				frappe.query_report.refresh();
+				// frappe.query_report.refresh();
 			}
 		},
 		{
@@ -34,11 +34,11 @@ frappe.query_reports["Price Lists - V2"] = {
 						frappe.query_report.set_filter_value('supplier', "");
 
 					if (frappe.query_report.get_filter_value('sales_order'))
-						frappe.query_report.set_filter_value('sales_order', []);
+						frappe.query_report.set_filter_value('sales_order',"");
 
-					if (!frappe.query_report.get_filter_value('supplier') && !frappe.query_report.get_filter_value('sales_order')){
-						frappe.query_report.refresh();
-					}
+					// if (!frappe.query_report.get_filter_value('supplier') && !frappe.query_report.get_filter_value('sales_order')){
+					// 	frappe.query_report.refresh();
+					// }
 				}
 			},
 			get_data: function(txt) {
@@ -48,21 +48,16 @@ frappe.query_reports["Price Lists - V2"] = {
 		{
 			"label": "Sales Order",
 			"fieldname": "sales_order",
-			"fieldtype": "MultiSelectList",
+			"fieldtype": "Link",
 			"options": "Sales Order",
 			on_change: () => {
-				// remove supplier filter value if sales order is selected
+				// remove purchase order filter value if supplier is selected
 				if (frappe.query_report.get_filter_value('sales_order')){
-					if (frappe.query_report.get_filter_value('supplier'))
-						frappe.query_report.set_filter_value('supplier', "");
-
-					if (frappe.query_report.get_filter_value('purchase_order'))
+					if (frappe.query_report.get_filter_value('purchase_order')){
 						frappe.query_report.set_filter_value('purchase_order', []);
-
-
-					if (!frappe.query_report.get_filter_value('supplier') && !frappe.query_report.get_filter_value('purchase_order')){
-						frappe.query_report.refresh();
 					}
+					frappe.query_report.set_filter_value('supplier', "");
+					frappe.query_report.set_filter_value('sales_order', frappe.query_report.get_filter_value('sales_order'));
 				}
 			},
 			get_data: function(txt) {
