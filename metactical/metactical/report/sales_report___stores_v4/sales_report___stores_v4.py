@@ -33,7 +33,7 @@ def execute(filters=None):
 			row["in_transit"] = frappe.db.get_value("Bin", {"warehouse": transit_warehouse, "item_code": d.item_code}, "actual_qty") or 0
 			row['sale'] = d.qty
 			row['pos_profile'] = d.pos_profile
-			row["button"] = '<button onClick="create_material_transfer(\'{}\', \'{}\', \'{}\')">Create Material Transfer</button>'.format(
+			row["button"] = '<button onClick="create_material_request(\'{}\', \'{}\', \'{}\')">Create Material Request</button>'.format(
 								filters.get("pos_profile", ""), filters.get("to_date"), filters.get("item_code", ""))
 			if row['stock_levels'] > 0:
 				data.append(row)
@@ -130,7 +130,7 @@ def get_transit_warehouse(warehouse):
 	return transit_warehouse
 
 def get_data(conditions, filters):
-	data = frappe.db.sql("""
+	stock_items = frappe.db.sql("""
 		SELECT 
 			c.item_code, c.item_name, i.ifw_retailskusuffix, i.ifw_location, c.warehouse, sum(c.qty) as qty,
 			p.pos_profile, p.company, c.uom, c.stock_uom, c.conversion_factor
@@ -148,8 +148,56 @@ def get_data(conditions, filters):
 		ORDER BY 
 			c.item_name, p.pos_profile
 		""".format(filters.get("to_date"), conditions), as_dict=1)
-	return data
+	
+	product_bundles = frappe.db.sql(f"""
+		SELECT 
+			c.item_code, c.item_name, i.ifw_retailskusuffix, i.ifw_location, c.warehouse, sum(c.qty) as qty,
+			p.pos_profile, p.company, c.uom, c.uom AS stock_uom, c.conversion_factor
+		FROM
+			`tabPacked Item` c 
+		INNER JOIN
+			`tabSales Invoice` p ON p.name = c.parent
+		INNER JOIN 
+			`tabItem` i ON c.item_code = i.name 
+		WHERE 
+			p.docstatus = 1 AND p.is_pos =1 AND p.posting_date = '{filters.get("to_date")}' 
+			AND p.is_return <> 1 AND i.ais_blockfrmstoresale <> 1 {conditions}
+		GROUP BY 
+			c.item_code, p.pos_profile
+		ORDER BY 
+			c.item_name, p.pos_profile
+		""", as_dict=1)
+	
+	data = stock_items + product_bundles
+	
+	# Sort data by location
+	rows_with_none_location = []
+	digit_rows_with_location = []
+	non_digit_rows_with_location = []
 
+	for row in data:
+		if row['ifw_location'] is None:
+			rows_with_none_location.append(row)
+		else:
+			if row['ifw_location'].split("-")[0].isdigit():
+				digit_rows_with_location.append(row)
+			else:
+				non_digit_rows_with_location.append(row)
+
+	data = []
+
+	if digit_rows_with_location:
+		# sort by the first part of the location and then by the second part if there is a tie
+		data += sorted(digit_rows_with_location, key=lambda x: (int(x['ifw_location'].split("-")[0]), x['ifw_location'].split("-")[1], x['ifw_location'].split("-")[2]))
+		
+	if non_digit_rows_with_location:
+		data += sorted(non_digit_rows_with_location, key=lambda x: x['ifw_location'])
+
+	if rows_with_none_location:
+		data += rows_with_none_location
+
+	return data
+ 
 def get_conditions(filters, sales_order=None):
 	conditions = ""
 	if filters.get("item_code"):
@@ -182,7 +230,7 @@ def get_item_details(item, list_type="Selling"):
 	return rate
 	
 @frappe.whitelist()
-def create_material_transfer(**args):
+def create_material_request(**args):
 	args = frappe._dict(args)
 	filters = {}
 	if args.pos_profile != "":
@@ -195,10 +243,10 @@ def create_material_transfer(**args):
 	conditions = get_conditions(filters)
 	init_data = get_data(conditions, filters)
 	source_warehouse = "W01-WHS-Active Stock - " + frappe.db.get_value("Company", init_data[0].company, "abbr")
-	doc = frappe.new_doc("Stock Entry")
+	doc = frappe.new_doc("Material Request")
 	doc.update({
-		"stock_entry_type": "Material Transfer",
-		"ais_from_report": 1
+		"material_request_type": "Material Transfer",
+		"schedule_date": now(),
 	})
 	for row in init_data:
 		wh_actual = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "actual_qty") or 0.0
@@ -207,12 +255,13 @@ def create_material_transfer(**args):
 		transit_warehouse = get_transit_warehouse(row.warehouse)
 		if stock_levels > 0 and transit_warehouse != "":
 			doc.append("items", {
-				"s_warehouse": source_warehouse,
-				"t_warehouse": transit_warehouse,
+				"from_warehouse": source_warehouse,
+				"warehouse": transit_warehouse,
 				"item_code": row.item_code,
 				"qty": row.qty,
 				"uom": row.uom,
 				"stock_uom": row.stock_uom,
+				"ifw_location": row.ifw_location,
 				"conversion_factor": row.conversion_factor
 			})
 	doc.insert(ignore_permissions=True)
