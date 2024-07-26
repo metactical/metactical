@@ -148,7 +148,7 @@ doc_events = {
 		"on_update": "metactical.custom_scripts.item.item.on_update"
 	}, 
 	"Payment Entry": {
-		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.usaepay_refund_request"
+		"on_update": "metactical.custom_scripts.payment_entry.payment_entry.usaepay_refund_request"
 	},
 }
 
