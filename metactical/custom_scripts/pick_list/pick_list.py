@@ -18,6 +18,8 @@ from pytz import timezone
 from pathlib import Path
 import shutil
 from itertools import groupby
+from metactical.custom_scripts.utils.metactical_utils import queue_action
+from frappe import _, msgprint
 
 class CustomPickList(PickList):
 	def update_sales_order_item(self, item, picked_qty, item_code):
@@ -84,6 +86,7 @@ class CustomPickList(PickList):
 					frappe.msgprint('Warning: Sales Order <a href="/desk#Form/Sales Order/{0}">{0}</a> has credit due.'.format(item.sales_order))
 
 	def on_submit(self):
+		print("on_submit")
 		if self.do_not_create_delivery:
 			return
 		
@@ -238,6 +241,17 @@ class CustomPickList(PickList):
 
 		if save:
 			self.save()
+
+	def submit(self):
+		if len(self.locations) > 25:
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			self._submit()
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
