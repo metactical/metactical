@@ -1,0 +1,54 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-06-18 09:39:18.849903",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "store_credit_section",
+  "store_credit_account_cad",
+  "store_credit_account_usd"
+ ],
+ "fields": [
+  {
+   "fieldname": "store_credit_account_cad",
+   "fieldtype": "Link",
+   "label": "CAD Account for Store Credits",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_account_usd",
+   "fieldtype": "Link",
+   "label": "USD Account for Store Credit",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_section",
+   "fieldtype": "Section Break",
+   "label": "Store Credit"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2024-06-21 03:19:31.542323",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Metactical Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

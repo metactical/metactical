@@ -62,16 +62,17 @@ class CustomPickList(PickList):
 				frappe.throw("Row " + str(location.idx) + " has been picked already!")
 				
 		if len(self.locations) > 0:
-			rv = BytesIO()
-			_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
-			bstring = rv.getvalue()
-			self.barcode = bstring.decode('ISO-8859-1')
-			
-			# STO Barcode
-			sv = BytesIO()
-			_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
-			stoBarcode = sv.getvalue()
-			self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
+			if self.locations[0].get('sales_order'):
+				rv = BytesIO()
+				_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
+				bstring = rv.getvalue()
+				self.barcode = bstring.decode('ISO-8859-1')
+				
+				# STO Barcode
+				sv = BytesIO()
+				_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
+				stoBarcode = sv.getvalue()
+				self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
 
 		#Check if Sales Order has Balance Due or Credit Due
 		sales_orders = []

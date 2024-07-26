@@ -26,8 +26,38 @@ def get_default_warehouse():
 		return ""
 		
 @frappe.whitelist()
-def set_item_weight(item, weight):
-	default_uom = frappe.db.get_value("Packing Settings", "Packing Settings", "default_weight_uom");
+def set_item_weight(item, values):
+	default_uom = frappe.db.get_value("Packing Settings", "Packing Settings", "default_weight_uom")
 	frappe.db.set_value("Item", item, "weight_per_unit", weight)
 	frappe.db.set_value("Item", item, "weight_uom", default_uom)
 	return "OK"
+
+@frappe.whitelist()
+def set_item_values(item, values):
+	try:
+		# Parse the values if they're passed as a string
+		if isinstance(values, str):
+			values = frappe.parse_json(values)
+
+		# Get the item document
+		item_doc = frappe.get_doc("Item", item)
+
+		# Update the item fields if they exist in the values
+		if "item_weight" in values:
+			default_uom = frappe.db.get_value("Packing Settings", "Packing Settings", "default_weight_uom")
+			item_doc.weight_per_unit = float(values["item_weight"])
+			item_doc.weight_uom = default_uom
+		if "item_length" in values:
+			item_doc.ais_shipping_length = float(values["item_length"])
+		if "item_width" in values:
+			item_doc.ais_shipping_width = float(values["item_width"])
+		if "item_height" in values:
+			item_doc.ais_shipping_height = float(values["item_height"])
+
+		# Save the document
+		item_doc.save(ignore_permissions=True)
+		return {"success": True, "message": "Item updated successfully"}
+
+	except Exception as e:
+		frappe.log_error(f"Error updating item {item_name}: {str(e)}")
+		return {"success": False, "message": f"Error updating item: {str(e)}"}
