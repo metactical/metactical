@@ -86,7 +86,6 @@ class CustomPickList(PickList):
 					frappe.msgprint('Warning: Sales Order <a href="/desk#Form/Sales Order/{0}">{0}</a> has credit due.'.format(item.sales_order))
 
 	def on_submit(self):
-		print("on_submit")
 		if self.do_not_create_delivery:
 			return
 		
