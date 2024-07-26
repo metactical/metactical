@@ -244,6 +244,9 @@ def refund_payment(docname, refund_reason, refund_amount):
 		frappe.msgprint("You are not authorized to refund payment", title="Error")
 		return
 
+	# log = create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund", refund_reason)
+	log = create_usaepay_log("Sales Order", docname, "Refund")
+
 	try:
 		sales_order = frappe.get_doc("Sales Order", docname)
 		usaepay_transaction_key = sales_order.get("neb_usaepay_transaction_key")
@@ -261,7 +264,6 @@ def refund_payment(docname, refund_reason, refund_amount):
 
 		# get transaction details from USAePay
 		transaction = get_transaction_from_usaepay(usaepay_transaction_key, headers)
-
 		if transaction:
 			# Generate card token
 			card_token = get_card_token(usaepay_url, transaction.get("key"), headers)
@@ -270,20 +272,29 @@ def refund_payment(docname, refund_reason, refund_amount):
 			# process refund
 			payload, refund_response = create_refund(transaction, refund_amount, usaepay_url, headers)
 
+			log.request = format_json_for_html(payload)
+			log.response = format_json_for_html(refund_response)
+			log.amount = refund_amount
+			log.transaction_key = payload.get("trankey")
+			log.refund_transaction_key = refund_response.get("key")
+			log.refund_reason = refund_reason
+			log.save()
+
 			# create USAePay log
 			refunded_amount = refund_amount if refund_amount else transaction["amount"]
-			log = create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund", refund_reason)
 
 			card_holder = "for <b>" + refund_response.get("creditcard").get("cardholder") +"</b>" if refund_response.get("creditcard") else ""
 			frappe.msgprint(f"<b>{refund_response['auth_amount']}</b> is refunded successfully {card_holder}.")
 
-			return refund_response, log
+			return refund_response, log.name
 		else:
 			frappe.response["success"] = False
 			frappe.response["message"] = "Transaction not found in USAePay"
+			return None, None
 
 	except Exception as e:
 		frappe.log_error(title="Refund Payment Error", message=frappe.get_traceback())
+		frappe.throw("Unable to refund payment: {0}".format(e))
 
 @frappe.whitelist()
 def adjust_payment(docname, advance_paid=None):

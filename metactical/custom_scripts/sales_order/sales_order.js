@@ -9,7 +9,10 @@ frappe.ui.form.on('Sales Order', {
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
 			frm.clear_custom_buttons();
 		}*/
-				
+
+		if (frm.doc.__islocal)
+			frm.set_value("neb_usaepay_transaction_key", "");
+			
 		setTimeout(() => {
 			
 			frm.remove_custom_button("Pick List", 'Create'); 

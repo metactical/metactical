@@ -16,6 +16,7 @@
   "reference_doctype",
   "reference_docname",
   "payment_entry",
+  "sales_return",
   "reason",
   "section_break_6hrgt",
   "request",
@@ -119,11 +120,18 @@
    "fieldtype": "Link",
    "label": "Payment Entry",
    "options": "Payment Entry"
+  },
+  {
+   "depends_on": "eval:doc.action==\"Refund\"",
+   "fieldname": "sales_return",
+   "fieldtype": "Link",
+   "label": "Sales Return",
+   "options": "Sales Invoice"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-12 09:38:01.355370",
+ "modified": "2024-07-25 13:50:43.539783",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "USAePay Log",
