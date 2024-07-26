@@ -58,7 +58,7 @@ def get_columns(filters):
 def get_ca_data(filters):
 	data = []
 	#Get stores data
-	data.append({"Location": "Stores"})
+	# data.append({"Location": "Stores"})
 	stores_data, total_stores_with_tax, total_stores_without_tax, stores_total_mtd, stores_total_pmtd = get_website_stores_data(filters, "Stores")
 	
 	# sort the data based on the array given
@@ -229,7 +229,7 @@ def export_to_excel(date):
 
 	dates = {
 		"date": date,
-		"end_date": date
+		"end_date": (datetime.strptime(date, "%Y-%m-%d") + relativedelta(days=1)).strftime("%Y-%m-%d")
 	}
 
 	data = {
