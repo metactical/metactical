@@ -40,7 +40,7 @@
         </parcel-characteristics>
         <notification>
             <email>{{ doc.pickup_contact_email }}</email>
-            <on-shipment>true</on-shipment>
+            <on-shipment>false</on-shipment>
             <on-exception>false</on-exception>
             <on-delivery>true</on-delivery>
         </notification>
