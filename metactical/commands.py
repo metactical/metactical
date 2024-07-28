@@ -4,6 +4,7 @@ from tqdm import tqdm
 import click
 from frappe.commands import pass_context, get_site
 from frappe.exceptions import SiteNotSpecifiedError
+from metactical.utils.dormant_customers import delete_unlinked_customers
 
 @click.command("rename-customers")
 @pass_context
@@ -29,6 +30,18 @@ def rename_customers(context):
 		except Exception as e:
 			frappe.log_error(f"Failed to rename {old_name}: {e}")
 
+@click.command("delete-dormant-customers")
+@pass_context
+def delete_dormant_customers(context):
+	site = get_site(context)
+	if not site:
+		raise SiteNotSpecifiedError
+	
+	frappe.init(site=site)
+	frappe.connect()
+	delete_unlinked_customers()
+
 commands = [
+	delete_dormant_customers,
 	rename_customers
 ]
