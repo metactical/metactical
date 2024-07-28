@@ -1,7 +1,5 @@
 import frappe
 from tqdm import tqdm
-from fuzzywuzzy import fuzz
-from itertools import combinations
 
 def delete_unlinked_customers():
 	print("Getting dormant customers")
