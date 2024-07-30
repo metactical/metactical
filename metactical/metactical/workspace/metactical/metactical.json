@@ -347,6 +347,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Item Import Tool",
+   "link_to": "Item From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": " Purchase Order Import Tool",
    "link_to": "Purchase Order Import Tool",
    "link_type": "DocType",
@@ -828,7 +837,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-07-22 08:55:37.534107",
+ "modified": "2024-07-30 12:11:02.850612",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
