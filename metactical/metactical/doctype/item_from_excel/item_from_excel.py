@@ -18,12 +18,15 @@ class ItemFromExcel(Document):
 		linked_doctypes, item_field_map, required_fields = get_doctype_information()
 
 		# check if all required fields are present
+		if len(file_content) < 3:
+			frappe.throw(f"Required number of sheets not found in the uploaded file. Expected 3 (Template, Variant, Item Price), found {len(file_content)}")
+
 		for field in required_fields:
 			if field not in file_content[0][0]:
-				raise(f"Required field {field} not found in the uploaded file")
+				frappe.throw(f"Required field {field} not found in the uploaded file")
 
 			if field not in file_content[1][0]:
-				raise(f"Required field {field} not found in the uploaded file")
+				frappe.throw(f"Required field {field} not found in the uploaded file")
 		
 		self.check_mandatory_fields(file_content[0], required_fields)
 		self.check_mandatory_fields(file_content[1], required_fields)
@@ -60,7 +63,7 @@ class ItemFromExcel(Document):
 			if index > 0 and row[0] and item_code != row[0]:
 				child_table_values = remove_duplicate_child_table_values(child_table_values)
 				item = add_child_table_values_to_item(item, child_table_values)
-				
+
 				item.insert()
 				item_code = row[0]
 				item = frappe.new_doc("Item")
@@ -73,14 +76,13 @@ class ItemFromExcel(Document):
 					# if the field is standard field and has item code in the row
 					if row[0] is not None:
 						item.set(item_field_map[field], row[i])
-						
+
 				else: # if the column is from a child table
 					for doctype in updated_linked_doctypes_to_map:
 						parent_label = get_parent_label(linked_dcts, doctype)
 
 						if field.endswith("("+parent_label+")") and row[i] is not None:
 							child_table = get_key_from_value(linked_dcts, doctype)
-
 
 							child_table_field = updated_linked_doctypes_to_map[doctype][field]
 							child_table_values_temp2[child_table][child_table_field] = row[i]
@@ -137,12 +139,12 @@ class ItemFromExcel(Document):
 		linked_doctypes, item_field_map, required_fields = get_doctype_information()
 
 		try:
+
 			self.create_item(file_content[0], item_field_map, linked_doctypes)
 			self.create_item(file_content[1], item_field_map, linked_doctypes)
 			self.create_item_price(file_content[2])
 			
 			frappe.db.commit()
-
 		except Exception as e:
 			frappe.db.rollback()
 			frappe.throw(f"Error creating items: {e}")
