@@ -54,13 +54,13 @@ class ItemFromExcel(Document):
 		item = frappe.new_doc("Item")
 
 		for index, row in enumerate(data[1:]):
-			child_table_values_temp2 = child_table_values_temp.copy()
+			child_table_values_temp2 = child_table_values_temp
 
 			# insert an item when the item code changes if the new row is not empty
 			if index > 0 and row[0] and item_code != row[0]:
 				child_table_values = remove_duplicate_child_table_values(child_table_values)
 				item = add_child_table_values_to_item(item, child_table_values)
-
+				
 				item.insert()
 				item_code = row[0]
 				item = frappe.new_doc("Item")
@@ -70,8 +70,10 @@ class ItemFromExcel(Document):
 					item_code = row[0]
 
 				if field in item_field_map:
-					if row[0] is not None: # if the field is standard field and has item code in the row
+					# if the field is standard field and has item code in the row
+					if row[0] is not None:
 						item.set(item_field_map[field], row[i])
+						
 				else: # if the column is from a child table
 					for doctype in updated_linked_doctypes_to_map:
 						parent_label = get_parent_label(linked_dcts, doctype)
@@ -79,9 +81,9 @@ class ItemFromExcel(Document):
 						if field.endswith("("+parent_label+")") and row[i] is not None:
 							child_table = get_key_from_value(linked_dcts, doctype)
 
+
 							child_table_field = updated_linked_doctypes_to_map[doctype][field]
 							child_table_values_temp2[child_table][child_table_field] = row[i]
-
 
 			for child in child_table_values_temp2:
 				if len(child_table_values_temp2[child]):
@@ -94,7 +96,7 @@ class ItemFromExcel(Document):
 		if item:
 			item = add_child_table_values_to_item(item, child_table_values)
 			item.insert()
-	
+
 	def create_item_price(self, data):
 		headers = data[0]
 		price_lists = []
@@ -140,6 +142,7 @@ class ItemFromExcel(Document):
 			self.create_item_price(file_content[2])
 			
 			frappe.db.commit()
+
 		except Exception as e:
 			frappe.db.rollback()
 			frappe.throw(f"Error creating items: {e}")
