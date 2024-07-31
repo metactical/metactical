@@ -40,7 +40,7 @@ class ItemFromExcel(Document):
 				if not d[i] and d[0]:
 					frappe.throw(f"Value missing for field {headers[i]} at row {data.index(d) + 1}")
 
-	def create_item(self, data, item_field_map, linked_dcts):
+	def create_item(self, data, item_field_map, linked_dcts, is_template):
 		# create item template
 		fields = data[0]		
 		linked_doctypes_to_map, updated_linked_doctypes_to_map = get_linked_doctypes(linked_dcts, fields)
@@ -62,7 +62,7 @@ class ItemFromExcel(Document):
 			# insert an item when the item code changes if the new row is not empty
 			if index > 0 and row[0] and item_code != row[0]:
 				child_table_values = remove_duplicate_child_table_values(child_table_values)
-				item = add_child_table_values_to_item(item, child_table_values)
+				item = add_child_table_values_to_item(item, child_table_values, is_template)
 
 				item.insert()
 				item_code = row[0]
@@ -96,7 +96,7 @@ class ItemFromExcel(Document):
 		# add the last item 
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		if item:
-			item = add_child_table_values_to_item(item, child_table_values)
+			item = add_child_table_values_to_item(item, child_table_values, is_template)
 			item.insert()
 
 	def create_item_price(self, data):
@@ -140,8 +140,8 @@ class ItemFromExcel(Document):
 
 		try:
 
-			self.create_item(file_content[0], item_field_map, linked_doctypes)
-			self.create_item(file_content[1], item_field_map, linked_doctypes)
+			self.create_item(file_content[0], item_field_map, linked_doctypes, True)
+			self.create_item(file_content[1], item_field_map, linked_doctypes, False)
 			self.create_item_price(file_content[2])
 			
 			frappe.db.commit()
@@ -236,8 +236,20 @@ def get_linked_doctypes(linked_dcts, fields):
 
 	return linked_doctypes_to_map, updated_linked_doctypes_to_map
 
-def add_child_table_values_to_item(item, child_table_values):
+def add_child_table_values_to_item(item, child_table_values, is_template):
+	from frappe.client import validate_link
+
 	for child in child_table_values:
+		if child == "attributes" and is_template:
+			for attr in child_table_values[child]:
+				is_numeric = frappe.db.get_value("Item Attribute", {"name": attr["attribute"]}, "numeric_values")
+				if is_numeric:
+					props = frappe.db.get_value("Item Attribute", {"name": attr["attribute"]}, ["from_range", "to_range", "increment"], as_dict=1)
+					attr["from_range"] = props["from_range"]
+					attr["to_range"] = props["to_range"]
+					attr["increment"] = props["increment"]
+					attr["numeric_values"] = 1
+
 		if len(child_table_values[child]):
 			item.set(child, child_table_values[child])
 			child_table_values[child] = []
