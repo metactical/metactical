@@ -45,7 +45,7 @@ class ItemPriceFromExcel(Document):
 
 		return file_content, extn
 
-	def create_price_entries(self, data):
+	def create_price_entries(self, data, external_source=False):
 		item_code_col = None
 		item_sku_col = None
 		price_lists = []
@@ -103,6 +103,10 @@ class ItemPriceFromExcel(Document):
 						doc = frappe.get_doc("Item Price", exists)
 					else:
 						doc = frappe.new_doc("Item Price")
+					
+					if not price and external_source:
+						continue
+
 					doc.update({
 						"item_code": item_code,
 						"price_list": price_list,

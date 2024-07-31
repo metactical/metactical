@@ -132,7 +132,7 @@ class ItemFromExcel(Document):
 		for row in data:
 			updated_data.append([row[i] for i in range(len(row)) if i not in columns_to_remove])
 	
-		ItemPriceFromExcel.create_price_entries(self, updated_data)
+		ItemPriceFromExcel.create_price_entries(self, updated_data, True)
 
 	def on_submit(self):
 		file_content = self.check_file()
