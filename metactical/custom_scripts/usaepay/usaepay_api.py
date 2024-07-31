@@ -110,3 +110,37 @@ def adjust_amount(amount, transaction, usaepay_url, headers=None):
 		response = json.loads(response.text)
 		frappe.throw(_("Failed to make adjustment in USAePay: {0}").format(response.get("error")))
 
+def get_customer_detail(customer_key, headers):
+	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
+	if not usaepay_url:
+		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+
+	url += "/customers/" + customer_key
+	response = requests.get(url, headers=headers)
+
+	if response.status_code == 200:
+		customer = json.loads(response.text)
+		if customer.get("error"):
+			frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(cstr(customer.get("error"))))
+
+		return customer
+	else:
+		response = json.loads(response.text)
+		frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(response.get("error")))
+
+
+@frappe.whitelist()
+def receive_customer_data():
+	response = frappe.form_dict
+
+	event_body = response.get("event_body")
+	customer_key = event_body.get("key")
+
+	if "creditcard" in event_body["object"]:
+		print("Credit Card found")
+
+	if "check" in event_body["object"]:
+		print("Check found")
+
+
+	
