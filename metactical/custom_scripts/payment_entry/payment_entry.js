@@ -1,4 +1,14 @@
 frappe.ui.form.on('Payment Entry', {
+	refresh: function(frm) {
+		frm.trigger("make_payment_button");
+	},
+	make_payment_button: function(frm) {
+		if (frm.doc.payment_type == "Receive" && frm.doc.party_type == "Customer") {
+			frm.add_custom_button(__('Make Payment'), function() {
+				goto_payment_form(frm);
+			});	
+		}
+	},
 	source_exchange_rate: function(frm) {
 		if (frm.doc.paid_amount) {
 			frm.set_value("base_paid_amount", flt(frm.doc.paid_amount) * flt(frm.doc.source_exchange_rate));
@@ -19,3 +29,19 @@ frappe.ui.form.on('Payment Entry', {
 		}
 	}
 });
+
+var goto_payment_form = function(frm){
+    frappe.xcall("frappe.client.get", {
+        doctype: "Customer CC",
+        filters: {
+                erpnext_customer_id: frm.doc.party,
+            }
+        }).then(res => {
+			if (res.message) {
+				tokens = res.message.tokens;
+				if (tokens.length > 0) {
+							
+				}
+			}
+        })
+}
