@@ -168,8 +168,10 @@ class CustomPickList(PickList):
 						SELECT DISTINCT sdn.parent AS shipment_id
 						FROM 
 							 `tabShipment Delivery Note` sdn
+						INNER JOIN
+							 `tabShipment` s ON s.name = sdn.parent
 						WHERE 
-							 sdn.delivery_note = %(delivery_note)s
+							 sdn.delivery_note = %(delivery_note)s AND s.docstatus = 0
 						""", {"delivery_note": delivery_note.name}, as_dict=1)
 			for shipment in shipments:
 				shipment_doc = frappe.get_doc("Shipment", shipment.shipment_id)
