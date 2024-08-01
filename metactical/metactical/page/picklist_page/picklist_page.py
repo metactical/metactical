@@ -59,15 +59,21 @@ def load_summary(warehouse, source):
 	return {'ready_to_ship': to_ship, 'items_to_pick': to_pick, 'rush_orders': rush, 'same_address': same}
 	
 @frappe.whitelist()
-def get_pick_lists(warehouse, filters, source, qty_order):
+def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	where = ''
 	if filters != "":
 		where = " AND pl.name LIKE '%{where_f}%'".format(where_f = filters)
 	if source != "All":
 		where = " AND pl.ais_source = '{source}'".format(source = source)
+
+	location_order = "DESC"
+	if sort_by == "locations":
+		location_order = sort_order
+
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.is_rush, pli.sales_order,
-										COUNT(pli.name) AS qty_item
+										COUNT(pli.name) AS qty_item,
+										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} SEPARATOR '<br>') AS locations
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
@@ -83,8 +89,8 @@ def get_pick_lists(warehouse, filters, source, qty_order):
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
 									ORDER BY 
-										is_rush DESC, 
-										qty_item {qty_order}, 
+										is_rush DESC,
+										{sort_by} {sort_order},
 										pl.date DESC""", 
 								as_dict=1)
 	return pick_lists
