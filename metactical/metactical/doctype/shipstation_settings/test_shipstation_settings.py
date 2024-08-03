@@ -60,16 +60,17 @@ class TestShipstationSettings(unittest.TestCase):
 		
 	def create_delivery_note(self):
 		#Create customer
-		if not frappe.db.exists("Customer", "_Test Customer"):
+		existing_customer = frappe.db.exists("Customer", {"customer_name": "_Test Customer"})
+		if not existing_customer:
 			customer = frappe.get_doc({
 				"doctype": "Customer",
 				"customer_name": "_Test Customer",
 				"customer_type": "Individual",
 				"customer_group": "_Test Customer Group",
 				"territory": "_Test Territory"
-			}).save(ignore_if_duplicate=True)
+			}).save()
 		else:
-			customer = frappe.get_doc("Customer", "_Test Customer")
+			customer = frappe.get_doc("Customer", existing_customer)
 		
 		#Create Pick List
 		pick_list = frappe.new_doc("Pick List")
@@ -95,7 +96,7 @@ class TestShipstationSettings(unittest.TestCase):
 		delivery_note = frappe.get_doc({
 			"doctype": "Delivery Note",
 			"company": "_Test Company",
-			"customer": "_Test Customer",
+			"customer": customer.name,
 			"currency": "USD",
 			"conversion_rate": 1,
 			"selling_price_list": "Standard Selling",
@@ -235,6 +236,7 @@ class TestShipstationSettings(unittest.TestCase):
 		shipstation_settings.update({
 			"api_key": '_Test_98980898989890',
 			"api_secret": '98989898989898',
+			"shipstation_user": "Administrator"
 		})
 		
 		#Map lead source
