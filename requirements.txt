@@ -2,3 +2,4 @@ frappe
 python-barcode
 xmltodict
 pika
+pandas
