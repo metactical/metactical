@@ -12,7 +12,6 @@ class CustomStockReconciliation(StockReconciliation):
 				)
 			)
 
-			print(self.creation)
 			self.queue_action("submit", timeout=2000)
 		else:
 			self._submit()
@@ -27,8 +26,6 @@ class CustomStockReconciliation(StockReconciliation):
 
 		if hasattr(self, '_' + action):
 			action = '_' + action
-
-		frappe.log_error(title="aa", message=self.creation)
 
 		if file_lock.lock_exists(self.get_signature()):
 			frappe.throw(_('This document is currently queued for execution. Please try again'),

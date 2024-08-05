@@ -294,9 +294,7 @@ metactical.store_credit.StoreCredit = class {
                                     }
                                 })
 
-                                if (existing_store_credit){
-                                    me.updateTotals()
-                                }
+                                me.updateTotals()
 
                                 if (!me.si_items.length)
                                     me.process_payment_button = "d-none"
