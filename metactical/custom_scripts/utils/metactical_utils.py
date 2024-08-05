@@ -75,7 +75,7 @@ def post_to_rocket_chat(doc, msg, failed=False):
 			frappe.log_error(title='Rocket Chat Error', message=response.json())
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
-
+    
 @frappe.whitelist()
 def export_query(data, sub_headers=[]):
 	from frappe.desk.query_report import run, get_columns_dict, handle_duration_fieldtype_values
@@ -273,3 +273,39 @@ def check_si_payment_status_for_so(sales_order):
 		all_invoices_paid = True
 
 	return all_invoices_paid
+
+def get_customer_email_and_phone(customer):
+    contacts = frappe.db.sql("""select c.email_id, phone, c.mobile_no
+								from `tabContact` c
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" and cs.name = "{0}"
+                                ORDER BY c.creation desc
+                                """.format(customer), as_dict=True)
+            
+
+    if len(contacts):
+        return contacts
+    else:
+        return None
+
+def search_customer_by_phone_email(phone_number, email):
+    email_filter = ""
+    if email:
+        email_filter = f"AND c.email_id like '%{email}%'"
+    
+    phone_filter = ""
+    if phone_number:
+        phone_filter = f"AND (c.phone like '%{phone_number}%' or c.mobile_no like '%{phone_number}%')"
+
+    customers = frappe.db.sql(f"""select cs.name
+                                from `tabContact` c
+                                INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+                                INNER Join `tabCustomer` cs on dl.link_name=cs.name
+                                where  dl.link_doctype="Customer" {email_filter} {phone_filter}
+                                """, as_dict=True)
+
+    if len(customers):
+        return [customer.get('name') for customer in customers]
+    else:
+        return None
