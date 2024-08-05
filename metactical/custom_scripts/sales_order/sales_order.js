@@ -51,9 +51,6 @@ frappe.ui.form.on('Sales Order', {
 		}
 		
 		cur_frm.fields_dict["section_break_48"].collapse(0);
-
-		// add refund and adjust payment buttons
-		frm.trigger("get_roles_allowed_for_usae_pay")
 	},
 
 	onload: function(frm){
@@ -460,7 +457,6 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 			function(values){
 				frappe.call({
 					'method': 'metactical.custom_scripts.sales_order.sales_order.save_close_reason',
-
 					'args': {
 						'docname': cur_frm.docname,
 						'close_reason': values.close_reason
@@ -477,30 +473,6 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 });
 
 $.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
-
-let adjust_payment = function(frm){
-	frappe.confirm(
-		'Are you sure you want to adjust the payment?',
-		function(){
-			frappe.call({
-				method: 'metactical.custom_scripts.sales_order.sales_order.adjust_payment',
-				freeze: true,
-				freeze_message: "Adjusting payment...",
-				args: {
-					'docname': cur_frm.docname,
-				},
-				callback: function(r){
-					if (r.success){
-						frappe.msgprint(r.message, "Success");
-					}
-					else{
-						frappe.msgprint(r.message, "Error");
-					}
-				}
-			});
-		}
-	);
-}
 
 //Metactical Customization: Replace erpnext.utils.get_party_details
 var get_party_details = function(frm, method, args, callback) {
