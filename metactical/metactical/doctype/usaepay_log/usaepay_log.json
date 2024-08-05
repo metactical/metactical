@@ -80,7 +80,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Action",
-   "options": "Refund\nAdjustment",
+   "options": "New Payment\nRefund\nAdjustment",
    "read_only": 1
   },
   {
@@ -131,7 +131,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-25 13:50:43.539783",
+ "modified": "2024-08-02 05:50:02.571436",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "USAePay Log",

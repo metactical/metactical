@@ -7,7 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "label",
-  "token"
+  "token",
+  "cc_number"
  ],
  "fields": [
   {
@@ -22,12 +23,18 @@
    "fieldtype": "Data",
    "label": "Token",
    "reqd": 1
+  },
+  {
+   "fieldname": "cc_number",
+   "fieldtype": "Data",
+   "label": "CC Number",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-07-31 04:13:28.697879",
+ "modified": "2024-07-31 15:21:16.252738",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Customer CC Tokens",

@@ -8,51 +8,14 @@ from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_ban
 from frappe.utils import flt, comma_or, nowdate, getdate
 from frappe import _, scrub, ValidationError
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_reference_as_per_payment_terms
-from metactical.custom_scripts.sales_order.sales_order import refund_payment, get_usaepay_transaction_detail, adjust_payment
-
-def usaepay_refund_request(doc, method):
-	references = doc.references
-	if not doc.reference_no:
-		for ref in references:
-			if ref.reference_doctype == "Sales Invoice":
-				# check if there is a refund for this sales invoice
-				refund_transaction_key = frappe.db.get_value("USAePay Log", {"sales_return": ref.reference_name, "action": "Refund"}, ["refund_transaction_key"])
-
-				if refund_transaction_key:
-					print("checkpoint 1")
-					frappe.msgprint(_("Refund already processed for this Sales Invoice. Transaction Key: {0}").format(refund_transaction_key))
-					continue
-
-				sales_invoice = frappe.get_doc("Sales Invoice", ref.reference_name)
-				sales_order = ""
-				for item in sales_invoice.items:
-					if item.sales_order:
-						sales_order = item.sales_order
-						break
-				
-				if sales_invoice.is_return and sales_order and doc.payment_type == "Pay":
-					response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
-					if response:
-						frappe.db.set_value("Payment Entry", doc.name, "reference_no", response["key"])
-						frappe.db.set_value("USAePay Log", log, "payment_entry", doc.name)
-						frappe.db.set_value("USAePay Log", log, "sales_return", sales_invoice.name)
-						frappe.db.commit()
-
-			elif ref.reference_doctype == "Sales Order":
-				sales_order = ref.reference_name
-
-			if sales_order and doc.payment_type == "Receive":
-				so_fields = frappe.db.get_values("Sales Order", sales_order, ["neb_usaepay_transaction_key", "grand_total", "advance_paid"])
-				if so_fields:
-					result = so_fields[0]
-					if result[0]:
-						transaction_key = result[0]
-						# grand_total = result[1]
-						advance_paid = result[2]
-						transaction = get_usaepay_transaction_detail(transaction_key, sales_order)
-
-						if flt(advance_paid) > flt(transaction["amount"]):
-							adjust_payment(sales_order, advance_paid)
+from metactical.custom_scripts.usaepay.usaepay_api import (
+	get_card_token, 
+	get_token_hash, 
+	get_usaepay_transaction_detail, 
+	refund_payment, 
+	adjust_payment,
+	get_usaepay_roles
+)
 
 @frappe.whitelist()
 def get_payment_entry(dt, dn, party_amount=None, bank_account=None, bank_amount=None):
@@ -204,3 +167,94 @@ def get_payment_entry(dt, dn, party_amount=None, bank_account=None, bank_amount=
 		pe.set_exchange_rate()
 		pe.set_amounts()
 	return pe
+
+def on_submit(doc, method):
+	references = doc.references
+	if not doc.reference_no:
+		for ref in references:
+			if ref.reference_doctype == "Sales Invoice":
+				continue_loop, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref)
+				if not continue_loop:
+					continue
+				
+				usaepay_transaction_key = frappe.db.get_value("Sales Order", sales_order, "neb_usaepay_transaction_key")
+				if not usaepay_transaction_key:
+					continue
+	
+				response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
+				if response:
+					frappe.db.set_value("Payment Entry", doc.name, "reference_no", response["key"])
+					frappe.db.set_value("USAePay Log", log, "payment_entry", doc.name)
+					frappe.db.set_value("USAePay Log", log, "sales_return", sales_invoice.name)
+					frappe.db.commit()
+
+			elif ref.reference_doctype == "Sales Order":
+				sales_order = ref.reference_name
+
+			if sales_order and doc.payment_type == "Receive":
+				can_be_adjusted, advance_paid = check_if_payment_can_be_adjusted(doc, sales_order)
+				if can_be_adjusted:
+					adjust_payment(sales_order, advance_paid)
+
+def before_submit(doc, method):
+	usaepay_roles = get_usaepay_roles()
+	references = doc.references
+	if not doc.reference_no:
+		for ref in references:
+			if ref.reference_doctype == "Sales Invoice":
+				can_be_refunded, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref)
+				if not can_be_refunded:
+					continue
+					
+			elif ref.reference_doctype == "Sales Order":
+				sales_order = ref.reference_name
+
+			if sales_order and doc.payment_type == "Receive":
+				check_if_payment_can_be_adjusted(doc, sales_order)
+
+def check_if_payment_can_be_adjusted(doc, sales_order):
+	so_fields = frappe.db.get_value("Sales Order", sales_order, ["neb_usaepay_transaction_key", "grand_total", "advance_paid"], as_dict=True)
+	user_roles = frappe.get_roles()
+	usaepay_roles = get_usaepay_roles()
+
+	if so_fields:
+		transaction_key = so_fields["neb_usaepay_transaction_key"]
+		if transaction_key:
+			advance_paid = so_fields["advance_paid"]
+
+			transaction = get_usaepay_transaction_detail(transaction_key, sales_order)
+
+			if not any(role in usaepay_roles["adjust"] for role in user_roles):
+				frappe.throw(_("You do not have permission to process an adjustment. Please contact your System Administrator."))
+
+			if flt(advance_paid) > flt(transaction["amount"]):
+				return True, advance_paid
+		
+	return False, 0
+
+def check_if_payment_can_be_refunded(doc, ref):
+	user_roles = frappe.get_roles()
+	usaepay_roles = get_usaepay_roles()
+
+	# check if one of the user roles is in the usaepay_roles list for refund
+	if not any(role in usaepay_roles["refund"] for role in user_roles):
+		frappe.throw(_("You do not have permission to process a refund. Please contact your System Administrator."))
+
+	# check if there is a refund for this sales invoice
+	refund_transaction_key = frappe.db.get_value("USAePay Log", {"sales_return": ref.reference_name, "action": "Refund"}, ["refund_transaction_key"])
+
+	if refund_transaction_key:
+		frappe.msgprint(_("Refund already processed for this Sales Invoice. Transaction Key: {0}").format(refund_transaction_key))
+		return False, "", ""
+
+	sales_invoice = frappe.get_doc("Sales Invoice", ref.reference_name)
+	sales_order = ""
+	for item in sales_invoice.items:
+		if item.sales_order:
+			sales_order = item.sales_order
+			break
+	
+	if sales_invoice.is_return and sales_order and doc.payment_type == "Pay":
+		return True, sales_order, sales_invoice
+	
+	return False, "", ""
