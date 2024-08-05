@@ -1,7 +1,7 @@
 {% include 'erpnext/selling/sales_common.js' %}
 var old_tax_template;
 var base_in_words;
-var usaepay_roles = {}
+
 frappe.ui.form.on('Sales Order', {
 	refresh: function(frm){
 		//Clear update qty and rate button
@@ -337,23 +337,7 @@ frappe.ui.form.on('Sales Order', {
 		frm.set_indicator_formatter('item_code',
 			function(doc) { return (doc.actual_qty>=doc.qty) ? "green" : "red" }
 		);
-    },
-	get_roles_allowed_for_usae_pay: function(frm){
-		frappe.call({
-			method: 'metactical.custom_scripts.sales_order.sales_order.get_usaepay_roles',
-			callback: function(r){
-				usaepay_roles = r.message;
-				
-				if (frm.doc.neb_usaepay_transaction_key && usaepay_roles["refund"].some(role => frappe.user_roles.includes(role))){
-					frm.add_custom_button("Refund Payment", () => refund_payment(), __("USAePay"));
-				}
-	
-				if (frm.doc.neb_usaepay_transaction_key && usaepay_roles["adjust"].some(role => frappe.user_roles.includes(role))){
-					frm.add_custom_button("Adjust Payment", () => adjust_payment(), __("USAePay"));
-				}
-			}
-		});
-	}
+    }
 });
 frappe.ui.form.on("Sales Order Item", {
 	delivered_by_supplier: function(frm, cdt, cdn){
@@ -516,138 +500,6 @@ let adjust_payment = function(frm){
 			});
 		}
 	);
-}
-
-let refund_payment = function(frm){
-	if (!cur_frm.doc.neb_usaepay_transaction_key){
-		frappe.msgprint("No USAePay transaction key found.", "Error");
-		return;
-	}
-
-	frappe.call({
-		method: 'metactical.custom_scripts.sales_order.sales_order.get_usaepay_transaction_detail',
-		freeze: true,
-		freeze_message: "Fetching transaction details...",
-		args: {
-			"transaction": cur_frm.doc.neb_usaepay_transaction_key,
-			"docname": cur_frm.docname,
-		},
-		callback: function(r){
-			var transaction = r.transaction;
-
-			if (parseFloat(transaction.amount) != cur_frm.doc.grand_total)
-			{
-				frappe.confirm(`The amount in USAePay does not match the order's grand total. Do you want to proceed?<br>
-					<br>USAePay Amount: <b>${transaction.amount}</b>
-					<br>Order Grand Total: <b>${cur_frm.doc.grand_total}</b>
-				`, function(){
-					show_refund_dialog(cur_frm, transaction);
-				},
-				function(){
-					return;
-				});
-			}
-			else{
-				show_refund_dialog(cur_frm, transaction);
-			}
-		}
-	})
-}
-
-let show_refund_dialog = function(frm, transaction){
-	if (parseFloat(transaction.available_amount) == 0){
-		frappe.msgprint("Full amount has already been refunded.", "Error");
-		return;
-	}
-
-	var d = new frappe.ui.Dialog({
-		'title': 'Refund Payment',
-		'fields': [
-			{
-				"fieldtype": "HTML",
-				"fieldname": "transaction_details",
-				"label": "Transaction Details",
-			},
-			{
-				"fieldtype": "Small Text",
-				"fieldname": "refund_reason",
-				"label": "Refund Reason",
-				"reqd": 1
-			},
-			{
-				"fieldtype": "Check",
-				"fieldname": "refund_full_amount",
-				"label": "Refund Full Amount",
-			},
-			{
-				"fieldtype": "Currency",
-				"fieldname": "refund_amount",
-				"label": "Refund Amount",
-				"mandatory_depends_on": "eval: !doc.refund_full_amount",
-				"depends_on": "eval: !doc.refund_full_amount"
-			}
-		],
-		primary_action: function(){
-			confirm_refund(d, transaction.available_amount);
-		},
-		primary_action_label: 'Refund'
-	});
-
-	var transaction_details = `<div class="row mt-2">`;
-	transaction_details += `<div class="col-md-6">Transaction ID: <br><b>${transaction.key}</b></div>`;
-	transaction_details += `<div class="col-md-6">Amount Paid: <br><b>${transaction.amount}</b></div></div>`;
-
-	if (transaction.trantype == "Credit Card Sale"){
-		transaction_details += `<div class="row mt-2"><div class="col-md-6">Card Holder: <br><b>${transaction.creditcard.cardholder}</b></div>`;
-		transaction_details += `<div class="col-md-6">Card Number: <br><b>${transaction.creditcard.number}</b></div></div>`;
-	}
-	else if (transaction.trantype == "Check Sale"){
-		transaction_details += `<div class="row mt-2"><div class="col-md-6">Check Holder: <br><b>${transaction.check.accountholder}</b></div>`;
-		transaction_details += `<div class="row mt-2"><div class="col-md-6">Tracking Number: <br><b>${transaction.check.trackingnum}</b></div>`;
-
-	}
-	transaction_details += `<div class="row my-3"><div class="col-md-6">Status: <br><b>${transaction.status}</b></div>`;
-	transaction_details += `<div class="col-md-6">Availabe: <br><b>${transaction.available_amount}</b></div></div>`;
-	transaction_details += `</div>`;
-
-	d.fields_dict.transaction_details.$wrapper.html(transaction_details);
-	d.show();
-}
-
-let confirm_refund = function(dialog, avl_amount){
-	var values = dialog.get_values();
-	var amount = values.refund_full_amount ? values.avl_amount: values.refund_amount
-
-	console.log(values.avl_amount, amount, parseFloat(values.avl_amount) < parseFloat(amount))
-	if (parseFloat(values.avl_amount) < parseFloat(amount)){
-		frappe.msgprint("Refund amount cannot exceed the amount available.", "Error");
-		return
-	}
-
-	frappe.confirm(
-		'Are you sure you want to refund <b>' + amount + '</b>?',
-		function(){
-			dialog.hide();
-			frappe.call({
-				method: 'metactical.custom_scripts.sales_order.sales_order.refund_payment',
-				freeze: true,
-				args: {
-					'docname': cur_frm.docname,
-					'refund_amount': amount,
-					"refund_reason": values.refund_reason
-				},
-				callback: function(r){
-					if (r.success){
-						cur_frm.reload_doc();
-						frappe.msgprint(r.message, "Success");
-					}
-					else{
-						frappe.msgprint(r.message, "Error");
-					}
-		
-				}
-			});
-		});
 }
 
 //Metactical Customization: Replace erpnext.utils.get_party_details

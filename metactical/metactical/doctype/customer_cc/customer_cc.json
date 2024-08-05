@@ -8,8 +8,6 @@
  "engine": "InnoDB",
  "field_order": [
   "erpnext_customer_id",
-  "column_break_t8nsd",
-  "usaepay_customer_id",
   "section_break_ceidr",
   "cc_tokens"
  ],
@@ -17,22 +15,9 @@
   {
    "fieldname": "erpnext_customer_id",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "ERPNext Customer ID",
    "options": "Customer",
-   "reqd": 1,
    "unique": 1
-  },
-  {
-   "fieldname": "column_break_t8nsd",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "usaepay_customer_id",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "USAePay Customer ID",
-   "reqd": 1
   },
   {
    "fieldname": "section_break_ceidr",
@@ -47,7 +32,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-31 08:55:21.213932",
+ "modified": "2024-07-31 12:54:44.800363",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Customer CC",

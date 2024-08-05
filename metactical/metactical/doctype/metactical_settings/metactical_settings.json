@@ -13,9 +13,11 @@
   "usaepay_url",
   "api_key",
   "pin",
+  "payment_form_url",
   "column_break_lmdac",
   "roles_to_refund",
-  "roles_to_adjust_payment"
+  "roles_to_adjust_payment",
+  "roles_to_make_payment"
  ],
  "fields": [
   {
@@ -71,12 +73,23 @@
    "fieldtype": "Table",
    "label": "Roles Allowed To Adjust Payment",
    "options": "MT Roles List"
+  },
+  {
+   "fieldname": "payment_form_url",
+   "fieldtype": "Data",
+   "label": "Payment Form URL"
+  },
+  {
+   "fieldname": "roles_to_make_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Make Payment",
+   "options": "MT Roles List"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-07-05 09:54:44.918366",
+ "modified": "2024-08-05 15:26:38.418034",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",
