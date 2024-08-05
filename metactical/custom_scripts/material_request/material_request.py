@@ -38,3 +38,30 @@ class CustomMaterialRequest(MaterialRequest):
 				for defaults in doc.item_defaults:
 					if defaults.company == self.company:
 						item.ais_default_supplier = defaults.default_supplier
+
+def set_default_supplier(self):
+	for item in self.items:
+		if not item.ais_default_supplier:
+			doc = frappe.get_doc('Item', item.item_code)
+			for defaults in doc.item_defaults:
+				if defaults.company == self.company:
+					item.ais_default_supplier = defaults.default_supplier
+
+@frappe.whitelist()
+def get_target_warehouse(doctype, txt, searchfield, start, page_len, filters):
+	user = filters.get("user")
+	warehouses = []
+	if user:
+		setting_exists = frappe.db.get_value("Material Request User Permission", filters={"user": user})
+		if setting_exists:
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabMaterial Request Permitted Warehouse` 
+							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
+							AND parentfield='permitted_target_warehouse'""", 
+							{
+								'txt': "%%%s%%" % txt,
+								'parent': setting_exists
+							})
+		else:
+			#Retrun all warehouses
+			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
+	return warehouses

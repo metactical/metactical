@@ -59,7 +59,10 @@ def sync_shipping_status():
 				'ais_updated_by_shipstation': 1,
 				'ignore_pricing_rule': 1
 			})
-			delivery_note.submit()
+			try:
+				delivery_note.submit()
+			except Exception as e:
+				frappe.log_error(frappe.get_traceback())
 				
 			#Delete order from other shipstation accounts
 			'''for row in delivery_note.get('ais_shipstation_order_ids'):
@@ -367,7 +370,11 @@ def orders_shipped_webhook():
 							'ais_updated_by_shipstation': 1,
 							'ignore_pricing_rule': 1
 						})
-						delivery_note.submit()
+
+						try:
+							delivery_note.submit()
+						except Exception as e:
+							frappe.log_error(frappe.get_traceback())
 						
 						#Add reference to Shipstation API Requests
 						new_req.update({
@@ -389,6 +396,7 @@ def orders_shipped_webhook():
 							'receipt_date': shipDate,
 							'transporter': transporter,
 							'weight_uom': weight.get('units'),
+							'size_uom': dimensions.get('units'),
 							'length': dimensions.get('length'),
 							'width': dimensions.get('width'),
 							'height': dimensions.get('height'),
@@ -426,11 +434,20 @@ def update_shipment(delivey_note, shipment_details):
 		shipment = frappe.get_doc('Shipment', shipment)
 		shipment.update({
 			'ais_shipstation_transporter': shipment_details.get('transporter'),
-			'ais_shipstaion_weight_uom': shipment_details.get('weight_uom'),
 			'ais_shipstation_receipt_no': shipment_details.get('receipt_number'),
 			'ais_shipstation_receipt_date': shipment_details.get('receipt_date'),
 			'ais_shipment_status': 'Shipped'
 		})
+
+		# Convert weight from ounces to kgs and and size from inches to cms
+		if shipment_details.get("weight_uom") == "ounces":
+			shipment_details["weight"] = float(shipment_details.get("weight", 0)) / 35.274
+
+		if shipment_details.get("size_uom") == "inches":
+			shipment_details['length'] = shipment_details.get('length', 0) * 2.54
+			shipment_details['width'] = shipment_details.get('width', 0) * 2.54
+			shipment_details['height'] = shipment_details.get("height", 0) * 2.54
+
 		shipment.shipment_parcel = []
 		shipment.append('shipment_parcel', {
 			'length': shipment_details.get('length'),
@@ -439,4 +456,7 @@ def update_shipment(delivey_note, shipment_details):
 			'weight': shipment_details.get('weight'),
 			'count': 1
 		})
-		shipment.submit()
+		try:
+			shipment.submit()
+		except Exception as e:
+			frappe.log_error(frappe.get_traceback())

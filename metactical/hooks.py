@@ -157,6 +157,8 @@ override_doctype_class = {
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
+	"Company": "metactical.custom_scripts.company.company.CustomCompany",
+	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
 	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
 }
 

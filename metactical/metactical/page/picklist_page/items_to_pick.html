@@ -1,6 +1,6 @@
 {% for row in items %}
 	{% if row.qty > 0 %}
-		<li class="item-li" data-item-code="{{row.item_code}}" data-pick-list="{{row.pick_list}}" 
+		<li class="item-li picklist-box" data-item-code="{{row.item_code}}" data-pick-list="{{row.pick_list}}" 
 			{% if row.tote %}
 				data-tote="{{row.tote}}"
 			{% endif %}
