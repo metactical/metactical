@@ -16,8 +16,7 @@ class TestShipstationSettings(unittest.TestCase):
 		frappe.set_user("Administrator")
 		
 		#Import custom fields
-		import_doc(path=frappe.get_app_path("metactical", "metactical/doctype/shipstation_settings/test_data/custom_field.json"),
-			ignore_links=True, overwrite=True)
+		import_doc(path=frappe.get_app_path("metactical", "metactical/doctype/shipstation_settings/test_data/custom_field.json"))
 			
 		frappe.reload_doctype("Delivery Note")
 		
@@ -29,22 +28,25 @@ class TestShipstationSettings(unittest.TestCase):
 		
 	def setup_shipstation(self):
 		#Create lead source
-		lead_source = frappe.get_doc({
-			"doctype": "Lead Source",
-			"source_name": "_Test_Lead_Source"
-		})
-		self.lead_source = lead_source.insert(ignore_if_duplicate=True)
+		if not frappe.db.exists("Lead Source", "_Test_Lead_Source"):
+			lead_source = frappe.get_doc({
+				"doctype": "Lead Source",
+				"source_name": "_Test_Lead_Source"
+			})
+			self.lead_source = lead_source.insert(ignore_permissions=True)
+		else:
+			self.lead_source = frappe.get_doc("Lead Source", "_Test_Lead_Source")
 		
 		shipstation_settings = frappe.new_doc("Shipstation Settings")
 		shipstation_settings.update({
 			"api_key": '_Test_98980898989898',
 			"api_secret": '98989898989898',
-			"shipstation_user": "malisa.aisenyi@gmail.com"
+			"shipstation_user": "web6@dogtagbuilder.com"
 		})
 		
 		#Map lead source
 		shipstation_settings.append("store_mapping", {
-			"source": lead_source.name,
+			"source": self.lead_source.name,
 			"store_id": "_Test_Store_ID"
 		})
 		
@@ -58,20 +60,34 @@ class TestShipstationSettings(unittest.TestCase):
 		
 	def create_delivery_note(self):
 		#Create customer
-		customer = frappe.get_doc({
-			"doctype": "Customer",
-			"customer_name": "_Test Customer",
-			"customer_type": "Individual",
-			"customer_group": "_Test Customer Group",
-			"territory": "_Test Territory"
-		}).save(ignore_permissions=True)
+		existing_customer = frappe.db.exists("Customer", {"customer_name": "_Test Customer"})
+		if not existing_customer:
+			customer = frappe.get_doc({
+				"doctype": "Customer",
+				"customer_name": "_Test Customer",
+				"customer_type": "Individual",
+				"customer_group": "_Test Customer Group",
+				"territory": "_Test Territory"
+			}).save()
+		else:
+			customer = frappe.get_doc("Customer", existing_customer)
 		
 		#Create Pick List
-		pick_list = frappe.get_doc({
-			"doctype": "Pick List",
-			"docname": "_Test Pick List",
-			"company": "_Test Company"
-		}).insert(ignore_if_duplicate=True)
+		pick_list = frappe.new_doc("Pick List")
+		pick_list.update({
+			"company": "_Test Company",
+			"purpose": "Delivery"
+		})
+		pick_list.append("locations", {
+			"item_code": "_Test Item",
+			"item_name": "_Test Item",
+			"description": "_Test Item",
+			"qty": 1,
+			"uom": "_Test UOM",
+			"warehouse": "_Test Warehouse - _TC",
+			"picked_qty": 1,
+		})
+		pick_list.save(ignore_permissions=True)
 		self.pick_list = pick_list.name
 		
 		#Create Delivery Note
@@ -80,14 +96,17 @@ class TestShipstationSettings(unittest.TestCase):
 		delivery_note = frappe.get_doc({
 			"doctype": "Delivery Note",
 			"company": "_Test Company",
-			"customer": "_Test Customer",
+			"customer": customer.name,
 			"currency": "USD",
 			"conversion_rate": 1,
 			"selling_price_list": "Standard Selling",
 			"price_list_currency": "USD",
 			"plc_conversion_rate": 1,
 			"pick_list": self.pick_list,
-			"source": self.lead_source.name
+			"source": self.lead_source.name,
+			"company_address": "_Test Company Address",
+			"shipping_address_name": "_Test Shipping Address",
+			"contact_person": "_Test Contact For _Test Customer"
 		})
 		delivery_note.append("items", {
 			"item_code": "_Test Item",
@@ -97,7 +116,8 @@ class TestShipstationSettings(unittest.TestCase):
 			"stock_uom": "_Test UOM",
 			"uom": "_Test UOM",
 			"conversion_factor": 1,
-			"warehouse": "_Test Warehouse - _TC"
+			"warehouse": "_Test Warehouse - _TC",
+			"rate": 20
 		})
 		self.delivery_note = delivery_note.insert(ignore_permissions=True)
 		
@@ -216,6 +236,7 @@ class TestShipstationSettings(unittest.TestCase):
 		shipstation_settings.update({
 			"api_key": '_Test_98980898989890',
 			"api_secret": '98989898989898',
+			"shipstation_user": "Administrator"
 		})
 		
 		#Map lead source

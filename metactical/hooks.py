@@ -114,12 +114,6 @@ doc_events = {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
 	},
-	"Delivery Note": {
-		"on_update": "metactical.custom_scripts.delivery_note.delivery_note.on_update",
-		"on_trash": "metactical.custom_scripts.delivery_note.delivery_note.on_trash",
-		"on_cancel": "metactical.custom_scripts.delivery_note.delivery_note.on_cancel",
-		"on_submit": "metactical.custom_scripts.delivery_note.delivery_note.on_submit"
-	},
 	"Material Request": {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
 	},
@@ -160,7 +154,8 @@ override_doctype_class = {
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
-	"Company": "metactical.custom_scripts.company.company.CustomCompany"
+	"Company": "metactical.custom_scripts.company.company.CustomCompany",
+	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
 }
 
 # Scheduled Tasks

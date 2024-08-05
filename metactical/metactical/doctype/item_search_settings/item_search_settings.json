@@ -15,7 +15,9 @@
   "section_warehouses",
   "warehouses",
   "section_price_list",
-  "print_price_list"
+  "print_price_list",
+  "section_franchise_settings",
+  "franchise_settings"
  ],
  "fields": [
   {
@@ -72,11 +74,21 @@
    "fieldname": "sales_report_url",
    "fieldtype": "Data",
    "label": "Sales Report URL"
+  },
+  {
+   "fieldname": "section_franchise_settings",
+   "fieldtype": "Section Break",
+   "label": "Franchise Settings"
+  },
+  {
+   "fieldname": "franchise_settings",
+   "fieldtype": "Table",
+   "options": "Item Search Settings Franchise"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2023-04-06 09:50:29.331590",
+ "modified": "2024-06-30 06:08:21.173973",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",

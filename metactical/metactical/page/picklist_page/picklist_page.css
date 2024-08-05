@@ -2,6 +2,17 @@
 	color: #1ad1ff;
 }
 
+.picklist-box {
+	margin-bottom: 15px;
+	border-radius: 10px;
+	box-shadow: 0px 0px 4px #CAC7C7;
+}
+
+.picklist-box:hover {
+	cursor: pointer;
+	transform: scale(1.02);
+}
+
 .div-summary {
 	display: flex; 
 	background-color: #FFF;
@@ -61,14 +72,14 @@
 	overflow: auto;
 	background-color: #FFF;
 	padding-left: 0;
-	margin-bottom: 5px;
 }
  
 .item-li:hover {
-	background: #eee;
+	/*background: #eee;*/
 	cursor: pointer;
 	margin: 0;
 	margin-bottom: 5px;
+	transform: scale(1.02);
 }
 
 .item-p {
@@ -137,8 +148,18 @@
 
 .order-list-div {
 	background-color: #FFF; 
-	padding: 5px;
+	padding: 10px;
 	margin-bottom: 10px;
+	border-radius: 10px;
+	box-shadow: 0 0 5px rgb(213, 213, 213);
+}
+
+.order-list-div p {
+	margin-bottom: 0px;
+}
+
+.pick-list-rush {
+	float: right;
 }
 
 .item-barcode {
@@ -198,16 +219,24 @@
   transform: translateZ(-25px) rotateX(-90deg);
 }
 
-.pl-barcode{
-	width: 50%; 
+.pl-barcode, .pl-multi-barcode {
 	padding-left: 15px; 
 	padding-right: 15px;
+	float: left;
 }
 
-.pl-source{
-	width: 50%; 
+.pl-source, .pl-multi-source{
 	padding-left: 15px; 
 	padding-right: 15px;
+	float: left;
+}
+
+.pl-sort-selector, .pl-multi-filters {
+	float: right;
+	padding-top: 25px;
+	margin-right: 0px;
+	padding-right: 0px;
+	margin-left: 15px;
 }
 
 .tote-check{
@@ -292,18 +321,6 @@
 	width: 20px; 
 	float: left; 
 	margin-right: 15px;
-}
-
-.pl-multi-barcode{
-	width: 50%; 
-	padding-left: 15px; 
-	padding-right: 15px;
-}
-
-.pl-multi-source{
-	width: 50%; 
-	padding-left: 15px; 
-	padding-right: 15px;
 }
 	
 @media only screen and (max-width: 992px) {

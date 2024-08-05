@@ -1,4 +1,22 @@
 frappe.ui.form.on('Material Request', {
+	onload: function(frm) {
+		frappe.after_ajax(function(){
+			frm.set_query("set_warehouse", function(doc){
+				return {
+					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse",
+					filters: {"user": frappe.session.user}
+				}
+			});
+
+			frm.set_query( "warehouse", "items", function(){
+				return {
+					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse",
+					filters: {"user": frappe.session.user}
+				}
+			});
+		});
+	},
+
 	get_item_data: function(frm, item, overwrite_warehouse=false) {
 		// Metactical customizatino: Prevent overwriting of target warehouse
 		overwrite_warehouse = false;

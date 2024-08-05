@@ -18,6 +18,8 @@ from pytz import timezone
 from pathlib import Path
 import shutil
 from itertools import groupby
+from metactical.custom_scripts.utils.metactical_utils import queue_action
+from frappe import _, msgprint
 
 class CustomPickList(PickList):
 	def update_sales_order_item(self, item, picked_qty, item_code):
@@ -60,16 +62,17 @@ class CustomPickList(PickList):
 				frappe.throw("Row " + str(location.idx) + " has been picked already!")
 				
 		if len(self.locations) > 0:
-			rv = BytesIO()
-			_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
-			bstring = rv.getvalue()
-			self.barcode = bstring.decode('ISO-8859-1')
-			
-			# STO Barcode
-			sv = BytesIO()
-			_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
-			stoBarcode = sv.getvalue()
-			self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
+			if self.locations[0].get('sales_order'):
+				rv = BytesIO()
+				_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
+				bstring = rv.getvalue()
+				self.barcode = bstring.decode('ISO-8859-1')
+				
+				# STO Barcode
+				sv = BytesIO()
+				_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
+				stoBarcode = sv.getvalue()
+				self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
 
 		#Check if Sales Order has Balance Due or Credit Due
 		sales_orders = []
@@ -160,6 +163,20 @@ class CustomPickList(PickList):
 	def on_cancel(self):
 		delivery_notes = frappe.get_all('Delivery Note', filters={'pick_list': self.name, 'docstatus': 0}, fields=['name'])
 		for delivery_note in delivery_notes:
+			# Delete shipments first before deleting delivery notes
+			shipments = frappe.db.sql("""
+						SELECT DISTINCT sdn.parent AS shipment_id
+						FROM 
+							 `tabShipment Delivery Note` sdn
+						INNER JOIN
+							 `tabShipment` s ON s.name = sdn.parent
+						WHERE 
+							 sdn.delivery_note = %(delivery_note)s AND s.docstatus = 0
+						""", {"delivery_note": delivery_note.name}, as_dict=1)
+			for shipment in shipments:
+				shipment_doc = frappe.get_doc("Shipment", shipment.shipment_id)
+				shipment_doc.delete()
+
 			doc = frappe.get_doc('Delivery Note', delivery_note.name)
 			doc.delete()
 			
@@ -238,6 +255,17 @@ class CustomPickList(PickList):
 
 		if save:
 			self.save()
+
+	def submit(self):
+		if len(self.locations) > 25:
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			self._submit()
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):

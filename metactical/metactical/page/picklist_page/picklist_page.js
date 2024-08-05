@@ -58,18 +58,21 @@ class PicklistPage{
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
+			metactical.pick_list.selection_type = "Single";
 			metactical.pick_list.is_tote = false;
 			frappe.run_serially([
 				() => me.list_orders()
 			]);
 		});
 		this.$list_orders_btn.on('click', function(){
+			metactical.pick_list.selection_type = "Single"
 			metactical.pick_list.is_tote = false;
 			frappe.run_serially([
 				() => me.list_orders()
 			]);
 		});
 		this.$list_totes_btn.on('click', function(){
+			metactical.pick_list.selection_type = "Multi";
 			metactical.pick_list.is_tote = true;
 			me.list_totes();
 		});
@@ -236,7 +239,7 @@ class PicklistPage{
 		}
 	}
 	
-	list_multi_orders(source="All", searched=false, pl_filter=""){
+	list_multi_orders(source="All", searched=false, pl_filter="", sort_by="qty_item", sort_order="desc"){
 		const me = this;
 		if(source == ""){
 			source = "All"
@@ -253,7 +256,7 @@ class PicklistPage{
 				me.wrapper.html(frappe.render_template('orders_list_multiorder', {
 					'pick_lists': filtered_pl, 
 					'selected_pick_lists': metactical.pick_list.selected_pick_lists}));
-				me.setup_multi_order_events(pl_filter, source);
+				me.setup_multi_order_events(pl_filter, source, sort_by, sort_order);
 			}
 		}
 		else{
@@ -265,19 +268,21 @@ class PicklistPage{
 				"args": {
 					"warehouse": metactical.pick_list.selected_warehouse,
 					"filters": "",
-					"source": source
+					"source": source,
+					"sort_by": sort_by,
+					"sort_order": sort_order
 				},
 				"callback": function(ret){
 					metactical.pick_list.pick_lists = ret.message;
 					me.wrapper.html(frappe.render_template('orders_list_multiorder', {
 						pick_lists: ret.message, selected_pick_lists: []}));
-					me.setup_multi_order_events("", source);
+					me.setup_multi_order_events("", source, sort_by, sort_order);
 				}
 			});
 		}
 	}
 	
-	setup_multi_order_events(pl_filter="", pl_source="All"){
+	setup_multi_order_events(pl_filter="", pl_source="All", sort_by="qty_item", sort_order="desc"){
 		var me = this;
 		me.wrapper.find('.start-picking-btn').hide();
 		me.wrapper.find('.refresh-orders').on('click', function(){
@@ -311,6 +316,32 @@ class PicklistPage{
 				placeholder: pl_placeholder
 			},
 			render_input: true
+		});
+		me.sort_selector = new frappe.ui.SortSelector({
+			parent: $('.pl-multi-filters'),
+			args: {
+				options: [
+					{
+						fieldname: "qty_items",
+						label: "QtyItems"
+					},
+					{
+						fieldname: "locations",
+						label: "Locations"
+					}
+				],
+				sort_by: "qty_item",
+				sort_by_label: "QtyItems",
+				sort_order: sort_order
+			},
+			sort_by: sort_by,
+			sort_order: sort_order,
+			onchange: function(){
+				let barcode = $('input[data-fieldname="pl_multi_barcode"]').val();
+				let sort_order = me.sort_selector.sort_order;
+				let sort_by = me.sort_selector.sort_by;
+				me.list_multi_orders(pl_source, false, barcode, sort_by, sort_order);
+			}
 		});
 		me.wrapper.find('.pl-list-div').on('click', function(){
 			let pl_div = $(this);
@@ -436,14 +467,16 @@ class PicklistPage{
 		});
 	}
 	
-	list_orders(filter=''){
+	list_orders(filter='', sort_by="qty_item", sort_order="desc"){
 		const me = this;
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
 				"warehouse": metactical.pick_list.selected_warehouse,
 				"filters": filter,
-				"source": metactical.pick_list.selected_source
+				"source": metactical.pick_list.selected_source,
+				"sort_by": sort_by,
+				"sort_order": sort_order
 			},
 			"freeze": true,
 			"callback": function(ret){
@@ -477,15 +510,34 @@ class PicklistPage{
 						}
 					},
 					render_input: true
-				})
-				
-				// Set default location
-				/*let current_location = me.pl_source.get_value();
-				if(current_location == "" && metactical.pick_list.default_location != "" &&
-					metactical.pick_list.selected_source == "All"){
-						metactical.pick_list.selected_source = metactical.pick_list.default_location;
-						me.pl_source.set_value(metactical.pick_list.default_location);
-				}*/
+				});
+
+				me.sort_selector = new frappe.ui.SortSelector({
+					parent: $('.pl-sort-selector'),
+					args: {
+						options: [
+							{
+								fieldname: "qty_item",
+								label: "QtyItems"
+							},
+							{
+								fieldname: "locations",
+								label: "Locations"
+							}
+						],
+						sort_by: "qty_item",
+						sort_by_label: "QtyItems",
+						sort_order: sort_order
+					},
+					sort_by: sort_by,
+					sort_order: sort_order,
+					onchange: function(){
+						let barcode = $('input[data-fieldname="pl_barcode"]').val();
+						let selected_sort_by = me.sort_selector.sort_by;
+						let selected_sort_order = me.sort_selector.sort_order;
+						me.list_orders(barcode, selected_sort_by, selected_sort_order);
+					}
+				});
 				
 				me.pl_barcode.set_value(filter);
 				me.pl_barcode.set_focus();
@@ -572,7 +624,7 @@ class PicklistPage{
 					me.list_orders();
 				});
 				me.wrapper.find('.refresh-totes').on('click', function(){
-					me.list_totes();
+					me.list_single_totes();
 				});
 			}
 		});
@@ -667,7 +719,7 @@ class PicklistPage{
 		else{
 			this.$back_to_list.on('click', function(){
 				me.close_pick_list(metactical.pick_list.current_pick).then(() => {
-					me.list_totes();
+					me.list_single_totes();
 				});
 			});
 		}

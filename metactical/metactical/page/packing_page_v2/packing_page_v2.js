@@ -488,8 +488,79 @@ metactical.packing_page.calc_packing_items = (barcode, amount=1) => {
 			}
 			frappe.utils.play_sound("alert");
 			
+			let fields = [];
+
+			if (cur_item.net_weight === 0) {
+				fields.push({
+					fieldname: 'item_weight',
+					label: 'Item weight',
+					fieldtype: 'Float',
+					reqd: 1
+				});
+			}
+
+			if (cur_item.shipping_length === 0) {
+				fields.push({
+					fieldname: 'item_length',
+					label: 'Shipping length',
+					fieldtype: 'Float',
+					reqd: 1
+				});
+			}
+
+			if (cur_item.shipping_width === 0) {
+				fields.push({
+					fieldname: 'item_width',
+					label: 'Shipping width',
+					fieldtype: 'Float',
+					reqd: 1
+				});
+			}
+
+			if (cur_item.shipping_height === 0) {
+				fields.push({
+					fieldname: 'item_height',
+					label: 'Shipping height',
+					fieldtype: 'Float',
+					reqd: 1
+				});
+			}
+
+			if (fields.length > 0) {
+				let dialog = new frappe.ui.Dialog({
+					title: 'Item Details',
+					fields: fields,
+					primary_action_label: 'Submit',
+					primary_action(values) {
+						frappe.call({
+							method: "metactical.metactical.page.packing_page_v2.packing_page_v2.set_item_values",
+							args: {
+								item: cur_item.item_code,
+								values: values
+							},
+							callback: function(r) {
+								if (r.message) {
+									if(values.item_weight && values.item_weight > 0){
+										cur_item.net_weight = values.item_weight;
+									}
+									pack_item(cur_item, barcode, amount);
+								} else {
+									frappe.msgprint("Error updating values");
+								}
+							}
+						});
+						this.hide();
+					}
+				});
+
+				dialog.show();
+			} else {
+				pack_item(cur_item, barcode, amount);
+			}
+
+
 			//If picked item has no weight, then add weight first
-			if(cur_item.net_weight == 0){
+			/*if(cur_item.net_weight == 0){
 				frappe.prompt({
 					fieldname: "item_weight",
 					fieldtype: "Float",
@@ -513,7 +584,7 @@ metactical.packing_page.calc_packing_items = (barcode, amount=1) => {
 			}
 			else{
 				pack_item(cur_item, barcode, amount);
-			}
+			}*/
 			
 			//return;
 			throw "Break";
