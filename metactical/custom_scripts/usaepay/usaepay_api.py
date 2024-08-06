@@ -534,6 +534,8 @@ def adjust_payment(docname, advance_paid=None):
 
 			frappe.response["message"] = f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b>"
 			frappe.response["success"] = True
+
+			return adjust_response, log.name
 		else:
 			print("Transaction not found in USAePay")
 			log.log = f"Transaction {usaepay_transaction_key} not found in USAePay"
