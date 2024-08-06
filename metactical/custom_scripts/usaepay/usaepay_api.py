@@ -136,7 +136,6 @@ def get_customer_detail(customer_key, headers):
 @frappe.whitelist()
 def receive_customer_data():
 	response = frappe.form_dict
-	frappe.log_error(title="USAePay Webhook", message=f"USAePay Webhook: {response} type: {type(response)}")
 
 	event_body = response.get("event_body")
 	transaction_key = event_body["object"]["key"]
@@ -534,6 +533,8 @@ def adjust_payment(docname, advance_paid=None):
 
 			frappe.response["message"] = f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b>"
 			frappe.response["success"] = True
+
+			return adjust_response, log.name
 		else:
 			log.log = f"Transaction {usaepay_transaction_key} not found in USAePay"
 			log.save()

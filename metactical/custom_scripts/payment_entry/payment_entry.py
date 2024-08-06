@@ -193,9 +193,16 @@ def on_submit(doc, method):
 
 			if sales_order and doc.payment_type == "Receive":
 				can_be_adjusted, advance_paid = check_if_payment_can_be_adjusted(doc, sales_order)
-				frappe.log_error(title="can_be_adjusted", message=f"{can_be_adjusted} {advance_paid}")
+
 				if can_be_adjusted:
-					adjust_payment(sales_order, advance_paid)
+					adjust_response, log = adjust_payment(sales_order, advance_paid)
+					
+					if adjust_response:
+						frappe.db.set_value("USAePay Log", log, "payment_entry", doc.name, update_modified=False)
+
+						if "key" in adjust_response:
+							frappe.db.set_value("Payment Entry", doc.name, "reference_no", adjust_response["key"], update_modified=False)
+							frappe.db.commit()
 
 def before_submit(doc, method):
 	usaepay_roles = get_usaepay_roles()
@@ -224,7 +231,6 @@ def check_if_payment_can_be_adjusted(doc, sales_order):
 			advance_paid = so_fields["advance_paid"]
 
 			transaction = get_usaepay_transaction_detail(transaction_key, sales_order)
-
 			if not any(role in usaepay_roles["adjust"] for role in user_roles):
 				frappe.throw(_("You do not have permission to process an adjustment. Please contact your System Administrator."))
 
