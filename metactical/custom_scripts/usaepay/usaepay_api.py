@@ -410,17 +410,17 @@ def get_usaepay_transaction_detail(transaction, docname):
 
 		transaction = get_transaction_from_usaepay(transaction, headers)
 
-		# refunds
-		refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
-		if refunds:
-			transaction["refunds"] = refunds
+		# # refunds
+		# refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
+		# if refunds:
+		# 	transaction["refunds"] = refunds
 			
-			total_refund = sum([flt(refund.get("refund_amount")) for refund in refunds])
-			if total_refund:
-				transaction["available_amount"] = float(transaction.get("amount")) - total_refund
-		else:
-			transaction["refunds"] = []
-			transaction["available_amount"] = transaction.get("amount")
+		# 	total_refund = sum([flt(refund.get("refund_amount")) for refund in refunds])
+		# 	if total_refund:
+		# 		transaction["available_amount"] = float(transaction.get("amount")) - total_refund
+		# else:
+		# 	transaction["refunds"] = []
+		# 	transaction["available_amount"] = transaction.get("amount")
 
 		if transaction:
 			frappe.response["transaction"] = transaction
