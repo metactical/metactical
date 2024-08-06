@@ -193,6 +193,7 @@ def on_submit(doc, method):
 
 			if sales_order and doc.payment_type == "Receive":
 				can_be_adjusted, advance_paid = check_if_payment_can_be_adjusted(doc, sales_order)
+				frappe.log_error(title="can_be_adjusted", message=f"{can_be_adjusted} {advance_paid}")
 				if can_be_adjusted:
 					adjust_payment(sales_order, advance_paid)
 
