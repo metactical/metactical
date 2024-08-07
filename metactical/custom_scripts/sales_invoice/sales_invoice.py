@@ -2,11 +2,7 @@ import frappe
 from frappe import _, msgprint
 import barcode as _barcode
 from io import BytesIO
-from frappe.model.mapper import get_mapped_doc, map_child_doc
-from frappe.utils import nowdate, cstr, flt, cint, now, getdate
-from erpnext.setup.doctype.company.company import update_company_current_month_sales
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import unlink_inter_company_doc
-from erpnext.healthcare.utils import manage_invoice_submit_cancel
+from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.controllers.selling_controller import SellingController
 from erpnext.controllers.stock_controller import StockController
