@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h4><center>Comercial Invoice</center></h4>
+    
+    <div class="invoice-info">
+        <p><b>Invoice Number:</b> {{doc.name}}</p>
+        <p><b>Invoice Date:</b> {{doc.posting_date}}</p>
+        <p><b>Payment Terms:</b> {{doc.mode_of_payment}}</p>
+        <p><b>Due Date:</b> {{doc.due_date}}</p>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-xs-6">
+            <b>Sold To:</b>
+            {% if sold_to %}
+                <div style="margin-left: 20px">
+                    <p>{{sold_to.ais_company if "ais_company" in sold_to else "" }}</p>
+                    <p>{{sold_to.first_name if sold_to.first_name else ""}} {{ sold_to.last_name if sold_to.last_name else "" }}</p>
+                    <p>{{sold_to.address_line1}}</p>
+                    <p>{{sold_to.address_line2}}</p>
+                    <p>{{sold_to.city}}, {{sold_to.state}}</p>
+                    <p>{{sold_to.pincode if "pincode" in sold_to else "" }}</p>
+                    <p>{{sold_to.country if "country" in sold_to }}</p>
+                </div> 
+            {% else %}
+                <p>-</p>
+            {% endif %}
+        </div>
+        <div class="col-xs-6">
+            <b>Shipped To:</b>
+            {% if shipped_to %}
+                <div style="margin-left: 20px">
+                    <p>{{shipped_to.ais_company if "ais_company" in shipped_to else "" }}</p>
+                    <p>{{shipped_to.first_name if shipped_to.first_name else ""}} {{ shipped_to.last_name if shipped_to.last_name else "" }}</p>
+                    <p>{{shipped_to.address_line1}}</p>
+                    <p>{{shipped_to.address_line2}}</p>
+                    <p>{{shipped_to.city}}, {{shipped_to.state}}</p>
+                    <p>{{shipped_to.pincode if "pincode" in shipped_to else "" }}</p>
+                    <p>{{shipped_to.country if "country" in shipped_to else ""}}</p>
+                </div>
+            {% else %}
+                <p>-</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xs-6">
+            <p><b>Order Number(s):</b> {{order_numbers}}</p>
+            <p><b>Customer Email:</b> {{customer_email}}</p>
+            <p><b>Customer Phone:</b> {{customer_phone}}</p>
+            <p><b>Tracking Number:</b> {{tracking_number}}</p>
+            <p><b>Customer PO(s):</b> {{customer_pos}}</p>
+        </div>
+        <div class="col-xs-6">
+            <p><b>Ship Via:</b> {{ship_via}}</p>
+            <p><b>Freight Terms:</b> {{freight_terms}}</p>
+            <p><b>Sales Agent:</b> {{sales_person}}</p>
+        </div>
+    </div>
+
+    <table style="width: 100%">
+        <thead>
+            <th>Item Code</th>
+            <th>Item Name</th>
+            <th>Quantity</th>
+            <th>Rate</th>
+            <th>Amount</th>
+        </thead>
+        <tbody>
+            {% for item in doc.items %}
+                <tr>
+                    <td>{{item.item_code}}</td>
+                    <td>{{item.item_name}}</td>
+                    <td>{{item.qty}}</td>
+                    <td>{{item.rate}}</td>
+                    <td>{{item.amount}}</td>
+                </tr>
+            {% endfor %}
+    </table>
+</body>
+</html>

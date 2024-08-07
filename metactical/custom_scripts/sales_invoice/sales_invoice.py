@@ -299,3 +299,151 @@ def si_mode_of_payment(name):
 	if len(mode) > 0:
 		payment_mode = mode[0].mode_of_payment
 	return payment_mode
+
+def get_commercial_invoice(doc):
+	doc.mode_of_payment = si_mode_of_payment(doc.name)
+
+	address = get_customer_address(doc.customer)
+	customer_phone, customer_email = get_customer_contact(doc.customer)
+
+	billing_address = address["Billing"] if "Billing" in address else None
+	shipping_address = address["Shipping"] if "Shipping" in address else None
+	sales_orders = []
+
+	# get sales orders
+	for item in doc.items:
+		if item.sales_order:
+			if item.sales_order not in sales_orders:
+				sales_orders.append(item.sales_order)
+	
+	order_numbers = len(sales_orders)
+
+	# get tracking number
+	tracking_number, shipments = get_tracking_number(sales_orders)
+	tracking_number = ', '.join(tracking_number) if tracking_number else "-"
+
+	# get customer POs
+	customer_pos = get_customer_po(sales_orders)
+	customer_pos = ', '.join(customer_pos) if customer_pos else "-"
+
+	# get freight terms
+	freight_term = get_freight_terms(shipments)
+	freight_term = freight_term.split(" ")[0] if freight_term else "-"
+
+	# get sales person
+	sales_person = get_sales_person(sales_orders)
+	sales_person = ', '.join(sales_person) if sales_person else "-"
+
+	html = frappe.render_template("metactical/metactical/print_format/ci___export___v1/ci_export_v1.html", 
+									{
+										"doc": doc, 
+										"sold_to": billing_address, 
+										"shipped_to": shipping_address,
+										"order_numbers": order_numbers,
+										"tracking_number": tracking_number,
+										"customer_pos": customer_pos,
+										"freight_terms": freight_term,
+										"sales_person": sales_person,
+										"customer_phone": customer_phone if customer_phone else "-",
+										"customer_email": customer_email if customer_email else "-",
+									}
+								)
+	return html
+
+def get_customer_address(customer):
+	customer_addresses = {}
+	
+	customer_address = frappe.db.sql("""select 	`tabAddress`.address_line1, 
+												`tabAddress`.address_line2, 
+												`tabAddress`.city, 
+												`tabAddress`.state, 
+												`tabAddress`.pincode, 
+												`tabAddress`.country, 
+												`tabAddress`.address_type
+											from `tabAddress` 
+											join `tabDynamic Link` on `tabAddress`.name = `tabDynamic Link`.parent
+											where `tabDynamic Link`.link_doctype = 'Customer' and 
+												  `tabDynamic Link`.link_name = %(customer)s""", 
+											{'customer': customer}, as_dict=1)
+
+	if len(customer_address) > 0:
+		for address in customer_address:
+			customer_info = frappe.db.get_value("Customer", customer, ["first_name", "last_name", "ais_company"])
+			
+			first_name = ""
+			last_name = ""
+			company = ""
+
+			if customer_info:
+				first_name = customer_info[0]
+				last_name = customer_info[1]
+				company = customer_info[2]
+
+			address.first_name = first_name
+			address.last_name = last_name
+			address.company = company
+			customer_addresses[address.address_type] = address
+	
+	return customer_addresses
+
+def get_customer_contact(customer):
+	primary_email = frappe.db.get_value("Customer", {"email_id": customer}, "ifw_email")
+	primary_phone = ""
+	if primary_email:
+		primary_phone = frappe.db.get_value("Contact", {"email_id": primary_email}, "mobile_no")
+
+	return primary_phone, primary_email
+
+# Metactical Customization: Get tracking number for the print format
+def get_tracking_number(sales_orders):
+	tracking_numbers = []
+	shipments = []
+
+	delivery_note_items = frappe.db.get_list("Delivery Note Item", filters={"against_sales_order": ["in", sales_orders], "parenttype": "Delivery Note", "docstatus": 1}, fields=["parent"])
+	# get delivery notes without duplicates
+	delivery_notes = list(set([item.parent for item in delivery_note_items]))
+
+
+	if delivery_notes:
+		shipment_delivery_note = frappe.db.get_list("Shipment Delivery Note", filters={"delivery_note": ["in", delivery_notes], "docstatus": 1}, fields=["parent"], order_by="creation")
+		shipments = [item.parent for item in shipment_delivery_note]
+		
+		# get shipments without duplicates
+		shipments = list(set(shipments))
+
+
+		if shipments:
+			for shipment in shipments:
+				shipment_doc = frappe.get_doc("Shipment", shipment)
+				multiple_shipments = shipment_doc.shipments
+				for shipment in multiple_shipments:
+					if shipment.awb_number not in tracking_numbers:
+						tracking_numbers.append(shipment.awb_number)
+
+	return tracking_numbers, shipments
+
+def get_customer_po(sales_orders):
+	customer_po = []
+	for sales_order in sales_orders:
+		customer_po.append(frappe.db.get_value("Sales Order", sales_order, "po_no"))
+	return customer_po
+
+def get_freight_terms(shipments):
+	freight_terms = ""
+	if shipments:
+		for shipment in shipments:
+			incoterm = frappe.db.get_value("Shipment", shipment, "incoterm")
+			if incoterm:
+				freight_terms = incoterm
+				break
+	return freight_terms
+
+def get_sales_person(sales_orders):
+	print(sales_orders)
+	sales_persons_list = []
+	sales_persons = frappe.db.get_list("Sales Team", filters={"parent": ["in", sales_orders], "parenttype": "Sales Order"}, fields=["sales_person"])
+	if sales_persons:
+		sales_persons_list = [item.sales_person for item in sales_persons]
+
+	return sales_persons_list
+		
