@@ -20,6 +20,7 @@ import shutil
 from itertools import groupby
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe import _, msgprint
+import re
 
 class CustomPickList(PickList):
 	def update_sales_order_item(self, item, picked_qty, item_code):
@@ -266,6 +267,59 @@ class CustomPickList(PickList):
 			queue_action(self, "submit", timeout=2000)
 		else:
 			self._submit()
+
+	def before_submit(self):
+		super(CustomPickList, self).before_submit()
+		self.reorder_items_by_location()
+
+	def reorder_items_by_location(self):
+		# Sort items based on their location
+		rows_with_none_location = []
+		digit_rows_with_location = []
+		non_digit_rows_with_location = []
+
+		# get rows with None location, digit location and non-digit location
+		for row in self.locations:
+			if row.ifw_location is None:
+				rows_with_none_location.append(row)
+			else:
+				if row.ifw_location.split("-")[0].isdigit():
+					digit_rows_with_location.append(row)
+				else:
+					non_digit_rows_with_location.append(row)
+
+		data = []
+		i = 1
+		if digit_rows_with_location:
+			# sort digit rows by location
+			digit_rows_with_location = {row.ifw_location: row for row in digit_rows_with_location}
+			location_keys = sorted(digit_rows_with_location.keys(), key=sort_key)
+
+			for key in location_keys:
+				digit_rows_with_location[key].idx = i
+				data.append(digit_rows_with_location[key])
+				i += 1
+
+		# sort non-digit rows by location
+		if non_digit_rows_with_location:
+			sorted_locations = sorted(non_digit_rows_with_location, key=lambda x: x.ifw_location)
+			for row in sorted_locations:
+				row.idx = i
+				data.append(row)
+				i += 1
+
+		# add rows with None location at the end
+		if rows_with_none_location:
+			data += rows_with_none_location
+
+		self.locations = []
+		for row in data:
+			self.append("locations", row)
+
+#  Function to extract numerical parts and convert them to integers for sorting
+def sort_key(item):
+    parts = re.split(r'[-]', item)
+    return [int(part) if part.isdigit() else part for part in parts]
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
