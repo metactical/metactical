@@ -270,9 +270,9 @@ class CustomPickList(PickList):
 
 	def before_submit(self):
 		super(CustomPickList, self).before_submit()
-		self.reorder_locations_by_location()
+		self.reorder_items_by_location()
 
-	def reorder_locations_by_location(self):
+	def reorder_items_by_location(self):
 		# Sort items based on their location
 		rows_with_none_location = []
 		digit_rows_with_location = []
@@ -320,7 +320,6 @@ class CustomPickList(PickList):
 def sort_key(item):
     parts = re.split(r'[-]', item)
     return [int(part) if part.isdigit() else part for part in parts]
-
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
