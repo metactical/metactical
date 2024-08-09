@@ -1,0 +1,122 @@
+# Copyright (c) 2024, Techlift Technologies and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe.model.document import Document
+import os
+from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
+from metactical.custom_scripts.utils.metactical_utils import queue_action
+
+class PricingRuleFromExcel(Document):
+	def submit(self):
+		frappe.msgprint(
+			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
+			the system will add a comment about the error on this document and revert to the Draft stage"""
+		)
+		queue_action(self, "submit", timeout=2000)
+
+	def on_submit(self):
+		file_content = self.check_file()
+		self.create_pricing_rules(file_content)
+
+	def validate(self):
+		self.check_file()
+
+	def check_file(self):
+		file_content, extn = self.read_file()
+		if extn == "xlsx":
+			file_content = read_xlsx_file_from_attached_file(fcontent=file_content)
+		elif extn == "xls":
+			file_content = read_xls_file_from_attached_file(file_content)
+		else:
+			frappe.throw("Only xls and xlsx files are supported.")
+		return file_content
+	
+	def read_file(self):
+		file_path = self.excel_file
+		extn = os.path.splitext(file_path)[1][1:]
+
+		file_content = None
+
+		file_name = frappe.db.get_value("File", {"file_url": file_path})
+		if file_name:
+			file = frappe.get_doc("File", file_name)
+			file_content = file.get_content()
+
+		return file_content, extn
+
+	def create_pricing_rules(self, data):
+		if not data:
+			frappe.throw("No data found in the file")
+
+		header = data[0]
+		price_list = header[2]
+		indexes = self.get_column_indexes(header)
+
+		for row in data[1:]:
+			if self.import_based_on == "Retail SKU":
+				item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": row[0]}, "name")
+			else:
+				item_code = row[0]
+				
+			if not item_code:
+				frappe.throw(f"Item with Retail SKU Suffix {row[0]} not found")
+
+			print(row[indexes["enabled"]], not row[indexes["enabled"]])
+
+			pricing_rule = frappe.new_doc("Pricing Rule")
+			# pricing_rule.for_price_list = price_list
+			pricing_rule.selling = 1
+			pricing_rule.title = price_list + " - " + item_code + str(row[indexes["valid_to"]])
+			pricing_rule.price_or_discount = "Discount Percentage"
+			pricing_rule.valid_from = self.change_date_format(row[indexes["valid_from"]])
+			pricing_rule.valid_upto = self.change_date_format(row[indexes["valid_to"]])
+			pricing_rule.discount_percentage = row[indexes["discount_percentage"]]
+			pricing_rule.disable = not row[indexes["enabled"]]
+			pricing_rule.append("items", {
+				"item_code": item_code,
+				"uom": "Nos",
+			})
+			
+			pricing_rule.insert()
+			frappe.db.commit()
+
+	def get_column_indexes(self, header):
+		indexes = {}
+		for i, col in enumerate(header):
+			print(i, col)
+			if col == "Valid FromDate":
+				indexes["valid_from"] = i
+			elif col == "Retail SKU":
+				indexes["retail_sku"] = i
+			elif col == "ValidToDate":
+				indexes["valid_to"] = i
+			elif col == "Enabled":
+				indexes["enabled"] = i
+			elif col.endswith("Discount Percentage"):
+				indexes["discount_percentage"] = i
+
+		return indexes
+
+	# convert date format from 31-Aug-14 to 2014-08-31
+	def change_date_format(self, date):
+		if (type(date) != str):
+			return date
+
+		months = {
+			"Jan": "01",
+			"Feb": "02",
+			"Mar": "03",
+			"Apr": "04",
+			"May": "05",
+			"Jun": "06",
+			"Jul": "07",
+			"Aug": "08",
+			"Sep": "09",
+			"Oct": "10",
+			"Nov": "11",
+			"Dec": "12"
+		}
+		date = date.split("-")
+		return f"20{date[2]}-{months[date[1]]}-{date[0]}"
+		
