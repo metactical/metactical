@@ -1,5 +1,5 @@
-erpnext.TransactionController = erpnext.TransactionController.extend({
-	scan_barcode: function() {
+erpnext.TransactionController = class TransactionController extends erpnext.TransactionController{
+	scan_barcode() {
 		let me = this;
 
 		if(this.frm.doc.scan_barcode) {
@@ -27,10 +27,10 @@ erpnext.TransactionController = erpnext.TransactionController.extend({
 			});
 		}
 		return false;
-	},
+	}
 	
 	// Metactical Customization: Add scan to confirm button functionality
-	ais_scan_to_confirm: function() {
+	ais_scan_to_confirm() {
 		var me = this;
 		var items = this.frm.doc.items;
 		if(this.frm.doc.items && this.frm.doc.items.length > 0){
@@ -115,4 +115,4 @@ erpnext.TransactionController = erpnext.TransactionController.extend({
 			scanned_dialog.show();
 		}
 	}
-});
+};
