@@ -358,8 +358,8 @@ frappe.ui.form.on("Sales Order Item", {
     }
 });
 
-erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
-	customer_address: function(doc, dt, dn){
+erpnext.selling.SalesOrderController = class SalesOrderController extends erpnext.selling.SalesOrderController {
+	customer_address(doc, dt, dn){
 		// Metactical Customization: Add ability to change address even when submitted
 		if(doc.docstatus == 1){
 			erpnext.utils.get_address_display(this.frm, "customer_address");		
@@ -368,9 +368,9 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 			erpnext.utils.get_address_display(this.frm, "customer_address");
 			erpnext.utils.set_taxes_from_address(this.frm, "customer_address", "customer_address", "shipping_address_name");
 		}
-	},
+	}
 	
-	warehouse: function(doc, cdt, cdn){
+	warehouse(doc, cdt, cdn){
 		var me = this;
 		var item = frappe.get_doc(cdt, cdn);
 
@@ -430,9 +430,9 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 					}
 				});
 		}
-	},
+	}
 	
-	customer: function(frm){
+	customer(frm){
 		// Metactical Customization: Clear company address to force them to enter manually
 		var me = this;
 		var args = {"company_address": ''}
@@ -446,9 +446,9 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 					}, 2000);
 			});
 		});
-	},
+	}
 	
-	close_sales_order: function(){
+	close_sales_order(){
 		// Metactical Customization: Pop up to enter reason for closing
 		var me = this;
 		frappe.prompt([
@@ -470,9 +470,9 @@ erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.exte
 			'Close'
 		)
 	}
-});
+};
 
-$.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
+extend_cscript(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
 
 //Metactical Customization: Replace erpnext.utils.get_party_details
 var get_party_details = function(frm, method, args, callback) {
