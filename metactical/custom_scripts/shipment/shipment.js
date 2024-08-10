@@ -1,13 +1,14 @@
-const ShipmentController = frappe.ui.form.Controller.extend({
-    refresh: function () {
+const ShipmentController = class ShipmentController extends frappe.ui.form.Controller{
+    refresh() {
         if (this.has_shipments() && this.frm.doc.docstatus===1) {
             this.make_rate_btn()
         }
         if (this.has_shipments(false)) {
             this.avoid_shipment_btn()
         }
-    },
-    has_shipments: function (fully = true) {
+    }
+
+    has_shipments(fully = true) {
         let exists = {}
         this.frm.doc.shipments?.forEach(row => {
             if (row.row_id in exists) {
@@ -21,8 +22,9 @@ const ShipmentController = frappe.ui.form.Controller.extend({
         }
         let has = this.frm.doc.shipment_parcel.filter(row => row.count !== exists[row.name])
         return has.length
-    },
-    make_rate_btn: function () {
+    }
+
+    make_rate_btn() {
         this.frm.add_custom_button(__("Get Rate"), () => {
             if (this.frm.is_dirty()) {
                 frappe.throw(__("Please Save before fetch rate"))
@@ -30,8 +32,9 @@ const ShipmentController = frappe.ui.form.Controller.extend({
             }
             this.fetch_rate()
         })
-    },
-    avoid_shipment_btn: function () {
+    }
+
+    avoid_shipment_btn() {
         this.frm.add_custom_button(__("Void Shipment<small>(s)</small>"), () => {
             if (this.frm.is_dirty()) {
                 frappe.throw(__("Please Save before fetch rate"))
@@ -39,8 +42,9 @@ const ShipmentController = frappe.ui.form.Controller.extend({
             }
             this.avoid_shipment()
         })
-    },
-    avoid_shipment: function () {
+    }
+
+    avoid_shipment() {
         let d = new frappe.ui.Dialog({
             title: __("Select Shipment to Void"),
             fields: this.frm.doc.shipments.map(r => {
@@ -61,8 +65,9 @@ const ShipmentController = frappe.ui.form.Controller.extend({
             }
         })
         d.show()
-    },
-    fetch_rate: function () {
+    }
+
+    fetch_rate() {
         frappe.xcall("metactical.utils.shipping.shipping.get_rate", {
             name: this.frm.docname,
             provider: this.frm.doc.service_provider
@@ -71,8 +76,9 @@ const ShipmentController = frappe.ui.form.Controller.extend({
                 this.show_rate(r)
             }
         })
-    },
-    show_rate: function (rates) {
+    }
+
+    show_rate(rates) {
         this.rates = rates
         if (!this.rateDialog) {
             this.rateDialog = new frappe.ui.Dialog({
@@ -137,9 +143,9 @@ const ShipmentController = frappe.ui.form.Controller.extend({
         }
         // end select default
         this.rateDialog.show()
-    },
+    }
     
-    get_manifest: function(){
+    get_manifest(){
 		let shipment_id = this.frm.doc.shipments[0].shipment_id;
 		this.frm.call({
 			method: "metactical.custom_scripts.shipment.shipment.get_manifest",
@@ -156,6 +162,6 @@ const ShipmentController = frappe.ui.form.Controller.extend({
 		});
 		
 	}
-})
+};
 
 $.extend(cur_frm.cscript, new ShipmentController({ frm: cur_frm }));
