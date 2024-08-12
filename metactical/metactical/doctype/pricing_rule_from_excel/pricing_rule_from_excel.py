@@ -58,16 +58,25 @@ class PricingRuleFromExcel(Document):
 				item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": row[0]}, "name")
 			else:
 				item_code = row[0]
-				
-			if not item_code:
+			
+			if not item_code and item_code is not None:
 				frappe.throw(f"Item with Retail SKU Suffix {row[0]} not found")
+			elif item_code is None:
+				continue
 
-			print(row[indexes["enabled"]], not row[indexes["enabled"]])
+			last_pricing_rule = self.get_last_pricing_rule(item_code, price_list)
+
+			# add 0 in the beginning if the last pricing rule is less than 100
+			if last_pricing_rule and int(last_pricing_rule) < 100:
+
+				last_pricing_rule = str(last_pricing_rule + 1).zfill(3)
+			
+			title = item_code + "-" + (price_list + "-" if price_list else "") + (last_pricing_rule if last_pricing_rule else "001")
 
 			pricing_rule = frappe.new_doc("Pricing Rule")
-			# pricing_rule.for_price_list = price_list
+			pricing_rule.for_price_list = price_list
 			pricing_rule.selling = 1
-			pricing_rule.title = price_list + " - " + item_code + str(row[indexes["valid_to"]])
+			pricing_rule.title = title
 			pricing_rule.price_or_discount = "Discount Percentage"
 			pricing_rule.valid_from = self.change_date_format(row[indexes["valid_from"]])
 			pricing_rule.valid_upto = self.change_date_format(row[indexes["valid_to"]])
@@ -81,10 +90,31 @@ class PricingRuleFromExcel(Document):
 			pricing_rule.insert()
 			frappe.db.commit()
 
+	def get_last_pricing_rule(self, item_code, price_list=""):
+		pricing_rule = frappe.db.sql(f"""
+			SELECT title
+			FROM `tabPricing Rule`
+			WHERE for_price_list = '{price_list}'
+			ORDER BY creation DESC
+			LIMIT 1
+		""", as_dict=True)
+
+		print(pricing_rule)
+
+		# get the last number from the pricing rule name
+		if pricing_rule:
+			pricing_rule = pricing_rule[0]["title"].split("-")
+			pricing_rule = int(pricing_rule[-1])
+			return pricing_rule
+
+		return None
+
 	def get_column_indexes(self, header):
 		indexes = {}
 		for i, col in enumerate(header):
-			print(i, col)
+			if not col:
+				continue
+
 			if col == "Valid FromDate":
 				indexes["valid_from"] = i
 			elif col == "Retail SKU":
