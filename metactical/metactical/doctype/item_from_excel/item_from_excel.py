@@ -103,15 +103,23 @@ class ItemFromExcel(Document):
 		headers = data[0]
 		price_lists = []
 		price_list_headers_index = []
+		suppliers_header_index = None
+
 
 		for i, header in enumerate(headers):
-			if header not in ["Item Code", "Item Name", "Item Group", "TemplateSKU", "ERPSKU"]:
+			if header not in ["Item Code", "Item Name", "Item Group", "TemplateSKU", "ERPSKU", "Supplier"]:
 				price_list = frappe.db.exists("Price List", {"name": header})
 
 				if price_list:
 					price_lists.append(header)
 					price_list_headers_index.append(i)
-		
+			elif header == "Supplier":
+				suppliers_header_index = i
+
+		# get all the default price lists for the suppliers
+		if suppliers_header_index:
+			data = self.update_data_with_supplier_price_lists(data, suppliers_header_index, headers)
+
 		# get price lists if all the cells in the column are empty
 		columns_to_remove = []
 		for plhi in price_list_headers_index:
@@ -134,12 +142,47 @@ class ItemFromExcel(Document):
 	
 		ItemPriceFromExcel.create_price_entries(self, updated_data, True)
 
+	def update_data_with_supplier_price_lists(self, data, suppliers_header_index, headers):
+		supplier_with_price_list = {}
+
+		# get all the suppliers from the excel (Price List sheet)
+		suppliers = [row[suppliers_header_index] for row in data[1:] if row[suppliers_header_index] is not None]
+		suppliers = list(set(suppliers))
+
+		# get all the default price lists for the suppliers
+		for supplier in suppliers:
+			price_list = frappe.db.get_value("Supplier", {"name": supplier}, "default_price_list")
+			if price_list:
+				supplier_with_price_list[supplier] = price_list
+		
+		# if there are suppliers with price lists, update the data with the price list and the cost
+		if len(supplier_with_price_list) > 0:
+			supplier_costs = list(set(supplier_with_price_list.values()))
+
+			for i, d in enumerate(data):
+				# add empty values to all the rows to match the price list columns because the suppier price lists are added in the header
+				if supplier_costs and i != 0:
+					d += [None] * len(supplier_costs)
+
+				if i == 0:
+					for sc in supplier_costs:
+						if sc not in headers:
+							headers.append(sc)
+
+				else:
+					cost = d[suppliers_header_index+1]
+					supplier = d[suppliers_header_index]
+					price_list = supplier_with_price_list[supplier]
+					suplier_price_list_index = headers.index(price_list)
+					d[suplier_price_list_index] = cost
+
+		return data
+
 	def on_submit(self):
 		file_content = self.check_file()
 		linked_doctypes, item_field_map, required_fields = get_doctype_information()
 
 		try:
-
 			self.create_item(file_content[0], item_field_map, linked_doctypes, True)
 			self.create_item(file_content[1], item_field_map, linked_doctypes, False)
 			self.create_item_price(file_content[2])
