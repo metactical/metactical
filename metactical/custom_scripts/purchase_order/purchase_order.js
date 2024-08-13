@@ -15,8 +15,8 @@ frappe.ui.form.on('Purchase Order', {
 	}
 });
 
-erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderController.extend({
-	onload: function(doc, cdt, cdn){
+erpnext.buying.CustomPurchaseOrderController = class PurchaseOrderController extends erpnext.buying.PurchaseOrderController{
+	onload(doc, cdt, cdn){
 		this.setup_queries(doc, cdt, cdn);
 		this._super();
 
@@ -60,18 +60,18 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 				this.frm.set_value("billing_address", "");
 			}, 1000)
 		}
-	},
+	}
 	
-	supplier: function(doc, cdt, cdn){
+	supplier(doc, cdt, cdn){
 		var me = this;
 		erpnext.utils.get_party_details(this.frm, null, null, function(){
 			me.apply_price_list();
 		});
 		// Metactical Customization: Remove address
 		this.frm.set_value("shipping_address", '');
-	},
+	}
 	
-	add_from_mappers: function() {
+	add_from_mappers() {
 		var me = this;
 		this.frm.add_custom_button(__('Material Request'),
 			// Metactical Customization: Add supplier filter
@@ -185,9 +185,9 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 				}
 			});
 		}, __("Tools"));
-	},
+	}
 	
-	get_items_from_open_material_requests: function() {
+	get_items_from_open_material_requests() {
 		// Metactical Customization: Replace company in Material Request selection with supplier
 		// Metactical Customization: Add option to get all material requeasts with default supplier
 		this.map_current_doc({
@@ -210,9 +210,9 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 			},
 			get_query_method: "erpnext.stock.doctype.material_request.material_request.get_material_requests_based_on_supplier"
 		});
-	},
+	}
 	
-	map_current_doc: function(opts) {
+	map_current_doc(opts) {
 		// Metactical Customization: Moved the location for price list information
 		// load. Not sure why
 		var me = this;
@@ -350,6 +350,6 @@ erpnext.buying.CustomPurchaseOrderController = erpnext.buying.PurchaseOrderContr
 			_map();
 		}
 	}
-})
+}
 // for backward compatibility: combine new and previous states
 $.extend(cur_frm.cscript, new erpnext.buying.CustomPurchaseOrderController({frm: cur_frm}));
