@@ -14,7 +14,7 @@
  "module": "Metactical",
  "name": "Pricing Rule Report - V1",
  "owner": "Administrator",
- "prepared_report": 0,
+ "prepared_report": 1,
  "ref_doctype": "Pricing Rule",
  "report_name": "Pricing Rule Report - V1",
  "report_type": "Script Report",
