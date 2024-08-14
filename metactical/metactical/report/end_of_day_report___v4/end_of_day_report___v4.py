@@ -220,9 +220,10 @@ def get_website_stores_data(filters, location):
 
 def get_us_data(item_search_settings, filters):
 	us_data = []
+	
 	if item_search_settings.get("daily_report_url") is not None and item_search_settings.get("daily_report_url") != "":
 		us_request = requests.get(item_search_settings.get("daily_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params={"date": filters.get("date")})
 
 		if us_request.status_code == 200:
@@ -244,7 +245,7 @@ def get_rameen_data(item_search_settings,  filters):
 	rameen_data = []
 	if item_search_settings.get("rameen_daily_report_url") is not None and item_search_settings.get("rameen_daily_report_url") != "":
 		us_request = requests.get(item_search_settings.get("rameen_daily_report_url"), 
-						auth=(item_search_settings.rameen_api_key, item_search_settings.rameen_api_secret),
+						auth=(item_search_settings.rameen_api_key, item_search_settings.get_password("rameen_api_secret")),
 									params={"date": filters.get("date")})
 
 		if us_request.status_code == 200:
@@ -265,8 +266,9 @@ def get_qc1_data(item_search_settings, filters):
 	qc1_data = []
 	if item_search_settings.get("qc1_daily_report_url") is not None and item_search_settings.get("qc1_daily_report_url") != "":
 		us_request = requests.get(item_search_settings.get("qc1_daily_report_url"), 
-						auth=(item_search_settings.qc1_api_key, item_search_settings.qc1_api_secret),
+						auth=(item_search_settings.qc1_api_key, item_search_settings.get_password("qc1_api_secret")),
 									params={"date": filters.get("date")})
+									
 		if us_request.status_code == 200:
 			for row in us_request.json().get("message", {}):
 				qc1_data.append(row)
