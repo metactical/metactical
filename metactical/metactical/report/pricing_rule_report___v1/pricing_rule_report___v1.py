@@ -81,14 +81,15 @@ def get_data(filters, conditions):
 			pricing_rule.price_list_rate = frappe.db.get_value("Item Price", {"price_list": pricing_rule.for_price_list, "item_code": pricing_rule.item_code}, "price_list_rate")
 
 			# calculate the amount after discount
-			if pricing_rule.rate_or_discount == "Discount Percentage":
-				if pricing_rule.price_list_rate:
-					pricing_rule.after_discount = pricing_rule.price_list_rate - (pricing_rule.price_list_rate * pricing_rule.discount_percentage / 100)
+			if pricing_rule.price_list_rate:
+				if pricing_rule.rate_or_discount == "Discount Percentage":
+					if pricing_rule.price_list_rate:
+						pricing_rule.after_discount = pricing_rule.price_list_rate - (pricing_rule.price_list_rate * pricing_rule.discount_percentage / 100)
 
-			elif pricing_rule.rate_or_discount == "Rate":
-				pricing_rule.after_discount = pricing_rule.rate
-			elif pricing_rule.rate_or_discount == "Discount Amount":
-				pricing_rule.after_discount = pricing_rule.price_list_rate - pricing_rule.discount_amount
+				elif pricing_rule.rate_or_discount == "Rate":
+					pricing_rule.after_discount = pricing_rule.rate
+				elif pricing_rule.rate_or_discount == "Discount Amount":
+					pricing_rule.after_discount = pricing_rule.price_list_rate - pricing_rule.discount_amount
 		else:
 			pricing_rule.erp_sku = pricing_rule.item_code
 
