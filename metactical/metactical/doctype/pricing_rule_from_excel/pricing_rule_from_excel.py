@@ -129,8 +129,9 @@ class PricingRuleFromExcel(Document):
 				pricing_rule = pricing_rule["title"].split("-")
 
 				if len(pricing_rule) > 1:
-					pricing_rule = int(pricing_rule[-1])
-					return pricing_rule
+					if pricing_rule[-1].isdigit():
+						pricing_rule = int(pricing_rule[-1])
+						return pricing_rule
 		return None
 
 	def get_column_indexes(self, header):
