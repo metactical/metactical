@@ -57,8 +57,8 @@ def get_data(filters, conditions):
 		SELECT
 			price_item.{main_field} as item_code, discount_percentage, rate_or_discount, 
 			for_price_list, valid_from, valid_upto, disable,
-			`tabPricing Rule`.name,
-			rate, discount_percentage
+			`tabPricing Rule`.name, 
+			rate, discount_percentage, discount_amount
 		FROM
 			`tabPricing Rule`
 		JOIN
@@ -81,18 +81,27 @@ def get_data(filters, conditions):
 			pricing_rule.price_list_rate = frappe.db.get_value("Item Price", {"price_list": pricing_rule.for_price_list, "item_code": pricing_rule.item_code}, "price_list_rate")
 
 			# calculate the amount after discount
-			if pricing_rule.rate_or_discount == "Discount Percentage":
-				if pricing_rule.price_list_rate:
-					pricing_rule.after_discount = pricing_rule.price_list_rate - (pricing_rule.price_list_rate * pricing_rule.discount_percentage / 100)
+			if pricing_rule.price_list_rate:
+				if pricing_rule.rate_or_discount == "Discount Percentage":
+					if pricing_rule.price_list_rate:
+						pricing_rule.after_discount = pricing_rule.price_list_rate - (pricing_rule.price_list_rate * pricing_rule.discount_percentage / 100)
 
-			elif pricing_rule.rate_or_discount == "Rate":
-				pricing_rule.after_discount = pricing_rule.rate
+				elif pricing_rule.rate_or_discount == "Rate":
+					pricing_rule.after_discount = pricing_rule.rate
+				elif pricing_rule.rate_or_discount == "Discount Amount":
+					pricing_rule.after_discount = pricing_rule.price_list_rate - pricing_rule.discount_amount
 		else:
 			pricing_rule.erp_sku = pricing_rule.item_code
 
 		pricing_rule.enabled = not pricing_rule.disable
 		pricing_rule.rate_or_discount = pricing_rule.rate_or_discount
-		pricing_rule.discount = str(pricing_rule.discount_percentage) + "%" if pricing_rule.rate_or_discount == "Discount Percentage" else pricing_rule.rate
+
+		if pricing_rule.rate_or_discount == "Discount Percentage":
+			pricing_rule.discount = str(pricing_rule.discount_percentage) + "%"
+		elif pricing_rule.rate_or_discount == "Rate":
+			pricing_rule.discount = pricing_rule.rate
+		elif pricing_rule.rate_or_discount == "Discount Amount":
+			pricing_rule.discount = pricing_rule.discount_amount
 
 	return pricing_rules
 
