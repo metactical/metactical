@@ -220,7 +220,6 @@ def get_website_stores_data(filters, location):
 
 def get_us_data(item_search_settings, filters):
 	us_data = []
-	print(filters.get("date"))
 	if item_search_settings.get("daily_report_url") is not None and item_search_settings.get("daily_report_url") != "":
 		us_request = requests.get(item_search_settings.get("daily_report_url"), 
 						auth=(item_search_settings.api_key, item_search_settings.api_secret),

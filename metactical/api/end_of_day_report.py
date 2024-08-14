@@ -2,7 +2,7 @@ import frappe
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_us_report_data(date):
 	#date = "2023-02-16"
 	data = []
