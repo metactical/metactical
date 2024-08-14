@@ -79,7 +79,7 @@
    "dt": "Material Request Item",
    "fetch_from": "item_code.ifw_location",
    "fetch_if_empty": 0,
-   "fieldname": "ifw_location", 
+   "fieldname": "ifw_location",
    "fieldtype": "Data",
    "hidden": 0,
    "hide_border": 0,

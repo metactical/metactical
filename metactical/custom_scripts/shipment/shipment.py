@@ -10,11 +10,28 @@ def validate(doc, method=None):
 		if parcel.weight > 32:
 			frappe.msgprint(_("Weight doesn't allow more than 32 Kg"))
 
+	set_source_and_customer_po(doc)
+
 
 def before_cancel(doc, method=None):
 	if doc.shipments:
 		avoid_shpment(doc.name, doc.service_provider, [x.name for x in doc.shipments])
 		
+def set_source_and_customer_po(doc):
+	doc.neb_source = None
+	doc.neb_customer_po_number = None
+
+	if doc.shipment_delivery_note:
+		for row in doc.shipment_delivery_note:
+			if not doc.neb_source and row.neb_source:
+				doc.neb_source = row.neb_source
+			if not doc.neb_customer_po_number and row.neb_order_id:
+				doc.neb_customer_po_number = row.neb_order_id
+
+			if doc.neb_source and doc.neb_customer_po_number:
+				break
+
+
 @frappe.whitelist()
 def get_manifest(start_date, shipment_id, doctype, docname):
 	cp = CanadaPost()

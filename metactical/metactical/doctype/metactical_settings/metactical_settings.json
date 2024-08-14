@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-06-18 09:39:18.849903",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "store_credit_section",
+  "store_credit_account_cad",
+  "store_credit_account_usd",
+  "usaepay_settings_section",
+  "usaepay_url",
+  "api_key",
+  "pin",
+  "payment_form_url",
+  "column_break_lmdac",
+  "roles_to_refund",
+  "roles_to_adjust_payment",
+  "roles_to_make_payment"
+ ],
+ "fields": [
+  {
+   "fieldname": "store_credit_account_cad",
+   "fieldtype": "Link",
+   "label": "CAD Account for Store Credits",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_account_usd",
+   "fieldtype": "Link",
+   "label": "USD Account for Store Credit",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_section",
+   "fieldtype": "Section Break",
+   "label": "Store Credit"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "usaepay_settings_section",
+   "fieldtype": "Section Break",
+   "label": "USAepay Settings"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "pin",
+   "fieldtype": "Data",
+   "label": "PIN"
+  },
+  {
+   "fieldname": "usaepay_url",
+   "fieldtype": "Data",
+   "label": "URL"
+  },
+  {
+   "fieldname": "column_break_lmdac",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "roles_to_refund",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Process Refund",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "roles_to_adjust_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Adjust Payment",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "payment_form_url",
+   "fieldtype": "Data",
+   "label": "Payment Form URL"
+  },
+  {
+   "fieldname": "roles_to_make_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Make Payment",
+   "options": "MT Roles List"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2024-08-05 15:26:38.418034",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Metactical Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

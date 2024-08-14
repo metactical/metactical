@@ -22,7 +22,7 @@ class CustomAutoEmailReport(AutoEmailReport):
 			return frappe.render_template(
 				"frappe/templates/emails/auto_email_report.html",
 				{
-					"title": self.name + " (" + formatted_date + ")",
+					"title": self.name + " Franchise (" + formatted_date + ")",
 					"description": self.description,
 					"date_time": date_time,
 					"columns": columns,
