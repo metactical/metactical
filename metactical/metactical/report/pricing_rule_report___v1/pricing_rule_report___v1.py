@@ -129,7 +129,7 @@ def get_columns(filters):
 		{
 			"fieldname": "discount",
 			"fieldtype": "Data",
-			"label": "Discount",
+			"label": "Discount/Percentage",
 			"width": 120
 		},
 		{
