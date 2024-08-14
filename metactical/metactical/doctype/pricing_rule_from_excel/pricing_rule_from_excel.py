@@ -15,7 +15,7 @@ class PricingRuleFromExcel(Document):
 		)
 		queue_action(self, "submit", timeout=2000)
 
-	def validate(self):
+	def on_submit(self):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
@@ -23,7 +23,6 @@ class PricingRuleFromExcel(Document):
 	def validate(self):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
-
 
 	def check_file(self):
 		file_content, extn = self.read_file()

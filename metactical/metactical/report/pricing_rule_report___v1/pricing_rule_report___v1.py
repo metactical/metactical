@@ -19,7 +19,6 @@ def get_conditions(filters):
 		if item_codes:
 			# change the list of item_codes to tuple
 			group_items = str(tuple(item_codes)).replace(",)", ")") if len(item_codes) == 1 else tuple(item_codes)
-			print(group_items)
 			conditions.append(f"price_item.item_code IN {group_items}")
 
 	elif filters.get("apply_on") == "Item Group":
@@ -45,7 +44,6 @@ def get_conditions(filters):
 def get_data(filters, conditions):
 	conditions = " AND ".join(conditions)
 	apply_on = filters.apply_on
-	print(filters.apply_on)
 	main_field = ""
 
 	if apply_on == "Item Code":
@@ -77,10 +75,9 @@ def get_data(filters, conditions):
 			item_names = frappe.db.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name", "item_name", "ifw_retailskusuffix"])
 			item_names = {item.name: item for item in item_names}
 
+			pricing_rule.erp_sku = pricing_rule.item_code
 			pricing_rule.item_name = item_names.get(pricing_rule.item_code).item_name
 			pricing_rule.retail_sku = item_names.get(pricing_rule.item_code).ifw_retailskusuffix
-			
-
 			pricing_rule.price_list_rate = frappe.db.get_value("Item Price", {"price_list": pricing_rule.for_price_list, "item_code": pricing_rule.item_code}, "price_list_rate")
 
 			# calculate the amount after discount
@@ -91,7 +88,7 @@ def get_data(filters, conditions):
 			elif pricing_rule.rate_or_discount == "Rate":
 				pricing_rule.after_discount = pricing_rule.rate
 		else:
-			pricing_rule.retail_sku = pricing_rule.item_code
+			pricing_rule.erp_sku = pricing_rule.item_code
 
 		pricing_rule.enabled = not pricing_rule.disable
 		pricing_rule.rate_or_discount = pricing_rule.rate_or_discount
@@ -100,20 +97,28 @@ def get_data(filters, conditions):
 	return pricing_rules
 
 def get_columns(filters):
-	columns = [
+	columns = [{
+			"fieldname": "erp_sku",
+			"fieldtype": "Data",
+			"label": filters.get("apply_on"),
+			"width": 120	
+	}]
+
+	if filters.get("apply_on") == "Item Code":
+		columns.append(
 		{
 			"fieldname": "retail_sku",
 			"fieldtype": "Data",
-			"label": filters.get("apply_on"),
+			"label": "Retail Sku",
 			"width": 120
-		}]
-	if filters.get("apply_on") == "Item Code":
+		})
 		columns.append({
 			"fieldname": "item_name",
 			"fieldtype": "Data",
 			"label": "Item Name",
 			"width": 120
 		})
+		
 	columns += [
 		{
 			"fieldname": "rate_or_discount",
