@@ -268,7 +268,7 @@ def get_qc1_data(item_search_settings, filters):
 		us_request = requests.get(item_search_settings.get("qc1_daily_report_url"), 
 						auth=(item_search_settings.qc1_api_key, item_search_settings.get_password("qc1_api_secret")),
 									params={"date": filters.get("date")})
-									
+
 		if us_request.status_code == 200:
 			for row in us_request.json().get("message", {}):
 				qc1_data.append(row)
@@ -298,7 +298,7 @@ def export_to_excel(date):
 		'filters': dates
 	}
 
-	sub_headers = ["Stores", "Online", "USA"]
+	sub_headers = ["Stores", "Online", "USA", "QC1", "Rameen"]
 	export_query(data, sub_headers)
 
 	
