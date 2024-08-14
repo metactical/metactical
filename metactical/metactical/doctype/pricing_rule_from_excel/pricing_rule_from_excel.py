@@ -15,12 +15,15 @@ class PricingRuleFromExcel(Document):
 		)
 		queue_action(self, "submit", timeout=2000)
 
-	def on_submit(self):
+	def validate(self):
 		file_content = self.check_file()
+		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
 
 	def validate(self):
-		self.check_file()
+		file_content = self.check_file()
+		self.check_mandatory(file_content)
+
 
 	def check_file(self):
 		file_content, extn = self.read_file()
@@ -54,10 +57,13 @@ class PricingRuleFromExcel(Document):
 		indexes = self.get_column_indexes(header)
 
 		for row in data[1:]:
+			retail_sku = ""
 			if self.import_based_on == "Retail SKU":
 				item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": row[0]}, "name")
+				retail_sku = row[0]
 			else:
 				item_code = row[0]
+				retail_sku = frappe.db.get_value("Item", item_code, "ifw_retailskusuffix")
 			
 			if not item_code and item_code is not None:
 				frappe.throw(f"Item with Retail SKU Suffix {row[0]} not found")
@@ -68,7 +74,6 @@ class PricingRuleFromExcel(Document):
 
 			# add 0 in the beginning if the last pricing rule is less than 100
 			if last_pricing_rule and int(last_pricing_rule) < 100:
-
 				last_pricing_rule = str(last_pricing_rule + 1).zfill(3)
 			
 			title = item_code + "-" + (price_list + "-" if price_list else "") + (last_pricing_rule if last_pricing_rule else "001")
@@ -76,11 +81,17 @@ class PricingRuleFromExcel(Document):
 			pricing_rule = frappe.new_doc("Pricing Rule")
 			pricing_rule.for_price_list = price_list
 			pricing_rule.selling = 1
+			pricing_rule.ifw_retailskusuffix = retail_sku
 			pricing_rule.title = title
 			pricing_rule.price_or_discount = "Discount Percentage"
 			pricing_rule.valid_from = self.change_date_format(row[indexes["valid_from"]])
 			pricing_rule.valid_upto = self.change_date_format(row[indexes["valid_to"]])
-			pricing_rule.discount_percentage = row[indexes["discount_percentage"]]
+			pricing_rule.rate_or_discount = "Rate" if row[indexes["rate_or_discount"]].lower() == "rate" else "Discount Percentage"
+			if pricing_rule.rate_or_discount == "Rate":
+				pricing_rule.rate = row[indexes["discount_percentage"]]
+			else:
+				pricing_rule.discount_percentage = row[indexes["discount_percentage"]]
+			
 			pricing_rule.disable = not row[indexes["enabled"]]
 			pricing_rule.append("items", {
 				"item_code": item_code,
@@ -90,23 +101,37 @@ class PricingRuleFromExcel(Document):
 			pricing_rule.insert()
 			frappe.db.commit()
 
+	def check_mandatory(self, data):
+		header = data[0]
+		indexes = self.get_column_indexes(header).values()
+
+		for i, data in enumerate(data[1:]):
+			# continue if all the columns in the row are empty
+			if not any(data):
+				continue
+
+			for index in indexes:
+				if not data[index]:
+					frappe.throw(f"Column <b>{header[index]}</b> is mandatory in row {i+2}")
+
+		
 	def get_last_pricing_rule(self, item_code, price_list=""):
-		pricing_rule = frappe.db.sql(f"""
+		pricing_rules = frappe.db.sql(f"""
 			SELECT title
 			FROM `tabPricing Rule`
 			WHERE for_price_list = '{price_list}'
 			ORDER BY creation DESC
-			LIMIT 1
+			LIMIT 5
 		""", as_dict=True)
 
-		print(pricing_rule)
-
 		# get the last number from the pricing rule name
-		if pricing_rule:
-			pricing_rule = pricing_rule[0]["title"].split("-")
-			pricing_rule = int(pricing_rule[-1])
-			return pricing_rule
+		if pricing_rules:
+			for pricing_rule in pricing_rules:
+				pricing_rule = pricing_rule["title"].split("-")
 
+				if len(pricing_rule) > 1:
+					pricing_rule = int(pricing_rule[-1])
+					return pricing_rule
 		return None
 
 	def get_column_indexes(self, header):
@@ -123,6 +148,8 @@ class PricingRuleFromExcel(Document):
 				indexes["valid_to"] = i
 			elif col == "Enabled":
 				indexes["enabled"] = i
+			elif col == "Rate or Percentage":
+				indexes["rate_or_discount"] = i
 			elif col.endswith("Discount Percentage"):
 				indexes["discount_percentage"] = i
 
