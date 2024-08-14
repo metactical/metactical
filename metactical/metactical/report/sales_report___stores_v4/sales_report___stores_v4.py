@@ -221,17 +221,24 @@ def create_material_request(**args):
 		
 	conditions = get_conditions(filters)
 	init_data = get_data(conditions, filters)
+	
 	source_warehouse = "W01-WHS-Active Stock - " + frappe.db.get_value("Company", init_data[0].company, "abbr")
+	
 	doc = frappe.new_doc("Material Request")
 	doc.update({
 		"material_request_type": "Material Transfer",
 		"schedule_date": now(),
 	})
+
 	for row in init_data:
 		wh_actual = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "actual_qty") or 0.0
 		wh_res = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "reserved_qty") or 0.0
 		stock_levels = wh_actual - wh_res
-		transit_warehouse = get_transit_warehouse(row.warehouse)
+		if row.pos_profile == "Edmonds Operators":
+			transit_warehouse = "R02-Edm-Active Stock - " + frappe.db.get_value("Company", row.company, "abbr")
+		else:
+			transit_warehouse = get_transit_warehouse(row.warehouse)
+	
 		if stock_levels > 0 and transit_warehouse != "":
 			doc.append("items", {
 				"from_warehouse": source_warehouse,
