@@ -22,6 +22,10 @@ class PricingRuleFromExcel(Document):
 
 	def validate(self):
 		file_content = self.check_file()
+		headers = ["Valid FromDate", "ValidToDate", "Enabled", "Rate or Percentage"]
+		for header in headers:
+			if header not in file_content[0]:
+				frappe.throw(f"Column <b>{header}</b> is missing")
 		self.check_mandatory(file_content)
 
 	def check_file(self):
