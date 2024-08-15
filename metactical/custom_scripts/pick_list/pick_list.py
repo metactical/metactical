@@ -20,35 +20,11 @@ import shutil
 from itertools import groupby
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe import _, msgprint
+from frappe.utils.nestedset import get_descendants_of
 
 class CustomPickList(PickList):
-	def update_sales_order_item(self, item, picked_qty, item_code):
-		item_table = "Sales Order Item" if not item.product_bundle_item else "Packed Item"
-		stock_qty_field = "stock_qty" if not item.product_bundle_item else "qty"
-		
-		# Metactical Customization: Take into consideration returned qty
-		already_picked, actual_qty, returned_qty = frappe.db.get_value(
-			item_table,
-			item.sales_order_item,
-			["picked_qty", stock_qty_field, "returned_qty"],
-		)
-		
-		if returned_qty is None:
-			returned_qty = 0
-
-		if self.docstatus == 1:
-			if (((already_picked + picked_qty - returned_qty) / actual_qty) * 100) > (
-				100 + flt(frappe.db.get_single_value("Stock Settings", "over_delivery_receipt_allowance"))
-			):
-				frappe.throw(
-					_(
-						"You are picking more than required quantity for {}. Check if there is any other pick list created for {}"
-					).format(item_code, item.sales_order)
-				)
-
-		frappe.db.set_value(item_table, item.sales_order_item, "picked_qty", already_picked + picked_qty)
-
 	def before_save(self):
+		super(CustomPickList, self).before_save()
 		# Metactical Customization: removed auto location assignement. Will remove the whole
 		# set_item_location in the future from this page
 		# self.set_item_locations()
@@ -87,6 +63,9 @@ class CustomPickList(PickList):
 					frappe.msgprint('Warning: Sales Order <a href="/desk#Form/Sales Order/{0}">{0}</a> has credit due.'.format(item.sales_order))
 
 	def on_submit(self):
+		super(CustomPickList, self).on_submit()
+
+		# Metactical Customization: Create delivery note automatically on submit
 		if self.do_not_create_delivery:
 			return
 		
@@ -161,6 +140,9 @@ class CustomPickList(PickList):
 	
 	
 	def on_cancel(self):
+		super(CustomPickList, self).on_cancel()
+
+		# Metactical Customization: Delete delivery notes and clear submitted date in sales orders
 		delivery_notes = frappe.get_all('Delivery Note', filters={'pick_list': self.name, 'docstatus': 0}, fields=['name'])
 		for delivery_note in delivery_notes:
 			# Delete shipments first before deleting delivery notes
@@ -189,25 +171,29 @@ class CustomPickList(PickList):
 			sales_doc = frappe.get_doc("Sales Order", sales_order)
 			sales_doc.update({"pick_list_submitted_date": ""})
 			sales_doc.save()
-			
+
 	@frappe.whitelist()
 	def set_item_locations(self, save=False):
 		self.validate_for_qty()
 		items = self.aggregate_item_qty()
+		picked_items_details = self.get_picked_items_details(items)
 		self.item_location_map = frappe._dict()
 
-		from_warehouses = None
+		from_warehouses = [self.parent_warehouse] if self.parent_warehouse else []
 		if self.parent_warehouse:
-			from_warehouses = get_descendants_of("Warehouse", self.parent_warehouse)
+			from_warehouses.extend(get_descendants_of("Warehouse", self.parent_warehouse))
 
 		# Create replica before resetting, to handle empty table on update after submit.
 		locations_replica = self.get("locations")
 
 		# reset
 		self.delete_key("locations")
+		updated_locations = frappe._dict()
+
+
 		#Metactical Customization: Get shipping items
 		shipping_items = frappe.db.get_all('Pick List Shipping Item', fields=["item"], pluck='item')
-		
+
 		for item_doc in items:
 			item_code = item_doc.item_code
 			# Metactical Customization: If item is one of the shipping items, 
@@ -218,13 +204,16 @@ class CustomPickList(PickList):
 			self.item_location_map.setdefault(
 				item_code,
 				get_available_item_locations(
-					item_code, from_warehouses, self.item_count_map.get(item_code), self.company
+					item_code,
+					from_warehouses,
+					self.item_count_map.get(item_code),
+					self.company,
+					picked_item_details=picked_items_details.get(item_code),
+					consider_rejected_warehouses=self.consider_rejected_warehouses,
 				),
 			)
 
-			locations = get_items_with_location_and_quantity(
-				item_doc, self.item_location_map, self.docstatus
-			)
+			locations = get_items_with_location_and_quantity(item_doc, self.item_location_map, self.docstatus)
 
 			item_doc.idx = None
 			item_doc.name = None
@@ -232,7 +221,26 @@ class CustomPickList(PickList):
 			for row in locations:
 				location = item_doc.as_dict()
 				location.update(row)
-				self.append("locations", location)
+				key = (
+					location.item_code,
+					location.warehouse,
+					location.uom,
+					location.batch_no,
+					location.serial_no,
+					location.sales_order_item or location.material_request_item,
+				)
+
+				if key not in updated_locations:
+					updated_locations.setdefault(key, location)
+				else:
+					updated_locations[key].qty += location.qty
+					updated_locations[key].stock_qty += location.stock_qty
+
+		for location in updated_locations.values():
+			if location.picked_qty > location.stock_qty:
+				location.picked_qty = location.stock_qty
+
+			self.append("locations", location)
 
 		# If table is empty on update after submit, set stock_qty, picked_qty to 0 so that indicator is red
 		# and give feedback to the user. This is to avoid empty Pick Lists.
@@ -307,7 +315,8 @@ def create_pick_list(source_name, target_doc=None):
 				"validation": {"docstatus": ["=", 1]},
 				'field_map': {
 					'sales_order': 'name',
-					'source': 'ais_source'
+					'source': 'ais_source',
+					"set_warehouse": "parent_warehouse"
 				}
 			},
 			"Sales Order Item": {
