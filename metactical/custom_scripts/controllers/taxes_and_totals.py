@@ -11,6 +11,7 @@ class custom_calculate_taxes_and_totals(calculate_taxes_and_totals):
 
 		pending_amount = total_amount_to_pay - total_paid_amount
 		
+		# Metactical Customization: If it's a return invoice, set the paid amount equal to the grand total
 		if self.doc.get("is_return") and pending_amount > 0:
 			default_mode_of_payment = frappe.db.get_value(
 				"POS Payment Method",

@@ -4,6 +4,7 @@ from frappe.utils import cint, flt
 
 class CustomPackingSlip(PackingSlip):
 	def on_submit(self):
+		super(CustomPackingSlip, self).on_submit()
 		#Clear associated tote if any
 		tote_exists = frappe.db.exists('Picklist Tote', {'current_delivery_note': self.delivery_note})
 		if tote_exists:
