@@ -81,7 +81,7 @@ def get_qoh(filters):
 	filters = json.loads(filters)
 	updated_qty = []
 
-	for value in filters[:-1]:
+	for value in filters:
 		qty = 0
 		data= frappe.db.sql("""select actual_qty-reserved_qty AS qty from `tabBin`
 			where item_code = %s and warehouse=%s

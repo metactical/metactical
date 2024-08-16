@@ -80,12 +80,12 @@ frappe.ui.form.on('Material Request Item', {
 	},
 
 	item_code: function(frm, cdt, cdn) {
-		get_qoh(frm)
+		get_qoh(frm, cdt, cdn)
 	},
 
 	from_warehouse: function(frm, cdt, cdn) {
 		// frm.events.get_item_data(frm, item, true);
-		get_qoh(frm);
+		get_qoh(frm, cdt, cdn);
 	},
 });
 
@@ -93,28 +93,28 @@ var get_quantities_on_hand = function(frm) {
 	if (frm.doc.items) {
 		var rows = []
 		$.each(frm.doc.items, function(i, d) {
-			if (d.item_code && d.warehouse) {
-				rows.push({"item": d.item_code, "warehouse": d.warehouse, "name": d.name});
+			if (d.item_code && d.from_warehouse) {
+				rows.push({"item": d.item_code, "warehouse": d.from_warehouse, "name": d.name});
 			}
 		});
 
 		if (rows.length > 0) {
-			get_qoh(frm, rows);
+			get_qoh(frm, null, null, rows);
 		}
 	}
 }
 
-var get_qoh = function(frm, rows=null) {
+var get_qoh = function(frm, cdt=null, cdn=null, rows=null) {
 	if (!rows){
 		var row = locals[cdt][cdn];
-		if (row.item_code && row.warehouse) {
+		if (!row.item_code || !row.from_warehouse) {
 			return
 		}
 		else{
 			rows = [{
 				"name": row.name,
 				"item": row.item_code,
-				"warehouse": row.warehouse
+				"warehouse": row.from_warehouse
 			}]
 		}
 	}
