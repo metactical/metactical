@@ -76,6 +76,128 @@ def post_to_rocket_chat(doc, msg, failed=False):
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
 
+def format_json_for_html(data, indent_size=2):
+	try:
+		# Function to recursively format JSON
+		def format_json(data, indent_level):
+			lines = []
+			for key, value in data.items():
+				if isinstance(value, dict):
+					# Recursively format nested objects
+					lines.append(f'{" " * indent_level * indent_size}"{key}": {{ <br>')
+					lines.extend(format_json(value, indent_level + 1))
+					lines.append(f'{" " * indent_level * indent_size}}}, <br>')
+				elif isinstance(value, list):
+					# Handle lists of objects
+					lines.append(f'{" " * indent_level * indent_size}"{key}": [ <br>')
+					for item in value:
+						lines.extend(format_json(item, indent_level + 1))
+					lines.append(f'{" " * indent_level * indent_size}] <br>')
+				else:
+					# Format primitive types (string, number, etc.)
+					lines.append(f'{" " * indent_level * indent_size}"{key}": "{value}", <br>')
+			return lines
+		
+		# Start formatting from the top-level object
+		formatted_lines = format_json(data, indent_level=1)
+		
+		# Join all lines with newline characters
+		formatted_json = '\n'.join(formatted_lines)
+		
+		return formatted_json
+	
+	except json.JSONDecodeError as e:
+		return f"Error decoding JSON: {str(e)}"
+	except Exception as e:
+		return f"Error: {str(e)}"
+
+def create_usaepay_log(doctype, docname, action):
+	# Create USAePay Log
+	log = frappe.get_doc({
+		"doctype": "USAePay Log",
+		"date": frappe.utils.now(),
+		"reference_docname": docname,
+		"action": action,
+		"reference_doctype": doctype
+	}).insert()
+
+	return log
+
+@frappe.whitelist()
+def get_customer_payment_information(customer):
+	from metactical.custom_scripts.usaepay.usaepay_api import get_token_hash
+
+	# get existing credit card tokens
+	tokens = []
+	
+	if frappe.db.exists("Customer CC", customer):
+		tokens = frappe.get_list("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
+
+	payment_form_url = frappe.db.get_single_value("Metactical Settings", "payment_form_url")
+	billing_address = get_customer_address(customer)
+
+	metactical_settings = frappe.get_single("Metactical Settings")
+	form_hash = get_token_hash(metactical_settings, "1234")
+	# form_hash = form_hash[6:] if form_hash else None
+	
+	if not form_hash:
+		frappe.log_error(title="Metactical Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
+		frappe.throw(_("Failed to generate form hash. Please check the MetaTactical settings"))
+
+	frappe.response["tokens"] = tokens
+	frappe.response["payment_form_url"] = payment_form_url
+	frappe.response["address"] = billing_address
+	frappe.response["hash"] = form_hash
+
+def get_customer_address(customer):
+	addresses = frappe.db.sql("""SELECT
+			address_line1, address_line2, city, state, 
+			country, phone, company, pincode, 
+			phone, address_type, 
+			is_shipping_address, is_primary_address
+		FROM
+			`tabAddress`
+		JOIN
+			`tabDynamic Link` ON `tabDynamic Link`.parent = `tabAddress`.name
+		WHERE
+			`tabDynamic Link`.link_doctype = 'Customer' AND
+			`tabDynamic Link`.link_name = %(customer)s 
+		""", {"customer": customer}, as_dict=1)
+
+	grouped_address = {}
+	billing_address = None
+	shipping_address = None
+	for address in addresses:
+		if billing_address and shipping_address:
+			break
+
+		if address.get("is_primary_address"):
+			billing_address = address
+		elif address.get("is_shipping_address"):
+			shipping_address = address
+
+		if address.address_type not in grouped_address:
+			grouped_address[address.address_type] = []
+
+		grouped_address[address.address_type].append(address)
+		
+	if not billing_address:
+		billing_address = grouped_address["Billing"][0] if "Billing" in grouped_address else None
+
+	if not shipping_address:
+		shipping_address = grouped_address["Shipping"][0] if "Shipping" in grouped_address else None
+	
+	# add customer personal information to the address
+	customer_info = frappe.db.get_value("Customer", customer, ["ais_company", "first_name", "last_name"], as_dict=1)
+	if customer_info:
+		billing_address.update(customer_info) if billing_address else None
+		shipping_address.update(customer_info) if shipping_address else None
+
+	return {
+		"billing": billing_address,
+		"shipping": shipping_address
+	}
+
 @frappe.whitelist()
 def export_query(data, sub_headers=[]):
 	from frappe.desk.query_report import run, get_columns_dict, handle_duration_fieldtype_values
@@ -242,3 +364,70 @@ def set_border(columns, rows, ws):
 		for col in range(1, columns):
 			cell = ws.cell(row=row, column=col)
 			cell.border = thin_border
+
+# check if all sales invoices are paid for a sales order
+def check_si_payment_status_for_so(sales_order):
+	all_invoices_paid = False
+	
+	invoices = frappe.db.sql("""SELECT
+								invoice.name AS invoice_name, invoice.status, invoice.grand_total
+							FROM
+								`tabSales Invoice Item`  AS item
+							LEFT JOIN
+								`tabSales Invoice` AS invoice ON invoice.name = item.parent
+						  	WHERE
+						  		item.sales_order = %(sales_order)s
+						  GROUP BY invoice.name, invoice.status, invoice.grand_total""", 
+				{"sales_order": sales_order}, as_dict=True)
+	
+	order_grand_total = frappe.db.get_value("Sales Order", sales_order, "grand_total")
+	invoices_total = 0
+
+	if invoices and len(invoices) > 0:
+		for invoice in invoices:
+			if invoice.status != "Paid":	
+				all_invoices_paid = False
+				break
+			else:
+				invoices_total += invoice.grand_total
+
+	if not all_invoices_paid and invoices_total == order_grand_total:
+		all_invoices_paid = True
+
+	return all_invoices_paid
+
+def get_customer_email_and_phone(customer):
+    contacts = frappe.db.sql("""select c.email_id, phone, c.mobile_no
+								from `tabContact` c
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" and cs.name = "{0}"
+                                ORDER BY c.creation desc
+                                """.format(customer), as_dict=True)
+            
+
+    if len(contacts):
+        return contacts
+    else:
+        return None
+
+def search_customer_by_phone_email(phone_number, email):
+    email_filter = ""
+    if email:
+        email_filter = f"AND c.email_id like '%{email}%'"
+    
+    phone_filter = ""
+    if phone_number:
+        phone_filter = f"AND (c.phone like '%{phone_number}%' or c.mobile_no like '%{phone_number}%')"
+
+    customers = frappe.db.sql(f"""select cs.name
+                                from `tabContact` c
+                                INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+                                INNER Join `tabCustomer` cs on dl.link_name=cs.name
+                                where  dl.link_doctype="Customer" {email_filter} {phone_filter}
+                                """, as_dict=True)
+
+    if len(customers):
+        return [customer.get('name') for customer in customers]
+    else:
+        return None

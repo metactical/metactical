@@ -9,13 +9,29 @@ from dateutil.relativedelta import relativedelta
 def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
-	
+	item_search_settings = frappe.get_doc("Item Search Settings")
+
 	# Get Canada and US data
 	data = get_ca_data(filters)
-	us_data = get_us_data(filters)
+
+	# Get USA data
+	us_data = get_us_data(item_search_settings, filters)
+
 	if len(us_data) > 0:
 		data.append({"Location": "USA"})
 		data.extend(us_data)
+
+	# Get Rameen data
+	rameen_data = get_rameen_data(item_search_settings, filters)
+	if len(rameen_data) > 0:
+		data.append({"Location": "Rameen"})
+		data.extend(rameen_data)
+
+	# Get QC1 data
+	qc1_data = get_qc1_data(item_search_settings, filters)
+	if len(qc1_data) > 0:
+		data.append({"Location": "QC1"})
+		data.extend(qc1_data)
 		
 	return columns, data
 	
@@ -58,7 +74,7 @@ def get_columns(filters):
 def get_ca_data(filters):
 	data = []
 	#Get stores data
-	data.append({"Location": "Stores"})
+	# data.append({"Location": "Stores"})
 	stores_data, total_stores_with_tax, total_stores_without_tax, stores_total_mtd, stores_total_pmtd = get_website_stores_data(filters, "Stores")
 	
 	# sort the data based on the array given
@@ -183,7 +199,7 @@ def get_website_stores_data(filters, location):
 			query = frappe.db.sql("""SELECT
 										COALESCE(SUM(total), 0) AS total_pmtd
 									FROM
-										`tabSales Order`
+										`""" + doctype + """`
 									WHERE
 										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""", 
@@ -202,13 +218,14 @@ def get_website_stores_data(filters, location):
 			data.append(row)
 	return data, total_with_tax, total_without_tax, total_mtd, total_pmtd 
 
-def get_us_data(filters):
-	item_search_settings = frappe.get_doc("Item Search Settings")
+def get_us_data(item_search_settings, filters):
 	us_data = []
+	
 	if item_search_settings.get("daily_report_url") is not None and item_search_settings.get("daily_report_url") != "":
 		us_request = requests.get(item_search_settings.get("daily_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params={"date": filters.get("date")})
+
 		if us_request.status_code == 200:
 			for row in us_request.json().get("message", {}):
 				us_data.append(row)
@@ -223,13 +240,56 @@ def get_us_data(filters):
 
 	return us_data
 
+def get_rameen_data(item_search_settings,  filters):
+	item_search_settings = frappe.get_doc("Item Search Settings")
+	rameen_data = []
+	if item_search_settings.get("rameen_daily_report_url") is not None and item_search_settings.get("rameen_daily_report_url") != "":
+		us_request = requests.get(item_search_settings.get("rameen_daily_report_url"), 
+						auth=(item_search_settings.rameen_api_key, item_search_settings.get_password("rameen_api_secret")),
+									params={"date": filters.get("date")})
+
+		if us_request.status_code == 200:
+			for row in us_request.json().get("message", {}):
+				rameen_data.append(row)
+
+	for row in rameen_data:
+		if row.get("location") == "Total Stores":
+			row.update({"location": "Stores Total"})
+		elif row.get("location") == "Total Websites":
+			row.update({"location": "Websites Total"})
+		elif row.get("location") == "USD Total":
+			row.update({"location": "Total - USD"})
+	
+	return rameen_data
+
+def get_qc1_data(item_search_settings, filters):
+	qc1_data = []
+	if item_search_settings.get("qc1_daily_report_url") is not None and item_search_settings.get("qc1_daily_report_url") != "":
+		us_request = requests.get(item_search_settings.get("qc1_daily_report_url"), 
+						auth=(item_search_settings.qc1_api_key, item_search_settings.get_password("qc1_api_secret")),
+									params={"date": filters.get("date")})
+									
+		if us_request.status_code == 200:
+			for row in us_request.json().get("message", {}):
+				qc1_data.append(row)
+
+	for row in qc1_data:
+		if row.get("location") == "Total Stores":
+			row.update({"location": "Stores Total"})
+		elif row.get("location") == "Total Websites":
+			row.update({"location": "Websites Total"})
+		elif row.get("location") == "USD Total":
+			row.update({"location": "Total - USD"})
+	
+	return qc1_data
+
 @frappe.whitelist()
 def export_to_excel(date):
 	from metactical.custom_scripts.utils.metactical_utils import export_query
-
+	
 	dates = {
 		"date": date,
-		"end_date": date
+		"end_date": (datetime.strptime(date, "%Y-%m-%d") + relativedelta(days=1)).strftime("%Y-%m-%d")
 	}
 
 	data = {
@@ -239,6 +299,7 @@ def export_to_excel(date):
 	}
 
 	sub_headers = ["Stores", "Online", "USA"]
+
 	export_query(data, sub_headers)
 
 	

@@ -9,19 +9,31 @@
 		<li><center><b>Pick Lists</b></center></li>
 		<li style="text-align: right;"><b><a class="alt-color refresh-orders" href="#" >Refresh</a></b></li>
 	</ul>
-	<div class="pl-barcode"></div>
-	<div class="pl-source"></div>
+	<div class="filters-wrapper col-md-12">
+		<div class="pl-barcode col-md-2"></div>
+		<div class="pl-source col-md-2"></div>
+		<div class="pl-sort-selector"></div>
+	</div>
 	<div class="col-md-12 orders-container">
 		{% for pl in pick_lists %}
-			<div class="order-list-div" data-pick-list="{{pl.name}}">
-				<p>
+			<div class="order-list-div picklist-box col-md-12" data-pick-list="{{pl.name}}" style="display: flex;">
+				<div class="col-md-6">
 					<b><span class="pick-list-name">{{pl.name}}</span></b><br>
 					<span class="pick-order-no"><b>{{pl.sales_order}}</b><br></span>
 					<span>
-						{{pl.customer}}
-						{% if pl.is_rush == 1 %}, Rush{% endif %}
+						{{pl.customer}}<br>
 					</span>
-				</p>
+					<span>
+						<b>QtyItems:</b> {{pl.qty_item}}
+					</span>
+				</div>
+				<div class="col-md-6">
+					{% if pl.is_rush == 1 %}
+						<span class="pick-list-rush indicator-pill green ellipsis">Rush</span>
+					{% endif %}
+					<b>Locations</b><br>
+					{{pl.locations}}
+				</div>
 			</div>
 		{% endfor %}
 	</div>

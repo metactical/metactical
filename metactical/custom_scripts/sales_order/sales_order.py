@@ -13,7 +13,20 @@ from frappe.model.utils import get_fetch_values
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
-from metactical.custom_scripts.utils.metactical_utils import queue_action
+from metactical.custom_scripts.utils.metactical_utils import ( 
+	queue_action, 
+	format_json_for_html, 
+	create_usaepay_log
+)
+
+from metactical.custom_scripts.usaepay.usaepay_api import (
+		get_transaction_from_usaepay, 
+		get_token_hash, 
+		create_refund, 
+		get_card_token, 
+		adjust_amount
+	)
+from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
 
 class SalesOrderCustom(SalesOrder):
 	def validate(self):
@@ -45,7 +58,10 @@ class SalesOrderCustom(SalesOrder):
 
 		# Metactical Customization: Added
 		if self.billing_status == "Fully Billed" and not self.neb_payment_completed_at:
-			self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
+			all_invoices_paid = check_si_payment_status_for_so(self.name)
+			if all_invoices_paid:
+				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
+
 		elif self.billing_status != "Fully Billed" and self.neb_payment_completed_at:
 			self.db_set("neb_payment_completed_at", None, notify=True)
 			

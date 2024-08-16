@@ -26,84 +26,72 @@ def load_summary(warehouse, source):
 	if source != "All":
 		where = " AND pl.ais_source = %(source)s "
 		where_filter.update({"source": source})
-	ready_to_ship = frappe.db.sql("""SELECT 
-							count(DISTINCT pli.parent) AS orders
-						FROM 
-							`tabPick List Item` AS pli
-						LEFT JOIN
-							`tabPick List` AS pl ON pl.name = pli.parent
-						WHERE
-							pli.warehouse = %(warehouse)s AND pl.docstatus = 0""" + where, 
-					where_filter, as_dict=1)
-	items_to_pick = frappe.db.sql("""SELECT
-										SUM(pli.qty) AS to_pick
-									FROM
-										`tabPick List Item` AS pli
-									LEFT JOIN
-										`tabPick List` AS pl ON pl.name = pli.parent
-									WHERE
-										pli.warehouse = %(warehouse)s AND pl.docstatus = 0""" + where, 
-					where_filter, as_dict=1)
-	rush_orders = frappe.db.sql("""SELECT
-							count(DISTINCT pli.parent) AS orders
-						FROM
-							`tabPick List Item` AS pli
-						LEFT JOIN
-							`tabPick List` AS pl ON pli.parent = pl.name
-						WHERE
-							pli.warehouse = %(warehouse)s AND pl.is_rush = 1 AND pl.docstatus = 0
-							""" + where, where_filter, as_dict=1)
-	same_address = frappe.db.sql("""SELECT SUM(occurences) AS orders
-							FROM
-								(
-									SELECT 
-										COUNT(DISTINCT pli.parent) AS occurences
-									FROM 
-										`tabPick List Item` AS pli
-									LEFT JOIN
-										`tabPick List` AS pl ON pli.parent = pl.name
-									WHERE
-										pli.warehouse = %(warehouse)s AND pl.customer IS NOT NULL 
-										AND pl.docstatus = 0 """ + where + """
-									GROUP BY
-										pl.customer
-									HAVING
-										COUNT(pl.customer) > 1
- 								) t
-							""", where_filter, as_dict=1)
-							
-	if len(ready_to_ship) > 0:
-		to_ship = ready_to_ship[0].orders
-		
-	if len(items_to_pick) > 0:
-		to_pick = items_to_pick[0].to_pick
+	picklists = frappe.db.sql("""
+			SELECT
+				pl.name, pl.customer, pl.is_rush, pli.qty
+			FROM
+				`tabPick List Item` AS pli
+			LEFT JOIN
+				`tabPick List` AS pl ON pl.name = pli.parent
+			LEFT JOIN
+				`tabSales Order` AS sales_order ON pli.sales_order = sales_order.name
+			WHERE
+				pli.warehouse = %(warehouse)s AND pl.docstatus = 0
+				AND sales_order.status <> 'On Hold'""" + where,
+			where_filter, as_dict=1)
 	
-	if len(rush_orders) > 0:
-		rush = rush_orders[0].orders
-	
-	if len(same_address) > 0:
-		same = same_address[0].orders
+	customers = []
+	orders = []
+	for picklist in picklists:
+		to_pick += picklist.qty
+		if picklist.is_rush == 1 and picklist.name not in orders:
+			rush += 1
+
+		if picklist.customer is not None and picklist.customer != '':
+			if picklist.customer in customers and picklist.name not in orders:
+				same += 1
+			else:
+				customers.append(picklist.customer)
+
+		if picklist.name not in orders:
+			orders.append(picklist.name)
+	to_ship = len(orders)
 	return {'ready_to_ship': to_ship, 'items_to_pick': to_pick, 'rush_orders': rush, 'same_address': same}
 	
 @frappe.whitelist()
-def get_pick_lists(warehouse, filters, source):
+def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	where = ''
 	if filters != "":
 		where = " AND pl.name LIKE '%{where_f}%'".format(where_f = filters)
 	if source != "All":
 		where = " AND pl.ais_source = '{source}'".format(source = source)
-	pick_lists = frappe.db.sql("""SELECT
-										pl.name, pl.customer, pl.is_rush, pli.sales_order
+
+	location_order = "DESC"
+	if sort_by == "locations":
+		location_order = sort_order
+
+	pick_lists = frappe.db.sql(f"""SELECT
+										pl.name, pl.customer, pl.is_rush, pli.sales_order,
+										COUNT(pli.name) AS qty_item,
+										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} SEPARATOR '<br>') AS locations
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
 										`tabPick List` AS pl ON pl.name = pli.parent
+									LEFT JOIN
+										`tabItem` AS item ON item.name = pli.item_code
+									LEFT JOIN
+										`tabSales Order` AS sales_order ON sales_order.name = pli.sales_order
 									WHERE
 										pl.docstatus = 0 AND pli.warehouse = '{warehouse}'
+										AND item.is_stock_item = 1 AND sales_order.status <> 'On Hold'
 										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
-										{where_f}
+										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
-									ORDER BY is_rush DESC, pl.date DESC""".format(where_f = where, warehouse = warehouse), 
+									ORDER BY 
+										is_rush DESC,
+										{sort_by} {sort_order},
+										pl.date DESC""", 
 								as_dict=1)
 	return pick_lists
 
@@ -115,7 +103,7 @@ def get_items(pick_list, warehouse, user, tote):
 	i = 0
 	for row in shipped_items:
 		i = i+1
-		not_include += "'" + row.item + "'"
+		not_include += f"'{row.item}'"
 		if len(shipped_items) != i:
 			not_include += ","
 	not_include += ")"
@@ -132,7 +120,7 @@ def get_items(pick_list, warehouse, user, tote):
 									WHERE
 										pli.parent = %(pick_list)s AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
-									""", {"warehouse": warehouse, "pick_list": pick_list, "not_include": not_include}, as_dict=1)
+									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
 		for item in items:
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
@@ -313,7 +301,18 @@ def get_tote_items(warehouse, pick_lists, user, totes):
 		where_pick += "'" + pl + "'"
 		i = i+1
 	where_pick += ")"
-	items = frappe.db.sql("""SELECT 
+
+	shipped_items = frappe.db.sql("""SELECT item FROM `tabPick List Shipping Item`""", as_dict=1)
+	not_include = "("
+	i = 0
+	for row in shipped_items:
+		i = i+1
+		not_include += f"'{row.item}'"
+		if len(shipped_items) != i:
+			not_include += ","
+	not_include += ")"
+
+	items = frappe.db.sql(f"""SELECT 
 								pli.name, pli.item_code, pli.item_name, item.image,
 								pli.ifw_location AS locations, pli.qty, bin.actual_qty,
 								pli.parent AS pick_list
@@ -324,7 +323,7 @@ def get_tote_items(warehouse, pick_lists, user, totes):
 							LEFT JOIN
 								`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
 							WHERE
-								pli.parent in """ + where_pick + """ 
+								pli.parent in {where_pick} AND pli.item_code NOT IN {not_include}
 							ORDER BY
 								pli.ifw_location""",
 						{"warehouse": warehouse}, as_dict=1)
