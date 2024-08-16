@@ -76,11 +76,14 @@ class PricingRuleFromExcel(Document):
 			last_pricing_rule = self.get_last_pricing_rule(item_code, price_list)
 
 			# add 0 in the beginning if the last pricing rule is less than 100
-			if last_pricing_rule and int(last_pricing_rule) < 100:
-				last_pricing_rule = str(last_pricing_rule + 1).zfill(3)
+			if last_pricing_rule:
+				if last_pricing_rule < 100:
+					last_pricing_rule = str(last_pricing_rule + 1).zfill(3)
+				elif last_pricing_rule >= 100:
+					last_pricing_rule = last_pricing_rule + 1
 			
 			title = item_code + "-" + (str(price_list) + "-" if price_list else "") + (str(last_pricing_rule) if last_pricing_rule else "001")
-			
+		
 			pricing_rule = frappe.new_doc("Pricing Rule")
 			pricing_rule.for_price_list = price_list
 			pricing_rule.selling = 1
