@@ -365,6 +365,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Pricing Rule Import Tool",
+   "link_to": "Pricing Rule From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Other Items",
    "link_type": "DocType",
    "onboard": 0,
@@ -632,6 +641,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pricing Rule Report - V1",
+   "link_to": "Pricing Rule Report - V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -837,7 +855,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-07-30 12:11:02.850612",
+ "modified": "2024-08-14 14:11:39.594249",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

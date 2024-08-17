@@ -133,7 +133,11 @@ doc_events = {
 	},
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
-	}
+	}, 
+	"Payment Entry": {
+		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
+		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+	},
 }
 
 # DocType Class

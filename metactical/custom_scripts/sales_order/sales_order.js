@@ -1,8 +1,10 @@
 {% include 'erpnext/selling/sales_common.js' %}
 var old_tax_template;
 var base_in_words;
+
 frappe.ui.form.on('Sales Order', {
 	refresh: function(frm){
+
 		if (frm.doc.__islocal)
 			frm.set_value("neb_payment_completed_at", null)
 		
@@ -11,8 +13,10 @@ frappe.ui.form.on('Sales Order', {
 			&& flt(frm.doc.per_delivered, 6) < 100 && flt(frm.doc.per_billed, 6) < 100) {
 			frm.clear_custom_buttons();
 		}*/
-		
-		
+
+		if (frm.doc.__islocal)
+			frm.set_value("neb_usaepay_transaction_key", "");
+			
 		setTimeout(() => {
 			
 			frm.remove_custom_button("Pick List", 'Create'); 
@@ -21,7 +25,7 @@ frappe.ui.form.on('Sales Order', {
 			frm.remove_custom_button("Request for Raw Materials", 'Create'); 
 			frm.remove_custom_button("Project", 'Create'); 
 			frm.remove_custom_button("Subscription", 'Create'); 
-			
+
 		}, 1000);
 
 		// Add Stock Entry (Transfer material) button
