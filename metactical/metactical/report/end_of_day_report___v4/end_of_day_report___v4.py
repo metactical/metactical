@@ -21,17 +21,19 @@ def execute(filters=None):
 		data.append({"Location": "USA"})
 		data.extend(us_data)
 
-	# Get Rameen data
-	rameen_data = get_rameen_data(item_search_settings, filters)
-	if len(rameen_data) > 0:
-		data.append({"Location": "Rameen"})
-		data.extend(rameen_data)
+	###### ------ New report (End of Day Report - v4 Franchise) created for qc1 and rameen data ------ ###### 
+	
+	# # Get Rameen data
+	# rameen_data = get_rameen_data(item_search_settings, filters)
+	# if len(rameen_data) > 0:
+	# 	data.append({"Location": "Rameen"})
+	# 	data.extend(rameen_data)
 
-	# Get QC1 data
-	qc1_data = get_qc1_data(item_search_settings, filters)
-	if len(qc1_data) > 0:
-		data.append({"Location": "QC1"})
-		data.extend(qc1_data)
+	# # Get QC1 data
+	# qc1_data = get_qc1_data(item_search_settings, filters)
+	# if len(qc1_data) > 0:
+	# 	data.append({"Location": "QC1"})
+	# 	data.extend(qc1_data)
 		
 	return columns, data
 	
