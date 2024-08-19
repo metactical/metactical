@@ -9,20 +9,18 @@ from dateutil.relativedelta import relativedelta
 def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
-	item_search_settings = frappe.get_doc("Item Search Settings")
 
-	# Get Rameen data
-	rameen_data = get_rameen_data(item_search_settings, filters)
-	if len(rameen_data) > 0:
-		# data.append({"Location": "Rameen"})
-		data.extend(rameen_data)
+	# get all the frachise companies and their settings
+	item_search_settings = get_all_franchises()
 
-	# Get QC1 data
-	qc1_data = get_qc1_data(item_search_settings, filters)
-	if len(qc1_data) > 0:
-		data.append({"Location": "QC1"})
-		data.extend(qc1_data)
-		
+	# get end of day report data for each franchise
+	for i, key in enumerate(item_search_settings):
+		franchise_data = get_data(item_search_settings[key], filters)
+		if len(franchise_data) > 0:
+			if i != 0:
+				data.append({"Location": key})
+			data += franchise_data
+
 	return columns, data
 	
 def get_columns(filters):
@@ -61,19 +59,18 @@ def get_columns(filters):
 	]
 	return columns
 
-def get_rameen_data(item_search_settings,  filters):
-	item_search_settings = frappe.get_doc("Item Search Settings")
-	rameen_data = []
-	if item_search_settings.get("rameen_daily_report_url") is not None and item_search_settings.get("rameen_daily_report_url") != "":
-		us_request = requests.get(item_search_settings.get("rameen_daily_report_url"), 
-						auth=(item_search_settings.rameen_api_key, item_search_settings.get_password("rameen_api_secret")),
+def get_data(item_search_settings,  filters):
+	data = []
+	if item_search_settings.get("franchise_url") is not None and item_search_settings.get("franchise_url") != "":
+		franchise_request = requests.get(item_search_settings.get("franchise_url") + "/api/method/metactical.api.end_of_day_report.get_us_report_data", 
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params={"date": filters.get("date")})
 
-		if us_request.status_code == 200:
-			for row in us_request.json().get("message", {}):
-				rameen_data.append(row)
+		if franchise_request.status_code == 200:
+			for row in franchise_request.json().get("message", {}):
+				data.append(row)
 
-	for row in rameen_data:
+	for row in data:
 		if row.get("location") == "Total Stores":
 			row.update({"location": "Stores Total"})
 		elif row.get("location") == "Total Websites":
@@ -81,28 +78,7 @@ def get_rameen_data(item_search_settings,  filters):
 		elif row.get("location") == "USD Total":
 			row.update({"location": "Total - USD"})
 	
-	return rameen_data
-
-def get_qc1_data(item_search_settings, filters):
-	qc1_data = []
-	if item_search_settings.get("qc1_daily_report_url") is not None and item_search_settings.get("qc1_daily_report_url") != "":
-		us_request = requests.get(item_search_settings.get("qc1_daily_report_url"), 
-						auth=(item_search_settings.qc1_api_key, item_search_settings.get_password("qc1_api_secret")),
-									params={"date": filters.get("date")})
-
-		if us_request.status_code == 200:
-			for row in us_request.json().get("message", {}):
-				qc1_data.append(row)
-
-	for row in qc1_data:
-		if row.get("location") == "Total Stores":
-			row.update({"location": "Stores Total"})
-		elif row.get("location") == "Total Websites":
-			row.update({"location": "Websites Total"})
-		elif row.get("location") == "USD Total":
-			row.update({"location": "Total - USD"})
-	
-	return qc1_data
+	return data
 
 @frappe.whitelist()
 def export_to_excel(date):
@@ -119,7 +95,18 @@ def export_to_excel(date):
 		'filters': dates
 	}
 
-	sub_headers = ["QC1", "Rameen"]
+	sub_headers = get_all_franchises().keys()
 	export_query(data, sub_headers)
 
 	
+def get_all_franchises():
+	franchise_settings = frappe.get_list("Item Search Settings Franchise", "*")
+	item_search_settings = {}
+
+	# group the settings by franchise
+	for setting in franchise_settings:
+		franchise = setting.get("franchise_url").split(".")
+		if franchise:
+			item_search_settings[franchise[0][8:]] = frappe.get_doc("Item Search Settings Franchise", setting.get("name"))
+	
+	return item_search_settings
