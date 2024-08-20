@@ -199,8 +199,9 @@ def receive_customer_data():
 				frappe.db.set_value("USAePay Log", log.name, "response", format_json_for_html(event_body), update_modified=False)
 				frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
 			
-			if not log.payment_entry:
+			if log.payment_entry:
 				frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+				
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
 
