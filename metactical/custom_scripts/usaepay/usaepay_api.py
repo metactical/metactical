@@ -166,7 +166,19 @@ def receive_customer_data():
 		if not transaction:
 			return
 
-		event_body["object"] = transaction
+		if frappe.db.exists("Sales Order", {"po_no": transaction["orderid"]}):
+			event_body["object"] = transaction
+			doctype = "Sales Order"
+		else:
+			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"]}):
+				frappe.get_doc({
+					"doctype": "SO USAePay Transaction", 
+					"order_id": transaction["orderid"],
+					"invoice": transaction["invoice"],
+					"credit_card": transaction["creditcard"]["number"],
+					"transaction_key": transaction["key"]
+				}).insert()
+				return
 
 	if not doctype:
 		return
