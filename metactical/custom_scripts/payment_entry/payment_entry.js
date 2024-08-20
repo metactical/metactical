@@ -10,7 +10,7 @@ frappe.ui.form.on("Payment Entry", {
         var user_roles = frappe.user_roles;
 
         if (roles_allowed_to_make_payment.some(role => user_roles.includes(role))) {
-          if (frm.doc.payment_type == "Receive" && frm.doc.docstatus == 1) {
+          if (frm.doc.payment_type == "Receive" && !frm.doc.reference_no && frm.doc.docstatus == 1) {
             frm.add_custom_button(__("Make Payment"), function () {
               goto_payment_form(frm);
             });
