@@ -136,7 +136,6 @@ def get_customer_detail(customer_key, headers):
 @frappe.whitelist()
 def receive_customer_data():
 	response = frappe.form_dict
-	frappe.log_error(title="USAePay Webhook", message=f"USAePay Webhook: {response} type: {type(response)}")
 
 	event_body = response.get("event_body")
 	transaction_key = event_body["object"]["key"]
@@ -153,7 +152,21 @@ def receive_customer_data():
 		else:
 			return
 	else:
-		return
+		metactical_settings = frappe.get_single("Metactical Settings")
+		usaepay_url = metactical_settings.get("usaepay_url")
+		token_hash = get_token_hash(metactical_settings)
+
+		headers = {
+			"Content-Type": "application/json",
+			"Authorization": token_hash
+		}
+
+		transaction = event_body["object"]["key"]
+		transaction = get_transaction_from_usaepay(transaction, headers)
+		if not transaction:
+			return
+
+		event_body["object"] = transaction
 
 	if not doctype:
 		return
@@ -168,7 +181,7 @@ def receive_customer_data():
 		process_credit_card_tokens(event_body, event_body["object"]["customer"])
 
 def process_sales_order(event_body, transaction_key):
-	sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key"], as_dict=1)
+	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key"], as_dict=1)
 
 	if not sales_order.neb_usaepay_transaction_key:
 		frappe.db.set_value("Sales Order", sales_order.name, "neb_usaepay_transaction_key", transaction_key)
@@ -534,6 +547,8 @@ def adjust_payment(docname, advance_paid=None):
 
 			frappe.response["message"] = f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b>"
 			frappe.response["success"] = True
+
+			return adjust_response, log.name
 		else:
 			log.log = f"Transaction {usaepay_transaction_key} not found in USAePay"
 			log.save()
