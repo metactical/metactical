@@ -204,6 +204,8 @@ def on_submit(doc, method):
 							frappe.db.set_value("Payment Entry", doc.name, "reference_no", adjust_response["key"], update_modified=False)
 							frappe.db.commit()
 
+						frappe.msgprint(f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b> for <b>{sales_order}</b>")
+
 def before_submit(doc, method):
 	usaepay_roles = get_usaepay_roles()
 	references = doc.references
