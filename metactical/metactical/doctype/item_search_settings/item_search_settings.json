@@ -13,18 +13,6 @@
   "api_key",
   "api_secret",
   "section_warehouses",
-  "rameen_instance_credentials_section",
-  "rameen_daily_report_url",
-  "rameen_sales_report_url",
-  "column_break_4g42q",
-  "rameen_api_key",
-  "rameen_api_secret",
-  "qc1_instance_credentials_section",
-  "qc1_daily_report_url",
-  "qc1_sales_report_url",
-  "column_break_3h7of",
-  "qc1_api_key",
-  "qc1_api_secret",
   "section_break_svddt",
   "warehouses",
   "section_price_list",
@@ -99,71 +87,13 @@
    "options": "Item Search Settings Franchise"
   },
   {
-   "fieldname": "rameen_instance_credentials_section",
-   "fieldtype": "Section Break",
-   "label": "Rameen Instance Credentials"
-  },
-  {
-   "fieldname": "rameen_daily_report_url",
-   "fieldtype": "Data",
-   "label": "Daily Report URL"
-  },
-  {
-   "fieldname": "rameen_sales_report_url",
-   "fieldtype": "Data",
-   "label": "Sales Report URL"
-  },
-  {
-   "fieldname": "column_break_4g42q",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "rameen_api_key",
-   "fieldtype": "Data",
-   "label": "API Key"
-  },
-  {
-   "fieldname": "rameen_api_secret",
-   "fieldtype": "Password",
-   "label": "API Secret"
-  },
-  {
-   "fieldname": "qc1_instance_credentials_section",
-   "fieldtype": "Section Break",
-   "label": "QC1 Instance Credentials"
-  },
-  {
-   "fieldname": "qc1_daily_report_url",
-   "fieldtype": "Data",
-   "label": "Daily Report URL"
-  },
-  {
-   "fieldname": "qc1_sales_report_url",
-   "fieldtype": "Data",
-   "label": "Sales Report URL"
-  },
-  {
-   "fieldname": "column_break_3h7of",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "qc1_api_key",
-   "fieldtype": "Data",
-   "label": "API Key"
-  },
-  {
-   "fieldname": "qc1_api_secret",
-   "fieldtype": "Password",
-   "label": "API Secret"
-  },
-  {
    "fieldname": "section_break_svddt",
    "fieldtype": "Section Break"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2024-08-13 16:54:10.864373",
+ "modified": "2024-08-19 15:10:15.427702",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
