@@ -15,10 +15,10 @@ frappe.ui.form.on('Purchase Order', {
 	}
 });
 
-erpnext.buying.CustomPurchaseOrderController = class PurchaseOrderController extends erpnext.buying.PurchaseOrderController{
+erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends erpnext.buying.PurchaseOrderController{
 	onload(doc, cdt, cdn){
 		this.setup_queries(doc, cdt, cdn);
-		this._super();
+		super.onload();
 
 		this.frm.set_query('shipping_rule', function() {
 			return {
@@ -63,10 +63,7 @@ erpnext.buying.CustomPurchaseOrderController = class PurchaseOrderController ext
 	}
 	
 	supplier(doc, cdt, cdn){
-		var me = this;
-		erpnext.utils.get_party_details(this.frm, null, null, function(){
-			me.apply_price_list();
-		});
+		super.supplier();
 		// Metactical Customization: Remove address
 		this.frm.set_value("shipping_address", '');
 	}
@@ -97,7 +94,7 @@ erpnext.buying.CustomPurchaseOrderController = class PurchaseOrderController ext
 					},
 					allow_child_item_selection: true,
 					child_fieldname: "items",
-					child_columns: ["item_code", "qty"]
+					child_columns: ["item_code", "qty", "ordered_qty"]
 				})
 			}, __("Get Items From"));
 
@@ -352,4 +349,4 @@ erpnext.buying.CustomPurchaseOrderController = class PurchaseOrderController ext
 	}
 }
 // for backward compatibility: combine new and previous states
-$.extend(cur_frm.cscript, new erpnext.buying.CustomPurchaseOrderController({frm: cur_frm}));
+extend_cscript(cur_frm.cscript, new erpnext.buying.PurchaseOrderController({frm: cur_frm}));
