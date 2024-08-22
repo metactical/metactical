@@ -30,7 +30,7 @@ class CustomPickList(PickList):
 		# self.set_item_locations()
 		
 		# set percentage picked in SO
-		for location in self.get("locations"):
+		for location in self.locations:
 			if (
 				location.sales_order
 				and frappe.db.get_value("Sales Order", location.sales_order, "per_picked") == 100
@@ -331,10 +331,12 @@ def create_pick_list(source_name, target_doc=None):
 
 	doc.purpose = "Delivery"
 	
-	# Metactical Customization: Check if it's from previously canceled sales order
+	# Metactical Customization: Check if it's from previously canceled sales order and
+	# default to manual picking
 	is_reprint = frappe.db.exists('Pick List Item', {'sales_order': source_name, 'docstatus': 2})
 	if is_reprint:
 		doc.reprinted = 1
+	doc.pick_manually = 1
 
 	#doc.set_item_locations()
 
