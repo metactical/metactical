@@ -435,13 +435,11 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 	customer(frm){
 		// Metactical Customization: Clear company address to force them to enter manually
 		var me = this;
-		var args = {"company_address": ''}
-		get_party_details(this.frm, null, null, function() {
+		erpnext.utils.get_party_details(this.frm, null, null, function() {
 			me.apply_price_list();
 			frappe.after_ajax(function(){
 				setTimeout(
 					function(){
-						cur_frm.fields_dict["contact_info"].collapse(0);
 						cur_frm.set_value("company_address", '');
 					}, 2000);
 			});
