@@ -267,3 +267,17 @@ def check_if_payment_can_be_refunded(doc, ref):
 		return True, sales_order, sales_invoice
 	
 	return False, "", ""
+
+@frappe.whitelist()
+def get_mode_of_payment(reference_doctype, reference_name):
+	if reference_doctype != "Sales Order":
+		frappe.response["mode_of_payment"] = "Cash"
+		frappe.response["reference_no"] = ""
+		
+	reference = frappe.db.get_value(reference_doctype, reference_name, "neb_usaepay_transaction_key")
+	if reference:
+		frappe.response["mode_of_payment"] = "Credit Card"
+		frappe.response["reference_no"] = reference
+	else:
+		frappe.response["mode_of_payment"] = "Cash"
+		frappe.response["reference_no"] = ""

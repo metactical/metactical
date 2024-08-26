@@ -38,7 +38,8 @@ class SalesOrderCustom(SalesOrder):
 		
 		if self.po_no and not self.neb_usaepay_transaction_key:
 			self.get_transaction_key()
-			
+			frappe.enqueue(set_reference_in_pe, queue='short', sales_order=self.name, reference=self.neb_usaepay_transaction_key)
+
 	def pull_reserved_qty(self):
 		for row in self.items:
 			#Check if bin exists
@@ -95,6 +96,14 @@ class SalesOrderCustom(SalesOrder):
 		process_credit_card_tokens(obj, self.customer)
 		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 
+def set_reference_in_pe(sales_order, reference):
+	try:
+		pe = frappe.db.get_value("Payment Entry Reference", {"reference_name": sales_order}, "parent")
+		if pe:
+			frappe.db.set_value("Payment Entry", pe, "reference_no", reference, update_modified=False)
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), _("Error in setting reference in Payment Entry"))
+	
 @frappe.whitelist()
 def save_cancel_reason(**args):
 	args = frappe._dict(args)
