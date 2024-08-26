@@ -552,6 +552,15 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "End Of Day Report - V4 Franchise",
+   "link_to": "End of Day Report - V4 Franchise",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Sales Register",
    "link_to": "Metactical Sales Register",
    "link_type": "Report",
