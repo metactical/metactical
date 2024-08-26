@@ -18,7 +18,7 @@ frappe.ui.form.on("Payment Entry", {
         }
       }
     })
-    
+
   },
   source_exchange_rate: function (frm) {
     if (frm.doc.paid_amount) {
@@ -56,8 +56,9 @@ frappe.ui.form.on("Payment Entry", {
 var goto_payment_form = function (frm) {
   // get customer information
   frappe.call({
-    method:
-      "metactical.custom_scripts.utils.metactical_utils.get_customer_payment_information",
+    method:"metactical.custom_scripts.utils.metactical_utils.get_customer_payment_information",
+    freeze: true,
+    freeze_message: __("Fetching customer information..."),
     args: {
       customer: frm.doc.party,
     },
@@ -129,6 +130,8 @@ var goto_payment_form = function (frm) {
               "Shipping"
             );
 
+            add_to_log(frm, values, billing_address);
+
             var url_params = "";
             if (billing_address) {
               url_params += billing_address;
@@ -155,6 +158,27 @@ var goto_payment_form = function (frm) {
 
       d.show();
     },
+  });
+};
+
+var add_to_log = function (frm, values, billing_address) {
+  var log = {
+    payment_entry: frm.doc.name,
+    invoice: values.invoice,
+    amount: values.amount,
+    billing_address: billing_address
+  };
+
+  frappe.call({
+    method: "metactical.custom_scripts.usaepay.usaepay_api.add_to_log",
+    args: {
+      log: log,
+    },
+    callback: (res) => {
+      if (res.error) {
+        frappe.msgprint(res.error);
+      }
+    }
   });
 };
 
@@ -220,6 +244,8 @@ var make_payment = function (frm, values, tokens) {
 
   frappe.call({
     method: "metactical.custom_scripts.usaepay.usaepay_api.make_payment",
+    freeze: true,
+    freeze_message: "Charging Customer in USAePay ....",
     args: {
       customer: frm.doc.party,
       amount: values.amount,

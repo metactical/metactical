@@ -90,7 +90,7 @@ def get_card_token(usaepay_url, transaction_key, headers):
 		return token.get("token").get("cardref")
 	else:
 		response = json.loads(response.text)
-		frappe.throw(_(f"Failed to get card token from USAePay: {response.error}"))
+		frappe.throw(_(f"Failed to get card token from USAePay: {response}"))
 
 def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 	payload = {
@@ -136,7 +136,7 @@ def get_customer_detail(customer_key, headers):
 @frappe.whitelist()
 def receive_customer_data():
 	response = frappe.form_dict
-
+	
 	event_body = response.get("event_body")
 	transaction_key = event_body["object"]["key"]
 
@@ -192,16 +192,32 @@ def receive_customer_data():
 	else:
 		process_credit_card_tokens(event_body, event_body["object"]["customer"])
 
+	try:
+		log = frappe.db.get_value("USAePay Log", {"reference_docname": event_body["object"]["invoice"], "action": "New Payment", "reference_doctype": doctype}, ["name", "response", "payment_entry"], as_dict=True)
+		if log:
+			if not log.response:
+				frappe.db.set_value("USAePay Log", log.name, "response", format_json_for_html(event_body), update_modified=False)
+				frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
+			
+			if log.payment_entry:
+				frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+				
+	except Exception as e:
+		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
+
 def process_sales_order(event_body, transaction_key):
 	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key"], as_dict=1)
+	if not sales_order:
+		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key"], as_dict=1)
+	
+		if not sales_order:
+			return
 
-	if not sales_order.neb_usaepay_transaction_key:
+	if not sales_order["neb_usaepay_transaction_key"]:
 		frappe.db.set_value("Sales Order", sales_order.name, "neb_usaepay_transaction_key", transaction_key)
 
 	customer = sales_order.customer
-
 	process_credit_card_tokens(event_body, customer)
-
 
 def process_payment_entry(event_body, transaction_key):
 	frappe.db.set_value("Payment Entry", event_body["object"]["invoice"], "reference_no", transaction_key)
@@ -222,7 +238,6 @@ def process_sales_invoice(event_body, transaction_key):
 			break
 
 	process_credit_card_tokens(event_body, sales_invoice.customer)
-
 
 def process_credit_card_tokens(event_body, customer):
 	transaction_key = event_body["object"]["key"]
@@ -591,3 +606,36 @@ def get_usaepay_roles():
 	except Exception as e:
 		frappe.log_error(title="USAePay Roles Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to get USAePay roles: {0}".format(e), title="Error")
+
+@frappe.whitelist()
+def add_to_log(log):
+	log = json.loads(log)
+	payment_entry = log.get("payment_entry")
+	invoice = log.get("invoice")
+	amount = log.get("amount")
+	billing_address = log.get("billing_address")
+	doctype = "Payment Entry"
+
+	if frappe.db.exists("Sales Invoice", invoice):
+		doctype = "Sales Invoice"
+	elif frappe.db.exists("Sales Order", invoice):
+		doctype = "Sales Order"
+
+	request = {
+		"amount": amount,
+		"command": "cc:sale",
+		"invoice": invoice,
+		"billing": billing_address
+	}
+
+	frappe.get_doc({
+		"doctype": "USAePay Log",
+		"payment_entry": payment_entry,
+		"invoice": invoice,
+		"amount": amount,
+		"request": format_json_for_html(request),
+		"action": "New Payment",
+		"reference_doctype": doctype,
+		"reference_docname": invoice,
+		"date": frappe.utils.now()
+	}).insert()

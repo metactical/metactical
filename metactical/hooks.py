@@ -56,6 +56,7 @@ doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
+	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
