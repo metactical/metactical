@@ -26,6 +26,7 @@ def execute(filters=None):
 	
 	# add totals to the end of the data
 	data.append({})
+	location = ""
 	
 	if len(totals) > 0:
 		location = totals[0]["location"]
