@@ -1,6 +1,26 @@
 frappe.ui.form.on("Payment Entry", {
   refresh: function (frm) {
+    console.log("refresh", frm.doc.mode_of_payment, frm.doc.references);
+    if (!frm.doc.mode_of_payment && frm.doc.references) {
+      if (frm.doc.references.length == 1)
+        frm.trigger("get_mode_of_payment");
+    }
+
     frm.trigger("make_payment_button");
+  },
+  get_mode_of_payment: function (frm) {
+    console.log("get_mode_of_payment");
+    frappe.call({
+      method: "metactical.custom_scripts.payment_entry.payment_entry.get_mode_of_payment",
+      args: {
+        reference_doctype: frm.doc.references[0].reference_doctype,
+        reference_name: frm.doc.references[0].reference_name,
+      },
+      callback: function (r) {
+        frm.set_value("mode_of_payment", r.mode_of_payment);
+        frm.set_value("reference_no", r.reference_no);
+      }
+    });
   },
   make_payment_button: function (frm) {
     frappe.call({
@@ -10,9 +30,14 @@ frappe.ui.form.on("Payment Entry", {
         var user_roles = frappe.user_roles;
 
         if (roles_allowed_to_make_payment.some(role => user_roles.includes(role))) {
-          if (frm.doc.payment_type == "Receive" && !frm.doc.reference_no && frm.doc.docstatus == 1) {
-            frm.add_custom_button(__("Make Payment"), function () {
-              goto_payment_form(frm);
+          if (frm.doc.payment_type == "Receive" && 
+              frm.doc.party &&
+              !frm.doc.reference_no && 
+              frm.doc.docstatus == 0 &&
+              !frm.doc.__islocal
+            ) {
+              frm.add_custom_button(__("Make Payment"), function () {
+                goto_payment_form(frm);
             });
           }
         }
