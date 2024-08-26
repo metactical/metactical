@@ -81,6 +81,7 @@ def get_columns(filters):
 	return columns
 
 def get_data(item_search_settings,  filters):
+	data = []
 	if item_search_settings.get("franchise_url") is not None and item_search_settings.get("franchise_url") != "":
 		franchise_request = requests.get(item_search_settings.get("franchise_url") + "/api/method/metactical.api.end_of_day_report.get_franchise_report_data", 
 						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
