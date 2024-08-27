@@ -318,8 +318,12 @@ class CustomPickList(PickList):
 
 #  Function to extract numerical parts and convert them to integers for sorting
 def sort_key(item):
-    parts = re.split(r'[-]', item)
-    return [int(part) if part.isdigit() else part for part in parts]
+	item = re.split(r'[|]', item)
+	if item:
+		parts = re.split(r'[-]', item[0])
+		return [int(part) if part.isdigit() else part for part in parts]
+	
+	return [0]
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
