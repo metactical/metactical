@@ -321,7 +321,7 @@ def sort_key(item):
 	item = re.split(r'[|]', item)
 	if item:
 		parts = re.split(r'[-]', item[0])
-		return [int(part) if part.isdigit() else part for part in parts]
+		return [int(part) if part.strip().isdigit() else part.strip() for part in parts]
 	
 	return [0]
 
