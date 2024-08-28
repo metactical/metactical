@@ -14,7 +14,8 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 	get_usaepay_transaction_detail, 
 	refund_payment, 
 	adjust_payment,
-	get_usaepay_roles
+	get_usaepay_roles,
+	void_payment_in_usaepay
 )
 
 @frappe.whitelist()
@@ -267,6 +268,26 @@ def check_if_payment_can_be_refunded(doc, ref):
 		return True, sales_order, sales_invoice
 	
 	return False, "", ""
+
+@frappe.whitelist()
+def void_payment(name):
+	pe = frappe.get_doc("Payment Entry", name)
+	usaepay_roles = get_usaepay_roles()
+	user_roles = frappe.get_roles()
+
+	if not any(role in usaepay_roles["cancel_payment"] for role in user_roles):
+		frappe.throw(_("You do not have permission to void a payment. Please contact System Administrator."))
+
+	if pe.reference_no:
+		response, log = void_payment_in_usaepay("Payment Entry", name, pe.reference_no)
+		if response:
+			if response.get("error"):
+				frappe.throw(response["error"])
+			elif response.get("result") == "Approved":
+				frappe.db.set_value("Payment Entry", name, "reference_no", "")
+				frappe.db.set_value("USAePay Log", log, "payment_entry", name)
+				frappe.db.commit()
+				frappe.msgprint(_("Payment voided successfully."))
 
 @frappe.whitelist()
 def get_mode_of_payment(reference_doctype, reference_name):
