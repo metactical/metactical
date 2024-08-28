@@ -143,6 +143,7 @@ def receive_customer_data():
 	docs_to_check = ["Sales Order", "Sales Invoice", "Payment Entry"]
 	doctype = ""
 
+	# check if the trnsaction is initiated from a payment Entry in the ERP
 	if "invoice" in event_body["object"]:
 		if event_body["object"]["invoice"]:
 			for doc in docs_to_check:
@@ -151,6 +152,9 @@ def receive_customer_data():
 					break
 		else:
 			return
+	# when the payment is created from the website and the SO is not created yet
+	# webhook's response will be added to a temporary doc and then will be processed when the SO is created.
+	# This is to avoid the case where the webhook response comes before the SO is created in the ERP
 	else:
 		metactical_settings = frappe.get_single("Metactical Settings")
 		usaepay_url = metactical_settings.get("usaepay_url")
@@ -166,6 +170,7 @@ def receive_customer_data():
 		if not transaction:
 			return
 
+		# check if the SO is created by the SB before usaepay webhook response
 		if frappe.db.exists("Sales Order", {"po_no": transaction["orderid"]}):
 			event_body["object"] = transaction
 			doctype = "Sales Order"
@@ -180,6 +185,7 @@ def receive_customer_data():
 				}).insert()
 				return
 
+	# doctype = the doctype referenced in the Payment Entry or the Sales order created by the SB
 	if not doctype:
 		return
 
@@ -191,7 +197,8 @@ def receive_customer_data():
 		process_sales_invoice(event_body, transaction_key)
 	else:
 		process_credit_card_tokens(event_body, event_body["object"]["customer"])
-
+	
+	# log the response from USAePay if the transaction is initiated from the ERP
 	try:
 		log = frappe.db.get_value("USAePay Log", {"reference_docname": event_body["object"]["invoice"], "action": "New Payment", "reference_doctype": doctype}, ["name", "response", "payment_entry"], as_dict=True)
 		if log:
@@ -644,8 +651,6 @@ def get_usaepay_roles():
 		adjust = metactical_settings.get("roles_to_adjust_payment")
 		make_payment = metactical_settings.get("roles_to_make_payment")
 		cancel_payment = metactical_settings.get("roles_to_cancel_payment")
-
-		print(refund, adjust, make_payment, cancel_payment)
 		
 		return {
 			"refund": [role.role for role in refund],

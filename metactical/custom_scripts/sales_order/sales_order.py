@@ -38,7 +38,6 @@ class SalesOrderCustom(SalesOrder):
 		
 		if self.po_no and not self.neb_usaepay_transaction_key:
 			self.get_transaction_key()
-			frappe.enqueue(set_reference_in_pe, queue='short', sales_order=self.name, reference=self.neb_usaepay_transaction_key)
 
 	def pull_reserved_qty(self):
 		for row in self.items:
