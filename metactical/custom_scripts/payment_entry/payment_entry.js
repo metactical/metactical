@@ -1,6 +1,5 @@
 frappe.ui.form.on("Payment Entry", {
     refresh: function (frm) {
-        console.log("refresh", frm.doc.mode_of_payment, frm.doc.references);
         if (!frm.doc.mode_of_payment && frm.doc.references) {
             if (frm.doc.references.length == 1)
                 frm.trigger("get_mode_of_payment");
@@ -9,7 +8,6 @@ frappe.ui.form.on("Payment Entry", {
         frm.trigger("custom_buttons");
     },
     get_mode_of_payment: function (frm) {
-        console.log("get_mode_of_payment");
         frappe.call({
             method: "metactical.custom_scripts.payment_entry.payment_entry.get_mode_of_payment",
             args: {
@@ -46,8 +44,6 @@ frappe.ui.form.on("Payment Entry", {
                         });
                     }
                 }
-
-                console.log("roles_allowed_to_cancel_payment", roles_allowed_to_cancel_payment, frm.doc)
 
                 if (
                     roles_allowed_to_cancel_payment.some((role) =>

@@ -75,9 +75,9 @@ class SalesOrderCustom(SalesOrder):
 		if not self.po_no:
 			return
 
-		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":self.po_no})
+		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":self.po_no, "lead_source": self.source})
 		if not so_usaepay_transaction:
-			so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": self.po_no})
+			so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": self.po_no, "lead_source": self.source})
 			if not so_usaepay_transaction:
 				return
 
