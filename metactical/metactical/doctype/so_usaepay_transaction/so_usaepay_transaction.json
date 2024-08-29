@@ -9,7 +9,9 @@
   "order_id",
   "invoice",
   "credit_card",
-  "transaction_key"
+  "transaction_key",
+  "merchant_id",
+  "lead_source"
  ],
  "fields": [
   {
@@ -32,11 +34,21 @@
    "fieldname": "transaction_key",
    "fieldtype": "Data",
    "label": "Transaction Key"
+  },
+  {
+   "fieldname": "merchant_id",
+   "fieldtype": "Data",
+   "label": "Merchant ID"
+  },
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Data",
+   "label": "Lead Source"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-20 08:37:50.997117",
+ "modified": "2024-08-29 07:37:41.666244",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SO USAePay Transaction",

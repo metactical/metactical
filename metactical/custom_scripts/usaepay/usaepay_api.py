@@ -175,13 +175,17 @@ def receive_customer_data():
 			event_body["object"] = transaction
 			doctype = "Sales Order"
 		else:
-			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"]}):
+			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "marchant_id": event_body["merchant"]["merch_key"]}):
+				lead_source = frappe.db.get_value("USAePay Merchant ID", {"merchant_id": event_body["merchant"]["merch_key"]}, "lead_source")
+
 				frappe.get_doc({
 					"doctype": "SO USAePay Transaction", 
 					"order_id": transaction["orderid"],
 					"invoice": transaction["invoice"],
 					"credit_card": transaction["creditcard"]["number"],
-					"transaction_key": transaction["key"]
+					"transaction_key": transaction["key"],
+					"merchant_id": event_body["merchant"]["merch_key"],
+					"lead_source": lead_source
 				}).insert()
 				return
 
