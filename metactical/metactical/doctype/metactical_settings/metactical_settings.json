@@ -14,10 +14,12 @@
   "api_key",
   "pin",
   "payment_form_url",
+  "usaepay_merchant_id",
   "column_break_lmdac",
   "roles_to_refund",
   "roles_to_adjust_payment",
-  "roles_to_make_payment"
+  "roles_to_make_payment",
+  "roles_to_cancel_payment"
  ],
  "fields": [
   {
@@ -84,12 +86,24 @@
    "fieldtype": "Table",
    "label": "Roles Allowed To Make Payment",
    "options": "MT Roles List"
+  },
+  {
+   "fieldname": "usaepay_merchant_id",
+   "fieldtype": "Table",
+   "label": "Lead Source - USAePay Merchant ID Mapping",
+   "options": "USAePay Merchant ID"
+  },
+  {
+   "fieldname": "roles_to_cancel_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Cancel Payment",
+   "options": "MT Roles List"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-08-05 15:26:38.418034",
+ "modified": "2024-08-29 10:58:11.767300",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",

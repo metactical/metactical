@@ -143,6 +143,7 @@ def receive_customer_data():
 	docs_to_check = ["Sales Order", "Sales Invoice", "Payment Entry"]
 	doctype = ""
 
+	# check if the trnsaction is initiated from a payment Entry in the ERP
 	if "invoice" in event_body["object"]:
 		if event_body["object"]["invoice"]:
 			for doc in docs_to_check:
@@ -151,6 +152,9 @@ def receive_customer_data():
 					break
 		else:
 			return
+	# when the payment is created from the website and the SO is not created yet
+	# webhook's response will be added to a temporary doc and then will be processed when the SO is created.
+	# This is to avoid the case where the webhook response comes before the SO is created in the ERP
 	else:
 		metactical_settings = frappe.get_single("Metactical Settings")
 		usaepay_url = metactical_settings.get("usaepay_url")
@@ -166,20 +170,26 @@ def receive_customer_data():
 		if not transaction:
 			return
 
+		# check if the SO is created by the SB before usaepay webhook response
 		if frappe.db.exists("Sales Order", {"po_no": transaction["orderid"]}):
 			event_body["object"] = transaction
 			doctype = "Sales Order"
 		else:
-			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"]}):
+			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "marchant_id": event_body["merchant"]["merch_key"]}):
+				lead_source = frappe.db.get_value("USAePay Merchant ID", {"merchant_id": event_body["merchant"]["merch_key"]}, "lead_source")
+
 				frappe.get_doc({
 					"doctype": "SO USAePay Transaction", 
 					"order_id": transaction["orderid"],
 					"invoice": transaction["invoice"],
 					"credit_card": transaction["creditcard"]["number"],
-					"transaction_key": transaction["key"]
+					"transaction_key": transaction["key"],
+					"merchant_id": event_body["merchant"]["merch_key"],
+					"lead_source": lead_source
 				}).insert()
 				return
 
+	# doctype = the doctype referenced in the Payment Entry or the Sales order created by the SB
 	if not doctype:
 		return
 
@@ -191,7 +201,8 @@ def receive_customer_data():
 		process_sales_invoice(event_body, transaction_key)
 	else:
 		process_credit_card_tokens(event_body, event_body["object"]["customer"])
-
+	
+	# log the response from USAePay if the transaction is initiated from the ERP
 	try:
 		log = frappe.db.get_value("USAePay Log", {"reference_docname": event_body["object"]["invoice"], "action": "New Payment", "reference_doctype": doctype}, ["name", "response", "payment_entry"], as_dict=True)
 		if log:
@@ -372,6 +383,9 @@ def make_payment(customer, amount, token, payment_entry=None):
 		response = requests.post(usaepay_url + "/transactions", headers=headers, data=json.dumps(payload))
 		handle_payment_response(response, log)
 		frappe.db.set_value("Payment Entry", payment_entry, "reference_no", log.transaction_key)
+		payment_entry = frappe.get_doc("Payment Entry", payment_entry)
+		payment_entry.submit()
+
 	except Exception as e:
 		handle_payment_exception(e, log)
 
@@ -589,6 +603,49 @@ def adjust_payment(docname, advance_paid=None):
 		# frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to adjust payment: {0}".format(e), title="Error")
 
+def void_payment_in_usaepay(doctype, docname, reference_no):
+	metactical_settings = frappe.get_single("Metactical Settings")
+	usaepay_url = metactical_settings.get("usaepay_url")
+
+	# Generate token hash
+	token_hash = get_token_hash(metactical_settings)
+
+	headers = {
+		"Content-Type": "application/json",
+		"Authorization": token_hash
+	}
+
+	args = {
+		"trankey": reference_no,
+		"command": "void"
+	}
+
+	log = create_usaepay_log(doctype, docname, "Void")
+	log.request = format_json_for_html(args)
+
+	try:
+		response = requests.post(usaepay_url + "/transactions", headers=headers, data=json.dumps(args))
+		if response.status_code == 200:
+			void_response = json.loads(response.text)
+			log.response = format_json_for_html(void_response)
+			log.save()
+
+			frappe.response["message"] = f"Payment voided successfully"
+			frappe.response["success"] = True
+
+			return void_response, log.name
+		else:
+			response = json.loads(response.text)
+			log.response = format_json_for_html(response)
+			log.save()
+
+			frappe.throw("Unable to void payment: {0}".format(response.get("error")))
+	except Exception as e:
+		log.log = frappe.get_traceback()
+		log.save()
+
+		frappe.throw("Unable to void payment: {0}".format(e))
+
 @frappe.whitelist()
 def get_usaepay_roles():
 	try:
@@ -597,11 +654,13 @@ def get_usaepay_roles():
 		refund = metactical_settings.get("roles_to_refund")
 		adjust = metactical_settings.get("roles_to_adjust_payment")
 		make_payment = metactical_settings.get("roles_to_make_payment")
-
+		cancel_payment = metactical_settings.get("roles_to_cancel_payment")
+		
 		return {
 			"refund": [role.role for role in refund],
 			"adjust": [role.role for role in adjust],
-			"make_payment": [role.role for role in make_payment]
+			"make_payment": [role.role for role in make_payment],
+			"cancel_payment": [role.role for role in cancel_payment]
 		}
 	except Exception as e:
 		frappe.log_error(title="USAePay Roles Error", message=frappe.get_traceback())
