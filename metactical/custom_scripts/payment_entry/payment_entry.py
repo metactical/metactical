@@ -215,7 +215,7 @@ def on_submit(doc, method):
 
 						frappe.msgprint(f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b> for <b>{sales_order}</b>")
 				else:
-					if not usaepay_transaction_key:
+					if usaepay_transaction_key:
 						frappe.db.set_value("Payment Entry", doc.name, "reference_no", usaepay_transaction_key, update_modified=False)
 
 # check if the current user is allowed to process a refund and adjust a payment
