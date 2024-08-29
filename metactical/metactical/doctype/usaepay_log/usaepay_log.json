@@ -17,6 +17,7 @@
   "reference_docname",
   "payment_entry",
   "sales_return",
+  "is_cancelled",
   "reason",
   "section_break_6hrgt",
   "request",
@@ -119,19 +120,28 @@
    "fieldname": "payment_entry",
    "fieldtype": "Link",
    "label": "Payment Entry",
-   "options": "Payment Entry"
+   "options": "Payment Entry",
+   "read_only": 1
   },
   {
    "depends_on": "eval:doc.action==\"Refund\"",
    "fieldname": "sales_return",
    "fieldtype": "Link",
    "label": "Sales Return",
-   "options": "Sales Invoice"
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_cancelled",
+   "fieldtype": "Check",
+   "label": "Is Cancelled",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-27 13:34:53.748151",
+ "modified": "2024-08-29 16:44:25.477677",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "USAePay Log",
