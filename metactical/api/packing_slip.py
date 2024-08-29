@@ -31,10 +31,10 @@ def get_item_master(items):
 				for barcode in item_doc.barcodes:
 					barcodes.append(barcode.barcode)
 			item["item_barcode"] = barcodes
-			item["shipping_height"] = item_doc.get("ais_shipping_height")
-			item["shipping_width"] = item_doc.get("ais_shipping_width")
-			item["shipping_length"] = item_doc.get("ais_shipping_length")
-			item["weight"] = item_doc.get("weight_per_unit")
+			item["shipping_height"] = item_doc.get("ais_shipping_height") or 0
+			item["shipping_width"] = item_doc.get("ais_shipping_width") or 0
+			item["shipping_length"] = item_doc.get("ais_shipping_length") or 0
+			item["weight"] = item_doc.get("weight_per_unit") or 0
 		temp_items.append(item)
 		
 	return temp_items

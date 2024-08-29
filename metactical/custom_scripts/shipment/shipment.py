@@ -8,7 +8,7 @@ from frappe.utils import get_files_path
 def validate(doc, method=None):
 	for parcel in doc.shipment_parcel:
 		if parcel.weight > 32:
-			frappe.throw(_("Weight doesn't allow more than 32 Kg"))
+			frappe.msgprint(_("Weight doesn't allow more than 32 Kg"))
 
 
 def before_cancel(doc, method=None):

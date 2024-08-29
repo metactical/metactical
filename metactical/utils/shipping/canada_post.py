@@ -65,6 +65,9 @@ class CanadaPost():
 			'User', doc.pickup_contact_person).as_dict()
 		delivery_contact_doc = frappe.get_doc(
 			'Contact', doc.delivery_contact_name).as_dict()
+		customer_first_name, customer_last_name = frappe.db.get_value("Customer", doc.delivery_customer, ["first_name", "last_name"])
+		delivery_contact_doc.first_name = customer_first_name
+		delivery_contact_doc.last_name = customer_last_name
 		delivery_note = frappe.get_doc(
 			'Delivery Note', doc.shipment_delivery_note[-1].delivery_note).as_dict()
 		return frappe._dict({

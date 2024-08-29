@@ -231,11 +231,12 @@
 	float: left;
 }
 
-.pl-filters, .pl-multi-filters {
+.pl-sort-selector, .pl-multi-filters {
 	float: right;
 	padding-top: 25px;
 	margin-right: 0px;
 	padding-right: 0px;
+	margin-left: 15px;
 }
 
 .tote-check{

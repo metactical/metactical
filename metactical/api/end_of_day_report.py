@@ -2,7 +2,7 @@ import frappe
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_us_report_data(date):
 	#date = "2023-02-16"
 	data = []
@@ -29,7 +29,7 @@ def get_us_report_data(date):
 					FROM
 						`tabSales Invoice`
 					WHERE
-						source = %(source)s AND posting_date = %(date)s
+						source = %(source)s AND neb_payment_completed_at = %(date)s
 						AND docstatus = 1"""
 			query = frappe.db.sql(sql, {"source": source.name, "date": date}, as_dict=1)
 			if len(query) > 0:
@@ -51,7 +51,7 @@ def get_us_report_data(date):
 									FROM
 										`tabSales Invoice`
 									WHERE
-										source = %(source)s AND posting_date BETWEEN %(start_date)s
+										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""",
 								{"source": source.name, "start_date": start_date, "end_date": date}, as_dict=1)
 			if len(query) > 0:
@@ -71,9 +71,9 @@ def get_us_report_data(date):
 			query = frappe.db.sql("""SELECT
 										COALESCE(SUM(total), 0) AS total_pmtd
 									FROM
-										`tabSales Order`
+										`tabSales Invoice`
 									WHERE
-										source = %(source)s AND transaction_date BETWEEN %(start_date)s
+										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""", 
 								{"source": source.name, "start_date": start_date, "end_date": end_date}, as_dict=1)
 			if len(query) > 0:
@@ -101,7 +101,7 @@ def get_us_report_data(date):
 					FROM
 						`tabSales Order`
 					WHERE
-						source = %(source)s AND transaction_date = %(date)s
+						source = %(source)s AND neb_payment_completed_at = %(date)s
 						AND docstatus = 1"""
 			query = frappe.db.sql(sql, {"source": source.name, "date": date}, as_dict=1)
 			if len(query) > 0:
@@ -122,7 +122,7 @@ def get_us_report_data(date):
 									FROM
 										`tabSales Order`
 									WHERE
-										source = %(source)s AND transaction_date BETWEEN %(start_date)s
+										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""",
 								{"source": source.name, "start_date": start_date, "end_date": date}, as_dict=1)
 			if len(query) > 0:
@@ -144,7 +144,7 @@ def get_us_report_data(date):
 									FROM
 										`tabSales Order`
 									WHERE
-										source = %(source)s AND transaction_date BETWEEN %(start_date)s
+										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
 										AND %(end_date)s AND docstatus = 1""", 
 								{"source": source.name, "start_date": start_date, "end_date": end_date}, as_dict=1)
 			if len(query) > 0:

@@ -12,6 +12,9 @@
             <contact-phone>{{ pickup_contact_person_doc.mobile_no }}</contact-phone>
             <address-details>
                 <address-line-1>{{ pickup_address_doc.address_line1 }}</address-line-1>
+				{% if pickup_address_doc.address_line2 %}
+					<address-line-2>{{ pickup_address_doc.address_line2 }}</address-line-2>
+				{% endif %}
                 <city>{{ pickup_address_doc.city }}</city>
                 <prov-state>{{ pickup_address_doc.state or "" }}</prov-state>
                 <country-code>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code").upper() }}</country-code>
@@ -23,6 +26,9 @@
             <company>{{ delivery_contact_doc.company_name or "" }}</company>
             <address-details>
                 <address-line-1>{{ delivery_address_doc.address_line1 }}</address-line-1>
+				{% if delivery_address_doc.address_line2 %}
+					<address-line-2>{{ delivery_address_doc.address_line2 }}</address-line-2>
+				{% endif %}
                 <city>{{ delivery_address_doc.city }}</city>
                 <prov-state>{{ delivery_address_doc.state or "" }}</prov-state>
                 <country-code>{{ frappe.db.get_value("Country", delivery_address_doc.country, "code")|upper }}</country-code>

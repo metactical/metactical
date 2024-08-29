@@ -13,7 +13,7 @@ import datetime
 
 class CustomAutoEmailReport(AutoEmailReport):
 	def get_html_table(self, columns=None, data=None):
-		if self.report == "End of Day Report - V4":
+		if self.report == "End of Day Report - V4" or self.report == "End of Day Report - V4 Franchise":
 			date_time = global_date_format(now()) + " " + format_time(now())
 			report_doctype = frappe.db.get_value("Report", self.report, "ref_doctype")
 

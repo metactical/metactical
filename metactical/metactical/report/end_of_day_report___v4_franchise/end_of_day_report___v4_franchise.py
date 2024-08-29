@@ -1,0 +1,112 @@
+# Copyright (c) 2023, Techlift Technologies and contributors
+# For license information, please see license.txt
+
+import frappe
+import requests
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+
+def execute(filters=None):
+	columns, data = [], []
+	columns = get_columns(filters)
+
+	# get all the frachise companies and their settings
+	item_search_settings = get_all_franchises()
+
+	# get end of day report data for each franchise
+	for i, key in enumerate(item_search_settings):
+		franchise_data = get_data(item_search_settings[key], filters)
+		if len(franchise_data) > 0:
+			if i != 0:
+				data.append({"Location": key})
+			data += franchise_data
+
+	return columns, data
+	
+def get_columns(filters):
+	columns = [
+		{
+			"fieldname": "location",
+			"fieldtype": "Location",
+			"label": "Location",
+			"options": "Lead Source",
+			"width": 200
+		},
+		{
+			"fieldname": "total_without_tax",
+			"fieldtype": "Currency",
+			"label": "Total Without Tax",
+			"width": 140
+		},
+		{
+			"fieldname": "space",
+			"fieldtype": "Data",
+			"label": "",
+			"width": 100
+		},
+		{
+			"fieldname": "total_mtd",
+			"fieldtype": "Currency",
+			"label": "CMA Sales",
+			"width": 120
+		},
+		{
+			"fieldname": "total_pmtd",
+			"fieldtype": "Currency",
+			"label": "PYMA Sales",
+			"width": 120
+		}
+	]
+	return columns
+
+def get_data(item_search_settings,  filters):
+	data = []
+	if item_search_settings.get("franchise_url") is not None and item_search_settings.get("franchise_url") != "":
+		franchise_request = requests.get(item_search_settings.get("franchise_url") + "/api/method/metactical.api.end_of_day_report.get_us_report_data", 
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
+									params={"date": filters.get("date")})
+
+		if franchise_request.status_code == 200:
+			for row in franchise_request.json().get("message", {}):
+				data.append(row)
+
+	for row in data:
+		if row.get("location") == "Total Stores":
+			row.update({"location": "Stores Total"})
+		elif row.get("location") == "Total Websites":
+			row.update({"location": "Websites Total"})
+		elif row.get("location") == "USD Total":
+			row.update({"location": "Total - USD"})
+	
+	return data
+
+@frappe.whitelist()
+def export_to_excel(date):
+	from metactical.custom_scripts.utils.metactical_utils import export_query
+
+	dates = {
+		"date": date,
+		"end_date": (datetime.strptime(date, "%Y-%m-%d") + relativedelta(days=1)).strftime("%Y-%m-%d")
+	}
+
+	data = {
+		'report_name': 'End of Day Report - V4 Franchise', 
+		'file_format_type': 'Excel', 
+		'filters': dates
+	}
+
+	sub_headers = get_all_franchises().keys()
+	export_query(data, sub_headers)
+
+	
+def get_all_franchises():
+	franchise_settings = frappe.get_list("Item Search Settings Franchise", "*")
+	item_search_settings = {}
+
+	# group the settings by franchise
+	for setting in franchise_settings:
+		franchise = setting.get("franchise_url").split(".")
+		if franchise:
+			item_search_settings[franchise[0][8:]] = frappe.get_doc("Item Search Settings Franchise", setting.get("name"))
+	
+	return item_search_settings
