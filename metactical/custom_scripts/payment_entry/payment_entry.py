@@ -291,26 +291,44 @@ def void_payment(name):
 	if not any(role in usaepay_roles["cancel_payment"] for role in user_roles):
 		frappe.throw(_("You do not have permission to void a payment. Please contact System Administrator."))
 
-	if pe.reference_no:
-		response, log = void_payment_in_usaepay("Payment Entry", name, pe.reference_no)
-		if response:
-			if response.get("error"):
-				frappe.throw(response["error"])
-			elif response.get("result") == "Approved":
-				frappe.db.set_value("Payment Entry", name, "reference_no", "")
-				frappe.db.set_value("USAePay Log", log, "payment_entry", name)
-				frappe.db.commit()
-				frappe.msgprint(_("Payment voided successfully."))
-	else:
-		frappe.throw(_("No reference number found for this Payment Entry."))
+	try:
+		if pe.reference_no:
+			response, log = void_payment_in_usaepay("Payment Entry", name, pe.reference_no)
+			if response:
+				if response.get("error"):
+					frappe.throw(response["error"])
+				elif response.get("result") == "Approved":
+					frappe.db.set_value("Payment Entry", name, "reference_no", "")
+					frappe.db.set_value("USAePay Log", log, "payment_entry", name)
+					frappe.db.commit()
+					frappe.msgprint(_("Payment voided successfully."))
+					frappe.get_doc("Payment Entry", name).cancel()
+		else:
+			frappe.throw(_("No reference number found for this Payment Entry."))
+	except Exception as e:
+		frappe.log.error(title="Void Payment Error", message=e)
+		frappe.throw(_("Unable to void payment. {0}").format(e))
 
 @frappe.whitelist()
 def get_mode_of_payment(reference_doctype, reference_name):
-	if reference_doctype != "Sales Order":
+	reference = ""
+
+	if reference_doctype == "Sales Invoice":
+		sales_order = frappe.db.get_value("Sales Invoice Item", {"parent": reference_name}, "sales_order")
+		is_return = frappe.db.get_value("Sales Invoice", reference_name, "is_return")
+		if sales_order and not is_return:
+			reference = frappe.db.get_value("Sales Order", sales_order, "neb_usaepay_transaction_key")
+		else:
+			frappe.response["mode_of_payment"] = "Cash"
+			frappe.response["reference_no"] = ""
+	
+	elif reference_doctype != "Sales Order":
 		frappe.response["mode_of_payment"] = "Cash"
 		frappe.response["reference_no"] = ""
 		
-	reference = frappe.db.get_value(reference_doctype, reference_name, "neb_usaepay_transaction_key")
+	elif reference_doctype == "Sales Order":
+		reference = frappe.db.get_value(reference_doctype, reference_name, "neb_usaepay_transaction_key")
+
 	if reference:
 		frappe.response["mode_of_payment"] = "Credit Card"
 		frappe.response["reference_no"] = reference

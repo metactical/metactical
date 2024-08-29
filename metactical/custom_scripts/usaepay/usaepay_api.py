@@ -212,6 +212,7 @@ def receive_customer_data():
 			
 			if log.payment_entry:
 				frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+				frappe.get_doc("Payment Entry", log.payment_entry).submit()
 				
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
@@ -383,8 +384,9 @@ def make_payment(customer, amount, token, payment_entry=None):
 		response = requests.post(usaepay_url + "/transactions", headers=headers, data=json.dumps(payload))
 		handle_payment_response(response, log)
 		frappe.db.set_value("Payment Entry", payment_entry, "reference_no", log.transaction_key)
-		payment_entry = frappe.get_doc("Payment Entry", payment_entry)
-		payment_entry.submit()
+
+		# submit payment entry
+		frappe.get_doc("Payment Entry", payment_entry).submit()
 
 	except Exception as e:
 		handle_payment_exception(e, log)
