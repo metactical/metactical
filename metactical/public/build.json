@@ -152,6 +152,7 @@
 		"public/js/store_credit.js"
 	],
 	"css/metactical.css": [
-		"metactical/page/packing_page/packing_page.scss"
+		"metactical/page/packing_page/packing_page.scss",
+		"metactical/page/packing_page_3/packing_page_3.scss"
 	]
 }

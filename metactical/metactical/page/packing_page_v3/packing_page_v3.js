@@ -85,6 +85,7 @@ class PackingPage {
 				},
 				change() {
 					metactical.packing_page.fetch_dn_items();
+					get_all_packed_items();
 				},
 			},
 			render_input: true,
@@ -173,6 +174,23 @@ class PackingPage {
 	}
 }
 
+function get_all_packed_items(){
+	// get packed items 
+	let delivery_note = $('input[data-fieldname="delivery_note"]').val();
+	metactical.packing_page.all_packed_items = [];
+	
+	frappe.call({
+		method: "metactical.metactical.page.packing_page_v3.packing_page_v3.get_all_packed_items",
+		freeze: true,
+		args: {
+			delivery_note: delivery_note
+		},
+		callback: function(ret){
+			metactical.packing_page.all_packed_items = ret.message;
+			console.log("All packed items: ", metactical.packing_page.all_packed_items);
+		}
+	});
+}
 
 function create_new() {
 	$('input[data-fieldname="tote_barcode"]').val("");
@@ -188,6 +206,7 @@ function refresh() {
 
 function save_form() {
 	let packed_items = metactical.packing_page.packed_items;
+	
 	let cur_doc = metactical.packing_page.cur_doc;
 	cur_doc.items = packed_items;
 	
@@ -223,6 +242,8 @@ function save_form() {
 			metactical.packing_page.packed_items = []
 			$(".pack-items-btn").addClass("d-none")
 			populate_dom()
+			metactical.packing_page.fetch_dn_items(from_refresh = true);
+			get_all_packed_items()
 		},
 		error: (r) => {
 			console.error(r);
@@ -243,6 +264,13 @@ function count_pending_items() {
 function count_packed_items() {
 	const items = metactical.packing_page.packed_items;
 	let count = 0;
+
+	$.each(metactical.packing_page.all_packed_items, function(i, item){
+		$.each(item, function(j, props){
+			count += props.qty;
+		});
+	})
+
 	for (const item of items) {
 		count += item.qty;
 	}
@@ -413,10 +441,23 @@ function selectItem(item) {
 	re_generate_current_item(item);
 }
 
+function ShowPackedItems() {
+	var dialog = new frappe.ui.Dialog({
+		title: "Packed Items",
+		fields: [{
+			fieldtype: "HTML",
+			fieldname: "packed_item_detail",
+		}]
+	})
+
+	dialog.show()
+}
+
 metactical.packing_page.fetch_dn_items = (from_refresh = false) => {
 	let delivery_note = $('input[data-fieldname="delivery_note"]').val();
 
 	if (!delivery_note) {
+		console.log("No delivery note selected");
 		let template = frappe.render_template("packing_page_v3", {
 			no_data_feedback: "Select Delivery Note",
 			delivery_note: 0,
@@ -429,6 +470,7 @@ metactical.packing_page.fetch_dn_items = (from_refresh = false) => {
 		metactical.packing_page.packed_items = [];
 		populate_dom();
 	} else {
+		console.log("Fetching items for delivery note: " + delivery_note);
 		let new_packing_slip = frappe.model.get_new_doc(
 			"Packing Slip",
 			null,
@@ -505,6 +547,8 @@ metactical.packing_page.calc_packing_items = (barcode, amount=1) => {
 			frappe.utils.play_sound("alert");
 			
 			let fields = [];
+
+			console.log(cur_item);
 
 			if (cur_item.net_weight === 0) {
 				fields.push({

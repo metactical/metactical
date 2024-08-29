@@ -61,3 +61,24 @@ def set_item_values(item, values):
 	except Exception as e:
 		frappe.log_error(f"Error updating item {item_name}: {str(e)}")
 		return {"success": False, "message": f"Error updating item: {str(e)}"}
+
+@frappe.whitelist()
+def get_all_packed_items(delivery_note):
+	packed_items = frappe.db.sql("""
+		SELECT
+			item_code, item_name, stock_uom, qty, net_weight, `tabPacking Slip Item`.parent AS packing_slip
+		FROM
+			`tabPacking Slip Item`
+			JOIN `tabPacking Slip` ON `tabPacking Slip`.name = `tabPacking Slip Item`.parent
+		WHERE
+			`tabPacking Slip`.delivery_note = %s
+	""", delivery_note, as_dict=1)
+
+	# group the items by packing slip
+	packed_items_dict = {}
+	for item in packed_items:
+		if item.packing_slip not in packed_items_dict:
+			packed_items_dict[item.packing_slip] = []
+		packed_items_dict[item.packing_slip].append(item)
+
+	return packed_items_dict
