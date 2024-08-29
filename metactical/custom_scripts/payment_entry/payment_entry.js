@@ -37,7 +37,8 @@ frappe.ui.form.on("Payment Entry", {
                         frm.doc.payment_type == "Receive" &&
                         frm.doc.party &&
                         !frm.doc.reference_no &&
-                        !frm.doc.__islocal
+                        !frm.doc.__islocal &&
+                        frm.doc.docstatus < 2
                     ) {
                         frm.add_custom_button(__("Make Payment"), function () {
                             goto_payment_form(frm);
