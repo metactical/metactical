@@ -1,16 +1,16 @@
-<div class="controls">
+<div class="controls bg-header">
   <div class="row">
     <div class="col-md-3">
-      <div class="warehouse-wrapper"></div>
+      <div class="warehouse-wrapper pt-2"></div>
     </div>
     <div class="col-md-3">
-      <div class="picklist-tote-wrapper"></div>
+      <div class="picklist-tote-wrapper pt-2"></div>
     </div>
     <div class="col-md-3">
-      <div class="delivery-note-wrapper"></div>
+      <div class="delivery-note-wrapper pt-2"></div>
     </div>
     <div class="col-md-3">
-      <div class="item-barcode-wrapper"></div>
+      <div class="item-barcode-wrapper pt-2"></div>
     </div>
   </div>
 </div>
@@ -62,13 +62,13 @@
 
     <div class="col-md-3">
       <section class="box packed-items">
-        <h4 class="section-title packed-items-count"></h4>
+        <h4 class="section-title packed-items-count cursor-pointer" onclick="ShowPackedItems()"></h4>
         <div class="section-wrapper">
           <!-- Packed Items -->
           <div class="packed-items-wrap"></div>
           <!--/ Packed Items -->
           <div class="text-center pack-items-btn d-none">
-            <button class="btn btn-primary" onclick="packSelectedItems()">Pack Seleted Items</button>
+            <button class="btn btn-primary cursor-pointer" onclick="packSelectedItems()">Pack Seleted Items</button>
           </div>
         </div>
       </section>

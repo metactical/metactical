@@ -1,8 +1,20 @@
-[data-page-route="packing-slip"] .layout-main-section-wrapper {
+[data-page-route="packing-page-v3"] .layout-main-section-wrapper {
   margin-bottom: -2px;
 }
 
-.packing-slip-wrapper {
+[data-theme="light"] [data-page-route="packing-page-v3"] .bg-header{
+  background: #e2e2e2;
+}
+
+[data-theme="dark"] [data-page-route="packing-page-v3"] .bg-header{
+  background: #1a1a1a;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.packing-page-v3-wrapper {
   border-bottom: 1px solid #d1d8dd;
 }
 .controls {
@@ -42,6 +54,7 @@
     border-bottom: 1px solid #d1d8dd;
     padding-bottom: 10px;
     margin-bottom: 10px;
+    cursor: pointer;
 
     img {
       width: 33%;
