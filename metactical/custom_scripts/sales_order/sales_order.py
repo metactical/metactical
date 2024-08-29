@@ -95,21 +95,12 @@ class SalesOrderCustom(SalesOrder):
 		process_credit_card_tokens(obj, self.customer)
 		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 
-def set_reference_in_pe(sales_order, reference):
-	try:
-		pe = frappe.db.get_value("Payment Entry Reference", {"reference_name": sales_order}, "parent")
-		if pe:
-			frappe.db.set_value("Payment Entry", pe, "reference_no", reference, update_modified=False)
-	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), _("Error in setting reference in Payment Entry"))
-	
 @frappe.whitelist()
 def save_cancel_reason(**args):
 	args = frappe._dict(args)
 	doc = frappe.get_doc("Sales Order", args.docname)
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
 	return 'Success'
-
 
 @frappe.whitelist()
 def get_open_count(**args):

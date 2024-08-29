@@ -42,13 +42,14 @@
   },
   {
    "fieldname": "lead_source",
-   "fieldtype": "Data",
-   "label": "Lead Source"
+   "fieldtype": "Link",
+   "label": "Lead Source",
+   "options": "Lead Source"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-29 07:37:41.666244",
+ "modified": "2024-08-29 11:59:16.737341",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SO USAePay Transaction",
