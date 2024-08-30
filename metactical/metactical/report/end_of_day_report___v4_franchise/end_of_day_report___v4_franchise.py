@@ -9,17 +9,43 @@ from dateutil.relativedelta import relativedelta
 def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
+	total_with_tax = 0
+	total_without_tax = 0
+	total_mtd = 0
+	total_pmtd = 0
+	location = ""
 
 	# get all the frachise companies and their settings
 	item_search_settings = get_all_franchises()
 
 	# get end of day report data for each franchise
+	totals = []
 	for i, key in enumerate(item_search_settings):
 		franchise_data = get_data(item_search_settings[key], filters)
 		if len(franchise_data) > 0:
-			if i != 0:
-				data.append({"Location": key})
-			data += franchise_data
+			for row in franchise_data:
+				if row.get("location") == "Stores Total":
+					totals.append(row)
+				else:
+					data.append(row)
+	
+	# add totals to the end of the data
+	data.append({})
+
+	if len(totals) > 0:
+		location = totals[0]["location"]
+		total_with_tax = sum([row["total_with_tax"] for row in totals])
+		total_without_tax = sum([row["total_without_tax"] for row in totals])
+		total_mtd = sum([row["total_mtd"] for row in totals])
+		total_pmtd = sum([row["total_pmtd"] for row in totals])
+
+	data.append({
+		"location": location, 
+		"total_with_tax": total_with_tax, 
+		"total_without_tax": total_without_tax,
+		"total_mtd": total_mtd,
+		"total_pmtd": total_pmtd
+	})
 
 	return columns, data
 	
@@ -62,7 +88,7 @@ def get_columns(filters):
 def get_data(item_search_settings,  filters):
 	data = []
 	if item_search_settings.get("franchise_url") is not None and item_search_settings.get("franchise_url") != "":
-		franchise_request = requests.get(item_search_settings.get("franchise_url") + "/api/method/metactical.api.end_of_day_report.get_us_report_data", 
+		franchise_request = requests.get(item_search_settings.get("franchise_url") + "/api/method/metactical.api.end_of_day_report.get_franchise_report_data", 
 						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params={"date": filters.get("date")})
 
