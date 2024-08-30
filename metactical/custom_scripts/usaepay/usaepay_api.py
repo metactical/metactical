@@ -535,9 +535,14 @@ def refund_payment(docname, refund_reason, refund_amount):
 
 			# create USAePay log
 			refunded_amount = refund_amount if refund_amount else transaction["amount"]
-
-			card_holder = "for <b>" + refund_response.get("creditcard").get("cardholder") +"</b>" if refund_response.get("creditcard") else ""
-			frappe.msgprint(f"<b>{refund_response['auth_amount']}</b> is refunded successfully {card_holder}.")
+			if refund_response.get("creditcard"):
+				if "cardholder" in refund_response.get("creditcard"):
+					card_holder = refund_response.get("creditcard").get("cardholder")
+					frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully for <b>{card_holder}</b>.")
+				else:
+					frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully.")
+			else:
+				frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully.")
 
 			return refund_response, log.name
 		else:
