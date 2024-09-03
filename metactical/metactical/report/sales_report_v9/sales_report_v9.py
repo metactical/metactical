@@ -34,7 +34,8 @@ def execute(filters=None):
 		row["ifw_retailskusuffix"] = i.get("ifw_retailskusuffix")
 		row["item_name"] = i.get("item_name")
 		row["item_code"] = i.get("item_code")
-
+		item_groups = get_item_group_parents(i.get("item_group"))
+		row["itemgroups"] = item_groups
 		row["ifw_duty_rate"] = i.get("ifw_duty_rate")
 		row["ifw_discontinued"] = i.get("ifw_discontinued")
 		row["ifw_product_name_ci"] = i.get("ifw_product_name_ci")
@@ -226,6 +227,12 @@ def get_column(filters,conditions):
 				"fieldtype": "Link",
 				"width": 150,
 				"align": "left",
+			},
+			{
+				"label": "ItemGroups",
+				"fieldname": "itemgroups",
+				"fieldtype": "Data",
+				"width": 200
 			},
 			{
 				"label": _("Barcode"),
@@ -801,7 +808,7 @@ def get_master(conditions="", filters={}):
 				country_of_origin,customs_tariff_number, ifw_duty_rate,
 				ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
 				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
-				s.ifw_supplier_qoh, i.stock_uom
+				s.ifw_supplier_qoh, i.stock_uom, i.item_group
 			from 
 				`tabItem Supplier` s 
 			inner join 
@@ -1081,3 +1088,22 @@ def get_us_data(filters):
 			return us_request.json().get("message", {})
 	else:
 		return {}
+
+def get_item_group_parents(lower_item_group):
+	item_groups = []
+	item_group = lower_item_group
+
+	while item_group:
+		item_group = frappe.db.get_value("Item Group", item_group, "parent_item_group")
+		if item_group:
+			item_groups.append(item_group)
+
+	item_groups.insert(0, lower_item_group)
+	item_groups.reverse()
+
+	if len(item_groups) > 1:
+		item_groups = ">".join(item_groups)
+	else:
+		item_groups = item_groups[0]
+		
+	return item_groups
