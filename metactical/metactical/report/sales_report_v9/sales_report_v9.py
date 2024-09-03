@@ -1095,7 +1095,7 @@ def get_item_group_parents(lower_item_group):
 
 	while item_group:
 		item_group = frappe.db.get_value("Item Group", item_group, "parent_item_group")
-		if item_group:
+		if item_group and item_group != "All Item Groups":
 			item_groups.append(item_group)
 
 	item_groups.insert(0, lower_item_group)
