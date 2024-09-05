@@ -1,4 +1,9 @@
 frappe.ui.form.on('Material Request', {
+	refresh: function(frm) {
+		if (frm.doc.docstatus == 0) {
+			get_quantities_on_hand(frm);
+		}
+	},
 	onload: function(frm) {
 		frappe.after_ajax(function(){
 			frm.set_query("set_warehouse", function(doc){
@@ -60,5 +65,75 @@ frappe.ui.form.on('Material Request', {
 				d.ais_default_supplier = r.message['supplier'];
 			}
 		});
-	}
+	},
+	
 });
+
+frappe.ui.form.on('Material Request Item', {
+	qty: function(frm, cdt, cdn) {
+		var row = locals[cdt][cdn];
+		if (row.qty > row.qoh) {
+			frappe.msgprint(__("Quantity cannot be greater than Quantity on Hand"));
+			row.qty = row.qoh;
+			frm.refresh_field('items');
+		}
+	},
+
+	item_code: function(frm, cdt, cdn) {
+		get_qoh(frm, cdt, cdn)
+	},
+
+	from_warehouse: function(frm, cdt, cdn) {
+		// frm.events.get_item_data(frm, item, true);
+		get_qoh(frm, cdt, cdn);
+	},
+});
+
+var get_quantities_on_hand = function(frm) {
+	if (frm.doc.items) {
+		var rows = []
+		$.each(frm.doc.items, function(i, d) {
+			if (d.item_code && d.from_warehouse) {
+				rows.push({"item": d.item_code, "warehouse": d.from_warehouse, "name": d.name});
+			}
+		});
+
+		if (rows.length > 0) {
+			get_qoh(frm, null, null, rows);
+		}
+	}
+}
+
+var get_qoh = function(frm, cdt=null, cdn=null, rows=null) {
+	if (!rows){
+		var row = locals[cdt][cdn];
+		if (!row.item_code || !row.from_warehouse) {
+			return
+		}
+		else{
+			rows = [{
+				"name": row.name,
+				"item": row.item_code,
+				"warehouse": row.from_warehouse
+			}]
+		}
+	}
+
+
+	frappe.call({
+		method: "metactical.custom_scripts.material_request.material_request.get_qoh",
+		args: {
+			"filters": rows
+		},
+		callback: function(r) {
+			var rows = r.message;
+
+			$.each(rows, function(i, d) {
+				var row = locals['Material Request Item'][d.name];
+				row.qoh = d.qty;
+			});
+
+			frm.refresh_field('items');
+		}
+	});
+}
