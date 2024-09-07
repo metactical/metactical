@@ -214,7 +214,9 @@ def receive_customer_data():
 				frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
 			
 			if log.payment_entry:
-				frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+				if not frappe.db.get_value("Payment Entry", log.payment_entry, "reference_no"):
+					frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+				
 				if frappe.db.get_value("Payment Entry", log.payment_entry, "docstatus", 0):
 					frappe.get_doc("Payment Entry", log.payment_entry).submit()
 				
