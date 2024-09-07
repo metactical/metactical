@@ -112,12 +112,15 @@ def get_email_content(ref_doc, amount):
 
 	payment_url = f"{payment_form_url}?{address}&UMamount={flt(amount)}&UMinvoice={ref_doc.name}"
 
+	# round the amount to 2 decimal places if it's more than 2
+	amount = round(amount, 2)
+
 	return frappe.render_template(
 		"""{% if doc.contact_person -%}
 			<p>Dear {{ doc.customer_name }},</p>
 			{%- else %}<p>Hello,</p>{% endif %}
 
-			<p>{{ _("Requesting payment against {0} {1} for amount $ <b>{2}</b>").format(doc.doctype,
+			<p>{{ _("Requesting payment against {0} {1} for amount <b>$ {2}</b>").format(doc.doctype,
 				doc.name, amount) }}</p>
 
 			<a href="{{ payment_url }}">{{ _("Make Payment") }}</a>
