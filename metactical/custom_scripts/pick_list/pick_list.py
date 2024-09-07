@@ -20,8 +20,13 @@ import shutil
 from itertools import groupby
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe import _, msgprint
+import re
 
 class CustomPickList(PickList):
+	def validate(self):
+		super(CustomPickList, self).validate()
+		self.check_for_existing_draft()
+
 	def update_sales_order_item(self, item, picked_qty, item_code):
 		item_table = "Sales Order Item" if not item.product_bundle_item else "Packed Item"
 		stock_qty_field = "stock_qty" if not item.product_bundle_item else "qty"
@@ -266,6 +271,115 @@ class CustomPickList(PickList):
 			queue_action(self, "submit", timeout=2000)
 		else:
 			self._submit()
+
+	def before_submit(self):
+		super(CustomPickList, self).before_submit()
+		self.reorder_items_by_location()
+
+	def reorder_items_by_location(self):
+		# Sort items based on their location
+		rows_with_none_location = []
+		digit_rows_with_location = []
+		non_digit_rows_with_location = []
+
+		# get rows with None location, digit location and non-digit location
+		for row in self.locations:
+			if row.ifw_location is None:
+				rows_with_none_location.append(row)
+			else:
+				if row.ifw_location.split("-")[0].isdigit():
+					digit_rows_with_location.append(row)
+				else:
+					non_digit_rows_with_location.append(row)
+
+		data = []
+		i = 1
+		if digit_rows_with_location:
+			# sort digit rows by location
+			digit_rows_with_location = {row.ifw_location: row for row in digit_rows_with_location}
+			location_keys = sorted(digit_rows_with_location.keys(), key=sort_key)
+
+			for key in location_keys:
+				digit_rows_with_location[key].idx = i
+				data.append(digit_rows_with_location[key])
+				i += 1
+
+		# sort non-digit rows by location
+		if non_digit_rows_with_location:
+			sorted_locations = sorted(non_digit_rows_with_location, key=lambda x: x.ifw_location)
+			for row in sorted_locations:
+				row.idx = i
+				data.append(row)
+				i += 1
+
+		# add rows with None location at the end
+		if rows_with_none_location:
+			data += rows_with_none_location
+
+		self.locations = []
+		for row in data:
+			self.append("locations", row)
+
+	def check_for_existing_draft(self):
+		if self.docstatus == 0:
+			sales_order = ""
+			for item in self.locations:
+				if item.sales_order:
+					sales_order = item.sales_order
+					break
+			
+			# Items in the current pick list
+			current_items = {item.item_code:item.picked_qty for item in self.locations}
+
+			# Previous draft and submitted pick lists for the same sales order
+			existing_pick_list_items = frappe.get_all("Pick List Item", filters={"sales_order": sales_order}, fields=["name", "qty", "picked_qty", "item_code", "parent"])
+			
+			# The actual qty of the items in the sales order
+			sales_order_items = frappe.get_all("Sales Order Item", filters={"parent": sales_order}, fields=["item_code", "qty", "name"])
+			sales_order_items = {item.item_code:item.qty for item in sales_order_items}
+
+			# group existing pick list items by parent
+			pick_list_items_grouped = {}
+			for item in existing_pick_list_items:
+				if item.parent == self.name:
+					continue
+
+				if item.parent in pick_list_items_grouped:
+					pick_list_items_grouped[item.parent].append(item)
+				else:
+					pick_list_items_grouped[item.parent] = [item]
+
+			# sum the picked_qty for each item in the existing pick lists
+			existing_items = {}
+			for key, so_item in (pick_list_items_grouped).items():
+				for item in so_item:
+					if item.item_code in existing_items:
+						existing_items[item.item_code] += item.picked_qty
+					else:
+						existing_items[item.item_code] = item.picked_qty
+
+			# check if the picked_qty in the current_items is not more than the remaining qty
+			for item_code, new_qty in current_items.items():
+				remaining_qty = sales_order_items.get(item_code, 0) - existing_items.get(item_code, 0)
+
+				if new_qty == 0:
+					frappe.throw("Item quantity can not be zero")
+
+				if new_qty > remaining_qty:
+					if remaining_qty > 0:
+						frappe.throw(_("Part of <b>{0}</b> has already been picked in a different Pick List. <br>The remaining quantity is <b>{1}</b>").format(item_code, remaining_qty))
+					else:
+						frappe.throw(_("All of <b>{0}</b> has already been picked in a different Pick List(s).").format(item_code))
+	
+
+#  Function to extract numerical parts and convert them to integers for sorting
+def sort_key(item):
+	item = re.split(r'[|]', item)
+	if item:
+		parts = re.split(r'[-]', item[0])
+		return [int(part) if part.strip().isdigit() else part.strip() for part in parts]
+	
+	return [0]
 
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
