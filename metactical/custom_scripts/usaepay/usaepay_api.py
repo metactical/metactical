@@ -215,7 +215,7 @@ def receive_customer_data():
 			
 			if log.payment_entry:
 				frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
-				if frappe.db.get_value("Payment Entry", "docstatus", 0):
+				if frappe.db.get_value("Payment Entry", log.payment_entry, "docstatus", 0):
 					frappe.get_doc("Payment Entry", log.payment_entry).submit()
 				
 	except Exception as e:
