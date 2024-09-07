@@ -1,9 +1,9 @@
 frappe.ui.form.on("Payment Entry", {
     refresh: function (frm) {
-        if (!frm.doc.mode_of_payment && frm.doc.references) {
-            if (frm.doc.references.length == 1)
-                frm.trigger("get_mode_of_payment");
-        }
+        // if (!frm.doc.mode_of_payment && frm.doc.references) {
+        //     if (frm.doc.references.length == 1)
+        //         frm.trigger("get_mode_of_payment");
+        // }
 
         frm.trigger("custom_buttons");
     },
