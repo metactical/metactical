@@ -7,6 +7,9 @@ from metactical.custom_scripts.utils.metactical_utils import (
 	format_json_for_html
 )
 
+from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+
 def get_transaction_from_usaepay(usaepay_transaction_key, headers):	
 	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
 
@@ -136,7 +139,7 @@ def get_customer_detail(customer_key, headers):
 @frappe.whitelist()
 def receive_customer_data():
 	response = frappe.form_dict
-	
+
 	event_body = response.get("event_body")
 	transaction_key = event_body["object"]["key"]
 
@@ -202,7 +205,7 @@ def receive_customer_data():
 	else:
 		process_credit_card_tokens(event_body, event_body["object"]["customer"])
 	
-	# log the response from USAePay if the transaction is initiated from the ERP
+	# log the response from USAePay if the transaction is initiated from the ERP and paid from the ERP
 	try:
 		log = frappe.db.get_value("USAePay Log", {"reference_docname": event_body["object"]["invoice"], "action": "New Payment", "reference_doctype": doctype}, ["name", "response", "payment_entry"], as_dict=True)
 		if log:
@@ -212,15 +215,16 @@ def receive_customer_data():
 			
 			if log.payment_entry:
 				frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
-				frappe.get_doc("Payment Entry", log.payment_entry).submit()
+				if frappe.db.get_value("Payment Entry", log.payment_entry, "docstatus", 0):
+					frappe.get_doc("Payment Entry", log.payment_entry).submit()
 				
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
 
 def process_sales_order(event_body, transaction_key):
-	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key"], as_dict=1)
+	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company"], as_dict=1)
 	if not sales_order:
-		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key"], as_dict=1)
+		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company"], as_dict=1)
 	
 		if not sales_order:
 			return
@@ -229,11 +233,24 @@ def process_sales_order(event_body, transaction_key):
 		frappe.db.set_value("Sales Order", sales_order.name, "neb_usaepay_transaction_key", transaction_key)
 
 	customer = sales_order.customer
+	sales_order.doctype = "Sales Order"
 	process_credit_card_tokens(event_body, customer)
+	
+	# create USAePay log
+	log = create_log(sales_order, event_body)
+	
+	create_payment_entry(sales_order, event_body, log)
 
 def process_payment_entry(event_body, transaction_key):
 	frappe.db.set_value("Payment Entry", event_body["object"]["invoice"], "reference_no", transaction_key)
 	customer = frappe.db.get_value("Payment Entry", event_body["object"]["invoice"], "party")
+	
+	# update the sales order with the transaction key
+	references = frappe.get_doc("Payment Entry", event_body["object"]["invoice"]).references
+	if references:
+		if len(references) == 1:
+			if references[0].reference_doctype == "Sales Order":
+				frappe.db.set_value("Sales Order", references[0].reference_name, "neb_usaepay_transaction_key", transaction_key)
 
 	process_credit_card_tokens(event_body, customer)
 
@@ -249,7 +266,81 @@ def process_sales_invoice(event_body, transaction_key):
 				frappe.db.set_value("Sales Order", item.sales_order, "neb_usaepay_transaction_key", transaction_key)
 			break
 
+	customer = sales_invoice.customer
+	sales_invoice.doctype = "Sales Invoice"
+	
+	# process credit card tokens
 	process_credit_card_tokens(event_body, sales_invoice.customer)
+
+	log = create_log(sales_invoice, event_body)
+	create_payment_entry(sales_invoice, event_body, log)
+
+def get_payment_entries(doc):
+	payment_entries = frappe.db.sql("""
+		SELECT paid_amount, pe.name, pe.reference_no
+		FROM `tabPayment Entry Reference` per
+		JOIN `tabPayment Entry` pe ON pe.name = per.parent
+		where per.reference_doctype = %s and per.reference_name = %s and pe.docstatus = 1
+	""", (doc.doctype, doc.name), as_dict=1)
+
+	return payment_entries
+
+# create USAePay log for payments that will be done from the payment form 
+def create_log(doc, event_body):
+	log = ""
+	payment_entries = get_payment_entries(doc)
+	log_type = ""
+
+	# log the response from USAePay if the transaction is initiated from the Payment Request
+	if len(payment_entries) == 0:
+		log_type = "New Payment"
+	else:
+		log_type = "Adjustment"
+		
+	if log_type:
+		log = create_usaepay_log(doc.doctype, doc.name, log_type)
+
+		frappe.db.set_value("USAePay Log", log.name, "response", format_json_for_html(event_body), update_modified=False)
+		frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
+		frappe.db.set_value("USAePay Log", log.name, "amount", event_body["object"]["auth_amount"], update_modified=False)
+		payment_requests = frappe.get_all("Payment Request", 
+												filters={
+													"reference_doctype": doc.doctype, 
+													"reference_name": doc.name, 
+													"docstatus": 1, 
+													"status": "Requested",
+													"grand_total": event_body["object"]["auth_amount"]
+												}, fields=["name"])
+
+		if payment_requests:
+			frappe.db.set_value("USAePay Log", log.name, "request", "<a href='/app/payment-request/{0}'>Payment Request</a>".format(payment_requests[0].name), update_modified=False)
+
+	return log
+
+def create_payment_entry(doc, data, log):
+	try: 
+		pe = get_payment_entry(doc.doctype, doc.name)
+		pe.mode_of_payment = "Credit Card"
+		pe.reference_no = data["object"]["key"]
+		pe.reference_date = frappe.utils.now()
+		pe.paid_amount = float(data["object"]["auth_amount"])
+		pe.set_missing_values()
+		
+		if pe.references:
+			outstanding_amount = pe.references[0].outstanding_amount
+			allocated = pe.references[0].allocated_amount if outstanding_amount >= pe.references[0].allocated_amount else outstanding_amount
+			
+			if float(allocated) > float(data["object"]["auth_amount"]):
+				pe.references[0].allocated_amount = int(data["object"]["auth_amount"])
+
+		pe.insert()
+		pe.submit()
+
+		if log:
+			frappe.db.set_value("USAePay Log", log.name, "payment_entry", pe.name, update_modified=False)
+
+	except:
+		frappe.log_error(title="PE Creation from USAePay Error", message=frappe.get_traceback())
 
 def process_credit_card_tokens(event_body, customer):
 	transaction_key = event_body["object"]["key"]
