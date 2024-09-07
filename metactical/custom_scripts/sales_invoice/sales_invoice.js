@@ -37,7 +37,6 @@ frappe.ui.form.on('Sales Invoice', {
 			if (custom_buttons.length){
 				clearInterval(interval);
 				if ("Payment Request" in cur_frm.custom_buttons){
-					console.log("Removing Payment Request");
 					frm.remove_custom_button("Payment Request", 'Create');
 					frm.add_custom_button("USAePay Payment Request", () => frm.events.create_usaepay_payment_request(frm), __("Create"));		
 				}
@@ -88,7 +87,6 @@ frappe.ui.form.on('Sales Invoice', {
 			},
 			callback: function(r){
 				if(r.message){
-					console.log(r.message, frm.doc.debit_to, r.message != frm.doc.debit_to);
 					if (r.message != frm.doc.debit_to){
 						frm.set_value("debit_to", r.message);
 						frm.trigger("get_advances")

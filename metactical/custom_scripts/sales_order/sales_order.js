@@ -25,10 +25,10 @@ frappe.ui.form.on('Sales Order', {
 			frm.remove_custom_button("Request for Raw Materials", 'Create'); 
 			frm.remove_custom_button("Project", 'Create'); 
 			frm.remove_custom_button("Subscription", 'Create'); 
-			frm.remove_custom_button("Payment Request", 'Create');
-			frm.add_custom_button("USAePay Payment Request", () => frm.events.create_usaepay_payment_request(frm), __("Create"));
 
 		}, 1000);
+
+		frm.trigger("update_custom_buttons");
 
 		// Add Stock Entry (Transfer material) button
 		if(frm.doc.docstatus == 1){ 
@@ -67,7 +67,24 @@ frappe.ui.form.on('Sales Order', {
 			frm.set_value("delivery_date", delivery_date.toISOString().split('T')[0]);
 		}
 	},
-	
+	update_custom_buttons: function(frm){
+		var seconds = 0;
+		var interval = setInterval(() => {
+			var custom_buttons = Object.keys(frm.custom_buttons)
+
+			if (custom_buttons.length){
+				clearInterval(interval);
+				if ("Payment Request" in cur_frm.custom_buttons){
+					frm.remove_custom_button("Payment Request", 'Create');
+					frm.add_custom_button("USAePay Payment Request", () => frm.events.create_usaepay_payment_request(frm), __("Create"));		
+				}
+			}
+			else if (seconds > 5){
+				clearInterval(interval);
+			}
+			seconds++;
+		}, 1000);
+	},
 	change_to_drop_ship: function(frm){
 		var fields = [
 			{
