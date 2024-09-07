@@ -89,8 +89,12 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 				primary_action: () => {
 					this.rateDialog.disable_primary_action()
 					let carrier_service = {}
+					let service_name = {}
 					$(this.rateDialog.body).find('[name^="carrier_service_"]:checked').each(function () {
 						carrier_service[$(this).closest('table').attr('data-row-name')] = $(this).val()
+						service_name[$(this).closest('table').attr('data-row-name')] = $(this).attr("data-service-name");
+						console.log({"this": $(this)});
+						console.log({"carrier_service": carrier_service, "service_name": $(this).attr("data-service-name")});
 					})
 					if ($.isEmptyObject(carrier_service)) {
 						frappe.msgprint(__("Please select min one."))
@@ -99,7 +103,8 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 					frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
 						name: this.frm.docname,
 						provider: this.frm.doc.service_provider,
-						carrier_service: carrier_service
+						carrier_service: carrier_service,
+						service_name: service_name
 					}).then(r => {
 						this.rateDialog.enable_primary_action()
 						this.rateDialog.hide()
