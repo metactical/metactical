@@ -7,6 +7,11 @@ frappe.ui.form.on("Payment Entry", {
 
         frm.trigger("custom_buttons");
     },
+
+    reference_no: function(frm){
+        frm.trigger("custom_buttons");
+    },
+
     get_mode_of_payment: function (frm) {
         frappe.call({
             method: "metactical.custom_scripts.payment_entry.payment_entry.get_mode_of_payment",
@@ -347,11 +352,5 @@ var make_payment = function (frm, values, tokens) {
 };
 
 var get_invoice = function (doc) {
-    var references = doc.references;
-
-    if (references.length == 1) {
-        return references[0].reference_name;
-    }
-
     return doc.name;
 };
