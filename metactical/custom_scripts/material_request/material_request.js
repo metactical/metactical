@@ -70,15 +70,6 @@ frappe.ui.form.on('Material Request', {
 });
 
 frappe.ui.form.on('Material Request Item', {
-	qty: function(frm, cdt, cdn) {
-		var row = locals[cdt][cdn];
-		if (row.qty > row.qoh) {
-			frappe.msgprint(__("Quantity cannot be greater than Quantity on Hand"));
-			row.qty = row.qoh;
-			frm.refresh_field('items');
-		}
-	},
-
 	item_code: function(frm, cdt, cdn) {
 		get_qoh(frm, cdt, cdn)
 	},
@@ -105,6 +96,9 @@ var get_quantities_on_hand = function(frm) {
 }
 
 var get_qoh = function(frm, cdt=null, cdn=null, rows=null) {
+	if (frm.doc.material_request_type != "Material Transfer")
+		return
+
 	if (!rows){
 		var row = locals[cdt][cdn];
 		if (!row.item_code || !row.from_warehouse) {
@@ -118,7 +112,6 @@ var get_qoh = function(frm, cdt=null, cdn=null, rows=null) {
 			}]
 		}
 	}
-
 
 	frappe.call({
 		method: "metactical.custom_scripts.material_request.material_request.get_qoh",

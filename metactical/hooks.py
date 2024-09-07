@@ -115,7 +115,8 @@ doc_events = {
 		"validate": "metactical.barcode_generator.po_validate",
 	},
 	"Material Request": {
-		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
+		"before_save": "metactical.custom_scripts.material_request.material_request.before_save",
+		"on_submit": "metactical.custom_scripts.material_request.material_request.on_submit",
 	},
 	"Address": {
 		"validate": "metactical.custom_scripts.address.address.validate"

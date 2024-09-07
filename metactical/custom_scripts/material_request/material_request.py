@@ -16,10 +16,18 @@ def before_save(self, method):
 					suppliers += item.ais_default_supplier
 		self.ais_suppliers = suppliers
 
+def on_submit(self, method):
 	# check if a qty greater than the quantity on hand is entered
-	for item in self.items:
-		if item.qty > item.qoh:
-			frappe.throw("Quantity entered for item <b>{0}</b> is greater than the available quantity (<b>{1}</b>) in the warehouse".format(item.item_code, item.qoh))
+	if self.material_request_type == "Material Transfer":
+		items = []
+		for item in self.items:
+			if item.qty > item.qoh:
+				items.append(item.item_code) 
+
+		if items:
+			message = 'The quantities of these items exceed the available warehouse stock. <br>'
+			message += "<b>" + ', '.join(items) + "</b>"
+			frappe.msgprint(message)
 
 def set_default_supplier(self):
 	for item in self.items:
