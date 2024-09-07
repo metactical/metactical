@@ -99,8 +99,8 @@ def get_email_content(ref_doc, amount):
 	if not customer_address.get("billing") and not customer_address.get("shipping"):
 		frappe.throw(_("Please set billing or shipping address for the customer"))
 
-	billing_address = map_fields_to_address(customer_address.get("billing"), "Billing")
-	shipping_address = map_fields_to_address(customer_address.get("shipping"), "Shipping")
+	billing_address = map_fields_to_address(customer_address.get("billing"), "Billing").replace("None", "")
+	shipping_address = map_fields_to_address(customer_address.get("shipping"), "Shipping").replace("None", "")
 
 	address = ""
 	if billing_address:
@@ -114,7 +114,7 @@ def get_email_content(ref_doc, amount):
 
 	return frappe.render_template(
 		"""{% if doc.contact_person -%}
-			<p>Dear {{ doc.customer }},</p>
+			<p>Dear {{ doc.customer_name }},</p>
 			{%- else %}<p>Hello,</p>{% endif %}
 
 			<p>{{ _("Requesting payment against {0} {1} for amount $ <b>{2}</b>").format(doc.doctype,
