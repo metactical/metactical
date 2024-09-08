@@ -4,18 +4,29 @@ from metactical.utils.shipping.shipping import avoid_shpment
 from metactical.utils.shipping.canada_post import CanadaPost
 from datetime import datetime
 from frappe.utils import get_files_path
-
-def validate(doc, method=None):
-	for parcel in doc.shipment_parcel:
-		if parcel.weight > 32:
-			frappe.msgprint(_("Weight doesn't allow more than 32 Kg"))
+from erpnext.stock.doctype.shipment.shipment import Shipment
 
 	set_source_and_customer_po(doc)
 
 
-def before_cancel(doc, method=None):
-	if doc.shipments:
-		avoid_shpment(doc.name, doc.service_provider, [x.name for x in doc.shipments])
+class CustomShipment(Shipment):
+	def validate(self):
+		super(CustomShipment, self).validate()
+		for parcel in self.shipment_parcel:
+			if parcel.weight > 32:
+				frappe.msgprint(_("Weight doesn't allow more than 32 Kg"))
+	
+	def before_cancel(self):
+		if self.shipments:
+			avoid_shpment(self.name, self.service_provider, [x.name for x in self.shipments])
+
+	def on_submit(self):
+		# Metactical Customization: Allow 0 value goods to be shipped
+		if not self.shipment_parcel:
+			frappe.throw(_("Please enter Shipment Parcel information"))
+		'''if self.value_of_goods == 0:
+			frappe.throw(_("Value of goods cannot be 0"))'''
+		self.db_set("status", "Submitted")
 		
 def set_source_and_customer_po(doc):
 	doc.neb_source = None
