@@ -13,6 +13,7 @@
   "api_key",
   "api_secret",
   "section_warehouses",
+  "section_break_svddt",
   "warehouses",
   "section_price_list",
   "print_price_list",
@@ -84,11 +85,15 @@
    "fieldname": "franchise_settings",
    "fieldtype": "Table",
    "options": "Item Search Settings Franchise"
+  },
+  {
+   "fieldname": "section_break_svddt",
+   "fieldtype": "Section Break"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2024-06-30 06:08:21.173973",
+ "modified": "2024-08-19 15:10:15.427702",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
