@@ -326,7 +326,10 @@ class CustomPickList(PickList):
 
 		# add rows with None location at the end
 		if rows_with_none_location:
-			data += rows_with_none_location
+			for row in rows_with_none_location:
+				row.idx = idx
+				data.append(row)
+				idx += 1
 
 		self.locations = []
 		for row in data:
