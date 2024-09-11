@@ -332,10 +332,12 @@ class CustomPickList(PickList):
 			current_items = {item.item_code:item.picked_qty for item in self.locations}
 
 			# Previous draft and submitted pick lists for the same sales order
-			existing_pick_list_items = frappe.get_all("Pick List Item", filters={"sales_order": sales_order}, fields=["name", "qty", "picked_qty", "item_code", "parent"])
+			existing_pick_list_items = frappe.get_all("Pick List Item", filters={"sales_order": sales_order, "docstatus": ["!=", "2"]}, 
+											 fields=["name", "qty", "picked_qty", "item_code", "parent"])
 			
 			# The actual qty of the items in the sales order
-			sales_order_items = frappe.get_all("Sales Order Item", filters={"parent": sales_order}, fields=["item_code", "qty", "name"])
+			sales_order_items = frappe.get_all("Sales Order Item", filters={"parent": sales_order, "docstatus": ["!=", "2"]}, 
+										fields=["item_code", "qty", "name"])
 			sales_order_items = {item.item_code:item.qty for item in sales_order_items}
 
 			# group existing pick list items by parent
