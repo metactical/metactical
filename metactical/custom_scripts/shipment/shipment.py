@@ -6,9 +6,6 @@ from datetime import datetime
 from frappe.utils import get_files_path
 from erpnext.stock.doctype.shipment.shipment import Shipment
 
-	set_source_and_customer_po(doc)
-
-
 class CustomShipment(Shipment):
 	def validate(self):
 		super(CustomShipment, self).validate()
