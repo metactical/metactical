@@ -289,24 +289,40 @@ class CustomPickList(PickList):
 					non_digit_rows_with_location.append(row)
 
 		data = []
-		i = 1
+		idx = 1
 		if digit_rows_with_location:
-			# sort digit rows by location
-			digit_rows_with_location = {row.ifw_location: row for row in digit_rows_with_location}
-			location_keys = sorted(digit_rows_with_location.keys(), key=sort_key)
+			locations_with_digit = []
+			digit_rows_with_location_values = []
 
+			# prepare data for sorting
+			for row in digit_rows_with_location:
+				locations_with_digit.append(row.ifw_location)
+				digit_rows_with_location_values.append({
+					"location": row.ifw_location,
+					"row": row
+				})
+
+			# sort digit rows by location
+			location_keys = sorted(locations_with_digit, key=sort_key)
+				
+			# add rows with digit location
 			for key in location_keys:
-				digit_rows_with_location[key].idx = i
-				data.append(digit_rows_with_location[key])
-				i += 1
+				for i, row in enumerate(digit_rows_with_location_values):
+					if row["location"] == key:
+						row["row"].idx = idx
+						data.append(row["row"])
+						idx += 1
+						digit_rows_with_location_values.pop(i)
+						break
+
 
 		# sort non-digit rows by location
 		if non_digit_rows_with_location:
 			sorted_locations = sorted(non_digit_rows_with_location, key=lambda x: x.ifw_location)
 			for row in sorted_locations:
-				row.idx = i
+				row.idx = idx
 				data.append(row)
-				i += 1
+				idx += 1
 
 		# add rows with None location at the end
 		if rows_with_none_location:
@@ -321,7 +337,7 @@ def sort_key(item):
 	item = re.split(r'[|]', item)
 	if item:
 		parts = re.split(r'[-]', item[0])
-		return [int(part) if part.isdigit() else part for part in parts]
+		return [int(part) if part.strip().isdigit() else part.strip() for part in parts]
 	
 	return [0]
 
