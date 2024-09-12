@@ -25,10 +25,20 @@
   "inteli_phone_no",
   "phone_no",
   "bank_information",
+  "bank_beneficiary_name",
   "bank_institution_no",
   "bank_transit_no",
   "bank_account_no",
   "bank_document",
+  "column_break_gfarp",
+  "iban_number",
+  "swift_code",
+  "bank_name",
+  "bank_address_line_1",
+  "bank_city",
+  "bank_province",
+  "bank_zip",
+  "bank_country",
   "extra_information",
   "sin_no",
   "sin_expiry_date",
@@ -39,6 +49,10 @@
   "role_profile_name",
   "roles_html",
   "roles",
+  "emergency_contact_section",
+  "emergency_contact_name",
+  "emergency_phone",
+  "relation",
   "amended_from"
  ],
  "fields": [
@@ -237,12 +251,82 @@
    "fieldname": "bank_document",
    "fieldtype": "Attach",
    "label": "Bank Document"
+  },
+  {
+   "fieldname": "bank_beneficiary_name",
+   "fieldtype": "Data",
+   "label": "Beneficiary Name (as per bank)"
+  },
+  {
+   "fieldname": "iban_number",
+   "fieldtype": "Data",
+   "label": "IBAN Number "
+  },
+  {
+   "fieldname": "swift_code",
+   "fieldtype": "Data",
+   "label": "SWIFT Code "
+  },
+  {
+   "fieldname": "bank_name",
+   "fieldtype": "Data",
+   "label": "Bank Name "
+  },
+  {
+   "fieldname": "bank_address_line_1",
+   "fieldtype": "Data",
+   "label": "Bank Address Line 1 "
+  },
+  {
+   "fieldname": "bank_city",
+   "fieldtype": "Data",
+   "label": "Bank City "
+  },
+  {
+   "fieldname": "bank_province",
+   "fieldtype": "Data",
+   "label": "Bank Province "
+  },
+  {
+   "fieldname": "bank_zip",
+   "fieldtype": "Data",
+   "label": "Bank Zip/Postal Code/PO Box "
+  },
+  {
+   "fieldname": "bank_country",
+   "fieldtype": "Link",
+   "label": "Bank Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "column_break_gfarp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "emergency_contact_section",
+   "fieldtype": "Section Break",
+   "label": "Emergency Contact"
+  },
+  {
+   "fieldname": "emergency_contact_name",
+   "fieldtype": "Data",
+   "label": "Emergency Contact Name "
+  },
+  {
+   "fieldname": "emergency_phone",
+   "fieldtype": "Data",
+   "label": "Emergency Phone "
+  },
+  {
+   "fieldname": "relation",
+   "fieldtype": "Data",
+   "label": "Relation"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-05-03 07:26:48.690951",
+ "modified": "2024-09-12 11:01:03.494662",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Employee Sign Up",

@@ -71,6 +71,9 @@ class EmployeeSignUp(Document):
 			'branch': self.branch,
 			'bio': self.comments, 
 			"bank_document": self.bank_document,
+			"person_to_be_contacted": self.emergency_contact_name if self.emergency_contact_name else "",
+			"emergency_phone_number": self.emergency_phone if self.emergency_phone else "",
+			"relation": self.relation if self.relation else ""
 		})
 		employee.insert(ignore_permissions=True)
 		
