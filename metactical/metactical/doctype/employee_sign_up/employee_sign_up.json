@@ -100,7 +100,7 @@
    "fieldname": "state",
    "fieldtype": "Data",
    "label": "Province/State",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.branch != \"Online\""
   },
   {
    "fieldname": "zip_code",
@@ -326,7 +326,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-09-12 11:01:03.494662",
+ "modified": "2024-09-12 12:21:37.518104",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Employee Sign Up",
