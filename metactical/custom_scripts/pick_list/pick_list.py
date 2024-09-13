@@ -19,8 +19,9 @@ from pathlib import Path
 import shutil
 from itertools import groupby
 from metactical.custom_scripts.utils.metactical_utils import queue_action
-from frappe import _, msgprint
+from frappe import _, msgprint, bold
 from frappe.utils.nestedset import get_descendants_of
+from erpnext.stock.doctype.packed_item.packed_item import is_product_bundle
 
 class CustomPickList(PickList):
 	def before_save(self):
@@ -275,10 +276,57 @@ class CustomPickList(PickList):
 		else:
 			self._submit()
 
+	def validate_stock_qty(self):
+		from erpnext.stock.doctype.batch.batch import get_batch_qty
+
+		for row in self.get("locations"):
+			# Metactical Customization: If is product budle, validate individual items
+			if is_product_bundle(row.item_code):
+				bundle_items = frappe.get_all('Product Bundle Item', filters={'parent': row.item_code}, fields=['item_code', 'qty'])
+				for bundle_item in bundle_items:
+					bin_qty = frappe.db.get_value(
+						"Bin",
+						{"item_code": bundle_item.item_code, "warehouse": row.warehouse},
+						"actual_qty",
+					)
+					if row.qty > bin_qty:
+						frappe.throw(
+							_(
+								"At Row #{0}: The picked quantity {1} for the product budle item {2} is greater than available stock {3} in the warehouse {5}."
+							).format(row.idx, bundle_item.item_code, bundle_item.qty,  bold(row.warehouse)),
+							title=_("Insufficient Stock"),
+						)
+			else:
+				if row.batch_no and not row.qty:
+					batch_qty = get_batch_qty(row.batch_no, row.warehouse, row.item_code)
+
+					if row.qty > batch_qty:
+						frappe.throw(
+							_(
+								"At Row #{0}: The picked quantity {1} for the item {2} is greater than available stock {3} for the batch {4} in the warehouse {5}."
+							).format(row.idx, row.item_code, batch_qty, row.batch_no, bold(row.warehouse)),
+							title=_("Insufficient Stock"),
+						)
+
+					continue
+
+				bin_qty = frappe.db.get_value(
+					"Bin",
+					{"item_code": row.item_code, "warehouse": row.warehouse},
+					"actual_qty",
+				)
+
+				if row.qty > bin_qty:
+					frappe.throw(
+						_(
+							"At Row #{0}: The picked quantity {1} for the item {2} is greater than available stock {3} in the warehouse {4}."
+						).format(row.idx, row.qty, bold(row.item_code), bin_qty, bold(row.warehouse)),
+						title=_("Insufficient Stock"),
+					)
+		
+
 @frappe.whitelist()
 def create_pick_list(source_name, target_doc=None):
-	from erpnext.stock.doctype.packed_item.packed_item import is_product_bundle
-
 	def update_item_quantity(source, target, source_parent) -> None:
 		picked_qty = flt(source.picked_qty) / (flt(source.conversion_factor) or 1)
 		qty_to_be_picked = flt(source.qty) - max(picked_qty, flt(source.delivered_qty))
