@@ -5,29 +5,19 @@ from erpnext.controllers.accounts_controller import (
 	validate_and_delete_children
 )
 from erpnext.stock.get_item_details import (
-	_get_item_tax_template,
 	get_conversion_factor,
-	get_item_details,
-	get_item_tax_map,
 	get_item_warehouse,
 )
 import json
 from frappe.utils import (
-	add_days,
-	add_months,
-	cint,
 	flt,
-	fmt_money,
-	formatdate,
-	get_last_day,
 	get_link_to_form,
-	getdate,
-	nowdate,
-	today,
+	getdate
 )
 from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 from frappe.model.workflow import get_workflow_name, is_transition_condition_satisfied
 from erpnext.buying.utils import update_last_purchase_rate
+from frappe import _
 
 def set_order_defaults(
 	parent_doctype, parent_doctype_name, child_doctype, child_docname, trans_item
