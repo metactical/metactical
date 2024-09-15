@@ -9,6 +9,11 @@ from dateutil.relativedelta import relativedelta
 def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
+	total_with_tax = 0
+	total_without_tax = 0
+	total_mtd = 0
+	total_pmtd = 0
+	location = ""
 
 	# get all the frachise companies and their settings
 	item_search_settings = get_all_franchises()
@@ -26,8 +31,6 @@ def execute(filters=None):
 	
 	# add totals to the end of the data
 	data.append({})
-	location = ""
-	
 	if len(totals) > 0:
 		location = totals[0]["location"]
 		total_with_tax = sum([row["total_with_tax"] for row in totals])

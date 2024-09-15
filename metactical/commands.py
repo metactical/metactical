@@ -23,7 +23,7 @@ def rename_customers(context):
 
 	for customer in tqdm(customers, desc="Renaming customers", unit="customer"):
 		old_name = customer.name
-		new_name = f"CS{getseries('CS', 5)}"
+		new_name = f"CS-.YY.-{getseries('CS-.YY.-', 5)}"
 		try:
 			frappe.rename_doc("Customer", old_name, new_name, rebuild_search=False)
 			frappe.db.commit()
@@ -42,6 +42,6 @@ def delete_dormant_customers(context):
 	delete_unlinked_customers()
 
 commands = [
-	delete_dormant_customers,
-	rename_customers
+	rename_customers,
+	delete_dormant_customers
 ]

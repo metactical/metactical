@@ -54,6 +54,20 @@ class CustomMaterialRequest(MaterialRequest):
 					if defaults.company == self.company:
 						item.ais_default_supplier = defaults.default_supplier
 
+	def on_submit(self):
+		super(CustomMaterialRequest, self).on_submit()
+		# check if a qty greater than the quantity on hand is entered
+		if self.material_request_type == "Material Transfer":
+			items = []
+			for item in self.items:
+				if item.qty > item.qoh:
+					items.append(item.item_code) 
+
+			if items:
+				message = 'The quantities of these items exceed the available warehouse stock. <br>'
+				message += "<b>" + ', '.join(items) + "</b>"
+				frappe.msgprint(message)
+
 def set_default_supplier(self):
 	for item in self.items:
 		if not item.ais_default_supplier:
