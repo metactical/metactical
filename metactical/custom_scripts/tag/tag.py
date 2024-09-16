@@ -4,7 +4,9 @@ from frappe.desk.doctype.tag.tag import DocTags
 @frappe.whitelist()
 def add_tag(tag, dt, dn, color=None):
     # check if user has permission to add tags to this document
-    if not frappe.has_permission("Tag Link", "create"):
+    if not frappe.has_permission("Tag", "create") and not frappe.db.exists("Tag", tag):
+        frappe.throw("Insufficient permission to create Tag")
+    elif not frappe.has_permission("Tag Link", "create"):
         frappe.throw("Insufficient permission to add tags to this document")
     else:
         DocTags(dt).add(dn, tag)
