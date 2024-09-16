@@ -22,6 +22,7 @@ class CycleCount(Document):
 					"qty": row.qty,
 					"valuation_rate": row.valuation_rate
 				})
+		doc.save()
 		if hasattr(doc, "items"):
 			doc.submit()
 
@@ -63,3 +64,6 @@ def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
+
+
+
