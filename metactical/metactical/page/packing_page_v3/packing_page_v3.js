@@ -20,6 +20,10 @@ frappe.pages['packing-page-v3'].on_page_load = function(wrapper) {
 			frappe.packing_slip = new PackingPage(wrapper);
 		}
 	});
+
+	frappe.db.get_single_value("Packing Settings", "multi_pack_if_qty").then((res) => {
+		metactical.packing_page.multi_pack_if_qty = res
+	})
 }
 
 class PackingPage {
@@ -298,6 +302,13 @@ function populate_current_item() {
 			add_button_html += "or <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button> \
 				<button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>";
 		}
+		else{
+			console.log(item.qty, metactical.packing_page.multi_pack_if_qty)
+			if (item.qty > metactical.packing_page.multi_pack_if_qty) {
+				add_button_html = "<button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>";
+			}
+		}
+
 		$(".cur-item-barcode").html("Packing Now " + item.item_barcode);
 		$(".cur-item-scan-feedback").html(add_button_html);
 		$(".cur-item-name").html(item.item_name);
@@ -404,7 +415,9 @@ function populate_dom() {
 	count_pending_items();
 	count_packed_items();
 	populate_pending_items();
-	populate_current_item();
+	if (metactical.packing_page.current_item) {
+		populate_current_item();
+	}
 	populate_packed_items();
 }
 
@@ -450,6 +463,30 @@ function ShowPackedItems() {
 		}]
 	})
 
+	let items = metactical.packing_page.all_packed_items;
+	console.log(items)
+	let packed_items = "";
+	$.each(items, (packing_slip, item) => {
+		packed_items += "<h4>" + packing_slip + "</h4>";
+		packed_items += "<table class='table table-bordered'>";
+		packed_items += "<thead><tr><th>Item Code</th><th>Item Name</th><th>Qty</th></tr></thead>";
+		packed_items += "<tbody>";
+		$.each(item, (i, props) => {
+			packed_items += "<tr>";
+			packed_items += "<td>" + props.item_code + "</td>";
+			packed_items += "<td>" + props.item_name + "</td>";
+			packed_items += "<td>" + props.qty + "</td>";
+			packed_items += "</tr>";
+		});
+		packed_items += "</tbody>";
+		packed_items += "</table>";
+	});
+
+	console.log(packed_items)
+
+	dialog.fields_dict.packed_item_detail.$wrapper.html(packed_items);
+
+
 	dialog.show()
 }
 
@@ -470,7 +507,6 @@ metactical.packing_page.fetch_dn_items = (from_refresh = false) => {
 		metactical.packing_page.packed_items = [];
 		populate_dom();
 	} else {
-		console.log("Fetching items for delivery note: " + delivery_note);
 		let new_packing_slip = frappe.model.get_new_doc(
 			"Packing Slip",
 			null,
@@ -489,42 +525,38 @@ metactical.packing_page.fetch_dn_items = (from_refresh = false) => {
 				let no_data_feedback = 0;
 				metactical.packing_page.cur_doc = r.docs[0];
 
-				if (!items.length) {
-					no_data_feedback = "No items for this Delivery Note";
-					$(".packing-slip-wrapper").html(
-						frappe.render_template("packing_page_v3", {
-							no_data_feedback: no_data_feedback,
-							delivery_note: 0,
-						})
-					);
-				} else {
-					frappe
-						.call("metactical.api.packing_slip.get_item_master", {
-							items: items,
-						})
-						.then((r) => {
-							items = r.message;
+				// } else {
+				frappe
+					.call("metactical.api.packing_slip.get_item_master", {
+						items: items,
+					})
+					.then((r) => {
+						items = r.message;
+						metactical.packing_page.current_item = []
 
-							$(".packing-slip-wrapper").html(
-								frappe.render_template("packing_page_v3", {
-									no_data_feedback: 0,
-									delivery_note: delivery_note,
-								})
-							);
+						$(".packing-slip-wrapper").html(
+							template =frappe.render_template("packing_page_v3", {
+								no_data_feedback: 0,
+								delivery_note: delivery_note,
+							})
+						);
 
-							if (metactical.packing_page.item_clicked && !from_refresh) {
-								//A hack to fix a bug(?) when the delivery note loaded. First click anywhere 
-								//on the page calls refresh()
-								metactical.packing_page.item_clicked = false;
-							} else {
-								metactical.packing_page.pending_items = items;
-								metactical.packing_page.current_item = items[0];
-								metactical.packing_page.packed_items = [];
-							}
+						if (items.length == 0) 
+							$(".current-section-title").html("<p class='no-items'>No items for this Delivery Note</p>")
 
-							populate_dom();
-						});
-				}
+						if (metactical.packing_page.item_clicked && !from_refresh) {
+							//A hack to fix a bug(?) when the delivery note loaded. First click anywhere 
+							//on the page calls refresh()
+							metactical.packing_page.item_clicked = false;
+						} else {
+							metactical.packing_page.pending_items = items;
+							metactical.packing_page.current_item = items[0];
+							metactical.packing_page.packed_items = [];
+						}
+
+						populate_dom();
+					});
+				// }
 			},
 		});
 	}
