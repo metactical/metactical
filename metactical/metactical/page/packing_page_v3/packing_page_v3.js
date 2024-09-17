@@ -48,15 +48,14 @@ class PackingPage {
 	make_action_bar() {
 		this.page.set_primary_action(
 			"New",
-			() => create_new(),
-			"octicon octicon-plus"
+			() => create_new()
 		);
 
-		this.page.set_secondary_action(
-			"Refresh",
-			() => refresh(),
-			"octicon octicon-sync"
-		);
+		// this.page.set_secondary_action(
+		// 	"Refresh",
+		// 	() => refresh(),
+		// 	"octicon octicon-sync"
+		// );
 	}
 
 	make_page_form(wrapper) {
@@ -191,7 +190,6 @@ function get_all_packed_items(){
 		},
 		callback: function(ret){
 			metactical.packing_page.all_packed_items = ret.message;
-			console.log("All packed items: ", metactical.packing_page.all_packed_items);
 		}
 	});
 }
@@ -202,11 +200,11 @@ function create_new() {
 	metactical.packing_page.fetch_dn_items(true);
 }
 
-function refresh() {
-	$('input[data-fieldname="tote_barcode"]').val("");
-	$('input[data-fieldname="delivery_note"]').val("");
-	metactical.packing_page.fetch_dn_items(true);
-}
+// function refresh() {
+// 	$('input[data-fieldname="tote_barcode"]').val("");
+// 	$('input[data-fieldname="delivery_note"]').val("");
+// 	metactical.packing_page.fetch_dn_items(true);
+// }
 
 function save_form() {
 	let packed_items = metactical.packing_page.packed_items;
@@ -266,7 +264,7 @@ function count_pending_items() {
 }
 
 function count_packed_items() {
-	const items = metactical.packing_page.packed_items;
+	// const items = metactical.packing_page.all_packed_items;
 	let count = 0;
 
 	$.each(metactical.packing_page.all_packed_items, function(i, item){
@@ -275,9 +273,9 @@ function count_packed_items() {
 		});
 	})
 
-	for (const item of items) {
-		count += item.qty;
-	}
+	// for (const item of items) {
+	// 	count += item.qty;
+	// }
 
 	$(".packed-items-count").html(count + " Item(s) Packed");
 }
@@ -303,7 +301,6 @@ function populate_current_item() {
 				<button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>";
 		}
 		else{
-			console.log(item.qty, metactical.packing_page.multi_pack_if_qty)
 			if (item.qty > metactical.packing_page.multi_pack_if_qty) {
 				add_button_html = "<button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>";
 			}
@@ -464,10 +461,9 @@ function ShowPackedItems() {
 	})
 
 	let items = metactical.packing_page.all_packed_items;
-	console.log(items)
 	let packed_items = "";
 	$.each(items, (packing_slip, item) => {
-		packed_items += "<h4>" + packing_slip + "</h4>";
+		packed_items += '<h5 class="cursor-pointer" onclick="openPackingSlip(\''+packing_slip+'\')">' + packing_slip + "</h5>";
 		packed_items += "<table class='table table-bordered'>";
 		packed_items += "<thead><tr><th>Item Code</th><th>Item Name</th><th>Qty</th></tr></thead>";
 		packed_items += "<tbody>";
@@ -482,11 +478,7 @@ function ShowPackedItems() {
 		packed_items += "</table>";
 	});
 
-	console.log(packed_items)
-
 	dialog.fields_dict.packed_item_detail.$wrapper.html(packed_items);
-
-
 	dialog.show()
 }
 
@@ -494,7 +486,6 @@ metactical.packing_page.fetch_dn_items = (from_refresh = false) => {
 	let delivery_note = $('input[data-fieldname="delivery_note"]').val();
 
 	if (!delivery_note) {
-		console.log("No delivery note selected");
 		let template = frappe.render_template("packing_page_v3", {
 			no_data_feedback: "Select Delivery Note",
 			delivery_note: 0,
@@ -569,7 +560,7 @@ metactical.packing_page.calc_packing_items = (barcode, amount=1) => {
 		re_generate_current_item();
 		return;
 	}
-	
+
 	pending_items.forEach(function(cur_item){
 		if (cur_item.item_barcode.indexOf(barcode) != -1) {
 			metactical.packing_page.current_item = cur_item;
@@ -579,8 +570,6 @@ metactical.packing_page.calc_packing_items = (barcode, amount=1) => {
 			frappe.utils.play_sound("alert");
 			
 			let fields = [];
-
-			console.log(cur_item);
 
 			if (cur_item.net_weight === 0) {
 				fields.push({
@@ -713,4 +702,8 @@ function pack_item(cur_item, barcode, amount=1){
 
 	populate_dom();
 	$(".pack-items-btn").removeClass("d-none")
+}
+
+function openPackingSlip(packing_slip){
+	window.open("/app/packing-slip/" + packing_slip, "_blank");
 }

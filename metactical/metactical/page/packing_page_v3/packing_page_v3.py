@@ -71,7 +71,7 @@ def get_all_packed_items(delivery_note):
 			`tabPacking Slip Item`
 			JOIN `tabPacking Slip` ON `tabPacking Slip`.name = `tabPacking Slip Item`.parent
 		WHERE
-			`tabPacking Slip`.delivery_note = %s
+			`tabPacking Slip`.delivery_note = %s and `tabPacking Slip`.docstatus = 1
 	""", delivery_note, as_dict=1)
 
 	# group the items by packing slip

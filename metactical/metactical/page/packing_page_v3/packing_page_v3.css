@@ -5,15 +5,21 @@
   background: #e2e2e2;
 }
 [data-theme="dark"] [data-page-route="packing-page-v3"] .bg-header {
-  background: #a09a9a;
+  background: #161616;
 }
 .packing-slip-wrapper .no-items {
   text-align: center;
   height: 14px;
+  font-size: 15px;
 }
 
-.packing-slip-wrapper .cursor-pointer {
+.cursor-pointer {
   cursor: pointer;
+}
+
+.packing-slip-wrapper .bg-header{
+  height: 0;
+  display: none;
 }
 
 .packing-slip-wrapper .packing-page-v3-wrapper {
