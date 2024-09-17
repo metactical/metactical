@@ -151,7 +151,6 @@
 		"public/js/template/shipment_rate.html"
 	],
 	"css/metactical.css": [
-		"metactical/page/packing_page/packing_page.scss",
-		"metactical/page/packing_page_3/packing_page_3.scss"
+		"metactical/page/packing_page/packing_page.scss"
 	]
 }
