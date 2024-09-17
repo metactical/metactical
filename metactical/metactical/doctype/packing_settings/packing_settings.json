@@ -9,7 +9,8 @@
   "allowed_user",
   "section_break_p947q",
   "default_warehouses",
-  "default_weight_uom"
+  "default_weight_uom",
+  "multi_pack_if_qty"
  ],
  "fields": [
   {
@@ -33,12 +34,17 @@
    "fieldtype": "Link",
    "label": "Default Weight UOM",
    "options": "UOM"
+  },
+  {
+   "fieldname": "multi_pack_if_qty",
+   "fieldtype": "Int",
+   "label": "Allow Multiple Items Packing if Quantity Exceeds"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-07-31 11:11:54.011289",
+ "modified": "2024-09-16 12:04:58.209727",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Packing Settings",
