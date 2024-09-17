@@ -87,8 +87,13 @@ class PackingPage {
 					};
 				},
 				change() {
-					metactical.packing_page.fetch_dn_items();
-					get_all_packed_items();
+					var is_focused = $(`#page-packing-page-v3  [data-fieldname='delivery_note']`).is(":focus")
+					if(is_focused)
+						$(`#page-packing-page-v3 [data-fieldname='delivery_note']`).blur();
+					else{
+						metactical.packing_page.fetch_dn_items();
+						get_all_packed_items();
+					}
 				},
 			},
 			render_input: true,
