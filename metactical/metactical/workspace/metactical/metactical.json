@@ -195,6 +195,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Packing Page V3",
+   "link_to": "packing-page-v3",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Packing Slip",
    "link_to": "Packing Slip",
    "link_type": "DocType",
@@ -552,6 +561,15 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "End Of Day Report - V4 Franchise",
+   "link_to": "End of Day Report - V4 Franchise",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Sales Register",
    "link_to": "Metactical Sales Register",
    "link_type": "Report",
@@ -855,7 +873,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-08-14 14:11:39.594249",
+ "modified": "2024-09-17 12:13:33.363508",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
