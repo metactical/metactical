@@ -28,6 +28,8 @@ frappe.ui.form.on('Sales Order', {
 
 		}, 1000);
 
+		frm.trigger("update_custom_buttons");
+
 		// Add Stock Entry (Transfer material) button
 		if(frm.doc.docstatus == 1){ 
 			frm.add_custom_button(__('Stock Entry'), 
@@ -65,7 +67,24 @@ frappe.ui.form.on('Sales Order', {
 			frm.set_value("delivery_date", delivery_date.toISOString().split('T')[0]);
 		}
 	},
-	
+	update_custom_buttons: function(frm){
+		var seconds = 0;
+		var interval = setInterval(() => {
+			var custom_buttons = Object.keys(frm.custom_buttons)
+
+			if (custom_buttons.length){
+				clearInterval(interval);
+				if ("Payment Request" in cur_frm.custom_buttons){
+					frm.remove_custom_button("Payment Request", 'Create');
+					frm.add_custom_button("USAePay Payment Request", () => frm.events.create_usaepay_payment_request(frm), __("Create"));		
+				}
+			}
+			else if (seconds > 5){
+				clearInterval(interval);
+			}
+			seconds++;
+		}, 1000);
+	},
 	change_to_drop_ship: function(frm){
 		var fields = [
 			{
@@ -338,7 +357,28 @@ frappe.ui.form.on('Sales Order', {
 		frm.set_indicator_formatter('item_code',
 			function(doc) { return (doc.actual_qty>=doc.qty) ? "green" : "red" }
 		);
-    }
+    },
+
+	create_usaepay_payment_request: function(frm){
+		const payment_request_type = "Inward"
+		frappe.call({
+			method:"metactical.custom_scripts.payment_request.payment_request.make_payment_request",
+			args: {
+				dt: frm.doc.doctype,
+				dn: frm.doc.name,
+				recipient_id: frm.doc.contact_email,
+				payment_request_type: payment_request_type,
+				party_type: "Customer",
+				party: frm.doc.customer
+			},
+			callback: function(r) {
+				if(!r.exc){
+					var doc = frappe.model.sync(r.message);
+					frappe.set_route("Form", r.message.doctype, r.message.name);
+				}
+			}
+		})
+	}
 });
 frappe.ui.form.on("Sales Order Item", {
 	delivered_by_supplier: function(frm, cdt, cdn){

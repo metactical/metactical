@@ -56,6 +56,7 @@ doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
+	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -121,10 +122,10 @@ doc_events = {
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
-	"Shipment": {
+	'''"Shipment": {
 		"validate": "metactical.custom_scripts.shipment.shipment.validate",
 		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
-	},
+	},'''
 	"Task": {
 		"before_insert": "metactical.custom_scripts.task.task.set_start_date"
 	}, 
@@ -159,7 +160,8 @@ override_doctype_class = {
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
-	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
 }
 
 # Scheduled Tasks
@@ -207,7 +209,9 @@ override_whitelisted_methods = {
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
-	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate"
+	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
+	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
+	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }
 #
 # each overriding function accepts a `data` argument;

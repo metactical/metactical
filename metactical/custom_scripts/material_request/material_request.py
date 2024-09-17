@@ -15,14 +15,21 @@ class CustomMaterialRequest(MaterialRequest):
 				if item.from_warehouse is None or item.from_warehouse == '':
 					frappe.throw(f'Source Warehouse is required for item {item.item_code}')
 
-				if item.qty > get_stock_balance(item.item_code, item.from_warehouse):
-					frappe.throw(f'Requested quantity of item {item.item_code} is greater than available quantity at warehouse')
+				# if item.qty > get_stock_balance(item.item_code, item.from_warehouse):
+				# 	frappe.throw(f'Requested quantity of item {item.item_code} is greater than available quantity at warehouse')
 
 	def validate_qoh(self):
 		# check if a qty greater than the quantity on hand is entered
-		for item in self.items:
-			if item.qty > item.qoh:
-				frappe.throw("Quantity entered for item <b>{0}</b> is greater than the available quantity (<b>{1}</b>) in the warehouse".format(item.item_code, item.qoh))
+		if self.material_request_type == "Material Transfer":
+			items = []
+			for item in self.items:
+				if item.qty > item.qoh:
+					items.append(item.item_code) 
+
+			if items:
+				message = 'The quantities of these items exceed the available warehouse stock. <br>'
+				message += "<b>" + ', '.join(items) + "</b>"
+				frappe.msgprint(message)
 
 	def before_save(self):
 		self.set_status(update=True)	
@@ -38,8 +45,6 @@ class CustomMaterialRequest(MaterialRequest):
 					else:
 						suppliers += item.ais_default_supplier
 			self.ais_suppliers = suppliers
-
-		self.validate_qoh()
 
 	def set_default_supplier(self):
 		for item in self.items:

@@ -93,31 +93,39 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 		for settings in shipstation_settings:
 			data = order_json(order, is_cancelled, settings)
 			orders_url = 'https://ssapi.shipstation.com/orders/createorder'
-			response = requests.post(orders_url,
-						auth=(settings.api_key, settings.get_password('api_secret')),
-						json=data)
-			if response.status_code == 200:
-				#To prevent adding orderIds multiple times
-				if settings.name not in orderIds: 
+			
+			try:
+				response = requests.post(
+					orders_url,
+					auth=(settings.api_key, settings.get_password('api_secret')),
+					json=data
+				)
+				
+				# This will raise an HTTPError if the status code is 4xx/5xx
+				response.raise_for_status()
+
+				# To prevent adding orderIds multiple times
+				if settings.name not in orderIds:
 					sorder = response.json()
-					#frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
+					# frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
 					order_table = frappe.new_doc('Shipstation Order ID', order, 'ais_shipstation_order_ids')
 					order_table.update({
-									'settings_id': settings.name,
-									'shipstation_order_id': sorder.get('orderId')
-								})
+						'settings_id': settings.name,
+						'shipstation_order_id': sorder.get('orderId')
+					})
 					order_table.save()
-			else:
-				#Add it to Shipstation API requests for troubleshooting
+			except requests.exceptions.HTTPError as e:
+				# Add the request to Shipstation API requests for troubleshooting
 				new_req = frappe.new_doc('Shipstation API Requests')
 				new_req.update({
 					"resource_url": orders_url,
 					"resource_type": 'CREATE_ORDER',
-					"result": response.text,
+					"result": e,
 					"reference_type": "Delivery Note",
 					"reference_name": order_no
 				})
 				new_req.insert(ignore_permissions=True)
+
 		
 	
 	

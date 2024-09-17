@@ -71,7 +71,7 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 		location_order = sort_order
 
 	pick_lists = frappe.db.sql(f"""SELECT
-										pl.name, pl.customer, pl.is_rush, pli.sales_order,
+										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
 										COUNT(pli.name) AS qty_item,
 										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} SEPARATOR '<br>') AS locations
 									FROM

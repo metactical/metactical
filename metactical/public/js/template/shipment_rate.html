@@ -37,7 +37,7 @@
         </tr>
         {% for item in row.items %}
         <tr>&nbsp;
-            <td><input type="radio" name="carrier_service_{{row.idx}}" value="{{ item.carrier_service }}"></td>
+            <td><input type="radio" name="carrier_service_{{row.idx}}" value="{{ item.carrier_service }}" data-service-name="{{item.service_name}}"></td>
             <td>{{ item.service_name }}</td>
             <td>{{ item.base }}</td>
             <td>{{ item.shipment_amount }}</td>
