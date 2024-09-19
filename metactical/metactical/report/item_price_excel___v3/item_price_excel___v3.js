@@ -123,7 +123,7 @@ frappe.query_reports["Item Price Excel - V3"] = {
 			}
 		},
 		{
-			"label": "Retail Price List",
+			"label": "Price List",
 			"fieldname": "price_list",
 			"fieldtype": "MultiSelectList",
 			"options": "Price List",
