@@ -139,16 +139,13 @@ def get_data(supplier, purchase_orders, sales_orders, quotation, price_lists, su
 
 
 def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders, quotation, cost):
-	# ERPSKU | TemplateSKU | Retail SKU | Item Name | SUP - Supplier Price List | ALC | RET - CamoFRN - CAD | RET - Camo | RET - Gorilla
 	columns = []
-	if type(supplier_price_lists) == list and len(supplier_price_lists) > 0:
-		doctype = "Purchase Order"
-
+	if purchase_orders:
 		columns.append({
-			"label": doctype,
+			"label": "Purchase Order",
 			"fieldtype": "Link",
 			"fieldname": "purchase_order",
-			"options": doctype,
+			"options": "Purchase Order"
 		})
 	elif sales_orders or quotation:
 		doctype = "Sales Order" if sales_orders else "Quotation"
