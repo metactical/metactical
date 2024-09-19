@@ -310,14 +310,89 @@ def get_commercial_invoice(doc):
 	shipping_address = address["Shipping"] if "Shipping" in address else None
 	sales_orders = []
 
-	# get sales orders
-	for item in doc.items:
-		if item.sales_order:
-			if item.sales_order not in sales_orders:
-				sales_orders.append(item.sales_order)
+	packing_slips = frappe.db.get_list("Packing Slip", filters={"delivery_note": doc.name, "docstatus":1}, order_by= "from_case_no asc", fields=["name", "from_case_no"])
+	packing_slip_names = [ps.name for ps in packing_slips]
 	
-	order_numbers = len(sales_orders)
+	# group dn items by item_code
+	dn_items_dict = {}
+	for item in doc.items:
+		if item.item_code not in dn_items_dict:
+			dn_items_dict[item.item_code] = []
+		dn_items_dict[item.item_code].append(item)
 
+
+	itemsss = []
+	items = {}
+	items_with_no_template = []
+	sales_orders = []
+
+	packing_slip_items = frappe.db.get_list("Packing Slip Item", 
+												filters={"parent": ["in", packing_slip_names]}, 
+												fields=["item_code", "item_name", "weight_uom", "qty", "parent"])
+	
+	for psi in packing_slip_items:
+		psi.rate = dn_items_dict[psi.item_code][0].rate if psi.item_code in dn_items_dict else 0
+		for ps in packing_slips:
+			if psi.parent == ps.name:
+				psi.from_case_no = ps.from_case_no
+		
+		# if psi.against_sales_order:
+		# 	if psi.against_sales_order not in sales_orders:
+		# 		sales_orders.append(psi.against_sales_order)
+
+		variant_of = frappe.db.get_value("Item", psi.item_code, "variant_of")
+		if variant_of:
+			template_name = frappe.db.get_value("Item", variant_of, "item_name")
+			if template_name:
+				psi.template_name = template_name
+
+			psi.variant_of = variant_of
+		else:
+			psi.variant_of = "No Template"
+			psi.template_name = ""
+
+	# group items based on variant of 
+	for item in psi:
+		if psi.variant_of != "No Template":
+			if psi.variant_of not in items:
+				items[psi.variant_of] = []
+			items[psi.variant_of].append(psi)
+		else:
+			items_with_no_template.append(psi)
+	
+		items.update({"No Template": items_with_no_template})
+
+
+		itemsss.append(items)
+
+
+		
+
+			
+
+	# items_list = get_items(doc.items, packing_slip_items)
+
+	# get sales orders
+	# for item in items_list:
+	# 	variant_of = frappe.db.get_value("Item", psi.item_code, "variant_of")
+	# 	if variant_of:
+	# 		template_name = frappe.db.get_value("Item", variant_of, "item_name")
+	# 		if template_name:
+	# 			item.template_name = template_name
+
+	# 		item.variant_of = variant_of
+	# 	else:
+	# 		item.variant_of = "No Template"
+	# 		item.template_name = ""
+
+	# 	if item.get("sales_order"):
+	# 		if item.sales_order not in sales_orders:
+	# 			sales_orders.append(item.sales_order)
+	
+	print(itemsss)
+
+	order_numbers = len(sales_orders)
+	
 	# get tracking number
 	tracking_number, shipments = get_tracking_number(sales_orders)
 	tracking_number = ', '.join(tracking_number) if tracking_number else "-"
@@ -335,11 +410,12 @@ def get_commercial_invoice(doc):
 	sales_person = ', '.join(sales_person) if sales_person else "-"
 
 	html = frappe.render_template("metactical/metactical/print_format/ci___export___v1/ci_export_v1.html", 
-									{
+									{	
+										"itemss": itemsss,
 										"doc": doc, 
 										"sold_to": billing_address, 
 										"shipped_to": shipping_address,
-										"order_numbers": order_numbers,
+										"order_numbers": order_numbers ,
 										"tracking_number": tracking_number,
 										"customer_pos": customer_pos,
 										"freight_terms": freight_term,
@@ -349,6 +425,17 @@ def get_commercial_invoice(doc):
 									}
 								)
 	return html
+
+def get_rate(packing_slip_item, delivery_note):
+
+	# add rate to packing slip items from delivery note items
+	if psi.item_code in dn_items_dict:
+		for item in dn_items_dict[psi.item_code]:
+			psi.rate = item.rate
+			psi.item_name = item.item_name
+			psi.description = item.description
+
+	return packing_slip_items
 
 def get_customer_address(customer):
 	customer_addresses = {}
@@ -439,7 +526,6 @@ def get_freight_terms(shipments):
 	return freight_terms
 
 def get_sales_person(sales_orders):
-	print(sales_orders)
 	sales_persons_list = []
 	sales_persons = frappe.db.get_list("Sales Team", filters={"parent": ["in", sales_orders], "parenttype": "Sales Order"}, fields=["sales_person"])
 	if sales_persons:
