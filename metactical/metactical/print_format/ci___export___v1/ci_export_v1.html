@@ -65,14 +65,7 @@
         </div>
     </div>
 
-    <table style="width: 100%">
-        <!-- Ctn. Item Description Qty
-Shipped
-Qty
-B/O UM Wgt.(LB) Wgt.(KG) C.O Unit
-Price
-Extended
-Amount -->
+    <table style="width: 100%" class="ci_items_table">
         <thead>
             <th>Ctn.</th>
             <th>Item Description</th>
@@ -83,32 +76,26 @@ Amount -->
             <th>Extended Amount</th>
         </thead>
         <tbody>
-            {% for items in itemss %}
-                {% for template, items in items.items() %}
+            {% for items_dict in itemss %}
+                {% for template, items in items_dict.items() %}
                     {% set total_qty = 0 %}
                     {% set total_weight = 0 %}
                     {% set total_price = 0 %}
                     {% set total_amount = 0 %}
-                    {% set items = "" %}
+                    {% set items_name = "" %}
                     {% set from_case_no = "" %}
-                    {% for item in items %}
-                        {% set items = items + item.item_code + ", " %}
-                        {% set total_qty = total_qty + item.qty %}
-                        {% set total_weight = total_weight + item.weight %}
-                        {% set total_price = total_price + item.rate %}
-                        {% set total_amount = total_amount + (item.rate * item.qty) %}
-                        {% set from_case_no = item.from_case_no %}
-                    {% endfor %}
                     <tr>
-                        <td>{{template}}</td>
                         {% for item in items %}
                             {% set from_case_no = item.from_case_no %}
-                            {% set items = items + item.item_code + ", " %}
+                            {% set items_name = items_name + item.item_code + ", " %}
                             {% set total_qty = total_qty + item.qty %}
-                            {% set total_weight = total_weight + item.weight %}
+                            {% set total_weight = total_weight + item.net_weight %}
                             {% set total_price = total_price + item.rate %}
                             {% set total_amount = total_amount + (item.rate * item.qty) %}
+
+                            <td></td>
                         {% endfor %}
+                        <td>{{template}} <br>{{items_name}}</td>
 
                         <td>{{from_case_no}}</td>
                         <td>{{total_qty}}</td>

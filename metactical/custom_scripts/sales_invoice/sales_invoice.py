@@ -328,7 +328,7 @@ def get_commercial_invoice(doc):
 
 	packing_slip_items = frappe.db.get_list("Packing Slip Item", 
 												filters={"parent": ["in", packing_slip_names]}, 
-												fields=["item_code", "item_name", "weight_uom", "qty", "parent"])
+												fields=["item_code", "item_name", "weight_uom", "net_weight", "qty", "parent"])
 	
 	for psi in packing_slip_items:
 		psi.rate = dn_items_dict[psi.item_code][0].rate if psi.item_code in dn_items_dict else 0
@@ -352,7 +352,7 @@ def get_commercial_invoice(doc):
 			psi.template_name = ""
 
 	# group items based on variant of 
-	for item in psi:
+	for item in packing_slip_items:
 		if psi.variant_of != "No Template":
 			if psi.variant_of not in items:
 				items[psi.variant_of] = []
@@ -389,8 +389,6 @@ def get_commercial_invoice(doc):
 	# 		if item.sales_order not in sales_orders:
 	# 			sales_orders.append(item.sales_order)
 	
-	print(itemsss)
-
 	order_numbers = len(sales_orders)
 	
 	# get tracking number
