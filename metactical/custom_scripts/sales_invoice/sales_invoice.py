@@ -303,8 +303,18 @@ def si_mode_of_payment(name):
 def get_commercial_invoice(doc):
 	doc.mode_of_payment = si_mode_of_payment(doc.name)
 
-	address = get_customer_address(doc.customer)
-	customer_phone, customer_email = get_customer_contact(doc.customer)
+	sales_order = ""
+	for item in doc.items:
+		if item.against_sales_order:
+			sales_order = item.against_sales_order
+			break
+	
+	if sales_order:
+		sales_order = frappe.get_doc("Sales Order", sales_order)
+		doc.delivery_date = sales_order.delivery_date
+
+	address = get_customer_address(sales_order.customer)
+	customer_phone, customer_email = get_customer_contact(sales_order.customer)
 
 	billing_address = address["Billing"] if "Billing" in address else None
 	shipping_address = address["Shipping"] if "Shipping" in address else None
@@ -316,86 +326,64 @@ def get_commercial_invoice(doc):
 	# group dn items by item_code
 	dn_items_dict = {}
 	for item in doc.items:
+		# print(item.price_list_rate)
 		if item.item_code not in dn_items_dict:
 			dn_items_dict[item.item_code] = []
 		dn_items_dict[item.item_code].append(item)
 
 
 	itemsss = []
-	items = {}
 	items_with_no_template = []
-	sales_orders = []
 
-	packing_slip_items = frappe.db.get_list("Packing Slip Item", 
-												filters={"parent": ["in", packing_slip_names]}, 
-												fields=["item_code", "item_name", "weight_uom", "net_weight", "qty", "parent"])
-	
-	for psi in packing_slip_items:
-		psi.rate = dn_items_dict[psi.item_code][0].rate if psi.item_code in dn_items_dict else 0
-		for ps in packing_slips:
-			if psi.parent == ps.name:
-				psi.from_case_no = ps.from_case_no
-		
-		# if psi.against_sales_order:
-		# 	if psi.against_sales_order not in sales_orders:
-		# 		sales_orders.append(psi.against_sales_order)
+	for ps in packing_slips:
+		items = {}
+		packing_slip_items = frappe.db.get_list("Packing Slip Item", 
+													filters={"parent": ps.name}, 
+													fields=["name", "item_code", "item_name", "weight_uom", "net_weight", "qty", "parent"])
 
-		variant_of = frappe.db.get_value("Item", psi.item_code, "variant_of")
-		if variant_of:
-			template_name = frappe.db.get_value("Item", variant_of, "item_name")
-			if template_name:
-				psi.template_name = template_name
-
-			psi.variant_of = variant_of
-		else:
-			psi.variant_of = "No Template"
-			psi.template_name = ""
-
-	# group items based on variant of 
-	for item in packing_slip_items:
-		if psi.variant_of != "No Template":
-			if psi.variant_of not in items:
-				items[psi.variant_of] = []
-			items[psi.variant_of].append(psi)
-		else:
-			items_with_no_template.append(psi)
-	
-		items.update({"No Template": items_with_no_template})
-
-
-		itemsss.append(items)
-
-
-		
-
+		for psi in packing_slip_items:
+			psi.rate = dn_items_dict[psi.item_code][0].rate if psi.item_code in dn_items_dict else 0
+			for ps in packing_slips:
+				if psi.parent == ps.name:
+					psi.from_case_no = ps.from_case_no
 			
+			# if psi.against_sales_order:
+			# 	if psi.against_sales_order not in sales_orders:
+			# 		sales_orders.append(psi.against_sales_order)
 
-	# items_list = get_items(doc.items, packing_slip_items)
+			item_detail = frappe.db.get_value("Item", psi.item_code, ["variant_of", "country_of_origin"], as_dict=True)
+			psi.country_of_origin = item_detail.country_of_origin
+			if item_detail.variant_of:
+				template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
+				if template_name:
+					psi.template_name = template_name
 
-	# get sales orders
-	# for item in items_list:
-	# 	variant_of = frappe.db.get_value("Item", psi.item_code, "variant_of")
-	# 	if variant_of:
-	# 		template_name = frappe.db.get_value("Item", variant_of, "item_name")
-	# 		if template_name:
-	# 			item.template_name = template_name
+				psi.variant_of = item_detail.variant_of
+			else:
+				psi.variant_of = "No Template"
+				psi.template_name = ""
+		
+		# group items based on variant of 
+		for item in packing_slip_items:
+			if item.variant_of != "No Template":
+				if item.variant_of not in items:
+					items[item.variant_of] = []
+				items[item.variant_of].append(item)
+			else:
+				items_with_no_template.append(item)
+		
+		itemsss.append(items)
+	itemsss.append({"No Template": items_with_no_template})
 
-	# 		item.variant_of = variant_of
-	# 	else:
-	# 		item.variant_of = "No Template"
-	# 		item.template_name = ""
-
-	# 	if item.get("sales_order"):
-	# 		if item.sales_order not in sales_orders:
-	# 			sales_orders.append(item.sales_order)
-	
-	order_numbers = len(sales_orders)
+	order_numbers = 1
+	sales_orders = [sales_order.name]
 	
 	# get tracking number
 	tracking_number, shipments = get_tracking_number(sales_orders)
 	tracking_number = ', '.join(tracking_number) if tracking_number else "-"
 
 	# get customer POs
+	customer_pos = ""
 	customer_pos = get_customer_po(sales_orders)
 	customer_pos = ', '.join(customer_pos) if customer_pos else "-"
 
@@ -411,6 +399,7 @@ def get_commercial_invoice(doc):
 									{	
 										"itemss": itemsss,
 										"doc": doc, 
+										"ship_via": "-",
 										"sold_to": billing_address, 
 										"shipped_to": shipping_address,
 										"order_numbers": order_numbers ,
@@ -472,12 +461,24 @@ def get_customer_address(customer):
 	return customer_addresses
 
 def get_customer_contact(customer):
-	primary_email = frappe.db.get_value("Customer", {"email_id": customer}, "ifw_email")
-	primary_phone = ""
-	if primary_email:
-		primary_phone = frappe.db.get_value("Contact", {"email_id": primary_email}, "mobile_no")
+	contacts_list = frappe.db.sql("""select ce.email_id, cp.phone
+								from `tabContact` c
+								JOIN `tabContact Phone` cp on cp.parent=c.name
+								LEFT JOIN `tabContact Email` ce on ce.parent=c.name
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" and 
+									   dl.link_name = %(customer)s
+								""", {'customer': customer}, as_dict=1)
+	
+	phone = ""
+	email = ""
 
-	return primary_phone, primary_email
+	if len(contacts_list) > 0:
+		phone = contacts_list[0].phone
+		email = contacts_list[0].email_id
+
+	return phone, email
 
 # Metactical Customization: Get tracking number for the print format
 def get_tracking_number(sales_orders):
@@ -510,7 +511,10 @@ def get_tracking_number(sales_orders):
 def get_customer_po(sales_orders):
 	customer_po = []
 	for sales_order in sales_orders:
-		customer_po.append(frappe.db.get_value("Sales Order", sales_order, "po_no"))
+		po_no = frappe.db.get_value("Sales Order", sales_order, "po_no")
+		if po_no:
+			customer_po.append(po_no)
+
 	return customer_po
 
 def get_freight_terms(shipments):
@@ -531,3 +535,41 @@ def get_sales_person(sales_orders):
 
 	return sales_persons_list
 		
+def get_totals(items):
+	total_qty = 0
+	total_amount = 0
+	total_weight = 0
+	items_list = ""
+	from_case_no = 0
+	template_name = ""
+	rate = 0
+	country_of_origin = ""
+
+	print(items)
+
+	for item in items:
+		items_list += str(item.qty) +" / "+item.item_code+ "  "
+		total_qty += item.qty
+		total_amount += item.rate * item.qty
+		total_weight += item.net_weight
+		# rate = item.rate
+
+		if not from_case_no:
+			from_case_no = item.from_case_no
+		
+		if not template_name:
+			template_name = item.template_name
+
+		if not country_of_origin and item.country_of_origin:
+			country_of_origin = frappe.db.get_value("Country", item.country_of_origin, "code").upper()
+	
+	return {
+		"total_qty": total_qty,
+		"total_amount": total_amount,
+		"total_weight": total_weight,
+		"items": items_list,
+		"from_case_no": from_case_no,
+		"template_name": template_name,
+		"rate": rate,
+		"country_of_origin": country_of_origin
+	}

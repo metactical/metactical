@@ -241,6 +241,7 @@ jenv = {
 		"get_barcode:metactical.barcode_generator.get_barcode",
 		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
 		"get_commercial_invoice:metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
+		"get_totals:metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
 	]
 }
 
