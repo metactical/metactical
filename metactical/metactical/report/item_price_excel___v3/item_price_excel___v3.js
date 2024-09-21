@@ -15,6 +15,7 @@ frappe.query_reports["Item Price Excel - V3"] = {
 					if (frappe.query_report.get_filter_value('purchase_order')){
 						frappe.query_report.set_filter_value('purchase_order', []);
 						frappe.query_report.set_filter_value('sales_order', []);
+						frappe.query_report.set_filter_value('quotation', []);
 						frappe.query_report.set_filter_value('supplier', frappe.query_report.get_filter_value('supplier'));
 					}
 				}
@@ -34,6 +35,35 @@ frappe.query_reports["Item Price Excel - V3"] = {
 			},
 		},
 		{
+			"label": "Quotation",
+			"fieldname": "quotation",
+			"fieldtype": "MultiSelectList",
+			"options": "Quotation",
+			on_change: () => {
+				// remove supplier filter value if quotation is selected
+				if (frappe.query_report.get_filter_value('quotation')){
+					if (frappe.query_report.get_filter_value('supplier'))
+						frappe.query_report.set_filter_value('supplier', "");
+
+					if (frappe.query_report.get_filter_value('purchase_order'))
+						frappe.query_report.set_filter_value('purchase_order', []);
+
+					if (frappe.query_report.get_filter_value('sales_order'))
+						frappe.query_report.set_filter_value('sales_order', []);
+
+					if (!frappe.query_report.get_filter_value('supplier') && 
+						!frappe.query_report.get_filter_value('purchase_order' &&
+						!frappe.query_report.get_filter_value('sales_order')
+						)){
+						frappe.query_report.refresh();
+					}
+				}
+			},
+			get_data: function(txt) {
+				return frappe.db.get_link_options("Quotation", txt);
+			}
+		},
+		{
 			"label": "Purchase Order",
 			"fieldname": "purchase_order",
 			"fieldtype": "MultiSelectList",
@@ -47,7 +77,12 @@ frappe.query_reports["Item Price Excel - V3"] = {
 					if (frappe.query_report.get_filter_value('sales_order'))
 						frappe.query_report.set_filter_value('sales_order', []);
 
-					if (!frappe.query_report.get_filter_value('supplier') && !frappe.query_report.get_filter_value('sales_order')){
+					if (frappe.query_report.get_filter_value("quotation"))
+						frappe.query_report.set_filter_value("quotation", []);
+
+					if (!frappe.query_report.get_filter_value('supplier') 
+						&& !frappe.query_report.get_filter_value('sales_order') 
+						&& !frappe.query_report.get_filter_value('quotation')){
 						frappe.query_report.refresh();
 					}
 				}
@@ -72,8 +107,13 @@ frappe.query_reports["Item Price Excel - V3"] = {
 
 					if (frappe.query_report.get_filter_value("supplier_price_list"))
 						frappe.query_report.set_filter_value("supplier_price_list", []);
+					
+					if (frappe.query_report.get_filter_value("quotation"))
+						frappe.query_report.set_filter_value("quotation", []);
 
-					if (!frappe.query_report.get_filter_value('supplier') && !frappe.query_report.get_filter_value('purchase_order')){
+					if (!frappe.query_report.get_filter_value('supplier') && 
+					!frappe.query_report.get_filter_value('purchase_order') &&
+					!frappe.query_report.get_filter_value('quotation')){
 						frappe.query_report.refresh();
 					}
 				}
@@ -83,7 +123,7 @@ frappe.query_reports["Item Price Excel - V3"] = {
 			}
 		},
 		{
-			"label": "Retail Price List",
+			"label": "Price List",
 			"fieldname": "price_list",
 			"fieldtype": "MultiSelectList",
 			"options": "Price List",

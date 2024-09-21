@@ -65,6 +65,9 @@ class CanadaPost():
 			'User', doc.pickup_contact_person).as_dict()
 		delivery_contact_doc = frappe.get_doc(
 			'Contact', doc.delivery_contact_name).as_dict()
+		customer_first_name, customer_last_name = frappe.db.get_value("Customer", doc.delivery_customer, ["first_name", "last_name"])
+		delivery_contact_doc.first_name = customer_first_name
+		delivery_contact_doc.last_name = customer_last_name
 		delivery_note = frappe.get_doc(
 			'Delivery Note', doc.shipment_delivery_note[-1].delivery_note).as_dict()
 		return frappe._dict({
@@ -122,11 +125,16 @@ class CanadaPost():
 				})
 		return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
 
-	def create_shipping(self, name, carrier_service):
+	def create_shipping(self, name, carrier_service, service_name):
 		if carrier_service is None:
 			frappe.throw(_("Service Code Required. please select service"))
+
 		if isinstance(carrier_service, string_types) and carrier_service.startswith('{'):
 			carrier_service = ast.literal_eval(carrier_service)
+
+		if isinstance(service_name, string_types) and service_name.startswith('{'):
+			service_name = ast.literal_eval(service_name)
+
 		files = []
 		doc = frappe.get_doc('Shipment', name)
 		context = self.get_context(name)
@@ -137,6 +145,7 @@ class CanadaPost():
 		for parcel in context.doc.shipment_parcel:
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
+			context.parcel.service_name = service_name.get(parcel.name)
 			for c in range(parcel.count - exists.get(parcel.name, 0)):
 				body = frappe.render_template(
 					"metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
@@ -147,6 +156,7 @@ class CanadaPost():
 					'shipment_id': response['shipment-info']['shipment-id'],
 					'awb_number': response['shipment-info']['tracking-pin'],
 					'service_provider': 'Canada Post',
+					'service_name': context.parcel.service_name,
 					'carrier_service': context.parcel.carrier_service,
 					'tracking_status': '',
 					'carrier_status': response['shipment-info']['shipment-status'],

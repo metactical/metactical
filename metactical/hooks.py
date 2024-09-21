@@ -47,7 +47,8 @@ doctype_js = {
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
-	"Warehouse": "custom_scripts/warehouse/warehouse.js"
+	"Warehouse": "custom_scripts/warehouse/warehouse.js",
+	"Contact": "custom_scripts/contact/contact.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -55,6 +56,7 @@ doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
+	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -114,19 +116,16 @@ doc_events = {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
 	},
-	"Material Request": {
-		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
-	},
 	"Address": {
 		"validate": "metactical.custom_scripts.address.address.validate"
 	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
-	"Shipment": {
+	'''"Shipment": {
 		"validate": "metactical.custom_scripts.shipment.shipment.validate",
 		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
-	},
+	},'''
 	"Task": {
 		"before_insert": "metactical.custom_scripts.task.task.set_start_date"
 	}, 
@@ -135,7 +134,11 @@ doc_events = {
 	},
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
-	}
+	}, 
+	"Payment Entry": {
+		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
+		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+	},
 }
 
 # DocType Class
@@ -153,9 +156,12 @@ override_doctype_class = {
 	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
+	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
 }
 
 # Scheduled Tasks
@@ -203,7 +209,9 @@ override_whitelisted_methods = {
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
-	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate"
+	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
+	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
+	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -228,8 +236,16 @@ fixtures = [{
 			"Projects Status"
 		]]]
 	},
-	{
+  	{
 		"dt": "Provinces"
+	},
+	{
+		"dt": "Account",
+		"filters": [["name", "in", [
+			"Store Credits - ICL",
+			"Store Credit - CAD - ICL",
+			"Store Credit - USD - ICL"
+		]]]
 	}
 ]
 
@@ -242,6 +258,7 @@ jenv = {
 		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
 		"get_commercial_invoice:metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
 		"get_totals:metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
+		"get_customer_info:metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
 	]
 }
 

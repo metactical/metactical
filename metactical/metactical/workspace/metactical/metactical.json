@@ -195,6 +195,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Packing Page V3",
+   "link_to": "packing-page-v3",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Packing Slip",
    "link_to": "Packing Slip",
    "link_type": "DocType",
@@ -347,8 +356,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Item Import Tool",
+   "link_to": "Item From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": " Purchase Order Import Tool",
    "link_to": "Purchase Order Import Tool",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pricing Rule Import Tool",
+   "link_to": "Pricing Rule From Excel",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -534,6 +561,15 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "End Of Day Report - V4 Franchise",
+   "link_to": "End of Day Report - V4 Franchise",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Sales Register",
    "link_to": "Metactical Sales Register",
    "link_type": "Report",
@@ -617,6 +653,15 @@
    "is_query_report": 1,
    "label": "Store Credits",
    "link_to": "Store Credits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pricing Rule Report - V1",
+   "link_to": "Pricing Rule Report - V1",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
@@ -828,7 +873,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-07-22 08:55:37.534107",
+ "modified": "2024-09-17 12:13:33.363508",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
