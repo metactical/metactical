@@ -22,10 +22,14 @@ class CycleCount(Document):
 					"qty": row.qty,
 					"valuation_rate": row.valuation_rate
 				})
+		
 		if hasattr(doc, "items"):
 			doc.submit()
 
 	def validate(self):
+		if len(self.items) > 99:
+			frappe.throw("You can't add more than 99 items in a Cycle Count")
+
 		for row in self.items:
 			if row.get("expected_qty") is None:
 				expected = get_expected_qty(row.item_code, self.warehouse)
