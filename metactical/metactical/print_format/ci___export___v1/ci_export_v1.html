@@ -101,7 +101,7 @@
           <td>Kg</td>
           <td>{{item.total_weight}}</td>
           <td>{{item.country_of_origin}}</td>
-          <!-- <td>{{item.rate}}</td> -->
+          <td>{{item.rate}}</td>
           <td>{{item.total_amount}}</td>
         </tr>
         {% endfor %} {% else %} {% set totals = get_totals(items) %}
@@ -114,8 +114,8 @@
           <td>{{totals["total_qty"]}}</td>
           <td>Kg</td>
           <td>{{totals["total_weight"]}}</td>
-          <td>CA</td>
-          <!-- <td>{{totals["rate"]}}</td> -->
+          <td>{{item.country_of_origin}}</td>
+          <td>{{totals["rate"]}}</td>
           <td>{{totals["total_amount"]}}</td>
         </tr>
         {% endif %} {% endfor %} {% endfor %}
