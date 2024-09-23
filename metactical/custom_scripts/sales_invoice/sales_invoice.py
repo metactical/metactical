@@ -326,7 +326,6 @@ def get_commercial_invoice(doc):
 	# group dn items by item_code
 	dn_items_dict = {}
 	for item in doc.items:
-		# print(item.price_list_rate)
 		if item.item_code not in dn_items_dict:
 			dn_items_dict[item.item_code] = []
 		dn_items_dict[item.item_code].append(item)
@@ -348,7 +347,7 @@ def get_commercial_invoice(doc):
 					psi.from_case_no = ps.from_case_no
 
 			item_detail = frappe.db.get_value("Item", psi.item_code, ["variant_of", "country_of_origin"], as_dict=True)
-			psi.country_of_origin = item_detail.country_of_origin
+			psi.country_of_origin = frappe.db.get_value("Country", item_detail.country_of_origin, "code").upper() if item_detail.country_of_origin else "-"
 			# if item_detail.variant_of:
 			# 	template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
 			# 	if template_name:
@@ -366,15 +365,11 @@ def get_commercial_invoice(doc):
 					items[item.variant_of] = []
 				items[item.variant_of].append(item)
 			else:
-				country_of_origin = frappe.db.get_value("Country", item.country_of_origin, "code").upper()
-				item.country_of_origin = country_of_origin
 				items_with_no_template.append(item)
 		
 		items_list.append(items)
 	items_list.append({"No Template": items_with_no_template})
 
-
-	print(items_with_no_template)
 	order_numbers = 1
 	sales_orders = [sales_order.name]
 	
