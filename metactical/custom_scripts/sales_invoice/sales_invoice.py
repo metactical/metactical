@@ -349,7 +349,7 @@ def get_commercial_invoice(doc):
 		dn_items_dict[item.item_code].append(item)
 
 
-	itemsss = []
+	items_list = []
 	items_with_no_template = []
 
 	for ps in packing_slips:
@@ -363,22 +363,18 @@ def get_commercial_invoice(doc):
 			for ps in packing_slips:
 				if psi.parent == ps.name:
 					psi.from_case_no = ps.from_case_no
-			
-			# if psi.against_sales_order:
-			# 	if psi.against_sales_order not in sales_orders:
-			# 		sales_orders.append(psi.against_sales_order)
 
 			item_detail = frappe.db.get_value("Item", psi.item_code, ["variant_of", "country_of_origin"], as_dict=True)
 			psi.country_of_origin = item_detail.country_of_origin
-			if item_detail.variant_of:
-				template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
-				if template_name:
-					psi.template_name = template_name
+			# if item_detail.variant_of:
+			# 	template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
+			# 	if template_name:
+			# 		psi.template_name = template_name
 
-				psi.variant_of = item_detail.variant_of
-			else:
-				psi.variant_of = "No Template"
-				psi.template_name = ""
+			# 	psi.variant_of = item_detail.variant_of
+			# else:
+			psi.variant_of = "No Template"
+			psi.template_name = ""
 		
 		# group items based on variant of 
 		for item in packing_slip_items:
@@ -387,11 +383,15 @@ def get_commercial_invoice(doc):
 					items[item.variant_of] = []
 				items[item.variant_of].append(item)
 			else:
+				country_of_origin = frappe.db.get_value("Country", item.country_of_origin, "code").upper()
+				item.country_of_origin = country_of_origin
 				items_with_no_template.append(item)
 		
-		itemsss.append(items)
-	itemsss.append({"No Template": items_with_no_template})
+		items_list.append(items)
+	items_list.append({"No Template": items_with_no_template})
 
+
+	print(items_with_no_template)
 	order_numbers = 1
 	sales_orders = [sales_order.name]
 	
@@ -414,7 +414,7 @@ def get_commercial_invoice(doc):
 
 	html = frappe.render_template("metactical/metactical/print_format/ci___export___v1/ci_export_v1.html", 
 									{	
-										"itemss": itemsss,
+										"items_list": items_list,
 										"doc": doc, 
 										"ship_via": "-",
 										"sold_to": billing_address, 
@@ -514,7 +514,6 @@ def get_tracking_number(sales_orders):
 		# get shipments without duplicates
 		shipments = list(set(shipments))
 
-
 		if shipments:
 			for shipment in shipments:
 				shipment_doc = frappe.get_doc("Shipment", shipment)
@@ -556,20 +555,18 @@ def get_totals(items):
 	total_qty = 0
 	total_amount = 0
 	total_weight = 0
-	items_list = ""
+	variant_items = ""
 	from_case_no = 0
 	template_name = ""
 	rate = 0
 	country_of_origin = ""
 
-	print(items)
-
 	for item in items:
-		items_list += str(item.qty) +" / "+item.item_code+ "  "
+		variant_items += str(item.qty) +" / "+item.item_code+ "  "
 		total_qty += item.qty
 		total_amount += item.rate * item.qty
 		total_weight += item.net_weight
-		# rate = item.rate
+		rate = item.rate
 
 		if not from_case_no:
 			from_case_no = item.from_case_no
@@ -584,7 +581,7 @@ def get_totals(items):
 		"total_qty": total_qty,
 		"total_amount": total_amount,
 		"total_weight": total_weight,
-		"items": items_list,
+		"items": variant_items,
 		"from_case_no": from_case_no,
 		"template_name": template_name,
 		"rate": rate,

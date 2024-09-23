@@ -6,7 +6,7 @@
     <title>Document</title>
   </head>
   <body>
-    <h4><center>Comercial Invoice</center></h4>
+    <!-- <h4><center>Comercial Invoice</center></h4> -->
 
     <div class="invoice-info">
       <p><b>Invoice Number:</b> {{doc.name}}</p>
@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    <table style="width: 100%" class="ci_items_table">
+    <table style="width: 100%" class="ci_items_table table table-striped">
       <thead>
         <th>Ctn.</th>
         <th>Item Name</th>
@@ -83,26 +83,25 @@
         <th>U0M</th>
         <th>Wgt.(KG)</th>
         <th>C.O</th>
-        <!-- <th>Unit Price</th> -->
+        <th>Unit Price</th>
         <th>Extended Amount</th>
       </thead>
       <tbody>
-        {% for items_dict in itemss %} {% for template, items in
-        items_dict.items() %} {% if template == "No Template" %} {% for item in
+        {% for items_dict in items_list %} {% for template, items in
+        items_dict.items() %}
+        {% if template == "No Template" %} {% for item in
         items %}
         <tr>
           <td>{{item.from_case_no}}</td>
           <td>
-            <span class="template_name">{{item.template_name}} </span><br /><b
-              >Ordered: </b
-            >{{item.items}}
+            <span class="template_name">{{item.item_name}}</span>
           </td>
-          <td>{{item.total_qty}}</td>
+          <td>{{item.qty}}</td>
           <td>Kg</td>
-          <td>{{item.total_weight}}</td>
+          <td>{{item.net_weight}}</td>
           <td>{{item.country_of_origin}}</td>
-          <!-- <td>{{item.rate}}</td> -->
-          <td>{{item.total_amount}}</td>
+          <td>{{item.rate}}</td>
+          <td>{{item.rate * item.qty}}</td>
         </tr>
         {% endfor %} {% else %} {% set totals = get_totals(items) %}
         <tr>
@@ -114,8 +113,8 @@
           <td>{{totals["total_qty"]}}</td>
           <td>Kg</td>
           <td>{{totals["total_weight"]}}</td>
-          <td>CA</td>
-          <!-- <td>{{totals["rate"]}}</td> -->
+          <td>{{totals["country_of_origin"]}}</td>
+          <td>{{totals["rate"]}}</td>
           <td>{{totals["total_amount"]}}</td>
         </tr>
         {% endif %} {% endfor %} {% endfor %}
