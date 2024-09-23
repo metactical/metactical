@@ -349,15 +349,15 @@ def get_commercial_invoice(doc):
 
 			item_detail = frappe.db.get_value("Item", psi.item_code, ["variant_of", "country_of_origin"], as_dict=True)
 			psi.country_of_origin = item_detail.country_of_origin
-			if item_detail.variant_of:
-				template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
-				if template_name:
-					psi.template_name = template_name
+			# if item_detail.variant_of:
+			# 	template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
+			# 	if template_name:
+			# 		psi.template_name = template_name
 
-				psi.variant_of = item_detail.variant_of
-			else:
-				psi.variant_of = "No Template"
-				psi.template_name = ""
+			# 	psi.variant_of = item_detail.variant_of
+			# else:
+			psi.variant_of = "No Template"
+			psi.template_name = ""
 		
 		# group items based on variant of 
 		for item in packing_slip_items:
@@ -366,11 +366,15 @@ def get_commercial_invoice(doc):
 					items[item.variant_of] = []
 				items[item.variant_of].append(item)
 			else:
+				country_of_origin = frappe.db.get_value("Country", item.country_of_origin, "code").upper()
+				item.country_of_origin = country_of_origin
 				items_with_no_template.append(item)
 		
 		items_list.append(items)
 	items_list.append({"No Template": items_with_no_template})
 
+
+	print(items_with_no_template)
 	order_numbers = 1
 	sales_orders = [sales_order.name]
 	
@@ -393,7 +397,7 @@ def get_commercial_invoice(doc):
 
 	html = frappe.render_template("metactical/metactical/print_format/ci___export___v1/ci_export_v1.html", 
 									{	
-										"itemss": items_list,
+										"items_list": items_list,
 										"doc": doc, 
 										"ship_via": "-",
 										"sold_to": billing_address, 
