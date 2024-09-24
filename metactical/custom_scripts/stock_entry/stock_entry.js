@@ -40,6 +40,29 @@ frappe.ui.form.on('Stock Entry', {
 	}
 })
 
+frappe.ui.form.on('Stock Entry Detail', {
+	item_code: function(frm, cdt, cdn){
+		var d = locals[cdt][cdn];
+
+		if(d.item_code){
+			frappe.db.get_value('Item', d.item_code, 'ifw_retailskusuffix', function(r) {
+				if(r.ifw_retailskusuffix){
+					d.ifw_retailskusuffix = r.ifw_retailskusuffix;
+					cur_frm.refresh_field("items");		
+				}
+				else{
+					d.ifw_retailskusuffix = "";
+					cur_frm.refresh_field("items");		
+				}
+			})
+		}
+		else{
+			d.ifw_retailskusuffix = "";
+			cur_frm.refresh_field("items");		
+		}
+	},
+});
+
 erpnext.stock.StockEntry = class StockEntry extends erpnext.stock.StockEntry {
 	onload(frm){
 		var me = this;
