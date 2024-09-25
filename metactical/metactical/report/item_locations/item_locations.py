@@ -5,18 +5,18 @@ import frappe
 
 def execute(filters=None):
 	purchase_orders = filters.get("purchase_order") if filters.get("purchase_order") else None
-	purchase_invoices = filters.get("purchase_invoice") if filters.get("purchase_invoice") else None
+	purchase_receipts = filters.get("purchase_receipt") if filters.get("purchase_receipt") else None
 
-	if not purchase_orders and not purchase_invoices:
+	if not purchase_orders and not purchase_receipts:
 		return [], []
 
-	columns = get_columns(purchase_orders, purchase_invoices)
-	data = get_data(purchase_orders, purchase_invoices)
+	columns = get_columns(purchase_orders, purchase_receipts)
+	data = get_data(purchase_orders, purchase_receipts)
 	return columns, data
 
-def get_data(purchase_orders, purchase_invoices):
-	doctype = "Purchase Order" if purchase_orders else "Purchase Invoice"
-	docnames = purchase_orders if purchase_orders else purchase_invoices
+def get_data(purchase_orders, purchase_receipts):
+	doctype = "Purchase Order" if purchase_orders else "Purchase Receipt"
+	docnames = purchase_orders if purchase_orders else purchase_receipts
 
 	items = frappe.db.sql(f""" SELECT doc.item_code, i.ifw_location, doc.parent as name, i.ifw_retailskusuffix as retail_sku
 								FROM `tab{doctype} Item` doc
@@ -37,7 +37,7 @@ def get_data(purchase_orders, purchase_invoices):
 	return data
 
 
-def get_columns(purchase_orders, purchase_invoices):
+def get_columns(purchase_orders, purchase_receipts):
 	columns = []
 
 	if purchase_orders:
@@ -48,9 +48,9 @@ def get_columns(purchase_orders, purchase_invoices):
 			"width": 200
 		})
 
-	if purchase_invoices:
+	if purchase_receipts:
 		columns.append({
-			"label": "Purchase Invoice",
+			"label": "Purchase Receipt",
 			"fieldname": "document",
 			"fieldtype": "Data",
 			"width": 200

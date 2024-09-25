@@ -12,8 +12,10 @@ frappe.query_reports["Item Locations"] = {
 			on_change: () => {
 				// remove supplier filter value if purchase order is selected
 				if (frappe.query_report.get_filter_value('purchase_order')){
-					if(frappe.query_report.get_filter_value('purchase_invoice'))
-						frappe.query_report.set_filter_value('purchase_invoice', []);
+					if(frappe.query_report.get_filter_value('purchase_receipt'))
+						frappe.query_report.set_filter_value('purchase_receipt', []);
+					
+					frappe.query_report.set_filter_value('purchase_order', frappe.query_report.get_filter_value('purchase_order'));
 				}
 			},
 			get_data: function(txt) {
@@ -21,19 +23,21 @@ frappe.query_reports["Item Locations"] = {
 			}
 		},
 		{
-			"label": "Purchase Invoice",
-			"fieldname": "purchase_invoice",
+			"label": "Purchase Receipt",
+			"fieldname": "purchase_receipt",
 			"fieldtype": "MultiSelectList",
-			"options": "Purchase Invoice",
+			"options": "Purchase Receipt",
 			on_change: () => {
-				// remove supplier filter value if purchase invoice is selected
-				if (frappe.query_report.get_filter_value('purchase_invoice')){
+				// remove supplier filter value if purchase receipt is selected
+				if (frappe.query_report.get_filter_value('purchase_receipt')){
 					if(frappe.query_report.get_filter_value('purchase_order'))
 						frappe.query_report.set_filter_value('purchase_order', []);
+
+					frappe.query_report.set_filter_value('purchase_receipt', frappe.query_report.get_filter_value('purchase_receipt'));
 				}
 			},
 			get_data: function(txt) {
-				return frappe.db.get_link_options("Purchase Invoice", txt);
+				return frappe.db.get_link_options("Purchase Receipt", txt);
 			}
 		},
 	]
