@@ -5,6 +5,25 @@
 frappe.query_reports["Item Locations"] = {
 	"filters": [
 		{
+			"label": "Supplier",
+			"fieldname": "supplier",
+			"fieldtype": "Link",
+			"options": "Supplier",
+			on_change: () => {
+				// remove purchase order filter value if supplier is selected
+				if (frappe.query_report.get_filter_value('supplier')){
+					if(frappe.query_report.get_filter_value('purchase_order'))
+						frappe.query_report.set_filter_value('purchase_order', []);
+					
+					if(frappe.query_report.get_filter_value('purchase_receipt'))
+						frappe.query_report.set_filter_value('purchase_receipt', []);
+					
+					frappe.query_report.set_filter_value('supplier', frappe.query_report.get_filter_value('supplier'));
+				}
+			}
+
+		},
+		{
 			"label": "Purchase Order",
 			"fieldname": "purchase_order",
 			"fieldtype": "MultiSelectList",
@@ -12,9 +31,12 @@ frappe.query_reports["Item Locations"] = {
 			on_change: () => {
 				// remove supplier filter value if purchase order is selected
 				if (frappe.query_report.get_filter_value('purchase_order')){
+					if(frappe.query_report.get_filter_value('supplier'))
+						frappe.query_report.set_filter_value('supplier', "");
+					
 					if(frappe.query_report.get_filter_value('purchase_receipt'))
 						frappe.query_report.set_filter_value('purchase_receipt', []);
-					
+
 					frappe.query_report.set_filter_value('purchase_order', frappe.query_report.get_filter_value('purchase_order'));
 				}
 			},
@@ -30,9 +52,12 @@ frappe.query_reports["Item Locations"] = {
 			on_change: () => {
 				// remove supplier filter value if purchase receipt is selected
 				if (frappe.query_report.get_filter_value('purchase_receipt')){
+					if(frappe.query_report.get_filter_value('supplier'))
+						frappe.query_report.set_filter_value('supplier', "");
+
 					if(frappe.query_report.get_filter_value('purchase_order'))
 						frappe.query_report.set_filter_value('purchase_order', []);
-
+					
 					frappe.query_report.set_filter_value('purchase_receipt', frappe.query_report.get_filter_value('purchase_receipt'));
 				}
 			},
