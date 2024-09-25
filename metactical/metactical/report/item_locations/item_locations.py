@@ -18,7 +18,7 @@ def get_data(purchase_orders, purchase_invoices):
 	doctype = "Purchase Order" if purchase_orders else "Purchase Invoice"
 	docnames = purchase_orders if purchase_orders else purchase_invoices
 
-	items = frappe.db.sql(f""" SELECT doc.item_code, i.ifw_location, doc.parent as name
+	items = frappe.db.sql(f""" SELECT doc.item_code, i.ifw_location, doc.parent as name, i.ifw_retailskusuffix as retail_sku
 								FROM `tab{doctype} Item` doc
 								JOIN `tabItem` i on doc.item_code = i.name
 								WHERE doc.parent IN %s """, (docnames,), as_dict=True) 
@@ -28,7 +28,8 @@ def get_data(purchase_orders, purchase_invoices):
 		row = {
 			"item_code": item["item_code"],
 			"location": item["ifw_location"],
-			"document": item["name"]
+			"document": item["name"],
+			"retail_sku": item["retail_sku"]
 		}
 
 		data.append(row)
@@ -57,10 +58,17 @@ def get_columns(purchase_orders, purchase_invoices):
 		})
 
 	columns.append({
-		"label": "Item Code",
+		"label": "ERP SKU",
 		"fieldname": "item_code",
 		"fieldtype": "Link",
 		"options": "Item",
+		"width": 200
+	})
+
+	columns.append({
+		"label": "Retail SKU",
+		"fieldname": "retail_sku",
+		"fieldtype": "Data",
 		"width": 200
 	})
 

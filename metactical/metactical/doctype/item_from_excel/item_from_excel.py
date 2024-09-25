@@ -9,9 +9,9 @@ from metactical.custom_scripts.utils.metactical_utils import queue_action
 from openpyxl import load_workbook
 from io import BytesIO
 from metactical.metactical.doctype.item_price_from_excel.item_price_from_excel import ItemPriceFromExcel
-from erpnext.controllers.item_variant import (
-	make_variant_item_code
-)
+# from erpnext.controllers.item_variant import (
+# 	make_variant_item_code
+# )
 
 class ItemFromExcel(Document):
 	def validate(self):
@@ -117,16 +117,16 @@ class ItemFromExcel(Document):
 		item = add_child_table_values_to_item(item, child_table_values, is_template)
 
 		# generate the item code if it is a variant
-		if not (item.item_code and is_template):
-			template_item_name = frappe.db.get_value("Item", item.variant_of, "item_name")
-			make_variant_item_code(item.variant_of, template_item_name, item)
+		# if not (item.item_code and is_template):
+		# 	template_item_name = frappe.db.get_value("Item", item.variant_of, "item_name")
+		# 	make_variant_item_code(item.variant_of, template_item_name, item)
 
 		# check if the template item already exists. if it does, skip creating the template item
-		elif is_template and frappe.db.exists("Item", item.item_code):
+		if is_template and frappe.db.exists("Item", item.item_code):
 			return
 
 		# set the retail sku suffix from the item code
-		item.ifw_retailskusuffix = item.item_code
+		# item.ifw_retailskusuffix = item.item_code
 		item.insert()
 		
 		# add the item_code, retail sku, and supplier to the price list rows
