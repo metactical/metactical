@@ -13,7 +13,7 @@ class MTItemLocationUpdator(Document):
 
 	def on_submit(self):
 		file_content = self.check_file()
-		data = self.validate_file(file_content)
+		data = self.validate_file(file_content, only_validate=False)
 
 		try:
 			for row in data:
@@ -31,7 +31,7 @@ class MTItemLocationUpdator(Document):
 		)
 		queue_action(self, "submit", timeout=2000)
 
-	def validate_file(self, file_content):
+	def validate_file(self, file_content, only_validate=True):
 		header = file_content[0]
 		item_code_index = -1
 		location_index = -1
@@ -55,10 +55,17 @@ class MTItemLocationUpdator(Document):
 					item_code = fcontent[item_code_index]
 
 				# check if the location is only include A-Z, a-z, 0-9, space and |
-				
 				if len(fcontent) > location_index:
 					if fcontent[location_index] and not all(c.isalnum() or c.isspace() or c == "|" or c == "-" for c in fcontent[location_index]):
 						frappe.throw(f"Location must only include A-Z, a-z, 0-9, space and | at row {i+2}")
+				
+				if only_validate:
+					if self.import_based_on == "Retail SKU":
+						if not item_code:
+							frappe.throw(f"Item not found for Retail SKU {fcontent[item_code_index]} at row {i+2}")
+
+					elif not frappe.db.exists("Item", item_code):
+						frappe.throw(f"Item {item_code} not found at row {i+2}")
 
 				data.append({
 					"item_code": item_code,
