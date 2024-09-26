@@ -67,12 +67,12 @@ def connect(server_ip, username, password, queue_name):
         error_message = f"Stream connection lost: {str(e)}"
         frappe.log_error(error_message, "RabbitMQ Consumption Error")
         # Attempt to reconnect with a delay
-        frappe.enqueue('rabbitmq.rabbitmq.integration.connect', queue='long', server_ip=server_ip, username=username, password=password, queue_name=queue_name, enqueue_after_commit=True)
+        frappe.enqueue('metactical.custom_scripts.rabbitmq.integration.connect', queue='long', server_ip=server_ip, username=username, password=password, queue_name=queue_name, enqueue_after_commit=True)
     except Exception as e:
         error_message = f"Error during message consumption: {str(e)}"
         frappe.log_error(error_message, "RabbitMQ Consumption Error")
         # Attempt to reconnect with a delay
-        frappe.enqueue('rabbitmq.rabbitmq.integration.connect', queue='long', server_ip=server_ip, username=username, password=password, queue_name=queue_name, enqueue_after_commit=True)
+        frappe.enqueue('metactical.custom_scripts.rabbitmq.integration.connect', queue='long', server_ip=server_ip, username=username, password=password, queue_name=queue_name, enqueue_after_commit=True)
 
 def stop_subscription():
     global connection, channel
@@ -118,14 +118,14 @@ def printmessage(message):
 def config_change_handler(doc, method):
     # This function will be called whenever the RabbitMQ Config is updated
     stop_existing_jobs()
-    frappe.enqueue('rabbitmq.rabbitmq.integration.subscribe_to_rabbitmq', queue='long')
+    frappe.enqueue('metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq', queue='long')
 
 def stop_existing_jobs():
     # Stop existing background jobs
     columns = frappe.db.get_table_columns('Scheduled Job Log')
     method_column_exists = 'method' in columns
     if method_column_exists:
-        jobs = frappe.get_all('Scheduled Job Log', filters={'status': 'Job Started', 'method': 'rabbitmq.rabbitmq.integration.connect'})
+        jobs = frappe.get_all('Scheduled Job Log', filters={'status': 'Job Started', 'method': 'metactical.custom_scripts.rabbitmq.integration.integration.connect'})
     else:
         jobs = frappe.get_all('Scheduled Job Log', filters={'status': 'Job Started'})
         
