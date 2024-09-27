@@ -160,6 +160,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Item Location Updator",
+   "link_to": "MT Item Location Updator",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_type": "DocType",
    "onboard": 0,
@@ -188,6 +197,15 @@
    "is_query_report": 0,
    "label": "Packing Page V2",
    "link_to": "packing-page-v2",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Packing Page V3",
+   "link_to": "packing-page-v3",
    "link_type": "Page",
    "onboard": 0,
    "type": "Link"
@@ -659,6 +677,15 @@
   },
   {
    "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Locations",
+   "link_to": "Item Locations",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
    "is_query_report": 0,
    "label": "Other Reports",
    "link_type": "DocType",
@@ -864,7 +891,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-08-19 15:02:47.276366",
+ "modified": "2024-09-25 14:43:37.928525",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

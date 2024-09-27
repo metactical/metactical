@@ -9,9 +9,9 @@ from metactical.custom_scripts.utils.metactical_utils import queue_action
 from openpyxl import load_workbook
 from io import BytesIO
 from metactical.metactical.doctype.item_price_from_excel.item_price_from_excel import ItemPriceFromExcel
-from erpnext.controllers.item_variant import (
-	make_variant_item_code
-)
+# from erpnext.controllers.item_variant import (
+# 	make_variant_item_code
+# )
 
 class ItemFromExcel(Document):
 	def validate(self):
@@ -117,16 +117,16 @@ class ItemFromExcel(Document):
 		item = add_child_table_values_to_item(item, child_table_values, is_template)
 
 		# generate the item code if it is a variant
-		if not (item.item_code and is_template):
-			template_item_name = frappe.db.get_value("Item", item.variant_of, "item_name")
-			make_variant_item_code(item.variant_of, template_item_name, item)
+		# if not (item.item_code and is_template):
+		# 	template_item_name = frappe.db.get_value("Item", item.variant_of, "item_name")
+		# 	make_variant_item_code(item.variant_of, template_item_name, item)
 
 		# check if the template item already exists. if it does, skip creating the template item
-		elif is_template and frappe.db.exists("Item", item.item_code):
+		if is_template and frappe.db.exists("Item", item.item_code):
 			return
 
 		# set the retail sku suffix from the item code
-		item.ifw_retailskusuffix = item.item_code
+		# item.ifw_retailskusuffix = item.item_code
 		item.insert()
 		
 		# add the item_code, retail sku, and supplier to the price list rows
@@ -190,7 +190,7 @@ class ItemFromExcel(Document):
 
 		# get all the default price lists for the suppliers
 		if suppliers_header_index:
-			data = self.update_data_with_supplier_price_lists(data, suppliers_header_index, headers)
+			data, headers = self.update_data_with_supplier_price_lists(data, suppliers_header_index, headers)
 
 		# get price lists if all the cells in the column are empty
 		columns_to_remove = []
@@ -214,8 +214,11 @@ class ItemFromExcel(Document):
 	
 		ItemPriceFromExcel.create_price_entries(self, updated_data, True)
 
+	# get supplier's price list and append it at the end of the headers and update the data with the cost
 	def update_data_with_supplier_price_lists(self, data, suppliers_header_index, headers):
+		headers = headers.copy()
 		supplier_with_price_list = {}
+		cost_column_index = headers.index("Cost")
 
 		# get all the suppliers from the excel (Price List sheet)
 		suppliers = [row[suppliers_header_index] for row in data[1:] if row[suppliers_header_index] is not None]
@@ -242,13 +245,15 @@ class ItemFromExcel(Document):
 							headers.append(sc)
 
 				else:
-					cost = d[suppliers_header_index+1]
+					cost = d[cost_column_index]
 					supplier = d[suppliers_header_index]
 					price_list = supplier_with_price_list[supplier]
 					suplier_price_list_index = headers.index(price_list)
 					d[suplier_price_list_index] = cost
 
-		return data
+			data[0] = headers
+
+		return data, headers
 
 	def on_submit(self):
 		file_content = self.check_file()
@@ -261,6 +266,7 @@ class ItemFromExcel(Document):
 			frappe.db.commit()
 		except Exception as e:
 			frappe.db.rollback()
+			frappe.log_error(title="Error creating items", message=frappe.get_traceback())
 			frappe.throw(f"Error creating items: {e}")
 			self.db_set("ais_queueu_comment", e)
 

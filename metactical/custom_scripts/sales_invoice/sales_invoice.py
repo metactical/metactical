@@ -317,6 +317,272 @@ def si_mode_of_payment(name):
 		payment_mode = mode[0].mode_of_payment
 	return payment_mode
 
+def get_commercial_invoice(doc):
+	doc.mode_of_payment = si_mode_of_payment(doc.name)
+
+	sales_order = ""
+	for item in doc.items:
+		if item.against_sales_order:
+			sales_order = item.against_sales_order
+			break
+	
+	if sales_order:
+		sales_order = frappe.get_doc("Sales Order", sales_order)
+		doc.delivery_date = sales_order.delivery_date
+
+	address = get_customer_address(sales_order.customer)
+	customer_phone, customer_email = get_customer_contact(sales_order.customer)
+
+	billing_address = address["Billing"] if "Billing" in address else None
+	shipping_address = address["Shipping"] if "Shipping" in address else None
+	sales_orders = []
+
+	packing_slips = frappe.db.get_list("Packing Slip", filters={"delivery_note": doc.name, "docstatus":1}, order_by= "from_case_no asc", fields=["name", "from_case_no"])
+	packing_slip_names = [ps.name for ps in packing_slips]
+	
+	# group dn items by item_code
+	dn_items_dict = {}
+	for item in doc.items:
+		if item.item_code not in dn_items_dict:
+			dn_items_dict[item.item_code] = []
+		dn_items_dict[item.item_code].append(item)
+
+
+	items_list = []
+	items_with_no_template = []
+
+	for ps in packing_slips:
+		items = {}
+		packing_slip_items = frappe.db.get_list("Packing Slip Item", 
+													filters={"parent": ps.name}, 
+													fields=["name", "item_code", "item_name", "weight_uom", "net_weight", "qty", "parent"])
+
+		for psi in packing_slip_items:
+			psi.rate = dn_items_dict[psi.item_code][0].rate if psi.item_code in dn_items_dict else 0
+			for ps in packing_slips:
+				if psi.parent == ps.name:
+					psi.from_case_no = ps.from_case_no
+
+			item_detail = frappe.db.get_value("Item", psi.item_code, ["variant_of", "country_of_origin"], as_dict=True)
+			psi.country_of_origin = frappe.db.get_value("Country", item_detail.country_of_origin, "code").upper() if item_detail.country_of_origin else "-"
+			# if item_detail.variant_of:
+			# 	template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
+			# 	if template_name:
+			# 		psi.template_name = template_name
+
+			# 	psi.variant_of = item_detail.variant_of
+			# else:
+			psi.variant_of = "No Template"
+			psi.template_name = ""
+		
+		# group items based on variant of 
+		for item in packing_slip_items:
+			if item.variant_of != "No Template":
+				if item.variant_of not in items:
+					items[item.variant_of] = []
+				items[item.variant_of].append(item)
+			else:
+				items_with_no_template.append(item)
+		
+		items_list.append(items)
+	items_list.append({"No Template": items_with_no_template})
+
+	order_numbers = 1
+	sales_orders = [sales_order.name]
+	
+	# get tracking number
+	tracking_number, shipments = get_tracking_number(sales_orders)
+	tracking_number = ', '.join(tracking_number) if tracking_number else "-"
+
+	# get customer POs
+	customer_pos = ""
+	customer_pos = get_customer_po(sales_orders)
+	customer_pos = ', '.join(customer_pos) if customer_pos else "-"
+
+	# get freight terms
+	freight_term = get_freight_terms(shipments)
+	freight_term = freight_term.split(" ")[0] if freight_term else "-"
+
+	# get sales person
+	sales_person = get_sales_person(sales_orders)
+	sales_person = ', '.join(sales_person) if sales_person else "-"
+
+	html = frappe.render_template("metactical/metactical/print_format/ci___export___v1/ci_export_v1.html", 
+									{	
+										"items_list": items_list,
+										"doc": doc, 
+										"ship_via": "-",
+										"sold_to": billing_address, 
+										"shipped_to": shipping_address,
+										"order_numbers": order_numbers ,
+										"tracking_number": tracking_number,
+										"customer_pos": customer_pos,
+										"freight_terms": freight_term,
+										"sales_person": sales_person,
+										"customer_phone": customer_phone if customer_phone else "-",
+										"customer_email": customer_email if customer_email else "-",
+									}
+								)
+	return html
+
+def get_rate(packing_slip_item, delivery_note):
+
+	# add rate to packing slip items from delivery note items
+	if psi.item_code in dn_items_dict:
+		for item in dn_items_dict[psi.item_code]:
+			psi.rate = item.rate
+			psi.item_name = item.item_name
+			psi.description = item.description
+
+	return packing_slip_items
+
+def get_customer_address(customer):
+	customer_addresses = {}
+	
+	customer_address = frappe.db.sql("""select 	`tabAddress`.address_line1, 
+												`tabAddress`.address_line2, 
+												`tabAddress`.city, 
+												`tabAddress`.state, 
+												`tabAddress`.pincode, 
+												`tabAddress`.country, 
+												`tabAddress`.address_type
+											from `tabAddress` 
+											join `tabDynamic Link` on `tabAddress`.name = `tabDynamic Link`.parent
+											where `tabDynamic Link`.link_doctype = 'Customer' and 
+												  `tabDynamic Link`.link_name = %(customer)s""", 
+											{'customer': customer}, as_dict=1)
+
+	if len(customer_address) > 0:
+		for address in customer_address:
+			customer_info = frappe.db.get_value("Customer", customer, ["first_name", "last_name", "ais_company"])
+			
+			first_name = ""
+			last_name = ""
+			company = ""
+
+			if customer_info:
+				first_name = customer_info[0]
+				last_name = customer_info[1]
+				company = customer_info[2]
+
+			address.first_name = first_name
+			address.last_name = last_name
+			address.company = company
+			customer_addresses[address.address_type] = address
+	
+	return customer_addresses
+
+def get_customer_contact(customer):
+	contacts_list = frappe.db.sql("""select ce.email_id, cp.phone
+								from `tabContact` c
+								JOIN `tabContact Phone` cp on cp.parent=c.name
+								LEFT JOIN `tabContact Email` ce on ce.parent=c.name
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" and 
+									   dl.link_name = %(customer)s
+								""", {'customer': customer}, as_dict=1)
+	
+	phone = ""
+	email = ""
+
+	if len(contacts_list) > 0:
+		phone = contacts_list[0].phone
+		email = contacts_list[0].email_id
+
+	return phone, email
+
+# Metactical Customization: Get tracking number for the print format
+def get_tracking_number(sales_orders):
+	tracking_numbers = []
+	shipments = []
+
+	delivery_note_items = frappe.db.get_list("Delivery Note Item", filters={"against_sales_order": ["in", sales_orders], "parenttype": "Delivery Note", "docstatus": 1}, fields=["parent"])
+	# get delivery notes without duplicates
+	delivery_notes = list(set([item.parent for item in delivery_note_items]))
+
+
+	if delivery_notes:
+		shipment_delivery_note = frappe.db.get_list("Shipment Delivery Note", filters={"delivery_note": ["in", delivery_notes], "docstatus": 1}, fields=["parent"], order_by="creation")
+		shipments = [item.parent for item in shipment_delivery_note]
+		
+		# get shipments without duplicates
+		shipments = list(set(shipments))
+
+		if shipments:
+			for shipment in shipments:
+				shipment_doc = frappe.get_doc("Shipment", shipment)
+				multiple_shipments = shipment_doc.shipments
+				for shipment in multiple_shipments:
+					if shipment.awb_number not in tracking_numbers:
+						tracking_numbers.append(shipment.awb_number)
+
+	return tracking_numbers, shipments
+
+def get_customer_po(sales_orders):
+	customer_po = []
+	for sales_order in sales_orders:
+		po_no = frappe.db.get_value("Sales Order", sales_order, "po_no")
+		if po_no:
+			customer_po.append(po_no)
+
+	return customer_po
+
+def get_freight_terms(shipments):
+	freight_terms = ""
+	if shipments:
+		for shipment in shipments:
+			incoterm = frappe.db.get_value("Shipment", shipment, "incoterm")
+			if incoterm:
+				freight_terms = incoterm
+				break
+	return freight_terms
+
+def get_sales_person(sales_orders):
+	sales_persons_list = []
+	sales_persons = frappe.db.get_list("Sales Team", filters={"parent": ["in", sales_orders], "parenttype": "Sales Order"}, fields=["sales_person"])
+	if sales_persons:
+		sales_persons_list = [item.sales_person for item in sales_persons]
+
+	return sales_persons_list
+		
+def get_totals(items):
+	total_qty = 0
+	total_amount = 0
+	total_weight = 0
+	variant_items = ""
+	from_case_no = 0
+	template_name = ""
+	rate = 0
+	country_of_origin = ""
+
+	for item in items:
+		variant_items += str(item.qty) +" / "+item.item_code+ "  "
+		total_qty += item.qty
+		total_amount += item.rate * item.qty
+		total_weight += item.net_weight
+		rate = item.rate
+
+		if not from_case_no:
+			from_case_no = item.from_case_no
+		
+		if not template_name:
+			template_name = item.template_name
+
+		if not country_of_origin and item.country_of_origin:
+			country_of_origin = frappe.db.get_value("Country", item.country_of_origin, "code").upper()
+	
+	return {
+		"total_qty": total_qty,
+		"total_amount": total_amount,
+		"total_weight": total_weight,
+		"items": variant_items,
+		"from_case_no": from_case_no,
+		"template_name": template_name,
+		"rate": rate,
+		"country_of_origin": country_of_origin
+	}
+
 @frappe.whitelist()
 def get_store_credit_account(currency):
 	field = None
