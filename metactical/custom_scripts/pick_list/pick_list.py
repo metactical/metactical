@@ -348,16 +348,14 @@ class CustomPickList(PickList):
 					break
 			
 			# Items in the current pick list
-			current_items = {item.item_code:item.picked_qty for item in self.locations}
+			current_items = {item.sales_order_item:item.picked_qty for item in self.locations}
 
 			# Previous draft and submitted pick lists for the same sales order
-			existing_pick_list_items = frappe.get_all("Pick List Item", filters={"sales_order": sales_order, "docstatus": ["!=", "2"]}, 
-											 fields=["name", "qty", "picked_qty", "item_code", "parent"])
+			existing_pick_list_items = frappe.get_all("Pick List Item", filters={"sales_order": sales_order, "docstatus": 0}, fields=["name", "qty", "picked_qty", "item_code", "parent", "sales_order_item"])
 			
-			# The actual qty of the items in the sales order
-			sales_order_items = frappe.get_all("Sales Order Item", filters={"parent": sales_order, "docstatus": ["!=", "2"]}, 
-										fields=["item_code", "qty", "name"])
-			sales_order_items = {item.item_code:item.qty for item in sales_order_items}
+			# # The actual qty of the items in the sales order
+			sales_order_items = frappe.get_all("Sales Order Item", filters={"parent": sales_order}, fields=["item_code", "qty", "picked_qty", "name"])
+			sales_order_items = {item.name:item for item in sales_order_items}
 
 			# group existing pick list items by parent
 			pick_list_items_grouped = {}
@@ -374,24 +372,28 @@ class CustomPickList(PickList):
 			existing_items = {}
 			for key, so_item in (pick_list_items_grouped).items():
 				for item in so_item:
-					if item.item_code in existing_items:
-						existing_items[item.item_code] += item.picked_qty
+					if item.sales_order_item in existing_items:
+						existing_items[item.sales_order_item] += item.picked_qty
 					else:
-						existing_items[item.item_code] = item.picked_qty
+						existing_items[item.sales_order_item] = item.picked_qty
 
-			# check if the picked_qty in the current_items is not more than the remaining qty
-			for item_code, new_qty in current_items.items():
-				remaining_qty = sales_order_items.get(item_code, 0) - existing_items.get(item_code, 0)
+			remaining_to_be_picked = {}
+			for so_item, row in sales_order_items.items():
+				remaining_to_be_picked[so_item] = row["qty"] - row["picked_qty"]
+		
+			for so_item, new_qty in current_items.items():
+				# if the item is not in the pick_lists_without_dn, it means it has been delivered
+				# so we can't pick more than the remaining qty
+				
+				if not remaining_to_be_picked.get(so_item, 0):
+					frappe.throw("Item {} has already been picked".format(sales_order_items.get(so_item).item_code))
 
-				if new_qty == 0:
-					frappe.throw("Item quantity can not be zero")
-
-				if new_qty > remaining_qty:
-					if remaining_qty > 0:
-						frappe.throw(_("Part of <b>{0}</b> has already been picked in a different Pick List. <br>The remaining quantity is <b>{1}</b>").format(item_code, remaining_qty))
+				check = remaining_to_be_picked.get(so_item, 0) - existing_items.get(so_item, 0)
+				if check < new_qty:
+					if check > 0:
+						frappe.throw(_("Part of <b>{0}</b> has already been picked in a different Pick List. <br>The remaining quantity is <b>{1}</b>").format(sales_order_items.get(so_item).item_code, check))
 					else:
-						frappe.throw(_("All of <b>{0}</b> has already been picked in a different Pick List(s).").format(item_code))
-	
+						frappe.throw(_("All of <b>{0}</b> has already been picked in a different Pick List(s).").format(sales_order_items.get(so_item).item_code))
 
 #  Function to extract numerical parts and convert them to integers for sorting
 def sort_key(item):
