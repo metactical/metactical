@@ -36,6 +36,7 @@ def execute(filters=None):
 		row["rate_camo"] = get_item_details(i.get("item_code"), "RET - Camo", "Selling" )
 		row["rate_gpd"] = get_item_details(i.get("item_code"), "RET - GPD", "Selling", )
 
+
 		row["date_last_received"] = get_date_last_received(i.get("item_code"), i.get("supplier"))
 		#row["item_cost"] = get_item_details(i.get("item_code"), "Buying", i.get("suppliIDer"))
 		row["item_cost"] = get_cost_details(i.get("item_code"), "Buying", i.get("suppliIDer"))

@@ -105,6 +105,13 @@ class CustomStockEntry(StockEntry):
 					
 				if row.t_warehouse not in t_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
+
+		# Metatical Customization: Validate that there is no other draft STE for the same Material request
+		for row in self.items:
+			if row.material_request:
+				ste = frappe.db.get_value('Stock Entry Detail', {'material_request': row.material_request, 'docstatus': 0}, "parent")
+				if ste is not None and ste != self.name and ste != "":
+					frappe.throw(f'<a href="/app/stock-entry/{ste}">{ste}</a> already created for Material Request {row.material_request} in row {row.idx}')
 				
 	def on_submit(self):
 		super(CustomStockEntry, self).on_submit()

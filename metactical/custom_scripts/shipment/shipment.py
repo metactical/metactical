@@ -6,7 +6,6 @@ from datetime import datetime
 from frappe.utils import get_files_path
 from erpnext.stock.doctype.shipment.shipment import Shipment
 
-
 class CustomShipment(Shipment):
 	def validate(self):
 		super(CustomShipment, self).validate()
@@ -26,6 +25,21 @@ class CustomShipment(Shipment):
 			frappe.throw(_("Value of goods cannot be 0"))'''
 		self.db_set("status", "Submitted")
 		
+def set_source_and_customer_po(doc):
+	doc.neb_source = None
+	doc.neb_customer_po_number = None
+
+	if doc.shipment_delivery_note:
+		for row in doc.shipment_delivery_note:
+			if not doc.neb_source and row.neb_source:
+				doc.neb_source = row.neb_source
+			if not doc.neb_customer_po_number and row.neb_order_id:
+				doc.neb_customer_po_number = row.neb_order_id
+
+			if doc.neb_source and doc.neb_customer_po_number:
+				break
+
+
 @frappe.whitelist()
 def get_manifest(start_date, shipment_id, doctype, docname):
 	cp = CanadaPost()
