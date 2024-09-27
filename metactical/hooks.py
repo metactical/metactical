@@ -260,7 +260,7 @@ jinja = {
 		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",
-		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment"
+		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
