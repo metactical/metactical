@@ -25,7 +25,6 @@ class CustomPackingSlip(PackingSlip):
 		self.set("items", [])
 
 		custom_fields = frappe.get_meta("Delivery Note Item").get_custom_fields()
-
 		dn_details = self.get_details_for_packing()[0]
 		shipping_items = frappe.get_all('Pick List Shipping Item', pluck='item')
 		for item in dn_details:
@@ -35,6 +34,7 @@ class CustomPackingSlip(PackingSlip):
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
 				ch.description = item.description
+				ch.dn_detail = item.name
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
 
@@ -71,7 +71,7 @@ class CustomPackingSlip(PackingSlip):
 
 		# gets item code, qty per item code, latest packed qty per item code and stock uom
 		res = frappe.db.sql(
-			"""select item_code, sum(qty) as qty,
+			"""select item_code, sum(qty) as qty, name,
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabPacking Slip` ps, `tabPacking Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
