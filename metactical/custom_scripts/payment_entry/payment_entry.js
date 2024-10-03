@@ -8,7 +8,7 @@ frappe.ui.form.on("Payment Entry", {
         frm.trigger("custom_buttons");
     },
 
-    reference_no: function(frm){
+    reference_no: function (frm) {
         frm.trigger("custom_buttons");
     },
 
@@ -31,7 +31,46 @@ frappe.ui.form.on("Payment Entry", {
             callback: function (r) {
                 var roles_allowed_to_make_payment = r.message.make_payment;
                 var roles_allowed_to_cancel_payment = r.message.cancel_payment;
+                var roles_allowed_to_refund_payment = r.message.refund;
                 var user_roles = frappe.user_roles;
+
+                frm.add_custom_button(__("Make Payment"), function () {});
+
+                frm.add_custom_button(__("Refund Payment"), function () {});
+
+                if (
+                    roles_allowed_to_refund_payment.some((role) =>
+                        user_roles.includes(role)
+                    )
+                ) {
+                    frappe.call({
+                        method: "metactical.custom_scripts.payment_entry.payment_entry.check_if_can_be_refunded",
+                        args: {
+                            doc: frm.doc,
+                        },
+                        callback: function (r) {
+                            if (r.message) {
+                                frm.remove_custom_button("Refund Payment");
+                                frm.add_custom_button(
+                                    __("Refund Payment"),
+                                    function () {
+                                        make_refund(frm);
+                                    }
+                                );
+                            } else {
+                                cur_frm.custom_buttons["Refund Payment"].attr(
+                                    "disabled",
+                                    "true"
+                                );
+                            }
+                        },
+                    });
+                } else {
+                    cur_frm.custom_buttons["Refund Payment"].attr(
+                        "disabled",
+                        "true"
+                    );
+                }
 
                 if (
                     roles_allowed_to_make_payment.some((role) =>
@@ -48,7 +87,17 @@ frappe.ui.form.on("Payment Entry", {
                         frm.add_custom_button(__("Make Payment"), function () {
                             goto_payment_form(frm);
                         });
+                    } else {
+                        cur_frm.custom_buttons["Make Payment"].attr(
+                            "disabled",
+                            "true"
+                        );
                     }
+                } else {
+                    cur_frm.custom_buttons["Make Payment"].attr(
+                        "disabled",
+                        "true"
+                    );
                 }
 
                 if (
@@ -57,37 +106,36 @@ frappe.ui.form.on("Payment Entry", {
                     )
                 ) {
                     if (frm.doc.docstatus == 1 && frm.doc.reference_no) {
-                        frm.add_custom_button(
-                            __("Void Payment"),
-                            function () {
-                                frappe.confirm(
-                                    __(
-                                        "Are you sure you want to cancel this Payment Entry?"
-                                    ),
-                                    function () {
-                                        frappe.call({
-                                            method: "metactical.custom_scripts.payment_entry.payment_entry.void_payment",
-                                            freeze: "true",
-                                            freeze_message: __("Cancelling Payment in Progress..."),
-                                            args: {
-                                                name: frm.doc.name,
-                                            },
-                                            callback: function (r) {
-                                                if (r.message) {
-                                                    frappe.msgprint(
-                                                        __(
-                                                            "Payment Entry {0} has been cancelled",
-                                                            [frm.doc.name]
-                                                        )
-                                                    );
-                                                    frm.reload_doc();
-                                                }
-                                            },
-                                        });
-                                    }
-                                );
-                            }
-                        );
+                        frm.add_custom_button(__("Void Payment"), function () {
+                            frappe.confirm(
+                                __(
+                                    "Are you sure you want to cancel this Payment Entry?"
+                                ),
+                                function () {
+                                    frappe.call({
+                                        method: "metactical.custom_scripts.payment_entry.payment_entry.void_payment",
+                                        freeze: "true",
+                                        freeze_message: __(
+                                            "Cancelling Payment in Progress..."
+                                        ),
+                                        args: {
+                                            name: frm.doc.name,
+                                        },
+                                        callback: function (r) {
+                                            if (r.message) {
+                                                frappe.msgprint(
+                                                    __(
+                                                        "Payment Entry {0} has been cancelled",
+                                                        [frm.doc.name]
+                                                    )
+                                                );
+                                                frm.reload_doc();
+                                            }
+                                        },
+                                    });
+                                }
+                            );
+                        });
                     }
                 }
             },
@@ -129,6 +177,22 @@ frappe.ui.form.on("Payment Entry", {
         }
     },
 });
+
+var make_refund = function (frm) {
+    frappe.call({
+        method: "metactical.custom_scripts.payment_entry.payment_entry.refund_payment",
+        args: {
+            doc: frm.doc.name,
+        },
+        freeze: true,
+        freeze_message: "Refunding Payment in Progress...",
+        callback: function (res) {
+            if (res.message) {
+                frm.reload_doc();
+            }
+        },
+    });
+};
 
 var goto_payment_form = function (frm) {
     // get customer information

@@ -15,8 +15,13 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
+<<<<<<< HEAD
 app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
 app_include_js = ["metactical.bundle.js"]
+=======
+app_include_css = ["/assets/css/metactical.css", "/assets/metactical/css/metactical_task.css"]
+app_include_js = ["/assets/js/metactical.min.js"]
+>>>>>>> 6ee8562c (changed the automatic refund on payment entry submission to be done manually using a button)
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -148,8 +153,7 @@ doc_events = {
 		"on_update": "metactical.custom_scripts.item.item.on_update"
 	}, 
 	"Payment Entry": {
-		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
-		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
 }
 
