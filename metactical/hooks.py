@@ -16,7 +16,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 app_include_css = ["/assets/css/metactical.css", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["/assets/js/metactical.min.js", "/assets/metactical/js/metactical_kanban_custom.js"]
+app_include_js = ["/assets/js/metactical.min.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -135,8 +135,7 @@ doc_events = {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	}, 
 	"Payment Entry": {
-		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
-		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
 }
 
