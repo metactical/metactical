@@ -6,3 +6,5 @@ from frappe.model.document import Document
 
 class SBWarehouseInventorySync(Document):
 	pass
+
+# dummy commit to trigger changes
