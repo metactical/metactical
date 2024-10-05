@@ -1,0 +1,86 @@
+/* ../../../../../../../tmp/tmp-170415-u2N5tt0vULAc/metactical/metactical/public/js/metactical.bundle.css */
+[data-page-route=packing-slip] .layout-main-section-wrapper {
+  margin-bottom: -2px;
+}
+.packing-slip-wrapper {
+  border-bottom: 1px solid #d1d8dd;
+}
+.controls {
+  border: 1px solid #d1d8dd;
+  padding: 0 20px;
+}
+.controls .hide-next + .item-barcode-wrapper {
+  display: none;
+}
+.box {
+  border: 1px solid #d1d8dd;
+  border-bottom: none;
+}
+.box .section-title {
+  margin: 0;
+  padding: 10px;
+  text-align: center;
+  margin-bottom: 5px;
+  color: inherit;
+  border-bottom: 1px solid #d1d8dd;
+}
+.box .section-wrapper {
+  padding: 10px;
+}
+.box .packing-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #d1d8dd;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+.box .packing-item img {
+  width: 33%;
+  height: auto;
+  margin-right: 10px;
+}
+.box .packing-item .item-detail {
+  flex: 1;
+  margin-right: 10px;
+}
+.box .packing-item .item-detail .item-title,
+.box .packing-item .item-detail .item-description {
+  margin: 0;
+}
+.box .current-section-title {
+  text-align: center;
+  margin: 0;
+  margin-bottom: 5px;
+  color: inherit;
+}
+.box .current-packing-item {
+  display: flex;
+  flex-direction: column;
+}
+.box .current-packing-item .item-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.box .current-packing-item .item-detail .item-title,
+.box .current-packing-item .item-detail .item-description {
+  margin: 0;
+}
+.box .current-packing-item img {
+  max-width: 100%;
+  height: auto;
+  max-height: 50vh;
+  margin: 0 auto;
+}
+.no-data-feedback {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #d1d8dd;
+  height: 75vh;
+}
+.no-data-feedback p {
+  color: inherit;
+}
+/*# sourceMappingURL=metactical.bundle.2ODBRWPO.css.map */

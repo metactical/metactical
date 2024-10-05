@@ -11,6 +11,8 @@ from pathlib import Path
 import pyqrcode
 from frappe.utils import cstr
 from io import BytesIO
+from barcode.writer import ImageWriter
+import base64
 
 
 def generate(self, method):
@@ -37,21 +39,62 @@ def get_barcode(name):
 	bstring = rv.getvalue()
 	return bstring.decode('ISO-8859-1')
 
-def get_barcode_for_print_format(name):
+def get_barcode_for_print_format(name, height=9, module_width=0.23):
 	rv = BytesIO()
+	# options = {
+	# 	"write_text": True,  # Do not write text below the barcode
+	# 	"module_height": height,  # Height of the barcode
+	# 	"dpi": 96,  # DPI for the image
+	# 	"font_size": 6,  # Since we are not writing text
+	# 	"module_width": module_width,  # Adjust to fit unit as you mentioned `Fit`
+	# 	"quiet_zone": 0,  # Quiet zone width in mm
+	# 	"text_distance": 2.2,  # Padding between barcode and text
+	# 	"background": "#ffffff",  # Background color
+	# 	"foreground": "#000000"  # Barcode color
+	# }
+
+	# # Use ImageWriter to generate a PNG
+	# CODE128 = barcode.get_barcode_class('code128')
+	# code128 = CODE128(name, writer=ImageWriter())
+	
+	# # Save barcode image to memory (BytesIO)
+	# buffer = BytesIO()
+	# code128.write(buffer)
+	
+	# # Convert to base64
+	# base64_image = base64.b64encode(buffer.getvalue()).decode('utf-8')
+	
+	# return base64_image
+
+
+	# Use ImageWriter to generate a PNG
+	CODE128 = barcode.get_barcode_class('code128')
+	code128 = CODE128(name, writer=ImageWriter())
+	
+	# Define writer options (customize size, text, etc.)
 	options = {
 		"write_text": True,  # Do not write text below the barcode
-		"module_height": 9,  # Height of the barcode
-		"dpi": 96,  # DPI for the image
+		"module_height": 6,  # Height of the barcode
+		"dpi": 500,  # DPI for the image
 		"font_size": 6,  # Since we are not writing text
-		"module_width": 0.23,  # Adjust to fit unit as you mentioned `Fit`
 		"quiet_zone": 0,  # Quiet zone width in mm
-		"text_distance": 2.2,  # Padding between barcode and text
+		"text_distance": 2.4,  # Padding between barcode and text
+		"margin_top": 1,  # Margin around the barcode
+		"margin_bottom": -1,  # Margin around the barcode
 		"background": "#ffffff",  # Background color
 		"foreground": "#000000",  # Barcode color
-		# "image_format": "GIF",  # Image format
+		# "format": "png"  # Output format
 	}
 	
-	barcode.get('code128', name).write(rv, options=options)
-	bstring = rv.getvalue()
-	return bstring.decode('ISO-8859-1')
+	# Save barcode image to memory (BytesIO)
+	buffer = BytesIO()
+	code128.write(buffer, options)  # Pass options when writing
+
+	# clean barcode image from memory (BytesIO)
+	rv = buffer.getvalue()
+	buffer.close()
+
+	# Convert to base64
+	base64_image = base64.b64encode(rv).decode('utf-8')
+	
+	return base64_image
