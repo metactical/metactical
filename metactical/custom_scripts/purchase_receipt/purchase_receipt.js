@@ -20,20 +20,5 @@ frappe.ui.form.on("Purchase Receipt", {
 				frappe.msgprint(__("Please enable pop-ups")); return;
 			}
 		});
-
-		// frm.add_custom_button("Print", function() {
-		// 	var print_format = "Purchase Receipt Barcode - V2";
-		// 	frappe.call({
-		// 		method: "metactical.custom_scripts.purchase_receipt.purchase_receipt.get_print_format",
-		// 		args: {
-		// 			"docname": frm.doc.name,
-		// 		},
-		// 		callback: function(r) {
-		// 			var w = window.open();
-		// 			w.document.write(r.message);
-		// 			w.print();
-		// 		}
-		// 	});
-		// });
 	}
 });
