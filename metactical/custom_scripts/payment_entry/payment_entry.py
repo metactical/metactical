@@ -19,12 +19,11 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 )
 import json
 
-def before_insert(self):
+def before_insert(doc, method):
 	if len(doc.references) == 1:
 		if doc.references[0].reference_doctype == "Sales Order":
 			doc.reference_no = frappe.db.get_value("Sales Order", doc.references[0].reference_name, "neb_usaepay_transaction_key")
 			
-
 @frappe.whitelist()
 def get_payment_entry(dt, dn, party_amount=None, bank_account=None, bank_amount=None):
 	doc = frappe.get_doc(dt, dn)
@@ -202,14 +201,14 @@ def check_if_can_be_refunded(doc):
 	for ref in references:
 		if ref["reference_doctype"] == "Sales Invoice":
 			ref = frappe._dict(ref)
-			can_be_refunded, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref)
+			can_be_refunded, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref, making_refund=False)
 			if can_be_refunded:
 				return True
 	
 	return False
 
 @frappe.whitelist()
-def refund_payment(doc):
+def make_refund(doc):
 	doc = frappe.get_doc("Payment Entry", doc)
 	if not doc.reference_no:
 		usaepay_transaction_key = ""
@@ -217,7 +216,7 @@ def refund_payment(doc):
 		for ref in references:
 			# check if the reference is a Sales Invoice and if it can be refunded
 			if ref.reference_doctype == "Sales Invoice":
-				continue_loop, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref)
+				continue_loop, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref, making_refund=True)
 				if not continue_loop:
 					continue
 				
@@ -236,7 +235,7 @@ def refund_payment(doc):
 					frappe.msgprint(f"$ {doc.paid_amount} refunded successfully for {sales_order}")
 					return True
 				else:
-					frappe.msgprint(f"Unable to process refund. Please check <a href='/desk#Form/USAePay Log/{log}'>USAePay Log</a> for more details.")
+					frappe.msgprint(f"Unable to process refund. Please check <a href='/app/usaepay-log/{log}'>USAePay Log</a> for more details.")
 					return False
 		
 		frappe.msgprint("Unable to process refund. Please check the Payment Entry.")
@@ -297,7 +296,7 @@ def check_if_payment_can_be_adjusted(doc, sales_order):
 		
 	return False, 0
 
-def check_if_payment_can_be_refunded(doc, ref):
+def check_if_payment_can_be_refunded(doc, ref, making_refund=False):
 	user_roles = frappe.get_roles()
 	usaepay_roles = get_usaepay_roles()
 
@@ -309,8 +308,11 @@ def check_if_payment_can_be_refunded(doc, ref):
 	refund_transaction_key = frappe.db.get_value("USAePay Log", {"sales_return": ref.reference_name, "action": "Refund", "is_cancelled": 0}, ["refund_transaction_key"])
 
 	if refund_transaction_key:
-		frappe.msgprint(_("Refund already processed for this Sales Invoice. Transaction Key: {0}").format(refund_transaction_key))
-		return False, "", ""
+		if not making_refund:
+			return False, "", ""
+		else:
+			frappe.msgprint(_("Refund already processed for this Sales Invoice. <br>Transaction Key: <b>{0}</b>").format(refund_transaction_key))
+			return False, "", ""
 
 	sales_invoice = frappe.get_doc("Sales Invoice", ref.reference_name)
 	sales_order = ""
