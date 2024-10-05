@@ -10,14 +10,11 @@
   "store_credit_account_cad",
   "store_credit_account_usd",
   "usaepay_settings_section",
-  "usaepay_url",
-  "api_key",
-  "pin",
-  "payment_form_url",
-  "usaepay_merchant_id",
   "column_break_lmdac",
+  "section_break_03fwb",
   "roles_to_refund",
   "roles_to_adjust_payment",
+  "column_break_ax30v",
   "roles_to_make_payment",
   "roles_to_cancel_payment"
  ],
@@ -36,33 +33,20 @@
   },
   {
    "fieldname": "store_credit_section",
-   "fieldtype": "Section Break",
+   "fieldtype": "Tab Break",
    "label": "Store Credit"
   },
   {
    "collapsible": 1,
    "fieldname": "usaepay_settings_section",
-   "fieldtype": "Section Break",
+   "fieldtype": "Tab Break",
    "label": "USAepay Settings"
   },
   {
-   "fieldname": "api_key",
-   "fieldtype": "Data",
-   "label": "API Key"
-  },
-  {
-   "fieldname": "pin",
-   "fieldtype": "Data",
-   "label": "PIN"
-  },
-  {
-   "fieldname": "usaepay_url",
-   "fieldtype": "Data",
-   "label": "URL"
-  },
-  {
    "fieldname": "column_break_lmdac",
-   "fieldtype": "Column Break"
+   "fieldtype": "Table",
+   "label": "USAePay Accounts",
+   "options": "USAePay Accounts"
   },
   {
    "fieldname": "roles_to_refund",
@@ -77,33 +61,30 @@
    "options": "MT Roles List"
   },
   {
-   "fieldname": "payment_form_url",
-   "fieldtype": "Data",
-   "label": "Payment Form URL"
-  },
-  {
    "fieldname": "roles_to_make_payment",
    "fieldtype": "Table",
    "label": "Roles Allowed To Make Payment",
    "options": "MT Roles List"
   },
   {
-   "fieldname": "usaepay_merchant_id",
-   "fieldtype": "Table",
-   "label": "Lead Source - USAePay Merchant ID Mapping",
-   "options": "USAePay Merchant ID"
-  },
-  {
    "fieldname": "roles_to_cancel_payment",
    "fieldtype": "Table",
    "label": "Roles Allowed To Cancel Payment",
    "options": "MT Roles List"
+  },
+  {
+   "fieldname": "section_break_03fwb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ax30v",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-08-29 10:58:11.767300",
+ "modified": "2024-10-04 16:19:32.188851",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",
@@ -121,5 +102,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }
