@@ -21,6 +21,8 @@ class PackingPageV4 {
 		this.page = wrapper.page;
 		this.main_section = this.page.main;
 
+		console.log(this.page.page_actions)
+
 	}
 
 	show() {

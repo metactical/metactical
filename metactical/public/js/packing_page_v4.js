@@ -36,6 +36,8 @@ metactical.packing_page.PackingPageV4 = class {
                     item_clicked: false,
                     cur_packing_slip: "",
                     all_packed_items: {},
+                    filters: {},
+                    packed_packing_slips: {},
                 };
             },
             components: {
@@ -47,7 +49,7 @@ metactical.packing_page.PackingPageV4 = class {
             template: `
             <div class="">
                 <div class="packing-page-card">
-                    <filters @filtersUpdated="get_items" @itemScanned="itemScanned"></filters>
+                    <filters @filtersUpdated="updateFilters" @itemScanned="itemScanned"></filters>
                 </div>
                 <template v-if="selected_delivery_note">
                 <section class="packing-slip-wrapper py-2">
@@ -62,7 +64,7 @@ metactical.packing_page.PackingPageV4 = class {
                         </div>
                         <div class="col-md-6 px-2">
                         <section class="box current-item packing-page-card">
-                            <current-item :item="current_item"></current-item>
+                            <current-item :item="current_item" @itemScanned="itemScanned"></current-item>
                           </section>
                         </div>
                         <div class="col-md-3 packing-page-card">
@@ -87,6 +89,14 @@ metactical.packing_page.PackingPageV4 = class {
             </div>
             `,
             computed: {
+                refresh() {
+                    if (this.selected_delivery_note) {
+                        this.get_items();
+                    }
+                    else{
+                        frappe.msgprint("Please select a Delivery Note");
+                    }
+                },
                 get_total_pending_items() {
                     var total_pending_items = 0;
                     this.pending_items.forEach((item) => {
@@ -111,6 +121,62 @@ metactical.packing_page.PackingPageV4 = class {
                 },
             },
             methods: {
+                ShowPackedItems(){
+                    var dialog = new frappe.ui.Dialog({
+                        title: "Packed Items",
+                        size: "large",
+                        fields: [{
+                            fieldtype: "HTML",
+                            fieldname: "packed_item_detail",
+                        }]
+                    })
+                    
+                    let all_packed_items = JSON.parse(JSON.stringify(this.all_packed_items));
+                    let packed_items = "";
+                    $.each(all_packed_items, (packing_slip, item) => {
+                        packed_items += '<h5 class="cursor-pointer" onclick="openPackingSlip(\''+packing_slip+'\')">' + packing_slip + "</h5>";
+
+                        // add parcel details
+                        let parcel_details = this.packed_packing_slips[packing_slip];
+
+                        if (parcel_details) {
+                            packed_items += "<table class='table table-bordered packing-slip-parcel my-0'>";
+                            packed_items += "<thead><tr><th>Box No.</th><th>Template</th><th>Gross Weight</th><th>Height</th><th>Width</th><th>Length</th></tr></thead>";
+                            packed_items += "<tbody>";
+                            packed_items += "<tr>";
+                            packed_items += "<td>" + parcel_details.from_case_no + "</td>";
+                            packed_items += "<td>" + parcel_details.custom_neb_parcel_template + "</td>";
+                            packed_items += "<td>" + parcel_details.gross_weight_pkg + "</td>";
+                            packed_items += "<td>" + parcel_details.custom_neb_box_height + "</td>";
+                            packed_items += "<td>" + parcel_details.custom_neb_box_width + "</td>";
+                            packed_items += "<td>" + parcel_details.custom_neb_box_length + "</td>";
+                            packed_items += "</tr>";
+                            packed_items += "</tbody>";
+                            packed_items += "</table>";
+                        }
+
+
+                        packed_items += "<table class='table table-bordered packing-slip-detail mt-1'>";
+                        // packed_items += "<thead><tr><th>Retail SKU</th><th>Item Name</th><th>Qty</th></tr></thead>";
+                        packed_items += "<tbody class='packing-list-items-list'>";
+                        $.each(item, (i, props) => {
+                            packed_items += "<tr>";
+                            packed_items += "<td>" + props.ifw_retailskusuffix + "</td>";
+                            packed_items += "<td>" + props.item_name + "</td>";
+                            packed_items += "<td>" + props.qty + "</td>";
+                            packed_items += "</tr>";
+                        });
+                        packed_items += "</tbody>";
+                        packed_items += "</table>";
+                    }); 
+                
+                    dialog.fields_dict.packed_item_detail.$wrapper.html(packed_items);
+                    dialog.show()
+                },
+                updateFilters(filters) {
+                    this.filters = filters;
+                    this.get_items();
+                },
                 selectItem(item) {
                     this.current_item = item;
                 },
@@ -288,16 +354,73 @@ metactical.packing_page.PackingPageV4 = class {
                 },
                 pack_selected_items() {
                     var me = this;
-                    frappe.confirm(
-                        "Submit packing slip?",
-                        function () {
-                            metactical.packing_page.confirm_raised = false;
+                    var d = new frappe.ui.Dialog({
+                        title: "Shipment Parcel",
+                        fields: [
+                            {
+                                fieldname: "parcel_template",
+                                fieldtype: "Link",
+                                options: "Shipment Parcel Template",
+                                label: "Parcel Template",
+                                onchange: function() {
+                                    frappe.db
+                                        .get_value(
+                                            "Shipment Parcel Template",
+                                            d.get_value("parcel_template"),
+                                            ["weight", "height", "width", "length"]
+                                        )
+                                        .then((r) => {
+                                            d.set_values({
+                                                gross_weight_pkg: r.message.weight,
+                                                height: r.message.height,
+                                                width: r.message.width,
+                                                length: r.message.length,
+                                            });
+                                        });
+                                }
+                            },
+                            {
+                                fieldname: "gross_weight_pkg",
+                                label: "Box Gross Weight",
+                                fieldtype: "Float",
+                                fetch_from: "parcel_template.weight",
+                                reqd: 1,
+                            },
+                            {
+                                fieldname: "height",
+                                label: "Box Height",
+                                fieldtype: "Float",
+                                fetch_from: "parcel_template.height",
+                                reqd: 1,
+                            },
+                            {
+                                fieldname: "width",
+                                label: "Width",
+                                fieldtype: "Float",
+                                fetch_from: "parcel_template.width",
+                                reqd: 1,
+                            },
+                            {
+                                fieldname: "length",
+                                label: "Length",
+                                fieldtype: "Float",
+                                fetch_from: "parcel_template.length",
+                                reqd: 1,
+                            }
+                        ],
+                        primary_action_label: "Pack",
+                        primary_action(values) {
+                            me.cur_packing_slip.parcel_template = values.parcel_template;
+                            me.cur_packing_slip.gross_weight_pkg = values.gross_weight_pkg;
+                            me.cur_packing_slip.custom_neb_box_height = values.height;
+                            me.cur_packing_slip.custom_neb_box_width = values.width;
+                            me.cur_packing_slip.custom_neb_box_length = values.length;
+                            me.cur_packing_slip.custom_neb_parcel_template = values.parcel_template;
                             me.save_form();
+                            d.hide();
                         },
-                        function () {
-                            metactical.packing_page.confirm_raised = false;
-                        }
-                    );
+                    });
+                    d.show();
                 },
                 save_form() {
                     var me = this;
@@ -342,7 +465,7 @@ metactical.packing_page.PackingPageV4 = class {
                             // refresh();
                             me.packed_items = [];
                             $(".pack-items-btn").addClass("d-none");
-                            me.get_items((from_refresh = true));
+                            me.get_items();
                             me.get_all_packed_items();
                         },
                         error: (r) => {
@@ -351,10 +474,10 @@ metactical.packing_page.PackingPageV4 = class {
                     });
                 },
 
-                get_items(filters) {
-                    let delivery_note = filters.delivery_note;
-                    this.selected_delivery_note = delivery_note;
+                get_items() {
                     var me = this;
+                    let delivery_note = me.filters.delivery_note;
+                    this.selected_delivery_note = delivery_note;
 
                     if (!delivery_note) {
                         me.pending_items = [];
@@ -416,9 +539,8 @@ metactical.packing_page.PackingPageV4 = class {
                             delivery_note: this.selected_delivery_note,
                         },
                         callback: function (ret) {
-                            console.log("returned response", ret.items);
                             me.all_packed_items = ret.items;
-                            console.log(me.all_packed_items, ret.items);
+                            me.packed_packing_slips = ret.packed_packing_slips;
                         },
                     });
                 },

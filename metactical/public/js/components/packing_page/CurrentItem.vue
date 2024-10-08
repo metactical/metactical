@@ -1,14 +1,17 @@
 <template>
     <!-- Current Item -->
     <div>
-        <h4 class="section-title cur-item-barcode" v-if="item">Packing Now {{ item.item_barcode }}</h4>
+        <div class="d-flex justify-content-between section-title align-items-center">
+            <h4 class="cur-item-barcode mb-0" v-if="item">{{ item.item_barcode ? item.item_barcode.join(", ") : '' }}</h4>
+            <span class="fa fa-gear fa-lg cur-item-close cursor-pointer" @click="showSettings"></span>
+        </div>
         <div class="current-items-wrap">
             <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
-                <button class='btn btn-default btn-sm' onClick='addOneItem()'>Click to Add</button>
-                <button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>
+                <button class='btn btn-default btn-sm' @click='addOneItem()'>Click to Add</button>
+                <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
             </h3>
             <h3 class="current-section-title cur-item-scan-feedback" v-else-if="item.qty > max_qty_to_pack">
-                <button class='btn btn-default btn-sm' onClick='addMultiple()'>Add Multiple</button>
+                <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
             </h3>
             <div class="current-packing-item">
                 <div class="item-detail">
@@ -48,7 +51,6 @@ export default {
             var me = this;
             frappe.db.get_single_value("Packing Settings", "multi_pack_if_qty").then((res) => {
                 me.max_qty_to_pack = res;
-                console.log('max_qty_to_pack', me.max_qty_to_pack);
             })
         },
         check_has_add_permission() {
@@ -63,12 +65,41 @@ export default {
                 }
             });
         },
-        ShowPackedItems() {
-            // Show packed items
+        add_multiple(){
+            var me = this;
+            frappe.prompt(
+                [{"fieldtype": "Int", "fieldname": "amount", "label": "Number of Items to Add", "reqd": 1}],
+                function(values){
+                    if(values.amount > me.item.qty){
+                        frappe.throw("You can only add a maximum of " + me.item.qty + " items");
+                    }
+                    else{
+                        console.log(me.item);
+                        me.$emit('itemScanned', me.item.item_barcode[0], values.amount);
+                    }
+                });
         },
-        packSelectedItems() {
-            // Pack selected items
-        }
+        showSettings() {
+            var d = new frappe.ui.Dialog({
+                title: __("Settings"),
+                fields: [
+                    {
+                        fieldname: "ask_shipment_info",
+                        fieldtype: "Check",
+                        label: __("Ask Shipment Information for each item"),
+                    }
+                ],
+                primary_action_label: __("Save"),
+                primary_action: (values) => {
+                    frappe.db.set_value("Packing Settings", "Packing Settings", "multi_pack_if_qty", values.qty).then(() => {
+                        this.max_qty_to_pack = values.qty;
+                        d.hide();
+                    });
+                }
+            });
+
+            d.show();
+        },
     }
 }
 </script>

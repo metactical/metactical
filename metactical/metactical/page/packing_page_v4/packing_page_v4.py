@@ -59,20 +59,27 @@ def set_item_values(item, values):
 		return {"success": True, "message": "Item updated successfully"}
 
 	except Exception as e:
-		frappe.log_error(f"Error updating item {item_name}: {str(e)}")
+		frappe.log_error(title="Unable to update item in packing page - v4", message=f"Error updating item {item}: {str(e)}")
 		return {"success": False, "message": f"Error updating item: {str(e)}"}
 
 @frappe.whitelist()
 def get_all_packed_items(delivery_note):
 	packed_items = frappe.db.sql("""
 		SELECT
-			item_code, item_name, stock_uom, qty, net_weight, `tabPacking Slip Item`.parent AS packing_slip
+			psi.item_code, psi.item_name, psi.stock_uom, psi.qty, 
+			psi.net_weight, psi.parent AS packing_slip,
+			i.ifw_retailskusuffix
 		FROM
-			`tabPacking Slip Item`
-			JOIN `tabPacking Slip` ON `tabPacking Slip`.name = `tabPacking Slip Item`.parent
+			`tabPacking Slip Item` psi
+			JOIN `tabPacking Slip` ON `tabPacking Slip`.name = psi.parent
+			JOIN `tabItem` i ON i.item_code = psi.item_code
 		WHERE
 			`tabPacking Slip`.delivery_note = %s and `tabPacking Slip`.docstatus = 1
 	""", delivery_note, as_dict=1)
+
+	packing_slips = frappe.db.get_list("Packing Slip", filters={"delivery_note": delivery_note, "docstatus": 1}, 
+									fields=["name", "custom_neb_box_height", "custom_neb_box_length", "custom_neb_box_width", "gross_weight_pkg", "custom_neb_parcel_template", "from_case_no"])
+	packing_slips = {pl["name"]: pl for pl in packing_slips}
 
 	# group the items by packing slip
 	packed_items_dict = {}
@@ -82,3 +89,4 @@ def get_all_packed_items(delivery_note):
 		packed_items_dict[item.packing_slip].append(item)
 
 	frappe.response["items"] = packed_items_dict
+	frappe.response["packed_packing_slips"] = packing_slips
