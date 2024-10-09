@@ -152,7 +152,7 @@ def get_default_usaepay_account():
 	return account
 
 @frappe.whitelist()
-def get_customer_payment_information(customer, reference_no, payment_entry):
+def get_customer_payment_information(customer, payment_entry, reference_no=None):
 	from metactical.custom_scripts.usaepay.usaepay_api import get_token_hash
 
 	# get existing credit card tokens
@@ -160,8 +160,8 @@ def get_customer_payment_information(customer, reference_no, payment_entry):
 	lead_source = ""
 	references = frappe.get_doc("Payment Entry", payment_entry).references
 	for ref in references:
-		if ref.reference_doctype == "Sales Order" and ref.reference_name:
-			lead_source = frappe.db.get_value("Sales Order", ref.reference_name, "source")
+		if ref.reference_doctype in ["Sales Order", "Sales Invoice"] and ref.reference_name:
+			lead_source = frappe.db.get_value(ref.reference_doctype, ref.reference_name, "source")
 			break
 
 	if frappe.db.exists("Customer CC", customer):

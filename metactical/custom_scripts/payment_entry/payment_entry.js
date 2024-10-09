@@ -299,8 +299,8 @@ var goto_payment_form = function (frm) {
         freeze_message: __("Fetching customer information..."),
         args: {
             customer: frm.doc.party,
-            reference_no: frm.doc.reference_no,
             payment_entry: frm.doc.name,
+            reference_no: frm.doc.reference_no
         },
         callback: (res) => {
             var tokens = res.tokens;
