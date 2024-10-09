@@ -418,42 +418,42 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 		var me = this;
 		var item = frappe.get_doc(cdt, cdn);
 
-// 		// check if serial nos entered are as much as qty in row
-// 		if (item.serial_no) {
-// 			let serial_nos = item.serial_no.split(`\n`).filter(sn => sn.trim()); // filter out whitespaces
-// 			if (item.qty === serial_nos.length) return;
-// 		}
+		// check if serial nos entered are as much as qty in row
+		if (item.serial_no) {
+			let serial_nos = item.serial_no.split(`\n`).filter(sn => sn.trim()); // filter out whitespaces
+			if (item.qty === serial_nos.length) return;
+		}
 
-// 		if (item.serial_no && !item.batch_no) {
-// 			item.serial_no = null;
-// 		}
+		if (item.serial_no && !item.batch_no) {
+			item.serial_no = null;
+		}
 
-// 		var has_batch_no;
-// 		frappe.db.get_value('Item', {'item_code': item.item_code}, 'has_batch_no', (r) => {
-// 			has_batch_no = r && r.has_batch_no;
-// 			if(item.item_code && item.warehouse) {
-// 				return this.frm.call({
-// 					method: "erpnext.stock.get_item_details.get_bin_details_and_serial_nos",
-// 					child: item,
-// 					args: {
-// 						item_code: item.item_code,
-// 						warehouse: item.warehouse,
-// 						has_batch_no: has_batch_no || 0,
-// 						stock_qty: item.stock_qty,
-// 						serial_no: item.serial_no || "",
-// 					},
-// 					callback:function(r){
-// 						if (in_list(['Delivery Note', 'Sales Invoice'], doc.doctype)) {
-// 							if (doc.doctype === 'Sales Invoice' && (!doc.update_stock)) return;
-// 							if (has_batch_no) {
-// 								me.set_batch_number(cdt, cdn);
-// 								me.batch_no(doc, cdt, cdn);
-// 							}
-// 						}
-// 					}
-// 				});
-// 			}
-// 		})
+		var has_batch_no;
+		frappe.db.get_value('Item', {'item_code': item.item_code}, 'has_batch_no', (r) => {
+			has_batch_no = r && r.has_batch_no;
+			if(item.item_code && item.warehouse) {
+				return this.frm.call({
+					method: "erpnext.stock.get_item_details.get_bin_details_and_serial_nos",
+					child: item,
+					args: {
+						item_code: item.item_code,
+						warehouse: item.warehouse,
+						has_batch_no: has_batch_no || 0,
+						stock_qty: item.stock_qty,
+						serial_no: item.serial_no || "",
+					},
+					callback:function(r){
+						if (in_list(['Delivery Note', 'Sales Invoice'], doc.doctype)) {
+							if (doc.doctype === 'Sales Invoice' && (!doc.update_stock)) return;
+							if (has_batch_no) {
+								me.set_batch_number(cdt, cdn);
+								me.batch_no(doc, cdt, cdn);
+							}
+						}
+					}
+				});
+			}
+		})
 		
 		// Metactical Customization: Load reserved qty in sales order
 		var row = locals[cdt][cdn];
