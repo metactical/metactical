@@ -40,8 +40,8 @@ frappe.ui.form.on('Stock Entry', {
 	}
 })
 
-erpnext.stock.StockEntry = erpnext.stock.StockEntry.extend({
-	onload: function(frm){
+erpnext.stock.StockEntry = class StockEntry extends erpnext.stock.StockEntry {
+	onload(frm){
 		var me = this;
 		frappe.after_ajax(function(){
 			me.frm.set_query("from_warehouse", function(){
@@ -92,11 +92,11 @@ erpnext.stock.StockEntry = erpnext.stock.StockEntry.extend({
 				}
 			});
 		}
-	},
+	}
 	
-	ais_scan_to_confirm: function(){
+	ais_scan_to_confirm(){
 		let transaction_controller= new erpnext.TransactionController({frm:this.frm});
 		transaction_controller.ais_scan_to_confirm();
 	}
-});
+};
 $.extend(cur_frm.cscript, new erpnext.stock.StockEntry({frm: cur_frm}));

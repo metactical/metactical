@@ -238,6 +238,4 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	if automatically_fetch_payment_terms:
 		doclist.set_payment_schedule()
 
-	doclist.set_onload("ignore_price_list", True)
-
 	return doclist

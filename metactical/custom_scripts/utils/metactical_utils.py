@@ -11,6 +11,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from frappe.utils.xlsxutils import handle_html, ILLEGAL_CHARACTERS_RE
 from io import BytesIO
+import re, os
 
 from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
@@ -464,3 +465,14 @@ def search_customer_by_phone_email(phone_number, email):
         return [customer.get('name') for customer in customers]
     else:
         return None
+def read_file(file_path):
+		extn = os.path.splitext(file_path)[1][1:]
+
+		file_content = None
+
+		file_name = frappe.db.get_value("File", {"file_url": file_path})
+		if file_name:
+			file = frappe.get_doc("File", file_name)
+			file_content = file.get_content()
+		
+		return file_content, extn

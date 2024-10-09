@@ -3,16 +3,13 @@ import functools
 from frappe import _, msgprint
 import barcode as _barcode
 from io import BytesIO
-from frappe.model.mapper import get_mapped_doc, map_child_doc
-from frappe.utils import nowdate, cstr, flt, cint, now, getdate
-from erpnext.setup.doctype.company.company import update_company_current_month_sales
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import unlink_inter_company_doc
-# from erpnext.healthcare.utils import manage_invoice_submit_cancel
+from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.controllers.selling_controller import SellingController
 from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
+from erpnext.accounts.utils import convert_to_list
 
 class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
 	def on_cancel(self):
@@ -113,7 +110,7 @@ def unlink_ref_doc_from_payment_entries(ref_doc):
 		
 	
 	remove_ref_doc_link_from_jv(ref_doc.doctype, ref_doc.name, multiple_orders, ref_doc.items[0].sales_order)
-	remove_ref_doc_link_from_pe(ref_doc.doctype, ref_doc.name, multiple_orders, ref_doc.items[0].sales_order)
+	remove_ref_doc_link_from_pe(ref_doc.doctype, ref_doc.name, None, multiple_orders, ref_doc.items[0].sales_order)
 
 	if multiple_orders == False:
 		frappe.db.sql("""update `tabGL Entry`
@@ -150,73 +147,71 @@ def remove_ref_doc_link_from_jv(ref_type, ref_no, multiple_orders, sales_order=N
 
 		frappe.msgprint(_("Journal Entries {0} are un-linked".format("\n".join(linked_jv))))
 
-def remove_ref_doc_link_from_pe(ref_type, ref_no, multiple_orders, sales_order=None):
-	if multiple_orders == False:
-		linked_pe = frappe.db.sql_list("""select parent from `tabPayment Entry Reference`
-			where reference_doctype=%s and reference_name=%s and docstatus < 2""", (ref_type, ref_no))
+def remove_ref_doc_link_from_pe(
+	ref_type: str | None = None, ref_no: str | None = None, payment_name: str | None = None, multiple_orders=True, sales_order=None
+):
+	per = qb.DocType("Payment Entry Reference")
+	pay = qb.DocType("Payment Entry")
 
-		if linked_pe:
-			frappe.db.sql("""update `tabPayment Entry Reference`
-				set modified=%s, modified_by=%s, reference_doctype='Sales Order', reference_name=%s
-				where reference_doctype=%s and reference_name=%s
-				and docstatus < 2""", (now(), frappe.session.user, sales_order, ref_type, ref_no))
+	linked_pe = (
+		qb.from_(per)
+		.select(per.parent)
+		.where((per.reference_doctype == ref_type) & (per.reference_name == ref_no) & (per.docstatus.lt(2)))
+		.run(as_list=1)
+	)
+	linked_pe = convert_to_list(linked_pe)
+	# remove reference only from specified payment
+	linked_pe = [x for x in linked_pe if x == payment_name] if payment_name else linked_pe
 
-			for pe in linked_pe:
-				pe_doc = frappe.get_doc("Payment Entry", pe)
-				pe_doc.set_total_allocated_amount()
-				pe_doc.set_unallocated_amount()
-				pe_doc.clear_unallocated_reference_document_rows()
-
-				frappe.db.sql("""update `tabPayment Entry` set total_allocated_amount=%s,
-					base_total_allocated_amount=%s, unallocated_amount=%s, modified=%s, modified_by=%s
-					where name=%s""", (pe_doc.total_allocated_amount, pe_doc.base_total_allocated_amount,
-						pe_doc.unallocated_amount, now(), frappe.session.user, pe))
-
-			frappe.msgprint(_("Payment Entries {0} are re-linked to Sales Order {1}".format("\n".join(linked_pe), sales_order)))
-	else:
-		linked_pe = frappe.db.sql_list(
-			"""select parent from `tabPayment Entry Reference`
-			where reference_doctype=%s and reference_name=%s and docstatus < 2""",
-			(ref_type, ref_no),
-		)
-
-		if linked_pe:
-			frappe.db.sql(
-				"""update `tabPayment Entry Reference`
-				set allocated_amount=0, modified=%s, modified_by=%s
-				where reference_doctype=%s and reference_name=%s
-				and docstatus < 2""",
-				(now(), frappe.session.user, ref_type, ref_no),
+	if linked_pe:
+		# Metactical Customization: Relink sales invoices to sales orders
+		if not multiple_orders and sales_order is not None:
+			update_query = (
+				qb.update(per)
+				.set(per.reference_doctype, 'Sales Order')
+				.set(per.reference_name, sales_order)
+				.set(per.modified, now())
+				.set(per.modified_by, frappe.session.user)
+				.where(per.docstatus.lt(2) & (per.reference_doctype == ref_type) & (per.reference_name == ref_no))
 			)
 
-			for pe in linked_pe:
-				try:
-					pe_doc = frappe.get_doc("Payment Entry", pe)
-					pe_doc.set_amounts()
-					pe_doc.clear_unallocated_reference_document_rows()
-					pe_doc.validate_payment_type_with_outstanding()
-				except Exception as e:
-					msg = _("There were issues unlinking payment entry {0}.").format(pe_doc.name)
-					msg += "<br>"
-					msg += _("Please cancel payment entry manually first")
-					frappe.throw(msg, exc=PaymentEntryUnlinkError, title=_("Payment Unlink Error"))
+			if payment_name:
+				update_query = update_query.where(per.parent == payment_name)
 
-				frappe.db.sql(
-					"""update `tabPayment Entry` set total_allocated_amount=%s,
-					base_total_allocated_amount=%s, unallocated_amount=%s, modified=%s, modified_by=%s
-					where name=%s""",
-					(
-						pe_doc.total_allocated_amount,
-						pe_doc.base_total_allocated_amount,
-						pe_doc.unallocated_amount,
-						now(),
-						frappe.session.user,
-						pe,
-					),
-				)
+			update_query.run()
+		else:
+			update_query = (
+				qb.update(per)
+				.set(per.allocated_amount, 0)
+				.set(per.modified, now())
+				.set(per.modified_by, frappe.session.user)
+				.where(per.docstatus.lt(2) & (per.reference_doctype == ref_type) & (per.reference_name == ref_no))
+			)
 
-			frappe.msgprint(_("Payment Entries {0} are un-linked").format("\n".join(linked_pe)))
+			if payment_name:
+				update_query = update_query.where(per.parent == payment_name)
 
+			update_query.run()
+
+		for pe in linked_pe:
+			try:
+				pe_doc = frappe.get_doc("Payment Entry", pe)
+				pe_doc.set_amounts()
+				pe_doc.clear_unallocated_reference_document_rows()
+				pe_doc.validate_payment_type_with_outstanding()
+			except Exception:
+				msg = _("There were issues unlinking payment entry {0}.").format(pe_doc.name)
+				msg += "<br>"
+				msg += _("Please cancel payment entry manually first")
+				frappe.throw(msg, exc=PaymentEntryUnlinkError, title=_("Payment Unlink Error"))
+
+			qb.update(pay).set(pay.total_allocated_amount, pe_doc.total_allocated_amount).set(
+				pay.base_total_allocated_amount, pe_doc.base_total_allocated_amount
+			).set(pay.unallocated_amount, pe_doc.unallocated_amount).set(pay.modified, now()).set(
+				pay.modified_by, frappe.session.user
+			).where(pay.name == pe).run()
+
+		frappe.msgprint(_("Payment Entries {0} are un-linked").format("\n".join(linked_pe)))
 
 @frappe.whitelist()
 def create_journal_entry(source_name, bank_cash, amount, purpose, target_doc=None):
@@ -316,6 +311,272 @@ def si_mode_of_payment(name):
 	if len(mode) > 0:
 		payment_mode = mode[0].mode_of_payment
 	return payment_mode
+
+def get_commercial_invoice(doc):
+	doc.mode_of_payment = si_mode_of_payment(doc.name)
+
+	sales_order = ""
+	for item in doc.items:
+		if item.against_sales_order:
+			sales_order = item.against_sales_order
+			break
+	
+	if sales_order:
+		sales_order = frappe.get_doc("Sales Order", sales_order)
+		doc.delivery_date = sales_order.delivery_date
+
+	address = get_customer_address(sales_order.customer)
+	customer_phone, customer_email = get_customer_contact(sales_order.customer)
+
+	billing_address = address["Billing"] if "Billing" in address else None
+	shipping_address = address["Shipping"] if "Shipping" in address else None
+	sales_orders = []
+
+	packing_slips = frappe.db.get_list("Packing Slip", filters={"delivery_note": doc.name, "docstatus":1}, order_by= "from_case_no asc", fields=["name", "from_case_no"])
+	packing_slip_names = [ps.name for ps in packing_slips]
+	
+	# group dn items by item_code
+	dn_items_dict = {}
+	for item in doc.items:
+		if item.item_code not in dn_items_dict:
+			dn_items_dict[item.item_code] = []
+		dn_items_dict[item.item_code].append(item)
+
+
+	items_list = []
+	items_with_no_template = []
+
+	for ps in packing_slips:
+		items = {}
+		packing_slip_items = frappe.db.get_list("Packing Slip Item", 
+													filters={"parent": ps.name}, 
+													fields=["name", "item_code", "item_name", "weight_uom", "net_weight", "qty", "parent"])
+
+		for psi in packing_slip_items:
+			psi.rate = dn_items_dict[psi.item_code][0].rate if psi.item_code in dn_items_dict else 0
+			for ps in packing_slips:
+				if psi.parent == ps.name:
+					psi.from_case_no = ps.from_case_no
+
+			item_detail = frappe.db.get_value("Item", psi.item_code, ["variant_of", "country_of_origin"], as_dict=True)
+			psi.country_of_origin = frappe.db.get_value("Country", item_detail.country_of_origin, "code").upper() if item_detail.country_of_origin else "-"
+			# if item_detail.variant_of:
+			# 	template_name = frappe.db.get_value("Item", item_detail.variant_of, "item_name")
+			# 	if template_name:
+			# 		psi.template_name = template_name
+
+			# 	psi.variant_of = item_detail.variant_of
+			# else:
+			psi.variant_of = "No Template"
+			psi.template_name = ""
+		
+		# group items based on variant of 
+		for item in packing_slip_items:
+			if item.variant_of != "No Template":
+				if item.variant_of not in items:
+					items[item.variant_of] = []
+				items[item.variant_of].append(item)
+			else:
+				items_with_no_template.append(item)
+		
+		items_list.append(items)
+	items_list.append({"No Template": items_with_no_template})
+
+	order_numbers = 1
+	sales_orders = [sales_order.name]
+	
+	# get tracking number
+	tracking_number, shipments = get_tracking_number(sales_orders)
+	tracking_number = ', '.join(tracking_number) if tracking_number else "-"
+
+	# get customer POs
+	customer_pos = ""
+	customer_pos = get_customer_po(sales_orders)
+	customer_pos = ', '.join(customer_pos) if customer_pos else "-"
+
+	# get freight terms
+	freight_term = get_freight_terms(shipments)
+	freight_term = freight_term.split(" ")[0] if freight_term else "-"
+
+	# get sales person
+	sales_person = get_sales_person(sales_orders)
+	sales_person = ', '.join(sales_person) if sales_person else "-"
+
+	html = frappe.render_template("metactical/metactical/print_format/ci___export___v1/ci_export_v1.html", 
+									{	
+										"items_list": items_list,
+										"doc": doc, 
+										"ship_via": "-",
+										"sold_to": billing_address, 
+										"shipped_to": shipping_address,
+										"order_numbers": order_numbers ,
+										"tracking_number": tracking_number,
+										"customer_pos": customer_pos,
+										"freight_terms": freight_term,
+										"sales_person": sales_person,
+										"customer_phone": customer_phone if customer_phone else "-",
+										"customer_email": customer_email if customer_email else "-",
+									}
+								)
+	return html
+
+def get_rate(packing_slip_item, delivery_note):
+
+	# add rate to packing slip items from delivery note items
+	if psi.item_code in dn_items_dict:
+		for item in dn_items_dict[psi.item_code]:
+			psi.rate = item.rate
+			psi.item_name = item.item_name
+			psi.description = item.description
+
+	return packing_slip_items
+
+def get_customer_address(customer):
+	customer_addresses = {}
+	
+	customer_address = frappe.db.sql("""select 	`tabAddress`.address_line1, 
+												`tabAddress`.address_line2, 
+												`tabAddress`.city, 
+												`tabAddress`.state, 
+												`tabAddress`.pincode, 
+												`tabAddress`.country, 
+												`tabAddress`.address_type
+											from `tabAddress` 
+											join `tabDynamic Link` on `tabAddress`.name = `tabDynamic Link`.parent
+											where `tabDynamic Link`.link_doctype = 'Customer' and 
+												  `tabDynamic Link`.link_name = %(customer)s""", 
+											{'customer': customer}, as_dict=1)
+
+	if len(customer_address) > 0:
+		for address in customer_address:
+			customer_info = frappe.db.get_value("Customer", customer, ["first_name", "last_name", "ais_company"])
+			
+			first_name = ""
+			last_name = ""
+			company = ""
+
+			if customer_info:
+				first_name = customer_info[0]
+				last_name = customer_info[1]
+				company = customer_info[2]
+
+			address.first_name = first_name
+			address.last_name = last_name
+			address.company = company
+			customer_addresses[address.address_type] = address
+	
+	return customer_addresses
+
+def get_customer_contact(customer):
+	contacts_list = frappe.db.sql("""select ce.email_id, cp.phone
+								from `tabContact` c
+								JOIN `tabContact Phone` cp on cp.parent=c.name
+								LEFT JOIN `tabContact Email` ce on ce.parent=c.name
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" and 
+									   dl.link_name = %(customer)s
+								""", {'customer': customer}, as_dict=1)
+	
+	phone = ""
+	email = ""
+
+	if len(contacts_list) > 0:
+		phone = contacts_list[0].phone
+		email = contacts_list[0].email_id
+
+	return phone, email
+
+# Metactical Customization: Get tracking number for the print format
+def get_tracking_number(sales_orders):
+	tracking_numbers = []
+	shipments = []
+
+	delivery_note_items = frappe.db.get_list("Delivery Note Item", filters={"against_sales_order": ["in", sales_orders], "parenttype": "Delivery Note", "docstatus": 1}, fields=["parent"])
+	# get delivery notes without duplicates
+	delivery_notes = list(set([item.parent for item in delivery_note_items]))
+
+
+	if delivery_notes:
+		shipment_delivery_note = frappe.db.get_list("Shipment Delivery Note", filters={"delivery_note": ["in", delivery_notes], "docstatus": 1}, fields=["parent"], order_by="creation")
+		shipments = [item.parent for item in shipment_delivery_note]
+		
+		# get shipments without duplicates
+		shipments = list(set(shipments))
+
+		if shipments:
+			for shipment in shipments:
+				shipment_doc = frappe.get_doc("Shipment", shipment)
+				multiple_shipments = shipment_doc.shipments
+				for shipment in multiple_shipments:
+					if shipment.awb_number not in tracking_numbers:
+						tracking_numbers.append(shipment.awb_number)
+
+	return tracking_numbers, shipments
+
+def get_customer_po(sales_orders):
+	customer_po = []
+	for sales_order in sales_orders:
+		po_no = frappe.db.get_value("Sales Order", sales_order, "po_no")
+		if po_no:
+			customer_po.append(po_no)
+
+	return customer_po
+
+def get_freight_terms(shipments):
+	freight_terms = ""
+	if shipments:
+		for shipment in shipments:
+			incoterm = frappe.db.get_value("Shipment", shipment, "incoterm")
+			if incoterm:
+				freight_terms = incoterm
+				break
+	return freight_terms
+
+def get_sales_person(sales_orders):
+	sales_persons_list = []
+	sales_persons = frappe.db.get_list("Sales Team", filters={"parent": ["in", sales_orders], "parenttype": "Sales Order"}, fields=["sales_person"])
+	if sales_persons:
+		sales_persons_list = [item.sales_person for item in sales_persons]
+
+	return sales_persons_list
+		
+def get_totals(items):
+	total_qty = 0
+	total_amount = 0
+	total_weight = 0
+	variant_items = ""
+	from_case_no = 0
+	template_name = ""
+	rate = 0
+	country_of_origin = ""
+
+	for item in items:
+		variant_items += str(item.qty) +" / "+item.item_code+ "  "
+		total_qty += item.qty
+		total_amount += item.rate * item.qty
+		total_weight += item.net_weight
+		rate = item.rate
+
+		if not from_case_no:
+			from_case_no = item.from_case_no
+		
+		if not template_name:
+			template_name = item.template_name
+
+		if not country_of_origin and item.country_of_origin:
+			country_of_origin = frappe.db.get_value("Country", item.country_of_origin, "code").upper()
+	
+	return {
+		"total_qty": total_qty,
+		"total_amount": total_amount,
+		"total_weight": total_weight,
+		"items": variant_items,
+		"from_case_no": from_case_no,
+		"template_name": template_name,
+		"rate": rate,
+		"country_of_origin": country_of_origin
+	}
 
 @frappe.whitelist()
 def get_store_credit_account(currency):

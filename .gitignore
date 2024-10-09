@@ -4,6 +4,13 @@
 *.swp
 tags
 metactical/docs/current
+node_modules/
+__pycache__
+*~
+.backportrc.json
+dist/
+metactical/public/dist
+metactical/public/node_modules
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

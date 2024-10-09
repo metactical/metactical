@@ -402,21 +402,21 @@ frappe.ui.form.on("Sales Order Item", {
     }
 });
 
-// erpnext.selling.SalesOrderController = erpnext.selling.SalesOrderController.extend({
-// 	customer_address: function(doc, dt, dn){
-// 		// Metactical Customization: Add ability to change address even when submitted
-// 		if(doc.docstatus == 1){
-// 			erpnext.utils.get_address_display(this.frm, "customer_address");		
-// 		}
-// 		else{
-// 			erpnext.utils.get_address_display(this.frm, "customer_address");
-// 			erpnext.utils.set_taxes_from_address(this.frm, "customer_address", "customer_address", "shipping_address_name");
-// 		}
-// 	},
+erpnext.selling.SalesOrderController = class SalesOrderController extends erpnext.selling.SalesOrderController {
+	customer_address(doc, dt, dn){
+		// Metactical Customization: Add ability to change address even when submitted
+		if(doc.docstatus == 1){
+			erpnext.utils.get_address_display(this.frm, "customer_address");		
+		}
+		else{
+			erpnext.utils.get_address_display(this.frm, "customer_address");
+			erpnext.utils.set_taxes_from_address(this.frm, "customer_address", "customer_address", "shipping_address_name");
+		}
+	}
 	
-// 	warehouse: function(doc, cdt, cdn){
-// 		var me = this;
-// 		var item = frappe.get_doc(cdt, cdn);
+	warehouse(doc, cdt, cdn){
+		var me = this;
+		var item = frappe.get_doc(cdt, cdn);
 
 // 		// check if serial nos entered are as much as qty in row
 // 		if (item.serial_no) {
@@ -455,68 +455,66 @@ frappe.ui.form.on("Sales Order Item", {
 // 			}
 // 		})
 		
-// 		// Metactical Customization: Load reserved qty in sales order
-// 		var row = locals[cdt][cdn];
-// 		if (row.item_code && row.warehouse) {
-// 			return this.frm.call({
-// 					method: "metactical.custom_scripts.sales_order.sales_order.get_bin_details",
-// 					child: row,
-// 					args: {
-// 						item_code: row.item_code,
-// 						warehouse: row.warehouse,
-// 					},
-// 					callback:function(r){
-// 						console.log(r);
-// 						row.sal_reserved_qty =  r.message['reserved_qty'];
-// 						row.ais_is_stock_item = r.message["is_stock_item"]
-// 						refresh_field("sal_reserved_qty", cdn, "items");
-// 						refresh_field("ais_is_stock_item", cdn, "items");
-// 					}
-// 				});
-// 		}
-// 	},
+		// Metactical Customization: Load reserved qty in sales order
+		var row = locals[cdt][cdn];
+		if (row.item_code && row.warehouse) {
+			return this.frm.call({
+					method: "metactical.custom_scripts.sales_order.sales_order.get_bin_details",
+					child: row,
+					args: {
+						item_code: row.item_code,
+						warehouse: row.warehouse,
+					},
+					callback:function(r){
+						console.log(r);
+						row.sal_reserved_qty =  r.message['reserved_qty'];
+						row.ais_is_stock_item = r.message["is_stock_item"]
+						refresh_field("sal_reserved_qty", cdn, "items");
+						refresh_field("ais_is_stock_item", cdn, "items");
+					}
+				});
+		}
+	}
 	
-// 	customer: function(frm){
-// 		// Metactical Customization: Clear company address to force them to enter manually
-// 		var me = this;
-// 		var args = {"company_address": ''}
-// 		get_party_details(this.frm, null, null, function() {
-// 			me.apply_price_list();
-// 			frappe.after_ajax(function(){
-// 				setTimeout(
-// 					function(){
-// 						cur_frm.fields_dict["contact_info"].collapse(0);
-// 						cur_frm.set_value("company_address", '');
-// 					}, 2000);
-// 			});
-// 		});
-// 	},
+	customer(frm){
+		// Metactical Customization: Clear company address to force them to enter manually
+		var me = this;
+		erpnext.utils.get_party_details(this.frm, null, null, function() {
+			me.apply_price_list();
+			frappe.after_ajax(function(){
+				setTimeout(
+					function(){
+						cur_frm.set_value("company_address", '');
+					}, 2000);
+			});
+		});
+	}
 	
-// 	close_sales_order: function(){
-// 		// Metactical Customization: Pop up to enter reason for closing
-// 		var me = this;
-// 		frappe.prompt([
-// 				{'fieldname': 'close_reason', 'fieldtype': 'Small Text', 'label': 'Enter Reason', 'reqd': 1}
-// 			],
-// 			function(values){
-// 				frappe.call({
-// 					'method': 'metactical.custom_scripts.sales_order.sales_order.save_close_reason',
-// 					'args': {
-// 						'docname': cur_frm.docname,
-// 						'close_reason': values.close_reason
-// 					},
-// 					'callback': function(r){
-// 						me.frm.cscript.update_status("Close", "Closed")
-// 					}
-// 				});
-// 			},
-// 			'Please enter the reason for closing the Sales Order.',
-// 			'Close'
-// 		)
-// 	}
-// });
+	close_sales_order(){
+		// Metactical Customization: Pop up to enter reason for closing
+		var me = this;
+		frappe.prompt([
+				{'fieldname': 'close_reason', 'fieldtype': 'Small Text', 'label': 'Enter Reason', 'reqd': 1}
+			],
+			function(values){
+				frappe.call({
+					'method': 'metactical.custom_scripts.sales_order.sales_order.save_close_reason',
+					'args': {
+						'docname': cur_frm.docname,
+						'close_reason': values.close_reason
+					},
+					'callback': function(r){
+						me.frm.cscript.update_status("Close", "Closed")
+					}
+				});
+			},
+			'Please enter the reason for closing the Sales Order.',
+			'Close'
+		)
+	}
+};
 
-// $.extend(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
+extend_cscript(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
 
 //Metactical Customization: Replace erpnext.utils.get_party_details
 var get_party_details = function(frm, method, args, callback) {

@@ -10,6 +10,7 @@
   "shipment_id",
   "shipment_amount",
   "carrier_service",
+  "service_name",
   "awb_number",
   "tracking_status",
   "carrier_status",
@@ -50,7 +51,6 @@
    "allow_on_submit": 1,
    "fieldname": "carrier_service",
    "fieldtype": "Data",
-   "in_list_view": 1,
    "label": "Carrier Service"
   },
   {
@@ -130,17 +130,25 @@
    "fieldtype": "Small Text",
    "ignore_xss_filter": 1,
    "label": "Manifest URL"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "service_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Service Name"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-05-01 16:52:53.619077",
+ "modified": "2024-09-07 15:22:34.209186",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Canada Post Shipment",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

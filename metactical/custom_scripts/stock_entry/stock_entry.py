@@ -31,9 +31,10 @@ class CustomStockEntry(StockEntry):
 		return qty
 	
 	def set_actual_qty(self):
-		allow_negative_stock = cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock"))
+		from erpnext.stock.stock_ledger import is_negative_stock_allowed
 
 		for d in self.get("items"):
+			allow_negative_stock = is_negative_stock_allowed(item_code=d.item_code)
 			previous_sle = get_previous_sle(
 				{
 					"item_code": d.item_code,
@@ -77,7 +78,7 @@ class CustomStockEntry(StockEntry):
 					)
 					+ "<br><br>"
 					+ _("Available quantity is {0}, you need {1}").format(
-						frappe.bold(d.actual_qty), frappe.bold(d.transfer_qty)
+						frappe.bold(flt(d.actual_qty, d.precision("actual_qty"))), frappe.bold(d.transfer_qty)
 					),
 					NegativeStockError,
 					title=_("Insufficient Stock"),

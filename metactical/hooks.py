@@ -15,8 +15,8 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = ["/assets/css/metactical.css", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["/assets/js/metactical.min.js"]
+app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
+app_include_js = ["metactical.bundle.js", "/assets/metactical/js/metactical_kanban_custom.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -56,6 +56,7 @@ doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
+	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -121,10 +122,10 @@ doc_events = {
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
-	"Shipment": {
+	'''"Shipment": {
 		"validate": "metactical.custom_scripts.shipment.shipment.validate",
 		"before_cancel": "metactical.custom_scripts.shipment.shipment.before_cancel",
-	},
+	},'''
 	"Task": {
 		"before_insert": "metactical.custom_scripts.task.task.set_start_date"
 	}, 
@@ -133,6 +134,9 @@ doc_events = {
 	},
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
+	},
+	"RabbitMQ Config": {
+		"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
 	}, 
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
@@ -158,7 +162,8 @@ override_doctype_class = {
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
-	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
 }
 
 # Scheduled Tasks
@@ -168,6 +173,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
+    "all": [
+        "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+    ],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -201,12 +209,13 @@ after_migrate = "metactical.migrate.after_migrate"
 override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
-	#"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate",
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
-	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate"
+	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
+	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
+	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -245,14 +254,20 @@ fixtures = [{
 ]
 
 #For using in print format
-jenv = {
+jinja = {
 	"methods": [
-		"get_po_items:metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
-		"get_pr_items:metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
-		"get_barcode:metactical.barcode_generator.get_barcode",
-		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
-		"get_customer_info:metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
+		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
+		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
+		"metactical.barcode_generator.get_barcode",
+		"metactical.barcode_generator.get_barcode_for_print_format",
+		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
+		"metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
+		"metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
+		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
 	]
 }
 
 
+app_include_python = [
+    "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+]

@@ -3,22 +3,16 @@ import json
 
 import frappe
 from frappe import _, throw
-from frappe.model.meta import get_field_precision
-from frappe.utils import add_days, add_months, cint, cstr, flt, getdate
+from frappe.utils import add_days, cint, cstr, flt
 from six import iteritems, string_types
 
-from erpnext import get_company_currency
 from erpnext.accounts.doctype.pricing_rule.pricing_rule import (
-	get_pricing_rule_for_item,
-	set_transaction_type,
+	get_pricing_rule_for_item
 )
 from erpnext.setup.doctype.brand.brand import get_brand_defaults
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
-from erpnext.setup.utils import get_exchange_rate
-from erpnext.stock.doctype.batch.batch import get_batch_no
-from erpnext.stock.doctype.item.item import get_item_defaults, get_uom_conv_factor
 from erpnext.stock.doctype.item_manufacturer.item_manufacturer import get_item_manufacturer_part_no
-from erpnext.stock.doctype.price_list.price_list import get_price_list_details
+from erpnext.stock.doctype.item.item import get_item_defaults
 
 sales_doctypes = ["Quotation", "Sales Order", "Delivery Note", "Sales Invoice", "POS Invoice"]
 purchase_doctypes = [
@@ -29,15 +23,13 @@ purchase_doctypes = [
 	"Purchase Invoice",
 ]
 from erpnext.stock.get_item_details import update_stock, set_valuation_rate, process_args, process_string_args, \
-	get_item_code, validate_item_details, get_basic_details, get_item_warehouse, update_barcode_value, get_barcode_data, \
-	get_item_tax_info, get_item_tax_template, _get_item_tax_template, is_within_valid_range, get_item_tax_map, calculate_service_end_date, \
-	get_default_income_account, get_default_expense_account, get_default_discount_account, get_default_deferred_account, get_default_cost_center, \
-	get_default_supplier, get_price_list_rate, insert_item_price, get_item_price, get_price_list_rate_for, check_packing_list, \
-	validate_conversion_rate, get_party_item_code, get_pos_profile_item_details, get_pos_profile, get_serial_nos_by_fifo, get_serial_no_batchwise, \
-	get_conversion_factor, get_projected_qty, get_company_total_stock, get_serial_no_details, get_bin_details_and_serial_nos, \
-	get_batch_qty_and_serial_no, get_batch_qty, apply_price_list, apply_price_list_on_item, get_price_list_currency_and_exchange_rate, \
-	get_default_bom, get_valuation_rate, get_gross_profit, get_serial_no, update_party_blanket_order, get_blanket_order_details, \
-	get_so_reservation_for_item, get_reserved_qty_for_so
+	validate_item_details, get_basic_details, get_item_warehouse, update_barcode_value, get_barcode_data, \
+	get_item_tax_template, get_item_tax_map, calculate_service_end_date, \
+	get_default_income_account, get_default_expense_account, get_default_discount_account, get_default_cost_center, \
+	get_default_supplier, get_price_list_rate, \
+	get_party_item_code, get_pos_profile_item_details, \
+	get_conversion_factor, get_company_total_stock, \
+	get_default_bom, get_gross_profit, update_party_blanket_order
 	
 @frappe.whitelist()
 def get_item_details(args, doc=None, for_validate=False, overwrite_warehouse=True):
@@ -121,7 +113,7 @@ def get_item_details(args, doc=None, for_validate=False, overwrite_warehouse=Tru
 		if args.get(key) is None:
 			args[key] = value
 
-	data = get_pricing_rule_for_item(args, out.price_list_rate, doc, for_validate=for_validate)
+	data = get_pricing_rule_for_item(args, doc=doc, for_validate=for_validate)
 
 	out.update(data)
 
@@ -240,7 +232,9 @@ def get_basic_details(args, item, overwrite_warehouse=True):
 			),
 			"expense_account": expense_account
 			or get_default_expense_account(args, item_defaults, item_group_defaults, brand_defaults),
-			"discount_account": get_default_discount_account(args, item_defaults),
+			"discount_account": get_default_discount_account(
+				args, item_defaults, item_group_defaults, brand_defaults
+			),
 			"cost_center": get_default_cost_center(
 				args, item_defaults, item_group_defaults, brand_defaults
 			),
