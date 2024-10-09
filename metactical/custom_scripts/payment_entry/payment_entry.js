@@ -8,7 +8,7 @@ frappe.ui.form.on("Payment Entry", {
         frm.trigger("custom_buttons");
     },
 
-    reference_no: function(frm){
+    reference_no: function (frm) {
         frm.trigger("custom_buttons");
     },
 
@@ -31,65 +31,31 @@ frappe.ui.form.on("Payment Entry", {
             callback: function (r) {
                 var roles_allowed_to_make_payment = r.message.make_payment;
                 var roles_allowed_to_cancel_payment = r.message.cancel_payment;
+                var roles_allowed_to_refund_payment = r.message.refund;
+                var roles_allowed_to_adjust_payment = r.message.adjust;
                 var user_roles = frappe.user_roles;
 
-                if (
-                    roles_allowed_to_make_payment.some((role) =>
-                        user_roles.includes(role)
-                    )
-                ) {
-                    if (
-                        frm.doc.payment_type == "Receive" &&
-                        frm.doc.party &&
-                        !frm.doc.reference_no &&
-                        !frm.doc.__islocal &&
-                        frm.doc.docstatus < 2
-                    ) {
-                        frm.add_custom_button(__("Make Payment"), function () {
-                            goto_payment_form(frm);
-                        });
-                    }
-                }
+                refund_payment_button(
+                    roles_allowed_to_refund_payment,
+                    user_roles,
+                    frm
+                );
+                make_payment_button(
+                    roles_allowed_to_make_payment,
+                    user_roles,
+                    frm
+                );
+                cancel_payment_button(
+                    roles_allowed_to_cancel_payment,
+                    user_roles,
+                    frm
+                );
 
-                if (
-                    roles_allowed_to_cancel_payment.some((role) =>
-                        user_roles.includes(role)
-                    )
-                ) {
-                    if (frm.doc.docstatus == 1 && frm.doc.reference_no) {
-                        frm.add_custom_button(
-                            __("Void Payment"),
-                            function () {
-                                frappe.confirm(
-                                    __(
-                                        "Are you sure you want to cancel this Payment Entry?"
-                                    ),
-                                    function () {
-                                        frappe.call({
-                                            method: "metactical.custom_scripts.payment_entry.payment_entry.void_payment",
-                                            freeze: "true",
-                                            freeze_message: __("Cancelling Payment in Progress..."),
-                                            args: {
-                                                name: frm.doc.name,
-                                            },
-                                            callback: function (r) {
-                                                if (r.message) {
-                                                    frappe.msgprint(
-                                                        __(
-                                                            "Payment Entry {0} has been cancelled",
-                                                            [frm.doc.name]
-                                                        )
-                                                    );
-                                                    frm.reload_doc();
-                                                }
-                                            },
-                                        });
-                                    }
-                                );
-                            }
-                        );
-                    }
-                }
+                adjust_payment_button(
+                    roles_allowed_to_adjust_payment,
+                    user_roles,
+                    frm
+                );
             },
         });
     },
@@ -130,6 +96,201 @@ frappe.ui.form.on("Payment Entry", {
     },
 });
 
+var adjust_payment_button = function (
+    roles_allowed_to_adjust_payment,
+    user_roles,
+    frm
+) {
+    if (
+        roles_allowed_to_adjust_payment.some((role) =>
+            user_roles.includes(role)
+        ) &&
+        !frm.doc.__islocal &&
+        frm.doc.docstatus == 1 &&
+        frm.doc.reference_no
+    ) {
+        if (frm.doc.references.length == 0) return;
+        else if (frm.doc.references[0].reference_doctype != "Sales Order")
+            return;
+
+        frappe.call({
+            method: "metactical.custom_scripts.payment_entry.payment_entry.check_if_payment_can_be_adjusted",
+            args: {
+                doc: frm.doc,
+            },
+            callback: function (r) {
+                if (r.message[0]) {
+                    frm.add_custom_button(
+                        __("Adjust Payment"),
+                        function () {
+                            adjust_payment(frm);
+                        },
+                        "USAePay"
+                    );
+                } else {
+                    frm.remove_custom_button("Adjust Payment", "USAePay");
+                }
+            },
+        });
+    } else {
+        frm.remove_custom_button("Refund Payment", "USAePay");
+    }
+};
+
+var cancel_payment_button = function (
+    roles_allowed_to_cancel_payment,
+    user_roles,
+    frm
+) {
+    if (
+        roles_allowed_to_cancel_payment.some((role) =>
+            user_roles.includes(role)
+        )
+    ) {
+        if (frm.doc.docstatus == 1 && frm.doc.reference_no) {
+            frm.add_custom_button(
+                __("Void Payment"),
+                function () {
+                    void_payment(frm);
+                },
+                "USAePay"
+            );
+        } else {
+            frm.remove_custom_button("Void Payment", "USAePay");
+        }
+    } else {
+        frm.remove_custom_button("Void Payment", "USAePay");
+    }
+};
+
+var make_payment_button = function (
+    roles_allowed_to_make_payment,
+    user_roles,
+    frm
+) {
+    if (
+        roles_allowed_to_make_payment.some((role) =>
+            user_roles.includes(role)
+        ) &&
+        !frm.doc.__islocal
+    ) {
+        if (
+            frm.doc.payment_type == "Receive" &&
+            frm.doc.party &&
+            !frm.doc.reference_no &&
+            !frm.doc.__islocal &&
+            frm.doc.docstatus < 2
+        ) {
+            frm.add_custom_button(
+                __("Make Payment"),
+                function () {
+                    goto_payment_form(frm);
+                },
+                "USAePay"
+            );
+        } else {
+            frm.remove_custom_button("Make Payment", "USAePay");
+        }
+    } else {
+        frm.remove_custom_button("Make Payment", "USAePay");
+    }
+};
+
+var refund_payment_button = function (
+    roles_allowed_to_refund_payment,
+    user_roles,
+    frm
+) {
+    if (
+        roles_allowed_to_refund_payment.some((role) =>
+            user_roles.includes(role)
+        ) &&
+        !frm.doc.__islocal &&
+        frm.doc.docstatus == 1
+    ) {
+        frappe.call({
+            method: "metactical.custom_scripts.payment_entry.payment_entry.check_if_can_be_refunded",
+            args: {
+                doc: frm.doc,
+            },
+            callback: function (r) {
+                if (r.message) {
+                    console.log("can be refunded");
+                    frm.add_custom_button(
+                        __("Refund Payment"),
+                        function () {
+                            make_refund(frm);
+                        },
+                        "USAePay"
+                    );
+                } else {
+                    frm.remove_custom_button("Refund Payment", "USAePay");
+                }
+            },
+        });
+    } else {
+        frm.remove_custom_button("Refund Payment", "USAePay");
+    }
+};
+
+var adjust_payment = function (frm) {
+    frappe.call({
+        method: "metactical.custom_scripts.payment_entry.payment_entry.update_payment",
+        args: {
+            doc: frm.doc,
+        },
+        freeze: true,
+        freeze_message: "Adjusting Payment in Progress...",
+        callback: function (r) {
+            if (r.message) {
+                frm.reload_doc();
+            }
+        },
+    });
+};
+
+var void_payment = function (frm) {
+    frappe.confirm(
+        __("Are you sure you want to cancel this Payment Entry?"),
+        function () {
+            frappe.call({
+                method: "metactical.custom_scripts.payment_entry.payment_entry.void_payment",
+                freeze: "true",
+                freeze_message: __("Cancelling Payment in Progress..."),
+                args: {
+                    name: frm.doc.name,
+                },
+                callback: function (r) {
+                    if (r.message) {
+                        frappe.msgprint(
+                            __("Payment Entry {0} has been cancelled", [
+                                frm.doc.name,
+                            ])
+                        );
+                        frm.reload_doc();
+                    }
+                },
+            });
+        }
+    );
+};
+
+var make_refund = function (frm) {
+    frappe.call({
+        method: "metactical.custom_scripts.payment_entry.payment_entry.make_refund",
+        args: {
+            doc: frm.doc.name,
+        },
+        freeze: true,
+        freeze_message: "Refunding Payment in Progress...",
+        callback: function (res) {
+            if (res.message) {
+                frm.reload_doc();
+            }
+        },
+    });
+};
+
 var goto_payment_form = function (frm) {
     // get customer information
     frappe.call({
@@ -138,6 +299,8 @@ var goto_payment_form = function (frm) {
         freeze_message: __("Fetching customer information..."),
         args: {
             customer: frm.doc.party,
+            reference_no: frm.doc.reference_no,
+            payment_entry: frm.doc.name,
         },
         callback: (res) => {
             var tokens = res.tokens;

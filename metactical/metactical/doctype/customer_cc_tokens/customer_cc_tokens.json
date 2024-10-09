@@ -28,18 +28,20 @@
    "fieldname": "cc_number",
    "fieldtype": "Data",
    "label": "CC Number",
+   "permlevel": 1,
    "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-07-31 15:21:16.252738",
+ "modified": "2024-10-09 11:29:47.836259",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Customer CC Tokens",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

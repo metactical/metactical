@@ -139,8 +139,7 @@ doc_events = {
 		"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
 	}, 
 	"Payment Entry": {
-		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
-		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
 }
 
