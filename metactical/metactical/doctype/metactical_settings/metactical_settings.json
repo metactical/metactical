@@ -10,7 +10,7 @@
   "store_credit_account_cad",
   "store_credit_account_usd",
   "usaepay_settings_section",
-  "column_break_lmdac",
+  "usaepay_accounts",
   "section_break_03fwb",
   "roles_to_refund",
   "roles_to_adjust_payment",
@@ -43,12 +43,6 @@
    "label": "USAepay Settings"
   },
   {
-   "fieldname": "column_break_lmdac",
-   "fieldtype": "Table",
-   "label": "USAePay Accounts",
-   "options": "USAePay Accounts"
-  },
-  {
    "fieldname": "roles_to_refund",
    "fieldtype": "Table",
    "label": "Roles Allowed To Process Refund",
@@ -79,12 +73,18 @@
   {
    "fieldname": "column_break_ax30v",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "usaepay_accounts",
+   "fieldtype": "Table",
+   "label": "USAePay Accounts",
+   "options": "USAePay Accounts"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-04 16:19:32.188851",
+ "modified": "2024-10-08 13:57:03.676191",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",
