@@ -136,9 +136,9 @@ doc_events = {
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	},
-	"RabbitMQ Config": {
-        "on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
-    }
+	# "RabbitMQ Config": {
+    #     "on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
+    # }
 }
 
 # DocType Class
@@ -169,9 +169,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
-    "all": [
-        "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-    ],
+#	"all": [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+#	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -249,6 +249,6 @@ jinja = {
 }
 
 
-app_include_python = [
-    "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-]
+# app_include_python = [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+# ]
