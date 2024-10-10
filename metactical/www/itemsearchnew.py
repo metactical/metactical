@@ -99,6 +99,9 @@ def get_total(search_value=""):
 
 @frappe.whitelist(allow_guest=True)
 def get_items(search_value="", offset=0):
+	if search_value is None or search_value == "":
+		return {}
+
 	data = dict()
 	result = []
 
