@@ -278,8 +278,14 @@ class CustomPickList(PickList):
 
 	def validate_stock_qty(self):
 		from erpnext.stock.doctype.batch.batch import get_batch_qty
+		shipping_items = frappe.db.get_all('Pick List Shipping Item', fields=["item"], pluck='item')
+		
 
 		for row in self.get("locations"):
+			# Metactical Customization: Skip shipping items
+			if row.item_code in shipping_items:
+				continue
+
 			# Metactical Customization: If is product budle, validate individual items
 			if is_product_bundle(row.item_code):
 				bundle_items = frappe.get_all('Product Bundle Item', filters={'parent': row.item_code}, fields=['item_code', 'qty'])
