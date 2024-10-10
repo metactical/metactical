@@ -34,6 +34,7 @@ class CustomPackingSlip(PackingSlip):
 				ch.item_code = item.item_code
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
+				ch.dn_detail = item.name
 				ch.description = item.description
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
@@ -71,7 +72,7 @@ class CustomPackingSlip(PackingSlip):
 
 		# gets item code, qty per item code, latest packed qty per item code and stock uom
 		res = frappe.db.sql(
-			"""select item_code, sum(qty) as qty,
+			"""select item_code, sum(qty) as qty, name,
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabPacking Slip` ps, `tabPacking Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
