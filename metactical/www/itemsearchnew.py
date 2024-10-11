@@ -12,7 +12,10 @@ def get_context(context):
 		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)'''
 		
 	context.no_cache = True
-	search_text = frappe.request.args["searchtext"]
+	if frappe.request.args:
+		search_text = frappe.request.args["searchtext"]
+	else:
+		search_text = ""
 	items = get_items(search_text, 0)
 	context.csrf_token = frappe.sessions.get_csrf_token()
 	
@@ -96,6 +99,9 @@ def get_total(search_value=""):
 
 @frappe.whitelist(allow_guest=True)
 def get_items(search_value="", offset=0):
+	if search_value is None or search_value == "":
+		return {}
+
 	data = dict()
 	result = []
 

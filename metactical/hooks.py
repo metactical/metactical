@@ -173,9 +173,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
-    "all": [
-        "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-    ],
+#	"all": [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+#	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -268,6 +268,6 @@ jinja = {
 }
 
 
-app_include_python = [
-    "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-]
+# app_include_python = [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+# ]
