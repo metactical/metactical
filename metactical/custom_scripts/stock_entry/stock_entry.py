@@ -106,6 +106,12 @@ class CustomStockEntry(StockEntry):
 				if row.t_warehouse not in t_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
 				
+		
+		# Metactical Customization: check if retail sku is added to the items
+		for row in self.items:
+			if row.item_code and not row.ifw_retailskusuffix:
+				row.ifw_retailskusuffix = frappe.db.get_value("Item", row.item_code, "ifw_retailskusuffix")
+
 	def on_submit(self):
 		super(CustomStockEntry, self).on_submit()
 		# Metactical Customization: Add submitted date and barcode
