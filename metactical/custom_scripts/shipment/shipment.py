@@ -7,9 +7,6 @@ from frappe.utils import get_files_path
 from erpnext.stock.doctype.shipment.shipment import Shipment
 
 class CustomShipment(Shipment):
-	# def before_save(self):
-	# 	delivery_notes = self.
-
 	def validate(self):
 		super(CustomShipment, self).validate()
 		for parcel in self.shipment_parcel:

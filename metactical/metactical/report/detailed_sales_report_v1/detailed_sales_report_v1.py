@@ -1362,7 +1362,6 @@ def get_us_data(filters):
 						auth=(item_search_settings.api_key, item_search_settings.api_secret),
 									params=filters)
 
-		frappe.log_error(title="us_request", message=us_request.text)
 		if us_request.status_code == 200:
 			return us_request.json().get("message", {})
 	else:
