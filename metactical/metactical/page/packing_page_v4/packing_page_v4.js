@@ -20,9 +20,12 @@ class PackingPage {
 
         var me = this;
         this.page.set_secondary_action("", () => {
-            console.log(me.packing_page.vue_instance);
-
             me.packing_page.vue_instance.refresh();
         }, "refresh");
     }
 }
+
+var openPackingSlip = function (doc) {
+    window.open(`/app/packing-slip/${doc}`, "_blank");
+};
+
