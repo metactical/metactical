@@ -47,7 +47,11 @@ class EmployeeSignUp(Document):
 		address = self.address1 + "<br>"
 		if self.address2 and self.address2 != "":
 			address += self.address2 + "<br>"
-		address += self.city + ", " + self.state + "<br>" + self.zip_code + "<br>" + self.country
+
+		state = self.state if self.state else ""
+		zip_code = self.zip_code if self.zip_code else ""
+
+		address += self.city + ", " + state + "<br>" + zip_code + "<br>" + self.country
 		employee = frappe.new_doc('Employee')
 		employee.update({
 			'first_name': self.first_name,
@@ -71,6 +75,9 @@ class EmployeeSignUp(Document):
 			'branch': self.branch,
 			'bio': self.comments, 
 			"bank_document": self.bank_document,
+			"person_to_be_contacted": self.emergency_contact_name if self.emergency_contact_name else "",
+			"emergency_phone_number": self.emergency_phone if self.emergency_phone else "",
+			"relation": self.relation if self.relation else ""
 		})
 		employee.insert(ignore_permissions=True)
 		

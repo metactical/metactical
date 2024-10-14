@@ -68,3 +68,9 @@ def get_pr_items(docname):
 						'qty': i.qty + item.qty
 					})
 	return items
+
+
+@frappe.whitelist()
+def get_print_format(docname):
+	doc = frappe.get_doc('Purchase Receipt', docname)
+	return frappe.get_print(doctype=doc.doctype, name=doc.name, print_format="Purchase Receipt Barcode - V2", no_letterhead=0)

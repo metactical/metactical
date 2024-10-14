@@ -8,13 +8,14 @@ def execute(filters=None):
 	purchase_orders = filters.get("purchase_order") if filters.get("purchase_order") else None
 	supplier = filters.get("supplier") if filters.get("supplier") else None
 	sales_orders = filters.get("sales_order") if filters.get("sales_order") else None
+	quotation = filters.get("quotation") if filters.get("quotation") else None
 	price_lists = filters.get("price_list") if filters.get("price_list") else []
 	supplier_price_list_filter = filters.get("supplier_price_list") if filters.get("supplier_price_list") else []
 	costs = {}
 	supplier_price_list = []
 
 
-	if not supplier and not purchase_orders and not sales_orders:
+	if not supplier and not purchase_orders and not sales_orders and not quotation:
 		return [], []
 
 	if supplier:
@@ -37,10 +38,13 @@ def execute(filters=None):
 			supplier_price_list = list(set(supplier_price_list)) 
 			price_lists += supplier_price_list
 	
-	elif sales_orders:
+	elif sales_orders or quotation:
+		documents = sales_orders if sales_orders else quotation
+		doctype = "Sales Order" if sales_orders else "Quotation"
+
 		supplier_price_list = []
-		for so in sales_orders:
-			items = frappe.get_doc("Sales Order", so).items
+		for doc in documents:
+			items = frappe.get_doc(doctype, doc).items
 			for item in items:
 				suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
 				
@@ -54,11 +58,11 @@ def execute(filters=None):
 	# remove duplicates from supplier_price_list by keeping the order
 	supplier_price_list = list(dict.fromkeys(supplier_price_list))
 	
-	columns = get_columns(price_lists, supplier_price_list, sales_orders, purchase_orders, costs)
-	data = get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list, costs)
+	columns = get_columns(price_lists, supplier_price_list, sales_orders, purchase_orders, quotation, costs)
+	data = get_data(supplier, purchase_orders, sales_orders, quotation, price_lists, supplier_price_list, costs)
 	return columns, data
 
-def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_price_list=None, costs=None):
+def get_data(supplier, purchase_orders, sales_orders, quotation, price_lists, supplier_price_list=None, costs=None):
 	items_list = []
 	items = []
 
@@ -82,6 +86,14 @@ def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_pric
 									FROM `tabSales Order Item` soi
 									JOIN `tabItem` i on i.name = soi.item_code
 									WHERE soi.parent IN %s """, (sales_orders,), as_dict=True)
+
+		items_list = [item["item_code"] for item in items]
+
+	elif quotation:
+		items = frappe.db.sql(""" SELECT qi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, qi.parent, i.ifw_duty_rate
+									FROM `tabQuotation Item` qi
+									JOIN `tabItem` i on i.name = qi.item_code
+									WHERE qi.parent IN %s """, (quotation,), as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 	
@@ -126,15 +138,23 @@ def get_data(supplier, purchase_orders, sales_orders, price_lists, supplier_pric
 	return data
 
 
-def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders, cost):
-	# ERPSKU | TemplateSKU | Retail SKU | Item Name | SUP - Supplier Price List | ALC | RET - CamoFRN - CAD | RET - Camo | RET - Gorilla
+def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders, quotation, cost):
 	columns = []
-	if type(supplier_price_lists) == list and len(supplier_price_lists) > 0:
+	if purchase_orders:
 		columns.append({
-			"label": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else "",
+			"label": "Purchase Order",
 			"fieldtype": "Link",
 			"fieldname": "purchase_order",
-			"options": "Purchase Order" if purchase_orders else "Sales Order" if sales_orders else ""
+			"options": "Purchase Order"
+		})
+	elif sales_orders or quotation:
+		doctype = "Sales Order" if sales_orders else "Quotation"
+
+		columns.append({
+			"label": doctype,
+			"fieldtype": "Link",
+			"fieldname": "purchase_order",
+			"options": doctype,
 		})
 
 	columns.extend([{

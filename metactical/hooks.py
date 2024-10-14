@@ -115,7 +115,8 @@ doc_events = {
 		"validate": "metactical.barcode_generator.po_validate",
 	},
 	"Material Request": {
-		"before_save": "metactical.custom_scripts.material_request.material_request.before_save"
+		"before_save": "metactical.custom_scripts.material_request.material_request.before_save",
+		"on_submit": "metactical.custom_scripts.material_request.material_request.on_submit",
 	},
 	"Address": {
 		"validate": "metactical.custom_scripts.address.address.validate"
@@ -208,7 +209,10 @@ override_whitelisted_methods = {
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
-	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations"
+	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
+	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
+	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
+	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -244,7 +248,8 @@ jinja = {
 		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",
-		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment"
+		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
+		"metactical.barcode_generator.get_barcode_for_print_format"
 	]
 }
 
