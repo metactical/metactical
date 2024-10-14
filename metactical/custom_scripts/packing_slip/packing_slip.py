@@ -31,6 +31,7 @@ class CustomPackingSlip(PackingSlip):
 			if flt(item.qty) > flt(item.packed_qty) and item.item_code not in shipping_items:
 				ch = self.append("items", {})
 				ch.item_code = item.item_code
+				ch.ifw_retailskusuffix = item.ifw_retailskusuffix
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
 				ch.description = item.description
@@ -75,16 +76,24 @@ class CustomPackingSlip(PackingSlip):
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabPacking Slip` ps, `tabPacking Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
-				and ps.delivery_note = dni.parent and psi.item_code=dni.item_code) as packed_qty,
+				and ps.delivery_note = dni.parent and psi.dn_detail=dni.name) as packed_qty,
 			stock_uom, item_name, description, dni.batch_no {custom_fields}
 			from `tabDelivery Note Item` dni
 			where parent=%s {condition}
-			group by item_code""".format(
+			group by name""".format(
 				condition=condition, custom_fields=custom_fields
 			),
 			tuple([self.delivery_note] + rows),
 			as_dict=1,
 		)
+
+		item_codes = [d.item_code for d in res]
+		# get retail skus and them to the result
+		retail_skus = frappe.db.get_list('Item', filters={'item_code': ['in', item_codes]}, fields=['item_code', 'ifw_retailskusuffix'])
+		for r in res:
+			for sku in retail_skus:
+				if r.item_code == sku.item_code:
+					r.ifw_retailskusuffix = sku.ifw_retailskusuffix
 
 		ps_item_qty = dict([[d.item_code, d.qty] for d in self.get("items")])
 		no_of_cases = cint(self.to_case_no) - cint(self.from_case_no) + 1

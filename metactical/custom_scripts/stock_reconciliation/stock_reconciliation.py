@@ -5,7 +5,8 @@ from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import Stoc
 
 class CustomStockReconciliation(StockReconciliation):	
 	def submit(self):
-		if len(self.items) > 100:
+		frappe.throw("test")
+		if len(self.items) > 10:
 			msgprint(
 				_(
 					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this Stock Reconciliation and revert to the Draft stage"

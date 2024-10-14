@@ -6,22 +6,22 @@
             <span class="fa fa-gear fa-lg cur-item-close cursor-pointer" @click="showSettings"></span>
         </div>
         <div class="current-items-wrap">
-            <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
+            <div class="current-packing-item">
+                <div class="item-detail">
+                    <h5 class="item-title cur-item-name">{{ item.item_name }}</h5>
+                    <p class="item-description cur-item-code">{{ item.item_code }}</p>
+                </div>
+                <div class="item-quantity" v-if="item && item.qty">
+                    <span class="cur-item-quantity-remaining">{{ item.qty }} more to scan</span>
+                </div>
+
+                <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
                 <button class='btn btn-default btn-sm' @click='addOneItem()'>Click to Add</button>
                 <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
             </h3>
             <h3 class="current-section-title cur-item-scan-feedback" v-else-if="item.qty > max_qty_to_pack">
                 <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
             </h3>
-            <div class="current-packing-item">
-                <div class="item-detail">
-                    <h5 class="item-title cur-item-name">{{ item.item_name }}</h5>
-                    <p class="item-description cur-item-code">{{ item.item_code }}</p>
-                </div>
-
-                <div class="item-quantity">
-                    <span class="cur-item-quantity-remaining">{{ item.qty }} more to scan</span>
-                </div>
                 <template v-if="item.image">
                     <img :src="item.image" alt="" class="cur-item-image my-4" />
                 </template>
@@ -39,7 +39,8 @@ export default {
     data() {
         return {
             max_qty_to_pack: 0,
-            has_add_permission: false
+            has_add_permission: false,
+            ask_shipment_info: false
         }
     },
     mounted() {
@@ -74,27 +75,26 @@ export default {
                         frappe.throw("You can only add a maximum of " + me.item.qty + " items");
                     }
                     else{
-                        console.log(me.item);
                         me.$emit('itemScanned', me.item.item_barcode[0], values.amount);
                     }
                 });
         },
         showSettings() {
+            var me = this;
             var d = new frappe.ui.Dialog({
                 title: __("Settings"),
                 fields: [
                     {
                         fieldname: "ask_shipment_info",
                         fieldtype: "Check",
+                        default: me.ask_shipment_info,
                         label: __("Ask Shipment Information for each item"),
                     }
                 ],
                 primary_action_label: __("Save"),
                 primary_action: (values) => {
-                    frappe.db.set_value("Packing Settings", "Packing Settings", "multi_pack_if_qty", values.qty).then(() => {
-                        this.max_qty_to_pack = values.qty;
-                        d.hide();
-                    });
+                    me.ask_shipment_info = values.ask_shipment_info;
+                    d.hide();
                 }
             });
 

@@ -75,6 +75,8 @@ def get_all_packed_items(delivery_note):
 			JOIN `tabItem` i ON i.item_code = psi.item_code
 		WHERE
 			`tabPacking Slip`.delivery_note = %s and `tabPacking Slip`.docstatus = 1
+		ORDER BY
+			`tabPacking Slip`.creation ASC
 	""", delivery_note, as_dict=1)
 
 	packing_slips = frappe.db.get_list("Packing Slip", filters={"delivery_note": delivery_note, "docstatus": 1}, 

@@ -83,39 +83,38 @@ export default {
           get_query: function () {
             return {
               filters: [
-                ["warehouse", "=", selected_warehouse_field.get_value()],
+                ["warehouse", "=", me.filters.selected_warehouse],
                 ["current_delivery_note", "is", "set"]
               ]
             }
-          },
-          change: function () {
-            $('.picklist-tote-wrapper').on('keypress', function (event) {
-              //Only when enter is pressed
-              if (event.keyCode == 13) {
-                frappe.call({
-                  method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_delivery_from_tote",
-                  args: {
-                    tote: tote_barcode_field.get_value(),
-                    warehouse: selected_warehouse.get_value()
-                  },
-                  freeze: true,
-                  callback: function (ret) {
-                    let is_tote = ret.message.is_tote;
-                    if (is_tote) {
-                      delivery_note_field.set_value(ret.message.delivery_note);
-                    }
-                    else {
-                      frappe.throw("Error: No tote registered at warehouse with that name. Please check and try again.");
-                    }
-                  }
-                });
-              }
-            });
           }
         },
         render_input: true
       });
 
+      tote_barcode_field.$input.on('keypress', function (e) {
+        //Only when enter is pressed
+          if (event.keyCode == 13) {
+            me.filters.tote_barcode = tote_barcode_field.get_value();
+            frappe.call({
+              method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_delivery_from_tote",
+              args: {
+                tote: me.filters.tote_barcode,
+                warehouse: me.filters.selected_warehouse
+              },
+              freeze: true,
+              callback: function (ret) {
+                let is_tote = ret.message.is_tote;
+                if (is_tote) {
+                  delivery_note_field.set_value(ret.message.delivery_note);
+                }
+                else {
+                  frappe.throw("Error: No tote registered at warehouse with that name. Please check and try again.");
+                }
+              }
+            });
+          }
+      });
 
 
       // item barcode control
@@ -149,7 +148,7 @@ export default {
               $('.picklist-tote-wrapper').show();
             else
               $('.picklist-tote-wrapper').hide();
-            me.selected_warehouse = selected_warehouse_field.get_value()
+            me.filters.selected_warehouse = selected_warehouse_field.get_value()
           }
         },
         render_input: true

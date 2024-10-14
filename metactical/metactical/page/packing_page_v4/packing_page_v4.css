@@ -53,6 +53,7 @@
 .controls .hide-next + .item-barcode-wrapper {
     display: none;
 }
+
 .box {
     border-bottom: none;
     /*height: 75vh;
@@ -61,6 +62,10 @@
 }
 .packing-list-items-list {
     background: #f1f1f1;
+}
+
+.packing-slip-wrapper .text-bold{
+    font-weight: 600;
 }
 
 .packing-page-card .item-quantity {
@@ -99,6 +104,12 @@
 .box .packing-item .item-detail .item-description {
     margin: 0;
 }
+
+
+.box .packing-item .item-detail .item-description {
+    font-size: 13px;
+}
+
 .box .current-section-title {
     text-align: center;
     margin: 0;

@@ -7,12 +7,69 @@ from frappe.utils import get_files_path
 from erpnext.stock.doctype.shipment.shipment import Shipment
 
 class CustomShipment(Shipment):
+	# def before_save(self):
+	# 	delivery_notes = self.
+
 	def validate(self):
 		super(CustomShipment, self).validate()
 		for parcel in self.shipment_parcel:
 			if parcel.weight > 32:
 				frappe.msgprint(_("Weight doesn't allow more than 32 Kg"))
-	
+
+		self.update_shipment_parcel()
+		
+	def update_shipment_parcel(self):
+		shipment_parcels = self.shipment_parcel
+		delivery_notes = self.shipment_delivery_note
+
+		# remove duplicate delivery notes
+		delivery_notes = list({dn.delivery_note: dn for dn in delivery_notes}.values())
+
+		old_doc = self.get_doc_before_save()
+		old_delivery_notes = old_doc.shipment_delivery_note if old_doc else []
+
+		new_shipment_parcels = []
+		for dn in delivery_notes:
+			packing_slips = frappe.get_all("Packing Slip", filters={"delivery_note": dn.delivery_note, "docstatus": 1}, 
+											fields=["name", "from_case_no", "gross_weight_pkg", "custom_neb_box_length", "custom_neb_box_width", "custom_neb_box_height"])
+
+			for ps in packing_slips:
+				found = False
+				for sp in shipment_parcels:
+					if sp.custom_neb_box == ps.from_case_no and sp.custom_neb_delivery_note == dn.delivery_note:
+						found = True
+						break
+				
+				if not found:
+					new_shipment_parcels.append({
+						"parent": self.name,
+						"parentfield": "shipment_parcel",
+						"parenttype": "Shipment",
+						"custom_neb_box": ps.from_case_no,
+						"custom_neb_delivery_note": dn.delivery_note,
+						"weight": ps.gross_weight_pkg,
+						"length": ps.custom_neb_box_length,
+						"width": ps.custom_neb_box_width,
+						"height": ps.custom_neb_box_height,
+						"count": 1
+					})
+			
+		if new_shipment_parcels:
+			shipment_parcels += new_shipment_parcels
+
+		if old_delivery_notes:
+			for old_dn in old_delivery_notes:
+				if old_dn.delivery_note not in [dn.delivery_note for dn in delivery_notes]:
+					shipment_parcels = [sp for sp in shipment_parcels if sp.custom_neb_delivery_note != old_dn.delivery_note]
+						
+		for i, sp in enumerate(shipment_parcels):
+			if type(sp) == dict:
+				sp["idx"] = i+1
+			else:
+				sp.idx = i+1
+
+		self.update({"shipment_parcel": shipment_parcels})
+
 	def before_cancel(self):
 		if self.shipments:
 			avoid_shpment(self.name, self.service_provider, [x.name for x in self.shipments])

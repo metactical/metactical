@@ -2,8 +2,8 @@
     <div class="packing-item" @click="selectItem">
         <img :src="item.image" :alt="item.item_name" />
         <div class="item-detail">
-            <h5 class="item-title">{{ item.item_name }}</h5>
-            <p class="item-description">{{ item.item_code }}</p>
+            <p class="item-title">{{ item.item_name }}</p>
+            <p class="item-description text-bold mt-2">{{ item.ifw_retailskusufix }}</p>
         </div>
         <div class="item-quantity">
             <span>X {{ item.qty }}</span>
@@ -15,8 +15,7 @@ export default {
     props: ['item'],
     methods: {
         selectItem() {
-            console.log('selecting item', this.item);
-            this.$emit('select-item', this.item);
+            this.$emit('revertItem', this.item);
         }
     }
 }
