@@ -100,7 +100,7 @@ export default {
               method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_delivery_from_tote",
               args: {
                 tote: me.filters.tote_barcode,
-                warehouse: me.filters.selected_warehouse
+                warehouse: selected_warehouse_field.get_value()
               },
               freeze: true,
               callback: function (ret) {
@@ -135,7 +135,7 @@ export default {
         render_input: true,
       });
 
-      let selected_warehouse_field = frappe.ui.form.make_control({
+      var selected_warehouse_field = frappe.ui.form.make_control({
         parent: $('.warehouse-wrapper'),
         df: {
           label: 'Warehouse',
