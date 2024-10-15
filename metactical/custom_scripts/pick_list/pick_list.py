@@ -296,17 +296,6 @@ class CustomPickList(PickList):
 		if save:
 			self.save()
 
-	def submit(self):
-		if len(self.locations) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-
 	def validate_stock_qty(self):
 		from erpnext.stock.doctype.batch.batch import get_batch_qty
 
@@ -591,3 +580,17 @@ def create_delivery_note(source_name, target_doc=None):
 
 	#frappe.msgprint(_("Delivery Note(s) created for the Pick List"))
 	return delivery_note
+
+@frappe.whitelist()
+def submit_pick_list(doc):
+	# Metactical Customization: Submit pick list in background if more than 10 items
+	doc = frappe.get_doc("Pick List", doc)
+	if len(doc.locations) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()
