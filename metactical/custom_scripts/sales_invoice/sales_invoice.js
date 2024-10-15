@@ -4,7 +4,6 @@ frappe.ui.form.on('Sales Invoice', {
 			frm.set_value("neb_payment_completed_at", null)
 
 		frm.trigger("update_custom_buttons")
-
 		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	validate: function(frm){
@@ -46,6 +45,17 @@ frappe.ui.form.on('Sales Invoice', {
 			}
 			seconds++;
 		}, 1000);
+
+		if (frm.doc.docstatus == 0){
+			frm.add_custom_button("Submit", () => {
+				frappe.call({
+					method: "metactical.custom_scripts.sales_invoice.sales_invoice.submit_invoice",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
 	},
 	create_usaepay_payment_request: function(frm){
 		const payment_request_type = "Inward"

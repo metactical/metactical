@@ -56,6 +56,17 @@ frappe.ui.form.on('Sales Order', {
 			frm.add_custom_button(__('Warehouse'), () => frm.events.change_warehouse(frm), __('Change'));
 		}
 		
+		if (frm.doc.docstatus == 0 ){
+			frm.add_custom_button("Submit", () => {
+				frappe.call({
+					method: "metactical.custom_scripts.sales_order.sales_order.submit_order",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
+		
 		cur_frm.fields_dict["section_break_48"].collapse(0);
 	},
 

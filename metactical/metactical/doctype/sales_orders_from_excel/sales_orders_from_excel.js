@@ -5,18 +5,21 @@ frappe.provide("metactical.SalesOrdersFromExcel");
 
 metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.TransactionController {
 	setup() {
-
-	}
-
-	onload(){
-
-	}
-
-	refresh() {
-
-	}
-
-	currency() {
+	},
+	refresh: function(frm) {
+		if (frm.doc.docstatus == 0)
+		{
+			frm.add_custom_button(__('Submit'), function() {
+				frappe.call({
+					method: "metactical.custom_scripts.sales_orders_from_excel.sales_orders_from_excel.submit_sales_order_from_excel",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
+	},
+	currency: function() {
 		let transaction_date = this.frm.doc.transaction_date || this.frm.doc.posting_date;
 
 		let me = this;
