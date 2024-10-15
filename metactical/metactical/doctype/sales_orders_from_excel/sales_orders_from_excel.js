@@ -3,21 +3,26 @@
 
 frappe.provide("metactical.SalesOrdersFromExcel");
 
-metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.TransactionController {
-	setup() {
+metactical.SalesOrdersFromExcel = erpnext.TransactionController.extend({
+	setup: function() {
+
 	},
-	refresh: function(frm) {
-		if (frm.doc.docstatus == 0)
-		{
-			frm.add_custom_button(__('Submit'), function() {
-				frappe.call({
-					method: "metactical.custom_scripts.sales_orders_from_excel.sales_orders_from_excel.submit_sales_order_from_excel",
-					args: {
-						"doc": frm.doc.name
-					},
-				})
-			});
-		}
+	onload: function(){
+
+	},
+	refresh: function() {
+		var me = this
+		if (this.frm.doc.docstatus == 0)
+			{
+				this.frm.add_custom_button(__('Submit'), function() {
+					frappe.call({
+						method: "metactical.custom_scripts.sales_orders_from_excel.sales_orders_from_excel.submit_sales_order_from_excel",
+						args: {
+							"doc": me.frm.doc.name
+						},
+					})
+				});
+			}
 	},
 	currency: function() {
 		let transaction_date = this.frm.doc.transaction_date || this.frm.doc.posting_date;
@@ -46,17 +51,17 @@ metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.Tra
 				this.conversion_rate();
 			}
 		}
-	}
+	},
 
-	selling_price_list() {
+	selling_price_list: function() {
 		this.apply_price_list();
 		this.set_dynamic_labels();
-	}
+	},
 
-	taxes_and_charges() {
+	taxes_and_charges: function() {
 		// Replacing the default function with
-	}
-};
+	},
+});
 
 frappe.ui.form.on('Sales Orders From Excel', {
 	setup: function(frm) {
