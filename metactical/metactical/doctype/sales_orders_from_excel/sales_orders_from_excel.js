@@ -3,12 +3,8 @@
 
 frappe.provide("metactical.SalesOrdersFromExcel");
 
-metactical.SalesOrdersFromExcel = erpnext.TransactionController.extend({
-	setup: function() {
-
-	},
-	onload: function(){
-
+metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.TransactionController {
+	setup() {
 	},
 	refresh: function(frm) {
 		if (frm.doc.docstatus == 0)
@@ -50,17 +46,17 @@ metactical.SalesOrdersFromExcel = erpnext.TransactionController.extend({
 				this.conversion_rate();
 			}
 		}
-	},
+	}
 
-	selling_price_list: function() {
+	selling_price_list() {
 		this.apply_price_list();
 		this.set_dynamic_labels();
-	},
+	}
 
-	taxes_and_charges: function() {
+	taxes_and_charges() {
 		// Replacing the default function with
-	},
-});
+	}
+};
 
 frappe.ui.form.on('Sales Orders From Excel', {
 	setup: function(frm) {

@@ -933,7 +933,11 @@ def get_monthly_consumption(item_code, created_at,filters, sales_data):
 		if len(monthly_consumption) == 0:
 			average_monthly_consumption = 0
 		else:
-			average_monthly_consumption = sum(monthly_consumption) / (months_passed if months_passed < total_months else total_months)
+			total_months = months_passed if months_passed < total_months else total_months
+			if total_months == 0:
+				average_monthly_consumption = 0
+			else:
+				average_monthly_consumption = sum(monthly_consumption) / total_months
 
 		average_monthly_consumption = (average_monthly_consumption * 100) / 100
 		if i == 1:
@@ -1359,8 +1363,9 @@ def get_us_data(filters):
 	item_search_settings = frappe.get_doc("Item Search Settings")
 	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
 		us_request = requests.get(item_search_settings.get("sales_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params=filters)
+
 		if us_request.status_code == 200:
 			return us_request.json().get("message", {})
 	else:

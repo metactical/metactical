@@ -139,8 +139,7 @@ doc_events = {
 		"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
 	}, 
 	"Payment Entry": {
-		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
-		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
 }
 
@@ -174,9 +173,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
-    "all": [
-        "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-    ],
+#	"all": [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+#	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -269,6 +268,6 @@ jinja = {
 }
 
 
-app_include_python = [
-    "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-]
+# app_include_python = [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+# ]

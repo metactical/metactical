@@ -125,20 +125,53 @@ def create_usaepay_log(doctype, docname, action):
 	return log
 
 @frappe.whitelist()
-def get_customer_payment_information(customer):
+def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None):
+	usaepay_account = None
+	if lead_source:
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source})
+	elif merchant_id:
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id})
+	elif transaction_key:
+		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "name")
+		if source:
+			usaepay_account = frappe.db.exists("USAePay Accounts", {"source": source})
+
+	if usaepay_account:
+		return frappe.get_doc("USAePay Accounts", usaepay_account)
+
+	return get_default_usaepay_account()
+
+@frappe.whitelist()
+def get_default_usaepay_account():
+	account = frappe.db.get_value("USAePay Accounts", {"is_default": 1}, "name")
+	if not account:
+		frappe.throw(_("No default USAePay account found. Please add a default account"))
+	else:
+		account = frappe.get_doc("USAePay Accounts", account)
+
+	return account
+
+@frappe.whitelist()
+def get_customer_payment_information(customer, payment_entry, reference_no=None):
 	from metactical.custom_scripts.usaepay.usaepay_api import get_token_hash
 
 	# get existing credit card tokens
 	tokens = []
-	
+	lead_source = ""
+	references = frappe.get_doc("Payment Entry", payment_entry).references
+	for ref in references:
+		if ref.reference_doctype in ["Sales Order", "Sales Invoice"] and ref.reference_name:
+			lead_source = frappe.db.get_value(ref.reference_doctype, ref.reference_name, "source")
+			break
+
 	if frappe.db.exists("Customer CC", customer):
 		tokens = frappe.get_list("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
 
-	payment_form_url = frappe.db.get_single_value("Metactical Settings", "payment_form_url")
+	usaepay_settings = get_usaepay_account(reference_no, None, lead_source)
+	payment_form_url = usaepay_settings.payment_form_url
 	billing_address = get_customer_address(customer)
 
-	metactical_settings = frappe.get_single("Metactical Settings")
-	form_hash = get_token_hash(metactical_settings, "1234")
+	form_hash = get_token_hash(usaepay_settings, "1234")
 	# form_hash = form_hash[6:] if form_hash else None
 	
 	if not form_hash:
