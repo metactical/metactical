@@ -3,28 +3,20 @@
 
 frappe.provide("metactical.SalesOrdersFromExcel");
 
-metactical.SalesOrdersFromExcel = erpnext.TransactionController.extend({
-	setup: function() {
+metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.TransactionController {
+	setup() {
 
-	},
-	onload: function(){
+	}
 
-	},
-	refresh: function() {
-		var me = this
-		if (this.frm.doc.docstatus == 0)
-			{
-				this.frm.add_custom_button(__('Submit'), function() {
-					frappe.call({
-						method: "metactical.custom_scripts.sales_orders_from_excel.sales_orders_from_excel.submit_sales_order_from_excel",
-						args: {
-							"doc": me.frm.doc.name
-						},
-					})
-				});
-			}
-	},
-	currency: function() {
+	onload(){
+
+	}
+
+	refresh() {
+	
+	}
+
+	currency() {
 		let transaction_date = this.frm.doc.transaction_date || this.frm.doc.posting_date;
 
 		let me = this;
@@ -51,19 +43,32 @@ metactical.SalesOrdersFromExcel = erpnext.TransactionController.extend({
 				this.conversion_rate();
 			}
 		}
-	},
+	}
 
-	selling_price_list: function() {
+	selling_price_list() {
 		this.apply_price_list();
 		this.set_dynamic_labels();
-	},
+	}
 
-	taxes_and_charges: function() {
+	taxes_and_charges() {
 		// Replacing the default function with
-	},
-});
+	}
+};
 
 frappe.ui.form.on('Sales Orders From Excel', {
+	refresh: function(frm) {
+		if (frm.doc.docstatus == 0)
+		{
+			frm.add_custom_button(__('Submit'), function() {
+				frappe.call({
+					method: "metactical.metactical.doctype.sales_orders_from_excel.sales_orders_from_excel.submit_sales_order_from_excel",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
+	},
 	setup: function(frm) {
 		frm.set_query('company_address', function(doc) {
 			if(!doc.company) {
