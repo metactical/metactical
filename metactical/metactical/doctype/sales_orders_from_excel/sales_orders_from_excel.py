@@ -119,12 +119,12 @@ class SalesOrdersFromExcel(Document):
 
 @frappe.whitelist()
 def submit_sales_order_from_excel(doc):
-	doc = frappe.get_doc("Sales Order From Excel", doc)
-	if (frappe.has_permission("Sales Order From Excel", "submit")):
+	doc = frappe.get_doc("Sales Orders From Excel", doc)
+	if (frappe.has_permission("Sales Orders From Excel", "submit")):
 		frappe.msgprint(
 			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
 			the system will add a comment about the error on this document and revert to the Draft stage"""
 		)
-		queue_action(self, "submit", timeout=2000)
+		queue_action(doc, "submit", timeout=2000)
 	else:
 		frappe.throw("You do not have permission to submit this document")
