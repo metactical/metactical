@@ -43,6 +43,22 @@ frappe.query_reports["Pricing Rule Report - V1"] = {
 			get_data: function(txt) {
 				return frappe.db.get_link_options("Item", txt);
 			}
-		}
-	]
+		},
+		{
+			"fieldname": "price_list",
+			"label": __("Price List"),
+			"fieldtype": "Link",
+			"options": "Price List",
+			"reqd": 1
+		},
+	],
+	onload: function(report) {
+		report.page.add_inner_button(__("Download Excel"), function() {
+			const filters = report.get_values();
+			open_url_post(
+				"/api/method/metactical.metactical.report.pricing_rule_report___v1.pricing_rule_report___v1.download",
+				filters
+			);
+		}, __("Actions"));
+	}
 };
