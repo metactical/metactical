@@ -20,6 +20,7 @@ class PricingRuleFromExcel(Document):
 		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
 
+	
 	def validate(self):
 		file_content = self.check_file()
 		headers = ["Valid FromDate", "ValidToDate", "Enabled", "Rate or Percentage"]
@@ -89,9 +90,12 @@ class PricingRuleFromExcel(Document):
 			pricing_rule.selling = 1
 			pricing_rule.ifw_retailskusuffix = retail_sku
 			pricing_rule.title = title
-			pricing_rule.price_or_discount = "Discount Percentage"
+			pricing_rule.has_priority = 1
+			pricing_rule.priority = row[indexes["priority"]]
+			# pricing_rule.price_or_discount = "Discount Percentage"
 			pricing_rule.valid_from = self.change_date_format(row[indexes["valid_from"]])
 			pricing_rule.valid_upto = self.change_date_format(row[indexes["valid_to"]])
+
 			pricing_rule.rate_or_discount = "Rate" if row[indexes["rate_or_discount"]].lower() == "rate" else "Discount Percentage"
 			if pricing_rule.rate_or_discount == "Rate":
 				pricing_rule.rate = row[indexes["discount_percentage"]]
@@ -103,8 +107,15 @@ class PricingRuleFromExcel(Document):
 				"item_code": item_code,
 				"uom": "Nos",
 			})
-			
+
+			get_same_pricing_rules = frappe.db.get_list("Pricing Rule", filters={"for_price_list": price_list, "priority": pricing_rule.priority, "ifw_retailskusuffix": retail_sku}, fields="name")
 			pricing_rule.insert()
+
+			if get_same_pricing_rules:
+				for pricing_rule in get_same_pricing_rules:
+					pricing_rule = frappe.get_doc("Pricing Rule", pricing_rule.name)
+					pricing_rule.delete()
+
 			frappe.db.commit()
 
 	def check_mandatory(self, data):
@@ -159,6 +170,8 @@ class PricingRuleFromExcel(Document):
 				indexes["rate_or_discount"] = i
 			elif col.endswith("Discount Percentage"):
 				indexes["discount_percentage"] = i
+			elif col == "Priority":
+				indexes["priority"] = i
 
 		return indexes
 
