@@ -36,6 +36,8 @@ def execute(filters=None):
 
 		row["ifw_retailskusuffix"] = i.get("ifw_retailskusuffix")
 		row["item_name"] = i.get("item_name")
+		item_groups = get_item_group_parents(i.get("item_group"))
+		row["itemgroups"] = item_groups
 		row["item_code"] = i.get("item_code")
 
 		row["ifw_duty_rate"] = i.get("ifw_duty_rate")
@@ -390,6 +392,12 @@ def get_column(filters,conditions):
 				"fieldname": "item_name",
 				"fieldtype": "Data",
 				"width": 300,
+			},
+			{
+				"label": "ItemGroups",
+				"fieldname": "itemgroups",
+				"fieldtype": "Data",
+				"width": 200
 			},
 			{
 				"label": _("ItemImage"),
@@ -870,7 +878,7 @@ def get_master(conditions="", filters={}):
 				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
 				s.ifw_supplier_qoh, i.stock_uom, i.purchase_uom, i.lead_time_days,
 				i.min_order_qty, i.safety_stock, i.variant_of, i.ais_poreorderqty,
-				i.ais_poreorderlevel, i.creation
+				i.ais_poreorderlevel, i.creation, i.item_group
 			from 
 				`tabItem Supplier` s 
 			inner join 
@@ -925,7 +933,11 @@ def get_monthly_consumption(item_code, created_at,filters, sales_data):
 		if len(monthly_consumption) == 0:
 			average_monthly_consumption = 0
 		else:
-			average_monthly_consumption = sum(monthly_consumption) / (months_passed if months_passed < total_months else total_months)
+			total_months = months_passed if months_passed < total_months else total_months
+			if total_months == 0:
+				average_monthly_consumption = 0
+			else:
+				average_monthly_consumption = sum(monthly_consumption) / total_months
 
 		average_monthly_consumption = (average_monthly_consumption * 100) / 100
 		if i == 1:
@@ -1351,9 +1363,30 @@ def get_us_data(filters):
 	item_search_settings = frappe.get_doc("Item Search Settings")
 	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
 		us_request = requests.get(item_search_settings.get("sales_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params=filters)
+
 		if us_request.status_code == 200:
 			return us_request.json().get("message", {})
 	else:
 		return {}
+
+
+def get_item_group_parents(lower_item_group):
+	item_groups = []
+	item_group = lower_item_group
+
+	while item_group:
+		item_group = frappe.db.get_value("Item Group", item_group, "parent_item_group")
+		if item_group and item_group != "All Item Groups":
+			item_groups.append(item_group)
+
+	item_groups.insert(0, lower_item_group)
+	item_groups.reverse()
+
+	if len(item_groups) > 1:
+		item_groups = ">".join(item_groups)
+	else:
+		item_groups = item_groups[0]
+
+	return item_groups 

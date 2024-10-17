@@ -173,6 +173,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Item Location Updator",
+   "link_to": "MT Item Location Updator",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_count": 8,
    "link_type": "DocType",
@@ -380,9 +389,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Purchase Order Import Tool",
-   "link_count": 0,
+   "label": "Item Import Tool",
+   "link_to": "Item From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": " Purchase Order Import Tool",
    "link_to": "Purchase Order Import Tool",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pricing Rule Import Tool",
+   "link_to": "Pricing Rule From Excel",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -528,6 +554,24 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "End of Day Report - V4",
+   "link_to": "End of Day Report - V4",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "End Of Day Report - V4 Franchise",
+   "link_to": "End of Day Report - V4 Franchise",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Sales Register",
    "link_count": 0,
    "link_to": "Metactical Sales Register",
@@ -621,6 +665,24 @@
    "label": "Store Credits",
    "link_count": 0,
    "link_to": "Store Credits",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Pricing Rule Report - V1",
+   "link_to": "Pricing Rule Report - V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Locations",
+   "link_to": "Item Locations",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
@@ -854,7 +916,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-08-11 10:59:13.917185",
+ "modified": "2024-09-25 14:43:37.928525",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
