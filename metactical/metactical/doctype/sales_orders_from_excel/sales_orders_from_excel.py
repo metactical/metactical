@@ -9,13 +9,6 @@ from metactical.custom_scripts.utils.metactical_utils import queue_action
 from erpnext.controllers.accounts_controller import get_taxes_and_charges
 
 class SalesOrdersFromExcel(Document):
-	def submit(self):
-		frappe.msgprint(
-			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
-			the system will add a comment about the error on this document and revert to the Draft stage"""
-		)
-		queue_action(self, "submit", timeout=2000)
-
 	def on_submit(self):
 		file_content = self.check_file()
 		self.create_sales_orders(file_content)
@@ -123,3 +116,15 @@ class SalesOrdersFromExcel(Document):
 			doc.save()
 		except Exception as e:
 			frappe.log_error(frappe.get_traceback())
+
+@frappe.whitelist()
+def submit_sales_order_from_excel(doc):
+	doc = frappe.get_doc("Sales Order From Excel", doc)
+	if (frappe.has_permission("Sales Order From Excel", "submit")):
+		frappe.msgprint(
+			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
+			the system will add a comment about the error on this document and revert to the Draft stage"""
+		)
+		queue_action(self, "submit", timeout=2000)
+	else:
+		frappe.throw("You do not have permission to submit this document")

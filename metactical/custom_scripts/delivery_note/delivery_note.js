@@ -9,6 +9,17 @@ frappe.ui.form.on('Delivery Note', {
                 })
             }, __('Create'));
         }
+
+        if (frm.doc.docstatus == 0){
+			frm.add_custom_button("Submit", () => {
+				frappe.call({
+					method: "metactical.custom_scripts.delivery_note.delivery_note.submit_delivery_note",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
     }
 })
 
@@ -18,3 +29,4 @@ cur_frm.cscript.make_shipment = function () {
         frm: cur_frm
     })
 }
+
