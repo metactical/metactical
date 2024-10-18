@@ -131,6 +131,8 @@ def execute(filters=None):
 		row["sold_in_store"] = 0
 
 		years_ago = today - relativedelta(years=years_to_subtract)
+		last12_month_date = today - relativedelta(years=1)
+		last24_month_date = today - relativedelta(years=2)
 		for d in sales_data:
 			posting_date = getdate(d.get("posting_date"))
 			qty = d.get("qty")
@@ -141,8 +143,6 @@ def execute(filters=None):
 			elif posting_date.year == current_year:
 				row["total"] += qty
 
-			last12_month_date = today - relativedelta(years=1)
-			last24_month_date = today - relativedelta(years=2)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
 			
@@ -167,6 +167,33 @@ def execute(filters=None):
 					row["sold_last_thirty_days"] += qty
 					if posting_date >= sold_last_ten_days:
 						row["sold_last_ten_days"] += qty
+
+		# completed purchase receipts
+		received_purchase_receipts = get_received_purchase_receipts(i.get("item_code"), i.get("supplier"))
+		last_month = getdate(str(datetime(today.year-years_to_subtract, 1,1)))
+		while last_month <= today:
+			month = last_month.strftime("%B").lower()	
+			row[frappe.scrub("received"+month+str(last_month.year))]=0
+			last_month = last_month + relativedelta(months=1)
+
+
+		total_received_12m = 0
+		total_received_24m = 0
+
+		for d in received_purchase_receipts:
+			posting_date = getdate(d.get("posting_date"))
+			qty = d.get("qty")
+
+			total_received_24m += qty
+			if posting_date >= last12_month_date:
+				total_received_12m += qty
+			
+			month = posting_date.strftime("%B")
+			if posting_date >= years_ago:
+				row[frappe.scrub("received"+month+str(posting_date.year))] += qty
+		
+		row["received_last_twelve_months"] = total_received_12m
+		row["received_last_24_months"] = total_received_24m
 
 		#For Quantity to order
 		reference_warehouse = get_reference_warehouse(filters)
@@ -727,6 +754,32 @@ def get_column(filters,conditions):
 			"fieldname": "sales_revenue_last_twelve_months",
 			"fieldtype": "Currency",
 			"width": 140
+		}])
+
+	last_month = getdate(str(datetime(today.year-years_to_subtract, today.month,1)))
+	while last_month <= today:
+		month = last_month.strftime("%B")
+		columns.append({
+				"label": _(str(last_month.year) + "_RCVD" + month),
+				"fieldname": frappe.scrub("received"+month+str(last_month.year)),
+				"fieldtype": "Int",
+				"width": 140,
+		})
+
+		last_month = last_month + relativedelta(months=1)
+
+	columns.extend([
+		{
+			"label": _("TotalReceived12M"),
+			"fieldname": "received_last_twelve_months",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _("TotalReceived24M"),
+			"fieldname": "received_last_24_months",
+			"fieldtype": "Int",
+			"width": 140
 		},
 		{
 			"label": _(f"NoCustL12M"),
@@ -947,6 +1000,28 @@ def get_monthly_consumption(item_code, created_at,filters, sales_data):
 
 	return average_monthly_consumption_12, average_monthly_consumption_24
 
+def get_received_purchase_receipts(item_code, years_before):
+	# group the qty in months and sum
+
+	data = frappe.db.sql("""
+		select 
+			Month(posting_date) as month, Year(posting_date) as year, sum(qty) as qty
+		from	
+			`tabPurchase Receipt Item` pri
+		join
+			`tabPurchase Receipt` pr on pr.name = pri.parent
+		where
+			pri.item_code = %s and 
+			pr.docstatus = 1 and 
+			pr.posting_date >= %s and 
+			pr.status = "Completed" and
+			pri.warehouse not in ('US02-Houston - Active Stock - ICL')
+		group by
+			Month(posting_date), Year(posting_date)
+		""",(item_code, years_before), as_dict=1)
+		
+	return data
+
 def get_inventory(item_code, warehouse):
 	today = getdate(nowdate())
 	start_date = str(today.year)+"-01-01"
@@ -1041,7 +1116,7 @@ def get_order_frequency(item_code, today):
 								pr.docstatus = 1 and 
 								pr.posting_date >= %s and 
 								pr.status = "Completed" and
-								pri.warehouse not in ('US02-Houston - Active Stock - ICL', 'R04-Mon-Active Stock - ICL', 'R06-Reg-Active Stock - ICL')
+								pri.warehouse not in ('US02-Houston - Active Stock - ICL')
 		""",(item_code, two_years_before.strftime("%Y-%m-%d")), as_dict=1)
 
 	order_frequency = {}
