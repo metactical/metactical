@@ -1005,7 +1005,7 @@ def get_received_purchase_receipts(item_code, years_before):
 
 	data = frappe.db.sql("""
 		select 
-			Month(posting_date) as month, Year(posting_date) as year, sum(qty) as qty
+			pr.posting_date, qty
 		from	
 			`tabPurchase Receipt Item` pri
 		join
@@ -1013,13 +1013,11 @@ def get_received_purchase_receipts(item_code, years_before):
 		where
 			pri.item_code = %s and 
 			pr.docstatus = 1 and 
-			pr.posting_date >= %s and 
+			pr.posting_date >= %s and
 			pr.status = "Completed" and
 			pri.warehouse not in ('US02-Houston - Active Stock - ICL')
-		group by
-			Month(posting_date), Year(posting_date)
 		""",(item_code, years_before), as_dict=1)
-		
+
 	return data
 
 def get_inventory(item_code, warehouse):
