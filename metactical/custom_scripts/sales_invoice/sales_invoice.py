@@ -48,17 +48,6 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 			self.calculate_commission()
 			self.calculate_contribution()
 
-	def submit(self):
-		if len(self.items) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
 		
@@ -294,3 +283,17 @@ def si_mode_of_payment(name):
 	if len(mode) > 0:
 		payment_mode = mode[0].mode_of_payment
 	return payment_mode
+
+@frappe.whitelist()
+def submit_invoice(doc):
+	# Metactical Customization: Submit invoice in background if more than 10 items
+	doc = frappe.get_doc("Sales Invoice", doc)
+	if len(doc.items) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()
