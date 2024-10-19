@@ -652,6 +652,16 @@
   {
    "hidden": 0,
    "is_query_report": 1,
+   "label": "Detailed Sales Report - V2",
+   "link_count": 0,
+   "link_to": "Detailed Sales Report - V2",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
    "label": "Sales Report With Item Class Suggest",
    "link_count": 0,
    "link_to": "Sales Report with Item Class Suggest",
@@ -916,7 +926,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-09-25 14:43:37.928525",
+ "modified": "2024-10-19 04:20:52.301569",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
