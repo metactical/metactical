@@ -22,7 +22,7 @@ class CycleCount(Document):
 					"qty": row.qty,
 					"valuation_rate": row.valuation_rate
 				})
-		doc.save()
+		
 		if hasattr(doc, "items"):
 			doc.submit()
 
