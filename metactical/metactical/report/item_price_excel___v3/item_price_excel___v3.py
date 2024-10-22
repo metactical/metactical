@@ -46,7 +46,7 @@ def execute(filters=None):
 		for doc in documents:
 			items = frappe.get_doc(doctype, doc).items
 			for item in items:
-				suppliers = frappe.get_list("Item Supplier", filters={"parent": item.item_code}, fields=["supplier"])
+				suppliers = frappe.get_all("Item Supplier", filters={"parent": item.item_code, "parenttype": "Item"}, fields=["supplier"])
 				
 				cost, currrency, camfrn = get_item_details2(item.item_code, suppliers)
 				costs[item.item_code] = cost
