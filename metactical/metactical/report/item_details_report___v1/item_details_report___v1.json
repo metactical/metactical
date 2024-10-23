@@ -1,0 +1,50 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2024-10-21 14:40:34.120745",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2024-10-21 14:40:34.120745",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Details Report - V1",
+ "owner": "Administrator",
+ "prepared_report": 1,
+ "ref_doctype": "Item",
+ "report_name": "Item Details Report - V1",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "All"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Item Manager"
+  },
+  {
+   "role": "Maintenance User"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Stock User"
+  }
+ ]
+}
