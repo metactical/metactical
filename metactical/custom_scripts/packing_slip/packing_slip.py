@@ -18,6 +18,25 @@ class CustomPackingSlip(PackingSlip):
 			})
 			doc.save(ignore_permissions=True)
 
+	def calculate_net_total_pkg(self):
+		self.net_weight_uom = self.items[0].weight_uom if self.items else None
+		# self.gross_weight_uom = self.net_weight_uom
+
+		net_weight_pkg = 0
+		for item in self.items:
+			if item.weight_uom != self.net_weight_uom:
+				frappe.throw(
+					_(
+						"Different UOM for items will lead to incorrect (Total) Net Weight value. Make sure that Net Weight of each item is in the same UOM."
+					)
+				)
+
+			net_weight_pkg += flt(item.net_weight) * flt(item.qty)
+
+		self.net_weight_pkg = round(net_weight_pkg, 2)
+		if not flt(self.gross_weight_pkg):
+			self.gross_weight_pkg = self.net_weight_pkg
+
 	# Metactical Customization: get_items and get_details_for_packing functions have been removed from 
 	# version 14 but we maintin them here for the Packing Slip page to work as expected
 	@frappe.whitelist()

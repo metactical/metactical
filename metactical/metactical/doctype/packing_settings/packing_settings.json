@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "allowed_user",
+  "allowed_user_to_multi_pack",
   "section_break_p947q",
   "default_warehouses",
   "default_weight_uom",
@@ -39,12 +40,19 @@
    "fieldname": "multi_pack_if_qty",
    "fieldtype": "Int",
    "label": "Allow Multiple Items Packing if Quantity Exceeds"
+  },
+  {
+   "description": "Users added here will have the ability to add multiple quanitity at a time when the quantity exceeds the value specified in the settings.",
+   "fieldname": "allowed_user_to_multi_pack",
+   "fieldtype": "Table",
+   "label": "Add Multiple Qty Allowed Users",
+   "options": "Packing Allowed User"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-09-16 12:04:58.209727",
+ "modified": "2024-10-23 14:30:04.448478",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Packing Settings",
@@ -62,5 +70,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

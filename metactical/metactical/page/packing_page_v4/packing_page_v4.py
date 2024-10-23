@@ -11,11 +11,11 @@ def get_delivery_from_tote(tote, warehouse):
 	
 @frappe.whitelist()
 def check_to_add_permission():
-	has_permission = frappe.db.exists('Packing Allowed User', {"user": frappe.session.user})
-	if not has_permission:
-		return False
-	else:
-		return True
+	has_add_permission = frappe.db.exists('Packing Allowed User', {"user": frappe.session.user, "parentfield": "allowed_user"})
+	has_add_multiple_permission = frappe.db.exists('Packing Allowed User', {"user": frappe.session.user, "parentfield": "allowed_user_to_multi_pack"})
+
+	frappe.response["has_add_permission"] = has_add_permission
+	frappe.response["has_add_multiple_permission"] = has_add_multiple_permission
 		
 @frappe.whitelist()
 def get_default_warehouse():
