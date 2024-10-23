@@ -38,12 +38,14 @@ def get_data(conditions):
 		SELECT
 			poi.item_code,
 			pri.ifw_retailskusuffix AS retail_sku,
+
 			po.transaction_date AS purchase_order_date,
 			po.name AS po_order_id,
 			poi.qty AS quantity,
 			pri.warehouse,
 			poi.supplier_part_no AS supplier,
-			(SELECT transaction_date FROM `tabPurchase Receipt` pr WHERE (pr.name = pri.parent and pri.docstatus=1)) AS purchase_order_receive_date
+			(SELECT transaction_date FROM `tabPurchase Receipt` pr WHERE (pr.name = pri.parent and pri.docstatus=1)) AS purchase_order_receive_date,
+			(SELECT variant_of FROM `tabItem` WHERE (name = poi.item_code)) AS variant_of
 		FROM
 			`tabPurchase Order Item` poi
 		JOIN
@@ -65,7 +67,14 @@ def get_columns():
 		"fieldname": "retail_sku",
 		"fieldtype": "Data",
 		"width": 100
-	}, {
+	}, 
+	{
+		"label": "Item Template",
+		"fieldname": "variant_of",
+		"fieldtype": "Data",
+		"width": 100
+	},
+	{
 		"label": "Supplier Code",
 		"fieldname": "supplier",
 		"fieldtype": "Data",
