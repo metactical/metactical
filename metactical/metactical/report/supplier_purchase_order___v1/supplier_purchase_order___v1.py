@@ -7,8 +7,8 @@ import json
 def execute(filters=None):
 	columns = get_columns()
 	limit = filters.get("limit")
-	filters = get_conditions(filters)
-	data = get_data(filters, limit)
+	conditions = get_conditions(filters)
+	data = get_data(conditions)
 
 	for d in data:
 		d["po_order_id"] = f'<a href="/app/purchase-order/{d["po_order_id"]}">{d["po_order_id"]}</a>'
@@ -16,7 +16,6 @@ def execute(filters=None):
 	return columns, data
 
 def get_conditions(filters):
-	# from_date, to_date, supplier, item_code, retail_sku
 	conditions = []
 
 	if filters.get("from_date"):
@@ -27,10 +26,14 @@ def get_conditions(filters):
 		conditions.append("supplier = '{supplier}'".format(supplier=filters.get("supplier")))
 	if filters.get("item_code"):
 		conditions.append("poi.item_code = '{item_code}'".format(item_code=filters.get("item_code")))
-	
-	return "WHERE " + " AND ".join(conditions) if conditions else ""
 
-def get_data(filters, limit):
+	conditions = "WHERE " + " AND ".join(conditions) if conditions else ""
+	if filters.get("limit") and filters.get("limit") != "All":
+		conditions += " limit {}".format(filters.get("limit"))
+	
+	return conditions
+
+def get_data(conditions):
 	purchase_orders = frappe.db.sql("""
 		SELECT
 			poi.item_code,
@@ -47,9 +50,8 @@ def get_data(filters, limit):
 			`tabPurchase Order` po ON po.name = poi.parent
 		LEFT JOIN
 			`tabPurchase Receipt Item` pri ON poi.name = pri.purchase_order_item
-		{filters}
-		limit {limit}
-	""".format(filters=filters, limit=limit), as_dict=True)
+		{conditions}
+	""".format(conditions=conditions), as_dict=True)
 	return purchase_orders
 
 def get_columns():
