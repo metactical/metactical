@@ -301,7 +301,6 @@ export default {
 
     saveForm(dialog) {
       values = dialog.get_values();
-      console.log(values)
       this.cur_packing_slip = { ...this.cur_packing_slip, ...values };
       this.cur_packing_slip.items = this.packed_items;
       this.cur_packing_slip.custom_neb_box_height = values.height;
