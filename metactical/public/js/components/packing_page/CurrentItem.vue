@@ -16,10 +16,10 @@
                 </div>
 
                 <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
-                <button class='btn btn-default btn-sm' @click='addOneItem()'>Click to Add</button>
+                <button class='btn btn-default btn-sm' @click='add_one_item()'>Click to Add</button>
                 <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
             </h3>
-            <h3 class="current-section-title cur-item-scan-feedback" v-else-if="item.qty > max_qty_to_pack">
+            <h3 class="current-section-title cur-item-scan-feedback" v-else-if="item.qty > max_qty_to_pack && has_add_permission_when_qty_exceeds">
                 <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
             </h3>
                 <template v-if="item.image">
@@ -40,7 +40,8 @@ export default {
         return {
             max_qty_to_pack: 0,
             has_add_permission: false,
-            ask_shipment_info: false
+            ask_shipment_info: false,
+            has_add_permission_when_qty_exceeds: false
         }
     },
     mounted() {
@@ -60,9 +61,8 @@ export default {
                 method: "metactical.metactical.page.packing_page_v4.packing_page_v4.check_to_add_permission",
                 freeze: true,
                 callback: function (ret) {
-                    if (ret.message) {
-                        me.has_add_permission = true;
-                    }
+                    me.has_add_permission = ret.has_add_permission ? true: false;
+                    me.has_add_permission_when_qty_exceeds = ret.has_add_multiple_permission ? true:false;
                 }
             });
         },
@@ -78,6 +78,9 @@ export default {
                         me.$emit('itemScanned', me.item.item_barcode[0], values.amount);
                     }
                 });
+        },
+        add_one_item(){
+            this.$emit('itemScanned', this.item.item_barcode[0], 1);
         },
         showSettings() {
             var me = this;
