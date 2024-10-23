@@ -187,7 +187,7 @@ scheduler_events = {
 # 	],
 	"cron": {
 		"15 * * * *": [
-			"metactical.custom_scripts.frappe.document.clear_queues_docs"
+			"metactical.custom_scripts.frappe/document.clear_queues_docs"
 		]
 	}
 }
