@@ -1,3 +1,6 @@
+{% extends "templates/web.html" %}
+{% block title %}{{ _("Time tracker") }}{% endblock %}
+{% block page_content %}
 <div id="tracker">
   <form id="auth">
     <div class="form-group">
@@ -200,3 +203,5 @@
   </div>
 
 </div>
+
+{% endblock %}
