@@ -9,6 +9,8 @@ def scrub_data():
 	scrub_contacts()
 	scrub_address()
 	scrub_customer()
+
+def scrub_user_and_employee():
 	scrub_employee_checkin()
 	scrub_shift_assignment()
 	scrub_employee()
@@ -20,6 +22,7 @@ def scrub_data():
 	scrub_activity_log()
 	scrub_access_log()
 	scrub_user()
+
 	
 def scrub_delivery_notes():
 	max_offset = frappe.db.sql("""
