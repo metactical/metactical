@@ -27,7 +27,7 @@ def get_conditions(filters):
 def get_data(conditions, filters):
 	data = frappe.db.sql("""
 		SELECT
-			item_code, description, variant_of, brand, supplier, supplier_part_no, default_price_list
+			item_code, description, variant_of, brand, supplier, supplier_part_no, default_price_list, item_group
 		FROM
 			`tabItem`
 		LEFT JOIN
@@ -62,6 +62,12 @@ def get_columns():
 		{
 			"label": "Item Template",
 			"fieldname": "variant_of",
+			"fieldtype": "Data",
+			"width": 150
+		},
+		{
+			"label": "Item Group",
+			"fieldname": "item_group",
 			"fieldtype": "Data",
 			"width": 150
 		},
