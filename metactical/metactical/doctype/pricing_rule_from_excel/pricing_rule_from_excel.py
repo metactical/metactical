@@ -19,7 +19,6 @@ class PricingRuleFromExcel(Document):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
-
 	
 	def validate(self):
 		file_content = self.check_file()
@@ -61,9 +60,10 @@ class PricingRuleFromExcel(Document):
 		indexes = self.get_column_indexes(header)
 
 		for row in data[1:]:
-			pricing_rule = frappe.get_doc(self.get_pricing_rule(row, indexes, price_list))
+			pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
+			pricing_rule = frappe.get_doc(pricing_rule_dict)
 
-			get_same_pricing_rules = frappe.db.get_list("Pricing Rule", filters={"for_price_list": price_list, "priority": pricing_rule.priority, "ifw_retailskusuffix": retail_sku}, fields="name")
+			get_same_pricing_rules = frappe.db.get_list("Pricing Rule", filters={"title": pricing_rule_dict["title"]}, fields="name")
 			pricing_rule.insert()
 
 			if get_same_pricing_rules:
@@ -190,7 +190,7 @@ class PricingRuleFromExcel(Document):
 			]
 		}
 
-		return data
+		return data, retail_sku
 		
 	@frappe.whitelist()
 	def get_preview_from_template(doc):
@@ -206,7 +206,7 @@ class PricingRuleFromExcel(Document):
 		pricing_rules_list = []
 		columns = []
 		for i, row in enumerate(data):
-			pricing_rule = doc.get_pricing_rule(row, indexes, price_list)
+			pricing_rule, retail_sku = doc.get_pricing_rule(row, indexes, price_list)
 			if not columns:
 				columns = doc.get_columns(pricing_rule)
 			
@@ -223,7 +223,6 @@ class PricingRuleFromExcel(Document):
 					row.append(value[0]["item_code"])
 					row.append(value[0]["uom"])
 			
-			print(row)
 			pricing_rules_list.append(row)
 
 		return {
@@ -232,6 +231,7 @@ class PricingRuleFromExcel(Document):
 		}
 
 	def get_columns(self, columns):
+		print(columns)
 		headers = columns.keys()
 		doctype = columns["doctype"]
 		doc = frappe.get_meta(columns["doctype"])
