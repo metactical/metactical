@@ -9,6 +9,8 @@
   "import_based_on",
   "excel_file",
   "section_break_i8qkd",
+  "import_preview",
+  "section_break_wzfbv",
   "error_log",
   "section_queus",
   "ais_queue_failed",
@@ -45,8 +47,10 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.excel_file",
    "fieldname": "section_break_i8qkd",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Preview"
   },
   {
    "fieldname": "error_log",
@@ -110,12 +114,20 @@
    "options": "Pricing Rule From Excel",
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "import_preview",
+   "fieldtype": "HTML"
+  },
+  {
+   "fieldname": "section_break_wzfbv",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-08 16:11:25.597176",
+ "modified": "2024-10-28 14:02:45.424322",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pricing Rule From Excel",
@@ -135,5 +147,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

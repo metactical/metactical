@@ -19,7 +19,6 @@ class PricingRuleFromExcel(Document):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
-
 	
 	def validate(self):
 		file_content = self.check_file()
@@ -57,58 +56,14 @@ class PricingRuleFromExcel(Document):
 			frappe.throw("No data found in the file")
 
 		header = data[0]
-		price_list = header[2]
+		price_list = header[3]
 		indexes = self.get_column_indexes(header)
 
 		for row in data[1:]:
-			retail_sku = ""
-			if self.import_based_on == "Retail SKU":
-				item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": row[0]}, "name")
-				retail_sku = row[0]
-			else:
-				item_code = row[0]
-				retail_sku = frappe.db.get_value("Item", item_code, "ifw_retailskusuffix")
-			
-			if not item_code and item_code is not None:
-				frappe.throw(f"Item with Retail SKU Suffix {row[0]} not found")
-			elif item_code is None:
-				continue
+			pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
+			pricing_rule = frappe.get_doc(pricing_rule_dict)
 
-			last_pricing_rule = self.get_last_pricing_rule(item_code, price_list)
-
-			# add 0 in the beginning if the last pricing rule is less than 100
-			if last_pricing_rule:
-				if last_pricing_rule < 100:
-					last_pricing_rule = str(last_pricing_rule + 1).zfill(3)
-				elif last_pricing_rule >= 100:
-					last_pricing_rule = last_pricing_rule + 1
-			
-			title = item_code + "-" + (str(price_list) + "-" if price_list else "") + (str(last_pricing_rule) if last_pricing_rule else "001")
-		
-			pricing_rule = frappe.new_doc("Pricing Rule")
-			pricing_rule.for_price_list = price_list
-			pricing_rule.selling = 1
-			pricing_rule.ifw_retailskusuffix = retail_sku
-			pricing_rule.title = title
-			pricing_rule.has_priority = 1
-			pricing_rule.priority = row[indexes["priority"]]
-			# pricing_rule.price_or_discount = "Discount Percentage"
-			pricing_rule.valid_from = self.change_date_format(row[indexes["valid_from"]])
-			pricing_rule.valid_upto = self.change_date_format(row[indexes["valid_to"]])
-
-			pricing_rule.rate_or_discount = "Rate" if row[indexes["rate_or_discount"]].lower() == "rate" else "Discount Percentage"
-			if pricing_rule.rate_or_discount == "Rate":
-				pricing_rule.rate = row[indexes["discount_percentage"]]
-			else:
-				pricing_rule.discount_percentage = row[indexes["discount_percentage"]]
-			
-			pricing_rule.disable = not row[indexes["enabled"]]
-			pricing_rule.append("items", {
-				"item_code": item_code,
-				"uom": "Nos",
-			})
-
-			get_same_pricing_rules = frappe.db.get_list("Pricing Rule", filters={"for_price_list": price_list, "priority": pricing_rule.priority, "ifw_retailskusuffix": retail_sku}, fields="name")
+			get_same_pricing_rules = frappe.db.get_list("Pricing Rule", filters={"title": pricing_rule_dict["title"]}, fields="name")
 			pricing_rule.insert()
 
 			if get_same_pricing_rules:
@@ -160,6 +115,8 @@ class PricingRuleFromExcel(Document):
 
 			if col == "Valid FromDate":
 				indexes["valid_from"] = i
+			elif col == "Title":
+				indexes["title"] = i
 			elif col == "Retail SKU":
 				indexes["retail_sku"] = i
 			elif col == "ValidToDate":
@@ -196,4 +153,122 @@ class PricingRuleFromExcel(Document):
 		}
 		date = date.split("-")
 		return f"20{date[2]}-{months[date[1]]}-{date[0]}"
+
+	def get_pricing_rule(self, row, indexes, price_list):
+		retail_sku = ""
+		if self.import_based_on == "Retail SKU":
+			item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": row[1]}, "name")
+			retail_sku = row[1]
+		else:
+			item_code = row[1]
+			retail_sku = frappe.db.get_value("Item", item_code, "ifw_retailskusuffix")
 		
+		if not item_code and item_code is not None:
+			frappe.throw(f"Item with Retail SKU Suffix {row[0]} not found")
+		elif item_code is None:
+			return
+
+		data = {
+			"title": row[indexes["title"]],
+			"doctype": "Pricing Rule",
+			"for_price_list": price_list,
+			"selling": 1,
+			"ifw_retailskusuffix": retail_sku,
+			"has_priority": 1,
+			"priority": row[indexes["priority"]],
+			"valid_from": self.change_date_format(row[indexes["valid_from"]]),
+			"valid_upto": self.change_date_format(row[indexes["valid_to"]]),
+			"rate_or_discount": "Rate" if row[indexes["rate_or_discount"]].lower() == "rate" else "Discount Percentage",
+			"rate": row[indexes["discount_percentage"]] if row[indexes["rate_or_discount"]].lower() == "rate" else 0,
+			"discount_percentage": row[indexes["discount_percentage"]] if row[indexes["rate_or_discount"]].lower() == "discount percentage" else 0,
+			"disable": not row[indexes["enabled"]],
+			"items": [
+				{
+					"item_code": item_code,
+					"uom": "Nos",
+				}
+			]
+		}
+
+		return data, retail_sku
+		
+	@frappe.whitelist()
+	def get_preview_from_template(doc):
+		doc = frappe.get_doc("Pricing Rule From Excel", doc.name)
+		
+		# get the first 10 rows from the file and the columns definition
+		file_content = doc.check_file()
+		header = file_content[0]
+		data = file_content[1:11]
+		price_list = header[3]
+		indexes = doc.get_column_indexes(header)
+
+		pricing_rules_list = []
+		columns = []
+		for i, row in enumerate(data):
+			pricing_rule, retail_sku = doc.get_pricing_rule(row, indexes, price_list)
+			if not columns:
+				columns = doc.get_columns(pricing_rule)
+			
+			# add all values from pricing rule except doctype
+
+			row = []
+			for field, value in pricing_rule.items():
+				if field == "doctype":
+					continue
+				
+				if type(value) != list:
+					row.append(value)
+				else:
+					row.append(value[0]["item_code"])
+					row.append(value[0]["uom"])
+			
+			pricing_rules_list.append(row)
+
+		return {
+			"columns": columns,
+			"data": pricing_rules_list
+		}
+
+	def get_columns(self, columns):
+		print(columns)
+		headers = columns.keys()
+		doctype = columns["doctype"]
+		doc = frappe.get_meta(columns["doctype"])
+		columns = []
+
+		for i, header in enumerate(headers):
+			column = doc.get_field(header)
+			if not column:
+				continue
+			
+			if column.fieldtype != "Table":
+				columns.append({
+					"index": i,
+					"column_number": i+1,
+					"doctype": doctype,
+					"header_title": column.label,
+					"df": column.as_dict(),
+					"is_child_table_field": None,
+					"child_table_df": None,
+					"skip_import": False,
+				})
+			else:
+				child_table_df = frappe.get_meta(column.options)
+				child_table_fields = child_table_df.fields
+
+				for j, child_table_field in enumerate(child_table_fields):
+					columns.append({
+						"index": i,
+						"column_number": i+1,
+						"doctype": doctype,
+						"header_title": child_table_field.label + " - " + (column.label),
+						"df": column.as_dict(),
+						"is_child_table_field": True,
+						"child_table_df": child_table_field.as_dict(),
+						"skip_import": False,
+					})
+		
+		return columns
+
+
