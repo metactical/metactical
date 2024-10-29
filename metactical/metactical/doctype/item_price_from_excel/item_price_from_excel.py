@@ -17,9 +17,7 @@ class ItemPriceFromExcel(Document):
 
 	def on_submit(self):
 		file_content = self.check_file()
-		frappe.msgprint("testing after insert")
 		self.create_price_entries(file_content)
-		frappe.db.commit()
 
 	def validate(self):
 		self.check_file()
