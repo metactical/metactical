@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "import_based_on",
+  "download_template",
   "excel_file",
   "section_break_i8qkd",
   "import_preview",
@@ -122,12 +123,17 @@
   {
    "fieldname": "section_break_wzfbv",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "download_template",
+   "fieldtype": "Button",
+   "label": "Download Template"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-10-28 14:02:45.424322",
+ "modified": "2024-10-29 13:30:39.031730",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pricing Rule From Excel",

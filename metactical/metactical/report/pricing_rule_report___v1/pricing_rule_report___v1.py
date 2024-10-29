@@ -46,11 +46,16 @@ def get_conditions(filters):
 
 	if filters.get("price_list"):
 		conditions.append(f"for_price_list = '{filters.get('price_list')}'")
-		
+	
+	conditions = " AND ".join(conditions)
+
+
+	if filters.get("limit"):
+		conditions += f" LIMIT {filters.get('limit')}"
+
 	return conditions
 
 def get_data(filters, conditions):
-	conditions = " AND ".join(conditions)
 	apply_on = filters.apply_on
 	main_field = ""
 
@@ -64,7 +69,7 @@ def get_data(filters, conditions):
 	pricing_rules = frappe.db.sql(f"""
 		SELECT
 			price_item.{main_field} as item_code, discount_percentage, rate_or_discount, 
-			for_price_list, valid_from, valid_upto, disable, priority,
+			for_price_list, valid_from, valid_upto, disable, priority, title,
 			`tabPricing Rule`.name, 
 			rate, discount_percentage, discount_amount
 		FROM
@@ -82,7 +87,7 @@ def get_data(filters, conditions):
 		if filters.get("apply_on") == "Item Code":
 			item_names = frappe.db.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name", "item_name", "ifw_retailskusuffix"])
 			item_names = {item.name: item for item in item_names}
-
+			
 			pricing_rule.erp_sku = pricing_rule.item_code
 			pricing_rule.item_name = item_names.get(pricing_rule.item_code).item_name
 			pricing_rule.retail_sku = item_names.get(pricing_rule.item_code).ifw_retailskusuffix
@@ -90,6 +95,7 @@ def get_data(filters, conditions):
 			pricing_rule.priority = pricing_rule.priority
 			
 			# calculate the amount after discount
+			pricing_rule.after_discount = "-"
 			if pricing_rule.price_list_rate:
 				if pricing_rule.rate_or_discount == "Discount Percentage":
 					if pricing_rule.price_list_rate:
@@ -104,6 +110,7 @@ def get_data(filters, conditions):
 
 		pricing_rule.enabled = not pricing_rule.disable
 		pricing_rule.rate_or_discount = pricing_rule.rate_or_discount
+		pricing_rule.title = pricing_rule.title
 
 		if pricing_rule.rate_or_discount == "Discount Percentage":
 			pricing_rule.discount = str(pricing_rule.discount_percentage)
@@ -116,10 +123,16 @@ def get_data(filters, conditions):
 
 def get_columns(filters):
 	columns = [{
-			"fieldname": "erp_sku",
-			"fieldtype": "Data",
-			"label": filters.get("apply_on"),
-			"width": 120	
+		"fieldname": "title",
+		"fieldtype": "Data",
+		"label": "Title",
+		"width": 120
+	},
+	{
+		"fieldname": "erp_sku",
+		"fieldtype": "Data",
+		"label": filters.get("apply_on"),
+		"width": 120	
 	}]
 
 	if filters.get("apply_on") == "Item Code":
