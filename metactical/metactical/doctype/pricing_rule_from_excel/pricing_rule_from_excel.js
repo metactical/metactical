@@ -19,6 +19,45 @@ frappe.ui.form.on('Pricing Rule From Excel', {
 			});
 		}
 	},
+	download_template(frm) {
+		var dialog = new frappe.ui.Dialog({
+			title: __("Download Template"),
+			fields: [
+				{
+					fieldname: "price_list",
+					label: __("Price List"),
+					fieldtype: "Link",
+					options: "Price List",
+					reqd: 1
+				},
+				{
+					fieldname: "export_type",
+					label: __("Export Type"),
+					fieldtype: "Select",
+					options: [
+						{ value: "Blank", label: __("Blank Template") },
+						{ value: "All", label: __("All Records") },
+						{ value: "Five", label: __("First Five Records") },
+					],
+					default: "Blank",
+				}
+			],
+			primary_action_label: __("Download"),
+			primary_action: (values) => {
+				let method = "/api/method/metactical.metactical.doctype.pricing_rule_from_excel.pricing_rule_from_excel.download_template";
+
+				open_url_post(method, {
+					price_list: values.price_list,
+					export_type: values.export_type,
+					import_based_on: frm.doc.import_based_on,
+				});
+
+				dialog.hide();
+			}
+		});
+
+		dialog.show();
+	},
 	show_import_preview(frm, preview_data) {
 		let import_log = preview_data.import_log;
 

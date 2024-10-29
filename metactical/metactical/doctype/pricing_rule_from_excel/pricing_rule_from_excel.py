@@ -6,6 +6,8 @@ from frappe.model.document import Document
 import os
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
+from frappe.utils.xlsxutils import make_xlsx
+from metactical.metactical.report.pricing_rule_report___v1.pricing_rule_report___v1 import execute
 
 class PricingRuleFromExcel(Document):
 	def submit(self):
@@ -231,7 +233,6 @@ class PricingRuleFromExcel(Document):
 		}
 
 	def get_columns(self, columns):
-		print(columns)
 		headers = columns.keys()
 		doctype = columns["doctype"]
 		doc = frappe.get_meta(columns["doctype"])
@@ -272,3 +273,46 @@ class PricingRuleFromExcel(Document):
 		return columns
 
 
+@frappe.whitelist()
+
+def download_template(price_list, export_type, import_based_on):
+	# Define column headers for the Excel file
+	columns_list = [
+		[
+			"Title", import_based_on, "Item Name", price_list, "Rate or Percentage",
+			f"{price_list} Discount Percentage", f"{price_list} - AfterDiscount",
+			"Enabled", "Valid FromDate", "ValidToDate", "Priority"
+		]
+	]
+	data_list = []
+
+	# Fetch data based on export type
+	if export_type != "Blank":
+		params = frappe._dict({"price_list": price_list, "apply_on": "Item Code"})
+		if export_type == "Five":
+			params["limit"] = 5
+		columns, data = execute(params)
+
+		# Build data rows
+		for d in data:
+			item_identifier = d.get("item_code") if import_based_on == "ERP SKU" else d.get("retail_sku")	
+			discount = d.get('discount_percentage') if d.get('rate_or_discount') == 'Discount Percentage' else d.get('rate')			
+			row = [
+				d.get("title"), item_identifier, d.get("item_name"), d.get("price_list_rate"), d.get("rate_or_discount"),
+				discount, d.get("after_discount"), d.get("enabled"),
+				d.get("valid_from"), d.get("valid_upto"), d.get("priority")
+			]
+			data_list.append(row)
+
+	# Combine headers and data
+	full_data = columns_list + data_list
+
+	# Generate XLSX file content
+	xlsx_file = make_xlsx(full_data, "excel_data").getvalue()
+
+	# Update response with file data
+	frappe.local.response.update({
+		"filecontent": xlsx_file,
+		"type": "binary",
+		"filename": "Pricing Rule Template.xlsx"
+	})
