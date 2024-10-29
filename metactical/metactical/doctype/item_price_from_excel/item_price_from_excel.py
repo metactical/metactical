@@ -8,14 +8,14 @@ from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_f
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 
 class ItemPriceFromExcel(Document):
-	# def submit(self):
-	# 	frappe.msgprint(
-	# 		"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
-	# 		the system will add a comment about the error on this document and revert to the Draft stage"""
-	# 	)
-	# 	queue_action(self, "submit", timeout=2000)
+	def submit(self):
+		frappe.msgprint(
+			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
+			the system will add a comment about the error on this document and revert to the Draft stage"""
+		)
+		queue_action(self, "submit", timeout=2000)
 
-	def after_insert(self):
+	def on_submit(self):
 		file_content = self.check_file()
 		frappe.msgprint("testing after insert")
 		self.create_price_entries(file_content)
@@ -115,7 +115,6 @@ class ItemPriceFromExcel(Document):
 						"price_list_rate": price,
 					})
 					try:
-						print(doc.as_dict())
 						doc.save()
 					except Exception as e:
 						frappe.log_error(frappe.get_traceback())
