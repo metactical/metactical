@@ -17,19 +17,19 @@ class PricingRuleFromExcel(Document):
 			the system will add a comment about the error on this document and revert to the Draft stage"""
 		)
 		queue_action(self, "submit", timeout=2000)
+	
+	def validate(self):
+		file_content = self.check_file()
+		headers = ["Valid FromDate", "ValidToDate", "Enabled", "Rate or Discount Percentage"]
+		for header in headers:
+			if header not in file_content[0]:
+				frappe.throw(f"Column <b>{header}</b> is missing")
+		self.check_mandatory(file_content)
 
 	def on_submit(self):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
-
-	def validate(self):
-		file_content = self.check_file()
-		headers = ["Valid FromDate", "ValidToDate", "Enabled", "Rate or Percentage"]
-		for header in headers:
-			if header not in file_content[0]:
-				frappe.throw(f"Column <b>{header}</b> is missing")
-		self.check_mandatory(file_content)
 
 	def check_file(self):
 		file_content, extn = self.read_file()
@@ -81,6 +81,7 @@ class PricingRuleFromExcel(Document):
 													filters={"title": pricing_rule_dict["title"]}, 
 													fields="name"
 												)
+
 				if rules:
 					# update pricing rule information
 					for rule in rules:
@@ -93,22 +94,20 @@ class PricingRuleFromExcel(Document):
 					# Insert new pricing rule
 					pricing_rule.insert()
 		
-			# Update status and comment
-			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", "Pricing rules created successfully", update_modified=False)
-
 			# Commit changes
 			frappe.db.commit()
-
-			frappe.msgprint("Pricing Rules created successfully. Existing rules with the same priority are disabled or deleted.")
 		
 		# Roll back on error and log traceback
 		except Exception:
 			frappe.db.rollback()
-			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", frappe.get_traceback(), update_modified=False)
+			frappe.throw(frappe.get_traceback())
 
 	def check_mandatory(self, data):
 		header = data[0]
 		indexes = self.get_column_indexes(header).values()
+
+		if self.import_based_on not in header:
+			frappe.throw(f"Column <b>{self.import_based_on}</b> is missing")
 
 		for i, data in enumerate(data[1:]):
 			# continue if all the columns in the row are empty
@@ -156,7 +155,7 @@ class PricingRuleFromExcel(Document):
 				indexes["valid_to"] = i
 			elif col == "Enabled":
 				indexes["enabled"] = i
-			elif col == "Rate or Percentage":
+			elif col == "Rate or Discount Percentage":
 				indexes["rate_or_discount"] = i
 			elif col.endswith("Discount Percentage"):
 				indexes["discount_percentage"] = i
@@ -324,7 +323,7 @@ def download_template(price_list, export_type, import_based_on="Retail SKU"):
 	# Define column headers for the Excel file
 	columns_list = [
 		[
-			"Title", import_based_on, "Item Name", price_list, "Rate or Percentage",
+			"Title", import_based_on, "Item Name", price_list, "Rate or Discount Percentage",
 			f"{price_list} Discount Percentage", f"{price_list} - AfterDiscount",
 			"Enabled", "Valid FromDate", "ValidToDate", "Priority"
 		]
