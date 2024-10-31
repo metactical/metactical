@@ -1,0 +1,1 @@
+import "./template/shipment_rate.html";

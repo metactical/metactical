@@ -1,17 +1,14 @@
 import frappe
-from frappe import _, msgprint
+from frappe import _, msgprint, qb, throw
 import barcode as _barcode
 from io import BytesIO
-from frappe.model.mapper import get_mapped_doc, map_child_doc
-from frappe.utils import nowdate, cstr, flt, cint, now, getdate
-from erpnext.setup.doctype.company.company import update_company_current_month_sales
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import unlink_inter_company_doc
-from erpnext.healthcare.utils import manage_invoice_submit_cancel
+from frappe.utils import now
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.controllers.selling_controller import SellingController
 from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
+from erpnext.accounts.utils import convert_to_list
 
 class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
 	def on_cancel(self):
@@ -51,17 +48,6 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 			self.calculate_commission()
 			self.calculate_contribution()
 
-	def submit(self):
-		if len(self.items) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
 		
@@ -96,7 +82,7 @@ def unlink_ref_doc_from_payment_entries(ref_doc):
 		
 	
 	remove_ref_doc_link_from_jv(ref_doc.doctype, ref_doc.name, multiple_orders, ref_doc.items[0].sales_order)
-	remove_ref_doc_link_from_pe(ref_doc.doctype, ref_doc.name, multiple_orders, ref_doc.items[0].sales_order)
+	remove_ref_doc_link_from_pe(ref_doc.doctype, ref_doc.name, None, multiple_orders, ref_doc.items[0].sales_order)
 
 	if multiple_orders == False:
 		frappe.db.sql("""update `tabGL Entry`
@@ -133,73 +119,71 @@ def remove_ref_doc_link_from_jv(ref_type, ref_no, multiple_orders, sales_order=N
 
 		frappe.msgprint(_("Journal Entries {0} are un-linked".format("\n".join(linked_jv))))
 
-def remove_ref_doc_link_from_pe(ref_type, ref_no, multiple_orders, sales_order=None):
-	if multiple_orders == False:
-		linked_pe = frappe.db.sql_list("""select parent from `tabPayment Entry Reference`
-			where reference_doctype=%s and reference_name=%s and docstatus < 2""", (ref_type, ref_no))
+def remove_ref_doc_link_from_pe(
+	ref_type: str | None = None, ref_no: str | None = None, payment_name: str | None = None, multiple_orders=True, sales_order=None
+):
+	per = qb.DocType("Payment Entry Reference")
+	pay = qb.DocType("Payment Entry")
 
-		if linked_pe:
-			frappe.db.sql("""update `tabPayment Entry Reference`
-				set modified=%s, modified_by=%s, reference_doctype='Sales Order', reference_name=%s
-				where reference_doctype=%s and reference_name=%s
-				and docstatus < 2""", (now(), frappe.session.user, sales_order, ref_type, ref_no))
+	linked_pe = (
+		qb.from_(per)
+		.select(per.parent)
+		.where((per.reference_doctype == ref_type) & (per.reference_name == ref_no) & (per.docstatus.lt(2)))
+		.run(as_list=1)
+	)
+	linked_pe = convert_to_list(linked_pe)
+	# remove reference only from specified payment
+	linked_pe = [x for x in linked_pe if x == payment_name] if payment_name else linked_pe
 
-			for pe in linked_pe:
-				pe_doc = frappe.get_doc("Payment Entry", pe)
-				pe_doc.set_total_allocated_amount()
-				pe_doc.set_unallocated_amount()
-				pe_doc.clear_unallocated_reference_document_rows()
-
-				frappe.db.sql("""update `tabPayment Entry` set total_allocated_amount=%s,
-					base_total_allocated_amount=%s, unallocated_amount=%s, modified=%s, modified_by=%s
-					where name=%s""", (pe_doc.total_allocated_amount, pe_doc.base_total_allocated_amount,
-						pe_doc.unallocated_amount, now(), frappe.session.user, pe))
-
-			frappe.msgprint(_("Payment Entries {0} are re-linked to Sales Order {1}".format("\n".join(linked_pe), sales_order)))
-	else:
-		linked_pe = frappe.db.sql_list(
-			"""select parent from `tabPayment Entry Reference`
-			where reference_doctype=%s and reference_name=%s and docstatus < 2""",
-			(ref_type, ref_no),
-		)
-
-		if linked_pe:
-			frappe.db.sql(
-				"""update `tabPayment Entry Reference`
-				set allocated_amount=0, modified=%s, modified_by=%s
-				where reference_doctype=%s and reference_name=%s
-				and docstatus < 2""",
-				(now(), frappe.session.user, ref_type, ref_no),
+	if linked_pe:
+		# Metactical Customization: Relink sales invoices to sales orders
+		if not multiple_orders and sales_order is not None:
+			update_query = (
+				qb.update(per)
+				.set(per.reference_doctype, 'Sales Order')
+				.set(per.reference_name, sales_order)
+				.set(per.modified, now())
+				.set(per.modified_by, frappe.session.user)
+				.where(per.docstatus.lt(2) & (per.reference_doctype == ref_type) & (per.reference_name == ref_no))
 			)
 
-			for pe in linked_pe:
-				try:
-					pe_doc = frappe.get_doc("Payment Entry", pe)
-					pe_doc.set_amounts()
-					pe_doc.clear_unallocated_reference_document_rows()
-					pe_doc.validate_payment_type_with_outstanding()
-				except Exception as e:
-					msg = _("There were issues unlinking payment entry {0}.").format(pe_doc.name)
-					msg += "<br>"
-					msg += _("Please cancel payment entry manually first")
-					frappe.throw(msg, exc=PaymentEntryUnlinkError, title=_("Payment Unlink Error"))
+			if payment_name:
+				update_query = update_query.where(per.parent == payment_name)
 
-				frappe.db.sql(
-					"""update `tabPayment Entry` set total_allocated_amount=%s,
-					base_total_allocated_amount=%s, unallocated_amount=%s, modified=%s, modified_by=%s
-					where name=%s""",
-					(
-						pe_doc.total_allocated_amount,
-						pe_doc.base_total_allocated_amount,
-						pe_doc.unallocated_amount,
-						now(),
-						frappe.session.user,
-						pe,
-					),
-				)
+			update_query.run()
+		else:
+			update_query = (
+				qb.update(per)
+				.set(per.allocated_amount, 0)
+				.set(per.modified, now())
+				.set(per.modified_by, frappe.session.user)
+				.where(per.docstatus.lt(2) & (per.reference_doctype == ref_type) & (per.reference_name == ref_no))
+			)
 
-			frappe.msgprint(_("Payment Entries {0} are un-linked").format("\n".join(linked_pe)))
+			if payment_name:
+				update_query = update_query.where(per.parent == payment_name)
 
+			update_query.run()
+
+		for pe in linked_pe:
+			try:
+				pe_doc = frappe.get_doc("Payment Entry", pe)
+				pe_doc.set_amounts()
+				pe_doc.clear_unallocated_reference_document_rows()
+				pe_doc.validate_payment_type_with_outstanding()
+			except Exception:
+				msg = _("There were issues unlinking payment entry {0}.").format(pe_doc.name)
+				msg += "<br>"
+				msg += _("Please cancel payment entry manually first")
+				frappe.throw(msg, exc=PaymentEntryUnlinkError, title=_("Payment Unlink Error"))
+
+			qb.update(pay).set(pay.total_allocated_amount, pe_doc.total_allocated_amount).set(
+				pay.base_total_allocated_amount, pe_doc.base_total_allocated_amount
+			).set(pay.unallocated_amount, pe_doc.unallocated_amount).set(pay.modified, now()).set(
+				pay.modified_by, frappe.session.user
+			).where(pay.name == pe).run()
+
+		frappe.msgprint(_("Payment Entries {0} are un-linked").format("\n".join(linked_pe)))
 
 @frappe.whitelist()
 def create_journal_entry(source_name, bank_cash, amount, purpose, target_doc=None):
@@ -299,3 +283,17 @@ def si_mode_of_payment(name):
 	if len(mode) > 0:
 		payment_mode = mode[0].mode_of_payment
 	return payment_mode
+
+@frappe.whitelist()
+def submit_invoice(doc):
+	# Metactical Customization: Submit invoice in background if more than 10 items
+	doc = frappe.get_doc("Sales Invoice", doc)
+	if len(doc.items) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()

@@ -14,24 +14,24 @@ frappe.ui.form.on('Purchase Order Import Tool', {
 });
 
 
-metactical.PurchaseOrderImportTool = erpnext.buying.BuyingController.extend({
-	setup: function() {
+metactical.PurchaseOrderImportTool = class PurchaseOrderImportTool extends erpnext.buying.BuyingController{
+	setup() {
 
-	},
+	}
 
-	onload: function(){
+	onload(){
 
-	},
+	}
 
-	refresh: function() {
+	refresh() {
 
-	},
+	}
 
-	taxes_and_charges: function() {
+	taxes_and_charges() {
 
-	},
+	}
 
-	apply_price_list: function(item, reset_plc_conversion) {
+	apply_price_list(item, reset_plc_conversion) {
 		// We need to reset plc_conversion_rate sometimes because the call to
 		// `erpnext.stock.get_item_details.apply_price_list` is sensitive to its value
 		if (!reset_plc_conversion) {
@@ -65,11 +65,11 @@ metactical.PurchaseOrderImportTool = erpnext.buying.BuyingController.extend({
 		}).always(() => {
 			me.in_apply_price_list = false;
 		});
-	},
+	}
 
-	shipping_address: function(){
+	shipping_address(){
 		
 	}
-});
+};
 
-$.extend(cur_frm.cscript, new metactical.PurchaseOrderImportTool({frm: cur_frm}));
+extend_cscript(cur_frm.cscript, new metactical.PurchaseOrderImportTool({frm: cur_frm}));

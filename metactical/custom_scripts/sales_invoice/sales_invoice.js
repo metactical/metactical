@@ -2,6 +2,17 @@ frappe.ui.form.on('Sales Invoice', {
 	refresh: function(frm){
 		if (frm.doc.__islocal)
 			frm.set_value("neb_payment_completed_at", null)
+
+		if (frm.doc.docstatus == 0){
+			frm.add_custom_button("Submit", () => {
+				frappe.call({
+					method: "metactical.custom_scripts.sales_invoice.sales_invoice.submit_invoice",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
 		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	

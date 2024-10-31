@@ -17,6 +17,17 @@ frappe.ui.form.on('Pick List', {
 		}
 		dashboard_pick_list_doctype(frm, "Sales Order");
 
+		if (frm.doc.docstatus == 0){
+			frm.add_custom_button("Submit", () => {
+				frappe.call({
+					method: "metactical.custom_scripts.pick_list.pick_list.submit_pick_list",
+					args: {
+						"doc": frm.doc.name
+					},
+				})
+			});
+		}
+
 	},
 	
 	on_submit: function(frm){	

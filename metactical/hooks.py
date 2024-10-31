@@ -15,8 +15,8 @@ app_license = "MIT"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = ["/assets/css/metactical.css", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["/assets/js/metactical.min.js", "/assets/metactical/js/metactical_kanban_custom.js"]
+app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
+app_include_js = ["metactical.bundle.js", "/assets/metactical/js/metactical_kanban_custom.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -136,7 +136,10 @@ doc_events = {
 	},
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
-	}
+	},
+	# "RabbitMQ Config": {
+    #     "on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
+    # }
 }
 
 # DocType Class
@@ -167,6 +170,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
+#	"all": [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+#	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -200,7 +206,6 @@ after_migrate = "metactical.migrate.after_migrate"
 override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
-	#"erpnext.controllers.accounts_controller.update_child_qty_rate": "metactical.custom_scripts.sales_order_item.sales_order_item.update_child_qty_rate",
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
@@ -238,14 +243,17 @@ fixtures = [{
 ]
 
 #For using in print format
-jenv = {
+jinja = {
 	"methods": [
-		"get_po_items:metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
-		"get_pr_items:metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
-		"get_barcode:metactical.barcode_generator.get_barcode",
-		"si_mode_of_payment:metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
-		"get_barcode_for_print_format:metactical.barcode_generator.get_barcode_for_print_format"
+		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
+		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
+		"metactical.barcode_generator.get_barcode",
+		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
+		"metactical.barcode_generator.get_barcode_for_print_format"
 	]
 }
 
 
+# app_include_python = [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+# ]
