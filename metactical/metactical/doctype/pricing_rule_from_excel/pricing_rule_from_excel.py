@@ -54,26 +54,53 @@ class PricingRuleFromExcel(Document):
 		return file_content, extn
 
 	def create_pricing_rules(self, data):
+		# Raise error if data is empty
 		if not data:
 			frappe.throw("No data found in the file")
 
+		# Get header information and price list, determine column indexes
 		header = data[0]
 		price_list = header[3]
 		indexes = self.get_column_indexes(header)
 
-		for row in data[1:]:
-			pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
-			pricing_rule = frappe.get_doc(pricing_rule_dict)
+		try:
+			for row in data[1:]:
+				# Prepare pricing rule data and get retail SKU
+				pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
+				pricing_rule = frappe.get_doc(pricing_rule_dict)
 
-			get_same_pricing_rules = frappe.db.get_list("Pricing Rule", filters={"title": pricing_rule_dict["title"]}, fields="name")
-			pricing_rule.insert()
+				# Check for existing rules with the same price list, SKU, and priority
+				existing_rules = frappe.db.get_list("Pricing Rule", 
+													filters={
+														"for_price_list": price_list,
+														"ifw_retailskusuffix": retail_sku,
+														"priority": pricing_rule_dict["priority"]
+													}, 
+													fields="name"
+												)
+				# Insert new pricing rule
+				pricing_rule.insert()
 
-			if get_same_pricing_rules:
-				for pricing_rule in get_same_pricing_rules:
-					pricing_rule = frappe.get_doc("Pricing Rule", pricing_rule.name)
-					pricing_rule.delete()
+				# Disable or delete conflicting existing rules
+				if existing_rules:
+					for rule in existing_rules:
+						rule_doc = frappe.get_doc("Pricing Rule", rule.name)
+						try:
+							frappe.delete_doc("Pricing Rule", rule.name)
+						except Exception:
+							frappe.clear_last_message()
+							frappe.db.set_value("Pricing Rule", rule.name, "disable", 1)
+			
+			# Update status and comment
+			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", "Pricing rules created successfully", update_modified=False)
 
+			# Commit changes
 			frappe.db.commit()
+
+		# Roll back on error and log traceback
+		except Exception:
+			frappe.db.rollback()
+			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", frappe.get_traceback(), update_modified=False)
 
 	def check_mandatory(self, data):
 		header = data[0]
