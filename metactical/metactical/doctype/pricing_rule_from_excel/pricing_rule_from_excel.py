@@ -72,30 +72,26 @@ class PricingRuleFromExcel(Document):
 		indexes = self.get_column_indexes(header)
 
 		try:
-			existing_rules = []
 			for row in data[1:]:
 				# Prepare pricing rule data and get retail SKU
 				pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
-				pricing_rule = frappe.get_doc(pricing_rule_dict)
 
 				# Check for existing rules with the same price list, SKU, and priority
 				rules = frappe.db.get_list("Pricing Rule", 
-													filters={
-														"for_price_list": price_list,
-														"ifw_retailskusuffix": retail_sku,
-														"priority": pricing_rule_dict["priority"]
-													}, 
+													filters={"title": pricing_rule_dict["title"]}, 
 													fields="name"
 												)
 				if rules:
-					existing_rules  += rules
+					# update pricing rule information
+					for rule in rules:
+						pricing_rule = frappe.get_doc("Pricing Rule", rule.name)
+						pricing_rule.update(pricing_rule_dict)
+						pricing_rule.save()
+				else:
+					pricing_rule = frappe.get_doc(pricing_rule_dict)
 
-				# Insert new pricing rule
-				pricing_rule.insert()
-
-			# Disable or delete conflicting existing rules
-			if existing_rules:
-				self.delete_or_disable_rule(existing_rules)
+					# Insert new pricing rule
+					pricing_rule.insert()
 		
 			# Update status and comment
 			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", "Pricing rules created successfully", update_modified=False)
