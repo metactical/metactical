@@ -218,20 +218,22 @@ def download(apply_on, item_group, brand, item_code, price_list):
 		"price_list": price_list
 	})
 
-	columns, data = execute(filters)
+	from metactical.metactical.doctype.pricing_rule_from_excel.pricing_rule_from_excel import download_template
+	download_template(price_list, "All")
 
-	columns_list = [col.get("label") for col in columns]  # Extract column labels in one line
-	xlsx_data = [columns_list] + build_xlsx(data, columns)  # Insert headers and data in one step
+	# columns, data = execute(filters)
 
-	price_list = filters.get("price_list") or get_price_list(xlsx_data)
+	# columns_list = [col.get("label") for col in columns]  # Extract column labels in one line
+	# xlsx_data = [columns_list] + build_xlsx(data, columns)  # Insert headers and data in one step
+	# price_list = filters.get("price_list") or get_price_list(xlsx_data)
 
-	xlsx_file = make_xlsx(convert_data(xlsx_data, price_list), "excel_data").getvalue()
+	# xlsx_file = make_xlsx(convert_data(data, price_list), "excel_data").getvalue()
 
-	frappe.local.response.update({
-		"filecontent": xlsx_file,
-		"type": "binary",
-		"filename": f"{filters.get('price_list')} - Pricing Rule Report.xlsx"
-	})
+	# frappe.local.response.update({
+	# 	"filecontent": xlsx_file,
+	# 	"type": "binary",
+	# 	"filename": f"{filters.get('price_list')} - Pricing Rule Report.xlsx"
+	# })
 
 def get_price_list(data):
 	# Simplified to return the first valid price list found
@@ -243,16 +245,17 @@ def build_xlsx(rows, columns):
 
 def convert_data(data, price_list):
 	headers = [
-		'Retail SKU', 'Item Name', f'{price_list}', 'Rate or Percentage',
+		'Title', 'Retail SKU', 'Item Name', f'{price_list}', 'Rate or Percentage',
 		f'{price_list} Discount Percentage', f'{price_list} - AfterDiscount',
 		'Enabled', 'Valid FromDate', 'ValidToDate', 'Priority'
 	]
 	
 	rows = [
 		[
-			row[1], row[2], row[6], row[3], row[4], row[7],
-			row[10], row[8], row[9], row[11]
+			row['title'], row['erp_sku'], row['item_name'], row['price_list_rate'], row['rate_or_discount'],
+			row['discount'], row['after_discount'], row['enabled'], row['valid_from'], row['valid_upto'], row['priority']
+
 		] for row in data[1:]
 	]
-	
+
 	return [headers] + rows
