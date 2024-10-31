@@ -4,6 +4,7 @@
 import frappe
 from frappe.model.document import Document
 import os
+from frappe import _
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe.utils.xlsxutils import make_xlsx
@@ -21,7 +22,7 @@ class PricingRuleFromExcel(Document):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
 		self.create_pricing_rules(file_content)
-	
+
 	def validate(self):
 		file_content = self.check_file()
 		headers = ["Valid FromDate", "ValidToDate", "Enabled", "Rate or Percentage"]
@@ -38,7 +39,14 @@ class PricingRuleFromExcel(Document):
 			file_content = read_xls_file_from_attached_file(file_content)
 		else:
 			frappe.throw("Only xls and xlsx files are supported.")
-		return file_content
+
+		cleaned_data = []
+		# Remove empty rows
+		for row in file_content:
+			if any(row):
+				cleaned_data.append(row)
+				
+		return cleaned_data
 	
 	def read_file(self):
 		file_path = self.excel_file
@@ -64,13 +72,14 @@ class PricingRuleFromExcel(Document):
 		indexes = self.get_column_indexes(header)
 
 		try:
+			existing_rules = []
 			for row in data[1:]:
 				# Prepare pricing rule data and get retail SKU
 				pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
 				pricing_rule = frappe.get_doc(pricing_rule_dict)
 
 				# Check for existing rules with the same price list, SKU, and priority
-				existing_rules = frappe.db.get_list("Pricing Rule", 
+				rules = frappe.db.get_list("Pricing Rule", 
 													filters={
 														"for_price_list": price_list,
 														"ifw_retailskusuffix": retail_sku,
@@ -78,24 +87,23 @@ class PricingRuleFromExcel(Document):
 													}, 
 													fields="name"
 												)
+				if rules:
+					existing_rules  += rules
+
 				# Insert new pricing rule
 				pricing_rule.insert()
 
-				# Disable or delete conflicting existing rules
-				if existing_rules:
-					for rule in existing_rules:
-						rule_doc = frappe.get_doc("Pricing Rule", rule.name)
-						try:
-							frappe.delete_doc("Pricing Rule", rule.name)
-						except Exception:
-							frappe.clear_last_message()
-							frappe.db.set_value("Pricing Rule", rule.name, "disable", 1)
-			
+			# Disable or delete conflicting existing rules
+			if existing_rules:
+				frappe.enqueue(self.delete_or_disable_rule, rules=existing_rules, job_name="delete_or_disable_pricing_rules", timeout=2000, queue="default")
+		
 			# Update status and comment
 			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", "Pricing rules created successfully", update_modified=False)
 
 			# Commit changes
 			frappe.db.commit()
+
+			frappe.msgprint("Pricing Rules created successfully")
 
 		# Roll back on error and log traceback
 		except Exception:
@@ -158,7 +166,7 @@ class PricingRuleFromExcel(Document):
 				indexes["discount_percentage"] = i
 			elif col == "Priority":
 				indexes["priority"] = i
-
+		
 		return indexes
 
 	# convert date format from 31-Aug-14 to 2014-08-31
@@ -224,9 +232,15 @@ class PricingRuleFromExcel(Document):
 	@frappe.whitelist()
 	def get_preview_from_template(doc):
 		doc = frappe.get_doc("Pricing Rule From Excel", doc.name)
-		
+
+		if not doc.excel_file:
+			return
+
 		# get the first 10 rows from the file and the columns definition
 		file_content = doc.check_file()
+		if not file_content:
+			return
+		print(file_content)
 		header = file_content[0]
 		data = file_content[1:11]
 		price_list = header[3]
@@ -299,10 +313,18 @@ class PricingRuleFromExcel(Document):
 		
 		return columns
 
+	def delete_or_disable_rule(self, rules):
+		for rule in rules:
+			try:
+				frappe.delete_doc("Pricing Rule", rule.name)
+			except Exception:
+				frappe.clear_last_message()
+				frappe.db.set_value("Pricing Rule", rule.name, "disable", 1)
+				
+		frappe.db.commit()
 
 @frappe.whitelist()
-
-def download_template(price_list, export_type, import_based_on):
+def download_template(price_list, export_type, import_based_on="Retail SKU"):
 	# Define column headers for the Excel file
 	columns_list = [
 		[

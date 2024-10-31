@@ -3,7 +3,7 @@
 
 frappe.ui.form.on('Pricing Rule From Excel', {
 	refresh: function(frm) {
-		if (!frm.doc.__islocal) {
+		if (!frm.doc.__islocal && frm.doc.excel_file) {
 			frm.doc.preview_data = null;
 			frappe.call({
 				doc: frm.doc,
