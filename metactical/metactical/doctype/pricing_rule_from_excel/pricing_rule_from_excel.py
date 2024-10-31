@@ -117,9 +117,9 @@ class PricingRuleFromExcel(Document):
 			# continue if all the columns in the row are empty
 			if not any(data):
 				continue
-
+			
 			for index in indexes:
-				if not data[index]:
+				if data[index] == "" or data[index] == None:
 					frappe.throw(f"Column <b>{header[index]}</b> is mandatory in row {i+2}")
 
 		
