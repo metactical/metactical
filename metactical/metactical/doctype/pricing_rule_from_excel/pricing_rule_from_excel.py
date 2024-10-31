@@ -239,7 +239,7 @@ class PricingRuleFromExcel(Document):
 		file_content = doc.check_file()
 		if not file_content:
 			return
-		print(file_content)
+
 		header = file_content[0]
 		data = file_content[1:11]
 		price_list = header[3]
