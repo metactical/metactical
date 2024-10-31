@@ -95,7 +95,7 @@ class PricingRuleFromExcel(Document):
 
 			# Disable or delete conflicting existing rules
 			if existing_rules:
-				frappe.enqueue(self.delete_or_disable_rule, rules=existing_rules, job_name="delete_or_disable_pricing_rules", timeout=2000, queue="default")
+				self.delete_or_disable_rule(existing_rules)
 		
 			# Update status and comment
 			frappe.db.set_value("Pricing Rule From Excel", self.name, "ais_queueu_comment", "Pricing rules created successfully", update_modified=False)
@@ -103,7 +103,8 @@ class PricingRuleFromExcel(Document):
 			# Commit changes
 			frappe.db.commit()
 
-			frappe.msgprint("Pricing Rules created successfully. Existing rules with the same priority will be disabled or deleted in the background.")
+			frappe.msgprint("Pricing Rules created successfully. Existing rules with the same priority are disabled or deleted.")
+		
 		# Roll back on error and log traceback
 		except Exception:
 			frappe.db.rollback()
