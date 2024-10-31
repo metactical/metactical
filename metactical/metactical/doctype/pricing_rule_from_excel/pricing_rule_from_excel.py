@@ -103,8 +103,7 @@ class PricingRuleFromExcel(Document):
 			# Commit changes
 			frappe.db.commit()
 
-			frappe.msgprint("Pricing Rules created successfully")
-
+			frappe.msgprint("Pricing Rules created successfully. Existing rules with the same priority will be disabled or deleted in the background.")
 		# Roll back on error and log traceback
 		except Exception:
 			frappe.db.rollback()
@@ -320,7 +319,7 @@ class PricingRuleFromExcel(Document):
 			except Exception:
 				frappe.clear_last_message()
 				frappe.db.set_value("Pricing Rule", rule.name, "disable", 1)
-				
+
 		frappe.db.commit()
 
 @frappe.whitelist()
