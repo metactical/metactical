@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serial Number Entry</title>
+    
+    <!-- Initialize Frappe Environment -->
+    <script>
+        window.frappe = {};
+        frappe.ready_events = [];
+        frappe.ready = function(fn) {
+            frappe.ready_events.push(fn);
+        }
+        window.dev_server = {{ dev_server }};
+        window.socketio_port = {{ (frappe.socketio_port or 'null') }};
+        window.show_language_picker = {{ show_language_picker }};
+    </script>
+
+    <!-- Vue.js and Axios for Vue functionality and HTTP requests -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Google Fonts for styling -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        /* Same styles as before */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        label {
+            font-weight: 500;
+            margin-right: 10px;
+        }
+
+        .item-select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        .save-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        .save-button:hover {
+            background-color: #45a049;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-weight: 500;
+        }
+
+        .serial-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+
+        .serial-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .error {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .global-error {
+            color: #e74c3c;
+            font-size: 1em;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+		/* Custom styles for Frappe dialog */
+        .modal-dialog {
+            max-width: 600px;
+            margin: 30px auto;
+        }
+
+        .modal-content {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            background-color: #4CAF50;
+            color: white;
+            border-bottom: none;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+
+        .modal-title {
+            font-weight: 500;
+        }
+
+        .modal-body {
+            padding: 20px;
+            font-size: 1em;
+            color: #333;
+        }
+
+        .modal-footer {
+            padding: 10px;
+            border-top: none;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app" class="container">
+        <h1>Serial Number Entry</h1>
+        
+        <!-- Item Selection -->
+        <div>
+            <label for="item">Barcode:</label>
+            {% raw %}
+			<input v-model="searchQuery" id="item" type="text" @keyup.enter="searchBarcode(searchQuery)" />
+			<button class="save-button" @click="saveData">Save</button> <br>
+			<b>Item Code:</b> {{ selectedItem.item_code }} <br>
+			<b>Item Name:</b> {{ selectedItem.item_name }} <br>
+            {% endraw %}
+        </div>
+
+        <!-- Warehouse Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Warehouse</th>
+                    <th>Qty</th>
+                    <th>Serial No(s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% raw %}
+                <tr v-for="warehouse in warehouses" :key="warehouse.name">
+                    <td>{{ warehouse.name }}</td>
+                    <td>{{ warehouse.qty }}</td>
+                    <td>
+                        <div v-for="n in warehouse.qty" :key="n">
+                            <input type="text" v-model="warehouse.serials[n-1]" class="serial-input" placeholder="Enter Serial No">
+							<div v-if="warehouse.error" class="error">{{ warehouse.error }}</div>
+                        </div>
+                    </td>
+                </tr>
+                {% endraw %}
+            </tbody>
+        </table>
+
+        <!-- Global Error Display -->
+        {% raw %}
+        <div v-if="globalError" class="global-error">{{ globalError }}</div>
+        {% endraw %}
+    </div>
+    <!-- Frappe and jQuery Scripts -->
+    <script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
+    <script type="text/javascript" src="/assets/js/frappe-web.min.js?ver={{ build_version }}"></script>
+    <script type="text/javascript" src="/assets/js/bootstrap-4-web.min.js"></script>
+    <script>
+        frappe.boot = {
+            sysdefaults: {
+                float_precision: parseInt("{{ frappe.get_system_settings('float_precision') or 3 }}"),
+                date_format: "{{ frappe.get_system_settings('date_format') or 'yyyy-mm-dd' }}",
+            }
+        };
+        // for backward compatibility of some libs
+        frappe.sys_defaults = frappe.boot.sysdefaults;
+        frappe.provide('metactical.serialNoReconciliation');
+    </script>
+    <script>
+		// warehouses: [
+        //                 { name: 'Warehouse 1', qty: 2, valuation_rate, serials: ['', ''], error: ''},
+        //                 { name: 'Warehouse 2', qty: 1, serials: ['']},
+        //                 { name: 'Warehouse 3', qty: 4, serials: ['', '', '', '']}
+        //             ],
+        function initialize_app() {
+            metactical.serialNoReconciliation.app = new Vue({
+                el: '#app',
+                data: {
+                    globalError: '',
+                    warehouses: [],
+                    searchQuery: '',
+                    items: [],
+                    filteredItems: [],
+                    selectedItem: {},
+                },
+                created() {
+                    this.openDatabase();
+                },
+                methods: {
+                    openDatabase() {
+                        const request = indexedDB.open('SerialNoReconciliation', 8);
+
+                        request.onupgradeneeded = (event) => {
+                            const db = event.target.result;
+							if (db.objectStoreNames.contains('items')) {
+								db.deleteObjectStore('items');
+							}
+
+                            if (!db.objectStoreNames.contains('items')) {
+                                const itemDb = db.createObjectStore('items', { keyPath: 'barcode' });
+								itemDb.createIndex('barcode', 'barcode', { unique: true });
+								itemDb.createIndex('item_code', 'item_code', { unique: false });
+                            }
+                        };
+
+                        request.onsuccess = (event) => {
+							console.log('Database opened successfully.');
+                            this.db = event.target.result;
+                            this.loadItems();
+                        };
+
+                        request.onerror = (event) => {
+                            console.error('Database error:', event.target.error);
+                        };
+                    },
+                    loadItems() {
+						let me = this;
+						console.log("Load items function called");
+                        //const transaction = this.db.transaction(['items'], 'readonly');
+                        //const objectStore = transaction.objectStore('items');
+						frappe.call({
+							method: 'metactical.www.serial-number-reconciliation.index.get_items',
+							callback: (response) => {
+								//this.items = response.message || [];
+								console.log('Items fetched from server:', response.message);
+								// Save the fetched items to IndexedDB
+								me.saveItems(response.message);
+							}
+						});
+                    },
+                    async saveItems(items) {
+						console.log("Save items function called");
+                        const transaction = this.db.transaction(['items'], 'readwrite');
+                        const itemTab = transaction.objectStore('items');
+						let total = items.length;
+						let count = 0;
+
+						let saveItem = items.map((item, index) => {
+							return new Promise((resolve, reject) => {
+								let getRequest = itemTab.get(item.barcode);
+								getRequest.onsuccess = (event) => {
+									let existingItem = event.target.result;
+									if (!existingItem) {
+										let addRequest = itemTab.add(item);
+										count++;
+										addRequest.onsuccess = () => {
+											console.log('Item saved');
+											resolve();
+										};
+
+										addRequest.onerror = (event) => {
+											console.error('Failed to save item:', event.target.error);
+											reject();
+										};
+									} else {
+										count++;
+										console.log('Item already exists:', existingItem);
+										resolve();
+									}
+								};
+
+								getRequest.onerror = (event) => {
+									console.error('Failed to get item:', event.target.error);
+									reject();
+								};
+							});
+						});
+
+						try {
+							console.log("Reached here");
+							await Promise.all(saveItem);
+							console.log('All items saved:', count, total);
+						}
+						catch (error) {
+							console.error('Failed to save items:', error);
+						}
+                    },
+                    saveData() {
+                        let allSerials = [];
+                        let valid = true;
+						let me = this;
+
+                        // Reset errors
+                        this.globalError = '';
+                        this.warehouses.forEach(warehouse => warehouse.error = '');
+
+                        // Validate each warehouse
+                        this.warehouses.forEach(warehouse => {
+                            const filledSerials = warehouse.serials.filter(serial => serial !== '');
+
+                            // Check if the number of serials matches the quantity
+                            if (filledSerials.length !== warehouse.qty) {
+                                warehouse.error = `Please enter ${warehouse.qty} serial number(s).`;
+                                valid = false;
+                            }
+
+                            // Add serials to the global list for uniqueness check
+                            allSerials = allSerials.concat(filledSerials);
+                        });
+
+                        // Check for unique serial numbers
+                        const serialSet = new Set(allSerials);
+                        if (serialSet.size !== allSerials.length) {
+                            this.globalError = 'Serial numbers must be unique.';
+                            valid = false;
+                        }
+
+                        // If everything is valid, proceed with save logic
+                        if (valid) {
+                            console.log("Selected Item: " + this.selectedItem);
+                            console.log("Warehouses Data: ", this.warehouses);
+							frappe.call({
+								method: 'metactical.www.serial-number-reconciliation.index.save_serial_numbers',
+								args: {
+									item_code: this.selectedItem.item_code,
+									warehouses: this.warehouses
+								},
+								callback: (response) => {
+									console.log('Serial numbers saved:', response.message);
+									alert("Serial numbers validated and saved!");
+									// Remove item from database
+									const transaction = this.db.transaction(['items'], 'readwrite');
+									const itemTab = transaction.objectStore('items');
+									const deleteRequest = itemTab.delete(this.selectedItem.barcode);
+									deleteRequest.onsuccesss = () => {
+										console.log('Item deleted from database:', this.selectedItem);
+										if(response.message == "success"){
+											me.warehouses = [];
+											me.searchQuery = '';
+											me.selectedItem = {};
+										}
+									};
+									deleteRequest.onerror = (event) => {
+										console.error('Failed to delete item:', event.target.error);
+									};
+								}
+							});
+                            
+                        } else {
+							alert("Serial numbers validation failed. Please check the errors and try again.");
+                            console.log("Validation failed");
+                        }
+                    },
+                    filterItems() {
+						console.log("Filter items function called");
+						let me = this;
+                        const query = this.searchQuery.toLowerCase();
+						const transaction = this.db.transaction(['items'], 'readonly');
+						const objectStore = transaction.objectStore('items');
+						const index = objectStore.index('item_code');
+						const results = [];
+
+						index.openCursor().onsuccess = function(event) {
+							console.log("Filter items cursor function called");
+							const cursor = event.target.result;
+							if (cursor) {
+								const record = cursor.value;
+								if (record['item_code'] && record['item_code'].includes(query)) {
+									me.filteredItems.push(record);
+								}
+								cursor.continue();
+							}
+						};
+
+						objectStore.openCursor().onerror = function(event) {
+							console.error('Failed to filter items:', event.target.error);
+						};
+                    },
+                    selectItem(item) {
+                        this.selectedItem = item;
+                        this.searchQuery = item.item_name;
+                        this.filteredItems = [];
+                    },
+					searchBarcode(barcode) {
+						console.log("Search barcode function called");
+						let me = this;
+						const transaction = this.db.transaction(['items'], 'readonly');
+						const objectStore = transaction.objectStore('items');
+						const index = objectStore.index('barcode');
+						const request = index.get(barcode);
+
+						request.onsuccess = (event) => {
+							const item = event.target.result;
+							if (item) {
+								me.selectedItem = item;
+								frappe.call({
+									method: 'metactical.www.serial-number-reconciliation.index.get_warehouses',
+									args: { item_code: item.item_code },
+									callback: (response) => {
+										console.log('Warehouses fetched from server:', response.message);
+										me.warehouses = response.message || [];
+									}
+								});
+							} else {
+								console.error('Item not found:', barcode);
+							}
+						};
+
+						request.onerror = (event) => {
+							console.error('Failed to search barcode:', event.target.error);
+						};
+					}
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initialize_app();
+        });
+    </script>
+    <!-- csrf_token -->
+    {%- block body_include %}{{ body_include or "" }}{% endblock -%}
+</body>
+</html>
