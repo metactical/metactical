@@ -157,8 +157,11 @@
     </style>
 </head>
 <body>
-
-    <div id="app" class="container">
+	{% raw %}
+	<div id="app">
+		<div v-if="loading">{{ loading_message }}</div>
+		<div v-if="!loading" class="container">
+	{% endraw %}
         <h1>Serial Number Entry</h1>
         
         <!-- Item Selection -->
@@ -166,7 +169,7 @@
             <label for="item">Barcode:</label>
             {% raw %}
 			<input v-model="searchQuery" id="item" type="text" @keyup.enter="searchBarcode(searchQuery)" />
-			<button class="save-button" @click="saveData">Save</button> <br>
+			<button class="save-button" @click="saveData">Convert to Serialized Item</button> <br>
 			<b>Item Code:</b> {{ selectedItem.item_code }} <br>
 			<b>Item Name:</b> {{ selectedItem.item_name }} <br>
             {% endraw %}
@@ -201,7 +204,8 @@
         {% raw %}
         <div v-if="globalError" class="global-error">{{ globalError }}</div>
         {% endraw %}
-    </div>
+    	</div>
+	</div>
     <!-- Frappe and jQuery Scripts -->
     <script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
     <script type="text/javascript" src="/assets/js/frappe-web.min.js?ver={{ build_version }}"></script>
@@ -233,12 +237,15 @@
                     items: [],
                     filteredItems: [],
                     selectedItem: {},
+					loading_message: "",
+					loading: true
                 },
                 created() {
                     this.openDatabase();
                 },
                 methods: {
                     openDatabase() {
+						this.loading_message = "Initializing local database...";
                         const request = indexedDB.open('SerialNoReconciliation', 8);
 
                         request.onupgradeneeded = (event) => {
@@ -266,7 +273,7 @@
                     },
                     loadItems() {
 						let me = this;
-						console.log("Load items function called");
+						this.loading_message = "Loading unserialized barcodes from ERPNext...."
                         //const transaction = this.db.transaction(['items'], 'readonly');
                         //const objectStore = transaction.objectStore('items');
 						frappe.call({
@@ -280,7 +287,7 @@
 						});
                     },
                     async saveItems(items) {
-						console.log("Save items function called");
+						this.loading_message = "Saving barcodes to local database...";
                         const transaction = this.db.transaction(['items'], 'readwrite');
                         const itemTab = transaction.objectStore('items');
 						let total = items.length;
@@ -295,17 +302,18 @@
 										let addRequest = itemTab.add(item);
 										count++;
 										addRequest.onsuccess = () => {
-											console.log('Item saved');
+											this.loading_message = `Processesd barcode ${count} of ${total}`
 											resolve();
 										};
 
 										addRequest.onerror = (event) => {
+											this.loading_message = `Failed to process barcode ${count} of ${total}`
 											console.error('Failed to save item:', event.target.error);
 											reject();
 										};
 									} else {
 										count++;
-										console.log('Item already exists:', existingItem);
+										this.loading_message = `Processesd barcode ${count} of ${total}`
 										resolve();
 									}
 								};
@@ -318,11 +326,13 @@
 						});
 
 						try {
-							console.log("Reached here");
 							await Promise.all(saveItem);
+							this.loading_message = 'All barcodes processed successfully';
+							this.loading = false;
 							console.log('All items saved:', count, total);
 						}
 						catch (error) {
+							this.loading_message = 'Failed to load barcodes. Please view the console logs';
 							console.error('Failed to save items:', error);
 						}
                     },
