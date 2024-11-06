@@ -55,15 +55,24 @@ export default {
             };
           },
           change() {
+            // console.log("Delivery Note Changed", delivery_note_field.get_value());
             var is_focused = $(`#page-packing-page-v4  [data-fieldname='delivery_note']`).is(":focus")
             if (is_focused)
               $(`#page-packing-page-v4 [data-fieldname='delivery_note']`).blur();
             else if (delivery_note_field.get_value() != "") {
-              me.filters.stock_entry = "";
+              if (me.filters.stock_entry != ""){
+                stock_entry_field.set_value("");
+                me.filters.stock_entry = "";
+              }
+
               me.filters.delivery_note = delivery_note_field.get_value();
               me.$emit("filtersUpdated", me.filters);
             }
-          },
+            else{
+              me.filters.delivery_note = "";
+              me.$emit("filtersUpdated", me.filters);
+            }
+          }
         },
         render_input: true,
       });
@@ -85,10 +94,15 @@ export default {
           },
           change() {
             var is_focused = $(`#page-packing-page-v4  [data-fieldname='stock_entry']`).is(":focus")
+            console.log("Stock Entry Changed", stock_entry_field.get_value());
             if (is_focused)
               $(`#page-packing-page-v4 [data-fieldname='stock_entry']`).blur();
             else if (stock_entry_field.get_value() != "") {
-              me.filters.delivery_note = "";
+              if (me.filters.delivery_note != ""){
+                delivery_note_field.set_value("");
+                me.filters.delivery_note = "";
+              }
+
               me.filters.stock_entry = stock_entry_field.get_value();
               me.$emit("filtersUpdated", me.filters);
             }

@@ -10,7 +10,8 @@
             <section class="box pending-items">
               <h4 class="section-title pending-items-count">{{ getTotalPendingItems }} Item(s) left</h4>
               <div class="section-wrapper">
-                <pending-item @select-item="selectItem" v-for="item in pending_items" :key="item.name" :item="item"></pending-item>
+                <pending-item @select-item="selectItem" v-for="item in pending_items" :key="item.name"
+                  :item="item"></pending-item>
               </div>
             </section>
           </div>
@@ -21,11 +22,16 @@
           </div>
           <div class="col-md-3 packing-page-card">
             <section class="box packed-items">
-              <h4 class="section-title packed-items-count cursor-pointer" @click="showPackedItems">{{ getTotalPackedItems }} Item(s) Packed</h4>
+              <h4 class="section-title packed-items-count cursor-pointer" @click="showPackedItems">{{
+                getTotalPackedItems }} Item(s) Packed</h4>
               <div class="section-wrapper">
-                <packed-item @revertItem="revertItem" v-for="item in packed_items" :key="item.name" :item="item"></packed-item>
+                <packed-item @revertItem="revertItem" v-for="item in packed_items" :key="item.name"
+                  :item="item"></packed-item>
                 <div class="text-center pack-items-btn d-none">
                   <button class="btn btn-primary cursor-pointer" @click="packSelectedItems">Pack Selected Items</button>
+                </div>
+                <div class="text-center mt-2" v-if="filters.stock_entry && Object.keys(all_packed_items).length && Object.keys(pending_items).length">
+                  <button class="btn btn-danger cursor-pointer" v-if="all_packed_items" @click="RemoveRemainingItems">Remove Remaining Items</button>
                 </div>
               </div>
             </section>
@@ -50,7 +56,7 @@ import Filters from "./Filters.vue";
 export default {
   data() {
     return {
-      no_feedback: "Please select a Delivery Note",
+      no_feedback: "Please select a Delivery Note or Stock Entry",
       pending_items: [],
       packed_items: [],
       current_item: {},
@@ -83,7 +89,7 @@ export default {
       if (this.selected_document) {
         this.getItems();
       } else {
-        frappe.msgprint("Please select a Delivery Note");
+        frappe.msgprint("Please select a Delivery Note or Stock Entry");
       }
     },
     revertItem(item) {
@@ -93,7 +99,7 @@ export default {
         new_item = { ...item, qty: 0, item_barcode: [item.item_barcode] };
         this.pending_items.push(new_item);
       }
-    
+
       this.pending_items.forEach((pending_item) => {
         if (pending_item.dn_detail === item.dn_detail) {
           pending_item.qty += 1;
@@ -166,9 +172,13 @@ export default {
     updateFilters(filters) {
       this.filters = filters;
       this.selected_document = filters.delivery_note || filters.stock_entry;
-      console.log(this.selected_document);
       if (this.selected_document)
         this.getItems();
+      else{
+        this.pending_items = [];
+        this.packed_items = [];
+        this.current_item = {};
+      }
     },
 
     selectItem(item) {
@@ -312,7 +322,7 @@ export default {
       this.cur_packing_slip.custom_neb_parcel_template = values.parcel_template;
       this.cur_packing_slip.gross_weight_pkg = values.gross_weight_pkg;
       this.cur_packing_slip.net_weight_pkg = this.calculateNetWeight();
-      
+
       frappe.call({
         method: "frappe.desk.form.save.savedocs",
         args: { doc: this.cur_packing_slip, action: "Submit" },
@@ -374,12 +384,37 @@ export default {
             if (items.length) this.cur_packing_slip = r.docs[0];
             frappe.call("metactical.api.packing_slip.get_item_master", { items }).then((r) => {
               this.pending_items = r.message;
+              this.pending_items.forEach((item) => {
+                item.dn_detail = item.ste_detail
+              });
+
               this.current_item = this.pending_items[0] || {};
               this.packed_items = [];
             });
           },
         });
         this.getAllPackedItems();
+      }
+    },
+
+    RemoveRemainingItems() {
+      var me = this
+      if (this.all_packed_items) {
+        frappe.confirm("Are you sure you want to remove all remaining items?", () => {
+          frappe.call({
+            method: "metactical.metactical.page.packing_page_v4.packing_page_v4.remove_remaining_items",
+            args: { packing_slips: Object.keys(this.all_packed_items), stock_entry: this.filters.stock_entry },
+            callback: (r) => {
+              if (r.success) {
+                me.refresh();
+                frappe.msgprint(r.message)
+              }
+              else{
+                frappe.msgprint(r.message)
+              }
+            },
+          });
+        });
       }
     },
 
@@ -392,7 +427,7 @@ export default {
       frappe.call({
         method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_all_packed_items",
         freeze: true,
-        args: { delivery_note: this.filters.delivery_note, stock_entry: this.filters.stock_entry},
+        args: { delivery_note: this.filters.delivery_note, stock_entry: this.filters.stock_entry },
         callback: (ret) => {
           this.all_packed_items = ret.items;
           this.packed_packing_slips = ret.packed_packing_slips;
