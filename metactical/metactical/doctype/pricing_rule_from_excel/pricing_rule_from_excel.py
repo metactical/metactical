@@ -196,9 +196,9 @@ class PricingRuleFromExcel(Document):
 			retail_sku = frappe.db.get_value("Item", item_code, "ifw_retailskusuffix")
 		
 		if not item_code and item_code is not None:
-			frappe.throw(f"Item with Retail SKU Suffix {row[0]} not found")
+			frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
 		elif item_code is None:
-			return
+			frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
 
 		data = {
 			"title": row[indexes["title"]],
