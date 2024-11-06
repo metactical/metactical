@@ -22,11 +22,15 @@
   "get_items",
   "items",
   "package_weight_details",
+  "custom_neb_parcel_template",
   "net_weight_pkg",
   "net_weight_uom",
+  "custom_neb_box_length",
+  "custom_neb_box_height",
   "column_break4",
   "gross_weight_pkg",
   "gross_weight_uom",
+  "custom_neb_box_width",
   "letter_head_details",
   "letter_head",
   "misc_details",
@@ -184,15 +188,37 @@
    "options": "STE Packing Slip",
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "custom_neb_parcel_template",
+   "fieldtype": "Link",
+   "label": "Parcel Template",
+   "options": "Shipment Parcel Template"
+  },
+  {
+   "fieldname": "custom_neb_box_length",
+   "fieldtype": "Float",
+   "label": "Box Length"
+  },
+  {
+   "fieldname": "custom_neb_box_height",
+   "fieldtype": "Float",
+   "label": "Box Height"
+  },
+  {
+   "fieldname": "custom_neb_box_width",
+   "fieldtype": "Float",
+   "label": "Box Width"
   }
  ],
  "icon": "fa fa-suitcase",
  "is_submittable": 1,
  "links": [],
- "modified": "2023-03-22 11:54:57.787842",
+ "modified": "2024-11-05 13:36:16.075375",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "STE Packing Slip",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
@@ -269,5 +295,6 @@
  "search_fields": "stock_entry",
  "show_name_in_global_search": 1,
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

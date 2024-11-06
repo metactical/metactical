@@ -63,23 +63,31 @@ def set_item_values(item, values):
 		return {"success": False, "message": f"Error updating item: {str(e)}"}
 
 @frappe.whitelist()
-def get_all_packed_items(delivery_note):
-	packed_items = frappe.db.sql("""
+def get_all_packed_items(delivery_note, stock_entry=None):
+	doctype = "STE Packing Slip"
+	field = "stock_entry"
+	value = stock_entry if stock_entry else delivery_note
+
+	if delivery_note:
+		doctype = "Packing Slip"
+		field = "delivery_note"
+
+	packed_items = frappe.db.sql(f"""
 		SELECT
 			psi.item_code, psi.item_name, psi.stock_uom, psi.qty, 
 			psi.net_weight, psi.parent AS packing_slip,
 			i.ifw_retailskusuffix
 		FROM
-			`tabPacking Slip Item` psi
-			JOIN `tabPacking Slip` ON `tabPacking Slip`.name = psi.parent
+			`tab{doctype} Item` psi
+			JOIN `tab{doctype}` ON `tab{doctype}`.name = psi.parent
 			JOIN `tabItem` i ON i.item_code = psi.item_code
 		WHERE
-			`tabPacking Slip`.delivery_note = %s and `tabPacking Slip`.docstatus = 1
+			`tab{doctype}`.{field} = %s and `tab{doctype}`.docstatus = 1
 		ORDER BY
-			`tabPacking Slip`.creation ASC
-	""", delivery_note, as_dict=1)
+			`tab{doctype}`.creation ASC
+	""", value, as_dict=1)
 
-	packing_slips = frappe.db.get_list("Packing Slip", filters={"delivery_note": delivery_note, "docstatus": 1}, 
+	packing_slips = frappe.db.get_list(doctype, filters={field: value, "docstatus": 1}, 
 									fields=["name", "custom_neb_box_height", "custom_neb_box_length", "custom_neb_box_width", "gross_weight_pkg", "custom_neb_parcel_template", "from_case_no"])
 	packing_slips = {pl["name"]: pl for pl in packing_slips}
 

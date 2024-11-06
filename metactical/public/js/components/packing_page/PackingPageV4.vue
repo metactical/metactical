@@ -3,7 +3,7 @@
     <div class="packing-page-card">
       <filters @filtersUpdated="updateFilters" @itemScanned="itemScanned"></filters>
     </div>
-    <template v-if="selected_delivery_note">
+    <template v-if="selected_document">
       <section class="packing-slip-wrapper py-2">
         <div class="row mx-0" v-if="no_feedback">
           <div class="col-md-3 packing-page-card">
@@ -54,7 +54,7 @@ export default {
       pending_items: [],
       packed_items: [],
       current_item: {},
-      selected_delivery_note: "",
+      selected_document: "",
       item_clicked: false,
       cur_packing_slip: "",
       all_packed_items: {},
@@ -80,7 +80,7 @@ export default {
   methods: {
     refresh() {
       $(".pack-items-btn").addClass("d-none");
-      if (this.selected_delivery_note) {
+      if (this.selected_document) {
         this.getItems();
       } else {
         frappe.msgprint("Please select a Delivery Note");
@@ -93,7 +93,7 @@ export default {
         new_item = { ...item, qty: 0, item_barcode: [item.item_barcode] };
         this.pending_items.push(new_item);
       }
-       
+    
       this.pending_items.forEach((pending_item) => {
         if (pending_item.dn_detail === item.dn_detail) {
           pending_item.qty += 1;
@@ -165,7 +165,10 @@ export default {
 
     updateFilters(filters) {
       this.filters = filters;
-      this.getItems();
+      this.selected_document = filters.delivery_note || filters.stock_entry;
+      console.log(this.selected_document);
+      if (this.selected_document)
+        this.getItems();
     },
 
     selectItem(item) {
@@ -343,13 +346,26 @@ export default {
     getItems() {
       const delivery_note = this.filters.delivery_note;
       this.selected_delivery_note = delivery_note;
-      if (!delivery_note) {
+      this.selected_stock_entry = this.filters.stock_entry;
+
+      var packing_slip_doctype = ""
+      if (this.selected_stock_entry) {
+        packing_slip_doctype = "STE Packing Slip";
+      } else {
+        packing_slip_doctype = "Packing Slip";
+      }
+
+      if (!delivery_note && !this.selected_stock_entry) {
         this.pending_items = [];
         this.packed_items = [];
         this.current_item = {};
       } else {
-        const new_packing_slip = frappe.model.get_new_doc("Packing Slip", null, null, 1);
-        new_packing_slip.delivery_note = delivery_note;
+        const new_packing_slip = frappe.model.get_new_doc(packing_slip_doctype, null, null, 1);
+        if (this.selected_delivery_note)
+          new_packing_slip.delivery_note = delivery_note;
+        else if (this.selected_stock_entry)
+          new_packing_slip.stock_entry = this.selected_stock_entry;
+
         frappe.call({
           method: "runserverobj",
           args: { docs: new_packing_slip, method: "get_items" },
@@ -368,10 +384,15 @@ export default {
     },
 
     getAllPackedItems() {
+      var field = "delivery_note";
+      if (this.selected_stock_entry) {
+        field = "stock_entry";
+      }
+
       frappe.call({
         method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_all_packed_items",
         freeze: true,
-        args: { delivery_note: this.selected_delivery_note },
+        args: { delivery_note: this.filters.delivery_note, stock_entry: this.filters.stock_entry},
         callback: (ret) => {
           this.all_packed_items = ret.items;
           this.packed_packing_slips = ret.packed_packing_slips;
