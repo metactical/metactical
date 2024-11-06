@@ -75,7 +75,7 @@ class STEPackingSlip(Document):
 
 		# gets item code, qty per item code, latest packed qty per item code and stock uom
 		res = frappe.db.sql(
-			"""select item_code, sum(qty) as qty,
+			"""select item_code, sum(qty) as qty, name,
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabSTE Packing Slip` ps, `tabSTE Packing Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
@@ -109,6 +109,7 @@ class STEPackingSlip(Document):
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
 				ch.description = item.description
+				ch.ste_detail = item.name
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
 
