@@ -27,7 +27,7 @@ def get_conditions(filters):
 def get_data(conditions, filters):
 	data = frappe.db.sql("""
 		SELECT
-			item_code, description, variant_of, brand, supplier, supplier_part_no, default_price_list, item_group
+			item_code, description, variant_of, brand, supplier, supplier_part_no, default_price_list, item_group, `tabItem`.creation
 		FROM
 			`tabItem`
 		LEFT JOIN
@@ -99,6 +99,12 @@ def get_columns():
 			"label": "Standard Selling Price",
 			"fieldname": "standard_selling_price",
 			"fieldtype": "Currency",
+			"width": 150
+		},
+		{
+			"label": "Created At",
+			"fieldname": "creation",
+			"fieldtype": "Date",
 			"width": 150
 		}
 	]
