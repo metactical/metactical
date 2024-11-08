@@ -30,6 +30,7 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 		adjust_amount
 	)
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 
 class SalesOrderCustom(SalesOrder):
 	def validate(self):
@@ -83,6 +84,20 @@ class SalesOrderCustom(SalesOrder):
 		}
 		process_credit_card_tokens(obj, self.customer)
 		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
+
+	def on_submit(self):
+		super(SalesOrderCustom, self).on_submit()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+
+	def on_cancel(self):
+		super(SalesOrderCustom, self).on_cancel()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
 @frappe.whitelist()
 def save_cancel_reason(**args):

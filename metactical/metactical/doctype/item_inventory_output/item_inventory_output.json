@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:item_code",
+ "creation": "2024-11-07 14:18:12.883547",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "column_break_linoq",
+  "qoh",
+  "section_break_1ngjh",
+  "item_inventory_output_list"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item Code",
+   "options": "Item",
+   "unique": 1
+  },
+  {
+   "fieldname": "item_inventory_output_list",
+   "fieldtype": "Table",
+   "label": "Item Inventory Output List",
+   "options": "Item Inventory Output List"
+  },
+  {
+   "fieldname": "column_break_linoq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_1ngjh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "qoh",
+   "fieldtype": "Int",
+   "label": "QOH"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-11-08 04:27:23.032062",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Inventory Output",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
