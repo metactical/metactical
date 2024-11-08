@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "item_code",
+  "ifw_retailskusuffix",
   "column_break_linoq",
   "qoh",
   "section_break_1ngjh",
@@ -40,11 +41,18 @@
    "fieldname": "qoh",
    "fieldtype": "Int",
    "label": "QOH"
+  },
+  {
+   "fetch_from": "item_code.ifw_retailskusuffix",
+   "fetch_if_empty": 1,
+   "fieldname": "ifw_retailskusuffix",
+   "fieldtype": "Data",
+   "label": "RetailSKUSuffix"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-11-08 04:27:23.032062",
+ "modified": "2024-11-08 09:08:33.009436",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Inventory Output",
