@@ -9,10 +9,15 @@ class ItemInventoryOutput(Document):
 
 def on_sle_update(doc, method):
 	# Fetch bins and calculate net available quantities per warehouse
-	net_available_bins = get_all_bins(doc.item_code)
-	for bin in net_available_bins:
-		if bin == doc.warehouse:
-			net_available_bins[bin] += doc.actual_qty
+	all_bins = get_all_bins(doc.item_code)
+	net_available_bins = {}
+	for bin in all_bins:
+		if bin.warehouse == doc.warehouse and doc.voucher_type != 'Stock Reconciliation':
+			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty + doc.actual_qty
+		elif bin.warehouse == doc.warehouse and doc.voucher_type == 'Stock Reconciliation':
+			net_available_bins[bin.warehouse] = doc.qty_after_transaction - bin.reserved_qty
+		else:
+			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
 
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, queue='default')
 
@@ -23,8 +28,7 @@ def get_all_bins(item_code):
 		fields=["warehouse", "actual_qty", "reserved_qty"]
 	)
 
-	net_available_bins = frappe._dict({x.warehouse: x.actual_qty - x.reserved_qty for x in all_bins})
-	return net_available_bins
+	return all_bins
 	
 def update_item_inventory_output(item_code, net_available_bins = {}):
 	try:
@@ -33,7 +37,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			return
 
 		if not net_available_bins:
-			net_available_bins = get_all_bins(item_code)
+			all_bins = get_all_bins(item_code)
+			net_available_bins = frappe._dict({x.warehouse: x.actual_qty - x.reserved_qty for x in all_bins})
 
 		# Fetch lead sources and map website deduct quantities by lead source
 		website_deduct_qty = frappe.get_all(
@@ -57,6 +62,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 
 		# Loop through each lead source to calculate quantity to send
 		for lead_source in lead_sources:
+			
 			allowed_warehouses = frappe.get_all(
 				'SB Warehouse Inventory Sync', 
 				filters={'parent': lead_source}, 
