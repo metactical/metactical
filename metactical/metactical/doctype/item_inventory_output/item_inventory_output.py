@@ -28,6 +28,10 @@ def get_all_bins(item_code):
 	
 def update_item_inventory_output(item_code, net_available_bins = {}):
 	try:
+		maintain_stock = frappe.db.get_value('Item', item_code, 'is_stock_item')
+		if not maintain_stock:
+			return
+
 		if not net_available_bins:
 			net_available_bins = get_all_bins(item_code)
 
@@ -49,6 +53,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			item_inventory_output = frappe.get_doc('Item Inventory Output', item_inventory_output)
 			item_inventory_output.item_inventory_output_list = []
 
+		retail_sku = frappe.db.get_value('Item', item_code, 'ifw_retailskusuffix')
+
 		# Loop through each lead source to calculate quantity to send
 		for lead_source in lead_sources:
 			allowed_warehouses = frappe.get_all(
@@ -66,7 +72,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			item_inventory_output_data = frappe.new_doc('Item Inventory Output List')
 			item_inventory_output_data.update({
 				"lead_source": lead_source,
-				"qty": qty_to_send_to_sb
+				"qty": qty_to_send_to_sb,
+				"ifw_retailskusuffix": retail_sku
 			})
 			item_inventory_output.item_inventory_output_list.append(item_inventory_output_data)
 
@@ -74,7 +81,6 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 		total_available_qty = sum(net_available_bins.values())
 		item_inventory_output.qoh = total_available_qty
 		item_inventory_output.save()
-		frappe.msgprint('Item Inventory Output Updated')
 		frappe.db.commit()
 
 	except Exception as e:
