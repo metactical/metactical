@@ -14,6 +14,7 @@ from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 
 class SalesOrderCustom(SalesOrder):
 	def validate(self):
