@@ -141,6 +141,9 @@ doc_events = {
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
+	"Stock Ledger Entry": {
+		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+	}
 }
 
 # DocType Class
