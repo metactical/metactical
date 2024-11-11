@@ -227,8 +227,8 @@ def execute(filters=None):
 
 		# motnhly stock
 		average_monthly_consumption_12, average_monthly_consumption_24 = get_monthly_consumption(i.get("item_code"), i.get("creation"), filters, sales_data)
-		row["monthly_stock_12m"] = (((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_12) if average_monthly_consumption_12 > 0 else row["total_actual_qty"] + row["us_qoh"]) * 100 / 100
-		row["monthly_stock_24m"] = (((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24) if average_monthly_consumption_24 > 0 else row["total_actual_qty"] + row["us_qoh"]) * 100 / 100
+		row["monthly_stock_12m"] = ((row.get("wh_whs")/average_monthly_consumption_12) if average_monthly_consumption_12 > 0 else row.get("wh_whs")) * 100 / 100
+		row["monthly_stock_24m"] = (((row["total_actual_qty"] + row["us_qoh"])/average_monthly_consumption_24) if average_monthly_consumption_24 > 0 else row.get("wh_whs")) * 100 / 100
 
 		# NoStockOut12M
 		row["no_stock_out_12m"] = get_stock_out_days(i.get("item_code"), years_before, filters)
