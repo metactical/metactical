@@ -32,6 +32,13 @@ def get_all_bins(item_code):
 	
 def update_item_inventory_output(item_code, net_available_bins = {}):
 	try:
+		# get price lists from the item price list
+		price_lists = frappe.get_all(
+			'Item Price', 
+			filters={'item_code': item_code}, 
+			pluck="price_list"
+		)
+
 		maintain_stock = frappe.db.get_value('Item', item_code, 'is_stock_item')
 		if not maintain_stock:
 			return
@@ -47,7 +54,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			fields=["lead_source", "qty"]
 		)
 		website_deduct_qty_dict = frappe._dict({x.lead_source: x.qty for x in website_deduct_qty})
-		lead_sources = frappe.get_all('Lead Source', pluck='name', filters={"name": ["in", website_deduct_qty_dict.keys()]})
+		lead_sources_in_website_deduct_qty = [x.lead_source for x in website_deduct_qty]
+		lead_sources = frappe.get_all('Lead Source', pluck='name', filters={"custom_neb_price_list": ["in", price_lists]})
 
 		# Check for existing Item Inventory Output, create new if not found
 		item_inventory_output = frappe.db.get_value('Item Inventory Output', {'name': item_code})
@@ -62,7 +70,6 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 
 		# Loop through each lead source to calculate quantity to send
 		for lead_source in lead_sources:
-			
 			allowed_warehouses = frappe.get_all(
 				'SB Warehouse Inventory Sync', 
 				filters={'parent': lead_source}, 
@@ -72,7 +79,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			# Sum total available quantity across allowed warehouses for the lead source
 			total_available_qty = sum(net_available_bins.get(warehouse, 0) for warehouse in allowed_warehouses)
 			qty_to_deduct = website_deduct_qty_dict.get(lead_source, 0)
-			qty_to_send_to_sb = max(0, total_available_qty - qty_to_deduct)  # Avoid negative quantities
+			qty_to_send_to_sb = max(0, total_available_qty - qty_to_deduct) if lead_source in lead_sources_in_website_deduct_qty else 0
 
 			# Append item inventory output data
 			item_inventory_output_data = frappe.new_doc('Item Inventory Output List')
