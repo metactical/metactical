@@ -79,7 +79,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			# Sum total available quantity across allowed warehouses for the lead source
 			total_available_qty = sum(net_available_bins.get(warehouse, 0) for warehouse in allowed_warehouses)
 			qty_to_deduct = website_deduct_qty_dict.get(lead_source, 0)
-			qty_to_send_to_sb = max(0, total_available_qty - qty_to_deduct) if lead_source in lead_sources_in_website_deduct_qty else 0
+			qty_to_send_to_sb = max(0, total_available_qty - qty_to_deduct)
 
 			# Append item inventory output data
 			item_inventory_output_data = frappe.new_doc('Item Inventory Output List')

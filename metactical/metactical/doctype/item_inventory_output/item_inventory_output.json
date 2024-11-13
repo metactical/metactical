@@ -40,7 +40,7 @@
   {
    "fieldname": "qoh",
    "fieldtype": "Int",
-   "label": "QOH"
+   "label": "Active Warehouses QOH"
   },
   {
    "fetch_from": "item_code.ifw_retailskusuffix",
@@ -52,7 +52,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-11-08 09:08:33.009436",
+ "modified": "2024-11-13 06:43:04.843352",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Inventory Output",
