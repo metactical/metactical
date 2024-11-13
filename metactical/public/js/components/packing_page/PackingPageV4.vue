@@ -31,7 +31,7 @@
                   <button class="btn btn-primary cursor-pointer" @click="packSelectedItems">Pack Selected Items</button>
                 </div>
                 <div class="text-center mt-2" v-if="filters.stock_entry && Object.keys(all_packed_items).length && Object.keys(pending_items).length">
-                  <button class="btn btn-danger cursor-pointer" v-if="all_packed_items" @click="RemoveRemainingItems">Remove Remaining Items</button>
+                  <button class="btn btn-danger cursor-pointer" v-if="all_packed_items" @click="RemoveRemainingItems()">Remove Remaining Items & Submit</button>
                 </div>
               </div>
             </section>
@@ -174,7 +174,7 @@ export default {
       this.selected_document = filters.delivery_note || filters.stock_entry;
       if (this.selected_document)
         this.getItems();
-      else{
+      else {
         this.pending_items = [];
         this.packed_items = [];
         this.current_item = {};
@@ -330,6 +330,11 @@ export default {
         btn: $(".primary-action"),
         callback: () => {
           this.packed_items = [];
+
+          if (this.pending_items.length === 0 && this.filters.stock_entry) {
+            this.RemoveRemainingItems();
+          }
+
           $(".pack-items-btn").addClass("d-none");
           this.getAllPackedItems();
           this.refresh();
@@ -357,6 +362,7 @@ export default {
       const delivery_note = this.filters.delivery_note;
       this.selected_delivery_note = delivery_note;
       this.selected_stock_entry = this.filters.stock_entry;
+      $(".pack-items-btn").addClass("d-none");
 
       var packing_slip_doctype = ""
       if (this.selected_stock_entry) {
@@ -382,12 +388,15 @@ export default {
           callback: (r) => {
             const items = r.docs[0].items;
             if (items.length) this.cur_packing_slip = r.docs[0];
+
             frappe.call("metactical.api.packing_slip.get_item_master", { items }).then((r) => {
               this.pending_items = r.message;
-              this.pending_items.forEach((item) => {
-                item.dn_detail = item.ste_detail
-              });
-
+              if (this.filters.stock_entry) {
+                this.pending_items.forEach((item) => {
+                  item.dn_detail = item.ste_detail
+                });
+              }
+ 
               this.current_item = this.pending_items[0] || {};
               this.packed_items = [];
             });
@@ -399,18 +408,28 @@ export default {
 
     RemoveRemainingItems() {
       var me = this
+      var pending_items = true ? this.pending_items.length : false;
+
       if (this.all_packed_items) {
-        frappe.confirm("Are you sure you want to remove all remaining items?", () => {
+        var message = "";
+        if (pending_items) {
+          message = "Remove all remaining items and submit the Stock Entry?";
+        }
+        else {
+          message = "Submit the Stock Entry?";
+        }
+
+        frappe.confirm(message, () => {
           frappe.call({
             method: "metactical.metactical.page.packing_page_v4.packing_page_v4.remove_remaining_items",
-            args: { packing_slips: Object.keys(this.all_packed_items), stock_entry: this.filters.stock_entry },
+            args: { "packing_slips": Object.keys(this.all_packed_items), "stock_entry": this.filters.stock_entry, "has_pending_items": pending_items },
             callback: (r) => {
               if (r.success) {
                 me.refresh();
                 frappe.msgprint(r.message)
               }
-              else{
-                frappe.msgprint(r.message)
+              else {
+                frappe.msgprint(r.message+" Please try again.")
               }
             },
           });

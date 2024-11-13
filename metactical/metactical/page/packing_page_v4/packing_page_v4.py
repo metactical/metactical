@@ -102,41 +102,41 @@ def get_all_packed_items(delivery_note, stock_entry=None):
 	frappe.response["packed_packing_slips"] = packing_slips
 
 @frappe.whitelist()
-def remove_remaining_items(packing_slips, stock_entry):
+def remove_remaining_items(packing_slips, stock_entry, has_pending_items = False):
 	packing_slips = json.loads(packing_slips)
+	stock_entry_name = stock_entry
 
 	try:
-		packing_slips = frappe.get_all("STE Packing Slip Item", filters={"parent": ["in", packing_slips]}, fields=["name", "docstatus", "ste_detail", "qty"])
-		packed_qty = {}
+		if has_pending_items:
+			packing_slips = frappe.get_all("STE Packing Slip Item", filters={"parent": ["in", packing_slips]}, fields=["name", "docstatus", "ste_detail", "qty"])
+			packed_qty = {}
 
-		for packing_slip in packing_slips:
-			if packing_slip.ste_detail in packed_qty:
-				packed_qty[packing_slip.ste_detail] += packing_slip.qty
-			else:
-				packed_qty[packing_slip.ste_detail] = packing_slip.qty
+			for packing_slip in packing_slips:
+				if packing_slip.ste_detail in packed_qty:
+					packed_qty[packing_slip.ste_detail] += packing_slip.qty
+				else:
+					packed_qty[packing_slip.ste_detail] = packing_slip.qty
 
-		# Get the packing slip items
-		stock_entry_items = frappe.get_all("Stock Entry Detail", filters={"parent": stock_entry}, fields=["item_code", "qty", "name"])
-		for ste_item in stock_entry_items:
-			if ste_item.name in packed_qty:
-				stock_entry_item = frappe.get_doc("Stock Entry Detail", ste_item.name)
-				ste_item.qty -= (ste_item.qty -packed_qty[ste_item.name])
-				stock_entry_item.qty = ste_item.qty
-				stock_entry_item.save()
-			else:
-				stock_entry_item = frappe.get_doc("Stock Entry Detail", ste_item.name)
-				stock_entry_item.delete()
+			# Get the packing slip items
+			stock_entry_items = frappe.get_all("Stock Entry Detail", filters={"parent": stock_entry}, fields=["item_code", "qty", "name"])
+			for ste_item in stock_entry_items:
+				if ste_item.name in packed_qty:
+					stock_entry_item = frappe.get_doc("Stock Entry Detail", ste_item.name)
+					ste_item.qty -= (ste_item.qty -packed_qty[ste_item.name])
+					stock_entry_item.qty = ste_item.qty
+					stock_entry_item.save()
+				else:
+					stock_entry_item = frappe.get_doc("Stock Entry Detail", ste_item.name)
+					stock_entry_item.delete()
 		
+		stock_entry = frappe.get_doc("Stock Entry", stock_entry)
+		stock_entry.save()
+		stock_entry.submit()
 		frappe.db.commit()
 
-		update_stock_entry = frappe.get_doc("Stock Entry", stock_entry)
-		update_stock_entry.save()
-
 		frappe.response["success"] = True
-		frappe.response["message"] = "Items removed successfully"
+		frappe.response["message"] = "Items removed successfully" if has_pending_items else "Stock Entry submitted successfully"
 
 	except Exception as e:
 		frappe.log_error(title="Unable to remove remaining items in packing page - v4", message=f"Error removing remaining items: {str(e)}")
-		frappe.response["success"] = False
-		frappe.response["message"] = f"Error removing remaining items: {str(e)}"
-			
+		frappe.throw(f"<a href='/app/stock-entry/{stock_entry_name}' target='_blank'>Click here to open <b>{stock_entry_name}</b></a>")
