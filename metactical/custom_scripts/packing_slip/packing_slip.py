@@ -62,7 +62,7 @@ class CustomPackingSlip(PackingSlip):
 				for d in custom_fields:
 					if item.get(d.fieldname):
 						ch.set(d.fieldname, item.get(d.fieldname))
-
+						
 		self.update_item_details()
 
 	def get_details_for_packing(self):
