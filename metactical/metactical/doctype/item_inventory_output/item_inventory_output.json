@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "item_code",
+  "item",
   "ifw_retailskusuffix",
   "column_break_linoq",
   "qoh",
@@ -48,11 +49,18 @@
    "fieldname": "ifw_retailskusuffix",
    "fieldtype": "Data",
    "label": "RetailSKUSuffix"
+  },
+  {
+   "fetch_from": "item_code.item_code",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-11-13 06:43:04.843352",
+ "modified": "2024-11-14 03:08:05.863135",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Inventory Output",
