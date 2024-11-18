@@ -1,6 +1,6 @@
 {
   "charts": [],
-  "content": "[{\"id\":\"Qei47OACFO\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Metactical</span>\",\"col\":12}},{\"id\":\"nSBQ-WK7Vv\",\"type\":\"card\",\"data\":{\"card_name\":\"Stock Management\",\"col\":4}},{\"id\":\"eVP1IJpnpW\",\"type\":\"card\",\"data\":{\"card_name\":\"Pick Lists and Packing\",\"col\":4}},{\"id\":\"Y3THNEW2zM\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"dAU-MaJSwN\",\"type\":\"card\",\"data\":{\"card_name\":\"Bulk Updates\",\"col\":4}},{\"id\":\"qI7139Fmn5\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Items\",\"col\":4}},{\"id\":\"Yme2Sx3yX1\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Reports\",\"col\":4}},{\"id\":\"JIzfBRvj_a\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"m2R32o75kD\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}}]",
+  "content": "[{\"id\":\"Qei47OACFO\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Metactical</span>\",\"col\":12}},{\"id\":\"nSBQ-WK7Vv\",\"type\":\"card\",\"data\":{\"card_name\":\"Stock Management\",\"col\":4}},{\"id\":\"eVP1IJpnpW\",\"type\":\"card\",\"data\":{\"card_name\":\"Pick Lists and Packing\",\"col\":4}},{\"id\":\"Y3THNEW2zM\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"dAU-MaJSwN\",\"type\":\"card\",\"data\":{\"card_name\":\"Bulk Updates\",\"col\":4}},{\"id\":\"qI7139Fmn5\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Items\",\"col\":4}},{\"id\":\"Yme2Sx3yX1\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Reports\",\"col\":4}},{\"id\":\"JIzfBRvj_a\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"m2R32o75kD\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"1YbgcT7H5-\",\"type\":\"card\",\"data\":{\"card_name\":\"Data Analytics\",\"col\":4}}]",
   "creation": "2024-08-11 07:28:17.664552",
   "custom_blocks": [],
   "docstatus": 0,
@@ -579,6 +579,16 @@
    {
     "hidden": 0,
     "is_query_report": 1,
+    "label": "Detailed Sales Report - V2",
+    "link_count": 0,
+    "link_to": "Detailed Sales Report - V2",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
     "label": "Sales Report With Item Class Suggest",
     "link_count": 0,
     "link_to": "Sales Report with Item Class Suggest",
@@ -952,9 +962,48 @@
     "link_type": "DocType",
     "onboard": 0,
     "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Data Analytics",
+    "link_count": 1,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Current Stock Report - V1",
+    "link_count": 0,
+    "link_to": "Current Stock Report - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Details Report - V1",
+    "link_count": 0,
+    "link_to": "Item Details Report - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Supplier Purchase Order - V1",
+    "link_count": 0,
+    "link_to": "Supplier Purchase Order - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
    }
   ],
-  "modified": "2024-10-14 17:21:36.331607",
+  "modified": "2024-10-24 10:43:15.209163",
   "modified_by": "Administrator",
   "module": "Metactical",
   "name": "Metactical",
