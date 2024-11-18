@@ -1,60 +1,75 @@
 {
- "actions": [],
- "allow_rename": 1,
- "creation": "2023-06-04 10:57:28.556265",
- "doctype": "DocType",
- "editable_grid": 1,
- "engine": "InnoDB",
- "field_order": [
-  "allowed_user",
-  "section_break_p947q",
-  "default_warehouses",
-  "default_weight_uom"
- ],
- "fields": [
-  {
-   "fieldname": "allowed_user",
-   "fieldtype": "Table",
-   "label": "Click to Add Allowed Users",
-   "options": "Packing Allowed User"
-  },
-  {
-   "fieldname": "section_break_p947q",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "default_warehouses",
-   "fieldtype": "Table",
-   "label": "Default Warehouses",
-   "options": "Packing Default Warehouse"
-  },
-  {
-   "fieldname": "default_weight_uom",
-   "fieldtype": "Link",
-   "label": "Default Weight UOM",
-   "options": "UOM"
-  }
- ],
- "index_web_pages_for_search": 1,
- "issingle": 1,
- "links": [],
- "modified": "2023-07-31 11:11:54.011289",
- "modified_by": "Administrator",
- "module": "Metactical",
- "name": "Packing Settings",
- "owner": "Administrator",
- "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "print": 1,
-   "read": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  }
- ],
- "sort_field": "modified",
- "sort_order": "DESC"
-}
+  "actions": [],
+  "allow_rename": 1,
+  "creation": "2023-06-04 10:57:28.556265",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+   "allowed_user",
+   "allowed_user_to_multi_pack",
+   "section_break_p947q",
+   "default_warehouses",
+   "default_weight_uom",
+   "multi_pack_if_qty"
+  ],
+  "fields": [
+   {
+    "fieldname": "allowed_user",
+    "fieldtype": "Table",
+    "label": "Click to Add Allowed Users",
+    "options": "Packing Allowed User"
+   },
+   {
+    "fieldname": "section_break_p947q",
+    "fieldtype": "Section Break"
+   },
+   {
+    "fieldname": "default_warehouses",
+    "fieldtype": "Table",
+    "label": "Default Warehouses",
+    "options": "Packing Default Warehouse"
+   },
+   {
+    "fieldname": "default_weight_uom",
+    "fieldtype": "Link",
+    "label": "Default Weight UOM",
+    "options": "UOM"
+   },
+   {
+    "fieldname": "multi_pack_if_qty",
+    "fieldtype": "Int",
+    "label": "Allow Multiple Items Packing if Quantity Exceeds"
+   },
+   {
+    "description": "Users added here will have the ability to add multiple quanitity at a time when the quantity exceeds the value specified in the settings.",
+    "fieldname": "allowed_user_to_multi_pack",
+    "fieldtype": "Table",
+    "label": "Add Multiple Qty Allowed Users",
+    "options": "Packing Allowed User"
+   }
+  ],
+  "index_web_pages_for_search": 1,
+  "issingle": 1,
+  "links": [],
+  "modified": "2024-10-23 14:30:04.448478",
+  "modified_by": "Administrator",
+  "module": "Metactical",
+  "name": "Packing Settings",
+  "owner": "Administrator",
+  "permissions": [
+   {
+    "create": 1,
+    "delete": 1,
+    "email": 1,
+    "print": 1,
+    "read": 1,
+    "role": "System Manager",
+    "share": 1,
+    "write": 1
+   }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": []
+ }
