@@ -145,6 +145,9 @@ doc_events = {
 	},
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+	},
+	"Item": {
+		"on_update": "metactical.custom_scripts.item.item.on_update"
 	}
 }
 
