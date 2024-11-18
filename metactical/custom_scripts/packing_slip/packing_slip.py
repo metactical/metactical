@@ -2,6 +2,7 @@ import frappe
 from erpnext.stock.doctype.packing_slip.packing_slip import PackingSlip
 from frappe.utils import cint, flt
 from frappe.model import no_value_fields
+from frappe import _	
 
 class CustomPackingSlip(PackingSlip):
 	def on_submit(self):
