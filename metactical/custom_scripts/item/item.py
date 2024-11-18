@@ -35,10 +35,8 @@ def on_update(doc, method):
 
     # Trigger update if deduct_qty was changed
     if deduct_qty_updated:
-        frappe.msgprint("Updating item inventory output due to changes in deduct_qty.")
         frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
 
     # Check for removed lead sources and trigger updates for them
     elif removed_lead_sources:
-        frappe.msgprint(f"Updating item inventory output for removed lead sources: {removed_lead_sources}")
         frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
