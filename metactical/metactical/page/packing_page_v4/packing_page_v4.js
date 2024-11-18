@@ -28,3 +28,7 @@ class PackingPage {
 var openPackingSlip = function (doc) {
     window.open(`/app/packing-slip/${doc}`, "_blank");
 };
+
+var openSTEPackingSlip = function (doc) {
+    window.open(`/app/ste-packing-slip/${doc}`, "_blank");
+};

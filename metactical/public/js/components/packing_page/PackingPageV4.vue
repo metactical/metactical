@@ -128,8 +128,12 @@ export default {
 
             let packed_items = "";
             Object.entries(this.all_packed_items).forEach(([packing_slip, items]) => {
-                packed_items += `<h5 class="cursor-pointer" onclick="openPackingSlip('${packing_slip}')">${packing_slip}</h5>`;
-                const parcel_details = this.packed_packing_slips[packing_slip];
+                if (this.filters.stock_entry) 
+                    packed_items += `<h5 class="cursor-pointer" onclick="openSTEPackingSlip('${packing_slip}')">${packing_slip}</h5>`;
+                else
+                    packed_items += `<h5 class="cursor-pointer" onclick="openPackingSlip('${packing_slip}')">${packing_slip}</h5>`;
+                
+                    const parcel_details = this.packed_packing_slips[packing_slip];
                 if (parcel_details) {
                     packed_items += `
               <table class='table table-bordered packing-slip-parcel my-0'>
