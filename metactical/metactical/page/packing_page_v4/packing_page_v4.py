@@ -1,4 +1,4 @@
-import frappe
+import frappe, json
 
 @frappe.whitelist()
 def get_delivery_from_tote(tote, warehouse):
@@ -11,11 +11,11 @@ def get_delivery_from_tote(tote, warehouse):
 	
 @frappe.whitelist()
 def check_to_add_permission():
-	has_permission = frappe.db.exists('Packing Allowed User', {"user": frappe.session.user})
-	if not has_permission:
-		return False
-	else:
-		return True
+	has_add_permission = frappe.db.exists('Packing Allowed User', {"user": frappe.session.user, "parentfield": "allowed_user"})
+	has_add_multiple_permission = frappe.db.exists('Packing Allowed User', {"user": frappe.session.user, "parentfield": "allowed_user_to_multi_pack"})
+
+	frappe.response["has_add_permission"] = has_add_permission
+	frappe.response["has_add_multiple_permission"] = has_add_multiple_permission
 		
 @frappe.whitelist()
 def get_default_warehouse():
@@ -59,20 +59,37 @@ def set_item_values(item, values):
 		return {"success": True, "message": "Item updated successfully"}
 
 	except Exception as e:
-		frappe.log_error(f"Error updating item {item_name}: {str(e)}")
+		frappe.log_error(title="Unable to update item in packing page - v4", message=f"Error updating item {item}: {str(e)}")
 		return {"success": False, "message": f"Error updating item: {str(e)}"}
 
 @frappe.whitelist()
-def get_all_packed_items(delivery_note):
-	packed_items = frappe.db.sql("""
+def get_all_packed_items(delivery_note, stock_entry=None):
+	doctype = "STE Packing Slip"
+	field = "stock_entry"
+	value = stock_entry if stock_entry else delivery_note
+
+	if delivery_note:
+		doctype = "Packing Slip"
+		field = "delivery_note"
+
+	packed_items = frappe.db.sql(f"""
 		SELECT
-			item_code, item_name, stock_uom, qty, net_weight, `tabPacking Slip Item`.parent AS packing_slip
+			psi.item_code, psi.item_name, psi.stock_uom, psi.qty, 
+			psi.net_weight, psi.parent AS packing_slip,
+			i.ifw_retailskusuffix
 		FROM
-			`tabPacking Slip Item`
-			JOIN `tabPacking Slip` ON `tabPacking Slip`.name = `tabPacking Slip Item`.parent
+			`tab{doctype} Item` psi
+			JOIN `tab{doctype}` ON `tab{doctype}`.name = psi.parent
+			JOIN `tabItem` i ON i.item_code = psi.item_code
 		WHERE
-			`tabPacking Slip`.delivery_note = %s and `tabPacking Slip`.docstatus = 1
-	""", delivery_note, as_dict=1)
+			`tab{doctype}`.{field} = %s and `tab{doctype}`.docstatus = 1
+		ORDER BY
+			`tab{doctype}`.creation ASC
+	""", value, as_dict=1)
+
+	packing_slips = frappe.db.get_list(doctype, filters={field: value, "docstatus": 1}, 
+									fields=["name", "custom_neb_box_height", "custom_neb_box_length", "custom_neb_box_width", "gross_weight_pkg", "custom_neb_parcel_template", "from_case_no"])
+	packing_slips = {pl["name"]: pl for pl in packing_slips}
 
 	# group the items by packing slip
 	packed_items_dict = {}
@@ -82,3 +99,44 @@ def get_all_packed_items(delivery_note):
 		packed_items_dict[item.packing_slip].append(item)
 
 	frappe.response["items"] = packed_items_dict
+	frappe.response["packed_packing_slips"] = packing_slips
+
+@frappe.whitelist()
+def remove_remaining_items(packing_slips, stock_entry, has_pending_items = False):
+	packing_slips = json.loads(packing_slips)
+	stock_entry_name = stock_entry
+
+	try:
+		if has_pending_items:
+			packing_slips = frappe.get_all("STE Packing Slip Item", filters={"parent": ["in", packing_slips]}, fields=["name", "docstatus", "ste_detail", "qty"])
+			packed_qty = {}
+
+			for packing_slip in packing_slips:
+				if packing_slip.ste_detail in packed_qty:
+					packed_qty[packing_slip.ste_detail] += packing_slip.qty
+				else:
+					packed_qty[packing_slip.ste_detail] = packing_slip.qty
+
+			# Get the packing slip items
+			stock_entry_items = frappe.get_all("Stock Entry Detail", filters={"parent": stock_entry}, fields=["item_code", "qty", "name"])
+			for ste_item in stock_entry_items:
+				if ste_item.name in packed_qty:
+					stock_entry_item = frappe.get_doc("Stock Entry Detail", ste_item.name)
+					ste_item.qty -= (ste_item.qty -packed_qty[ste_item.name])
+					stock_entry_item.qty = ste_item.qty
+					stock_entry_item.save()
+				else:
+					stock_entry_item = frappe.get_doc("Stock Entry Detail", ste_item.name)
+					stock_entry_item.delete()
+		
+		stock_entry = frappe.get_doc("Stock Entry", stock_entry)
+		stock_entry.save()
+		stock_entry.submit()
+		frappe.db.commit()
+
+		frappe.response["success"] = True
+		frappe.response["message"] = "Items removed successfully" if has_pending_items else "Stock Entry submitted successfully"
+
+	except Exception as e:
+		frappe.log_error(title="Unable to remove remaining items in packing page - v4", message=f"Error removing remaining items: {str(e)}")
+		frappe.throw(f"<a href='/app/stock-entry/{stock_entry_name}' target='_blank'>Click here to open <b>{stock_entry_name}</b></a>")

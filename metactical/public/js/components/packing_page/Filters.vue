@@ -1,15 +1,18 @@
 <template>
   <div class="row">
-    <div class="col-md-3">
+    <div class="col-md-2">
       <div class="warehouse-wrapper pt-2"></div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
       <div class="picklist-tote-wrapper pt-2"></div>
     </div>
     <div class="col-md-3">
       <div class="delivery-note-wrapper pt-2"></div>
     </div>
     <div class="col-md-3">
+      <div class="stock-entry-wrapper pt-2"></div>
+    </div>
+    <div class="col-md-2">
       <div class="item-barcode-wrapper pt-2"></div>
     </div>
   </div>
@@ -20,6 +23,7 @@ export default {
     return {
       filters: {
         delivery_note: "",
+        stock_entry: "",
         item_barcode: "",
         tote_barcode: "",
         selected_warehouse: "",
@@ -31,17 +35,6 @@ export default {
     this.makeFilters();
   },
   methods: {
-    get_warehouse() {
-      var me = this;
-
-    },
-    ShowPendingItems() {
-      // Show pending items
-    },
-    packSelectedItems() {
-      // Pack selected items
-    },
-
     makeFilters() {
       // delivery note control
       var me = this
@@ -62,11 +55,59 @@ export default {
             };
           },
           change() {
+            // console.log("Delivery Note Changed", delivery_note_field.get_value());
             var is_focused = $(`#page-packing-page-v4  [data-fieldname='delivery_note']`).is(":focus")
             if (is_focused)
               $(`#page-packing-page-v4 [data-fieldname='delivery_note']`).blur();
-            else {
+            else if (delivery_note_field.get_value() != "") {
+              if (me.filters.stock_entry != ""){
+                stock_entry_field.set_value("");
+                me.filters.stock_entry = "";
+              }
+
               me.filters.delivery_note = delivery_note_field.get_value();
+              me.$emit("filtersUpdated", me.filters);
+            }
+            else{
+              me.filters.delivery_note = "";
+              me.$emit("filtersUpdated", me.filters);
+            }
+          }
+        },
+        render_input: true,
+      });
+
+      // stock entry control
+      let stock_entry_field = frappe.ui.form.make_control({
+        parent: $(".stock-entry-wrapper"),
+        df: {
+          label: "Stock Entry",
+          fieldname: "stock_entry",
+          fieldtype: "Link",
+          options: "Stock Entry",
+          get_query: () => {
+            return {
+              filters: {
+                docstatus: 0
+              },
+            };
+          },
+          change() {
+            var is_focused = $(`#page-packing-page-v4  [data-fieldname='stock_entry']`).is(":focus")
+            console.log("Stock Entry Changed", stock_entry_field.get_value());
+            if (is_focused)
+              $(`#page-packing-page-v4 [data-fieldname='stock_entry']`).blur();
+            else if (stock_entry_field.get_value() != "") {
+              if (me.filters.delivery_note != ""){
+                delivery_note_field.set_value("");
+                me.filters.delivery_note = "";
+              }
+
+              me.filters.stock_entry = stock_entry_field.get_value();
+              me.$emit("filtersUpdated", me.filters);
+            }
+            else{
+              me.filters.stock_entry = "";
               me.$emit("filtersUpdated", me.filters);
             }
           },
@@ -83,39 +124,38 @@ export default {
           get_query: function () {
             return {
               filters: [
-                ["warehouse", "=", selected_warehouse_field.get_value()],
+                ["warehouse", "=", me.filters.selected_warehouse],
                 ["current_delivery_note", "is", "set"]
               ]
             }
-          },
-          change: function () {
-            $('.picklist-tote-wrapper').on('keypress', function (event) {
-              //Only when enter is pressed
-              if (event.keyCode == 13) {
-                frappe.call({
-                  method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_delivery_from_tote",
-                  args: {
-                    tote: tote_barcode_field.get_value(),
-                    warehouse: selected_warehouse.get_value()
-                  },
-                  freeze: true,
-                  callback: function (ret) {
-                    let is_tote = ret.message.is_tote;
-                    if (is_tote) {
-                      delivery_note_field.set_value(ret.message.delivery_note);
-                    }
-                    else {
-                      frappe.throw("Error: No tote registered at warehouse with that name. Please check and try again.");
-                    }
-                  }
-                });
-              }
-            });
           }
         },
         render_input: true
       });
 
+      tote_barcode_field.$input.on('keypress', function (e) {
+        //Only when enter is pressed
+          if (event.keyCode == 13) {
+            me.filters.tote_barcode = tote_barcode_field.get_value();
+            frappe.call({
+              method: "metactical.metactical.page.packing_page_v4.packing_page_v4.get_delivery_from_tote",
+              args: {
+                tote: me.filters.tote_barcode,
+                warehouse: selected_warehouse_field.get_value()
+              },
+              freeze: true,
+              callback: function (ret) {
+                let is_tote = ret.message.is_tote;
+                if (is_tote) {
+                  delivery_note_field.set_value(ret.message.delivery_note);
+                }
+                else {
+                  frappe.throw("Error: No tote registered at warehouse with that name. Please check and try again.");
+                }
+              }
+            });
+          }
+      });
 
 
       // item barcode control
@@ -136,7 +176,7 @@ export default {
         render_input: true,
       });
 
-      let selected_warehouse_field = frappe.ui.form.make_control({
+      var selected_warehouse_field = frappe.ui.form.make_control({
         parent: $('.warehouse-wrapper'),
         df: {
           label: 'Warehouse',
@@ -149,7 +189,7 @@ export default {
               $('.picklist-tote-wrapper').show();
             else
               $('.picklist-tote-wrapper').hide();
-            me.selected_warehouse = selected_warehouse_field.get_value()
+            me.filters.selected_warehouse = selected_warehouse_field.get_value()
           }
         },
         render_input: true

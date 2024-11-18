@@ -18,6 +18,25 @@ class CustomPackingSlip(PackingSlip):
 			})
 			doc.save(ignore_permissions=True)
 
+	def calculate_net_total_pkg(self):
+		self.net_weight_uom = self.items[0].weight_uom if self.items else None
+		# self.gross_weight_uom = self.net_weight_uom
+
+		net_weight_pkg = 0
+		for item in self.items:
+			if item.weight_uom != self.net_weight_uom:
+				frappe.throw(
+					_(
+						"Different UOM for items will lead to incorrect (Total) Net Weight value. Make sure that Net Weight of each item is in the same UOM."
+					)
+				)
+
+			net_weight_pkg += flt(item.net_weight) * flt(item.qty)
+
+		self.net_weight_pkg = round(net_weight_pkg, 2)
+		if not flt(self.gross_weight_pkg):
+			self.gross_weight_pkg = self.net_weight_pkg
+
 	# Metactical Customization: get_items and get_details_for_packing functions have been removed from 
 	# version 14 but we maintin them here for the Packing Slip page to work as expected
 	@frappe.whitelist()
@@ -31,9 +50,9 @@ class CustomPackingSlip(PackingSlip):
 			if flt(item.qty) > flt(item.packed_qty) and item.item_code not in shipping_items:
 				ch = self.append("items", {})
 				ch.item_code = item.item_code
+				ch.ifw_retailskusuffix = item.ifw_retailskusuffix
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
-				ch.dn_detail = item.name
 				ch.description = item.description
 				ch.dn_detail = item.name
 				ch.batch_no = item.batch_no
@@ -43,7 +62,7 @@ class CustomPackingSlip(PackingSlip):
 				for d in custom_fields:
 					if item.get(d.fieldname):
 						ch.set(d.fieldname, item.get(d.fieldname))
-
+						
 		self.update_item_details()
 
 	def get_details_for_packing(self):
@@ -76,16 +95,24 @@ class CustomPackingSlip(PackingSlip):
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabPacking Slip` ps, `tabPacking Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
-				and ps.delivery_note = dni.parent and psi.item_code=dni.item_code) as packed_qty,
+				and ps.delivery_note = dni.parent and psi.dn_detail=dni.name) as packed_qty,
 			stock_uom, item_name, description, dni.batch_no {custom_fields}
 			from `tabDelivery Note Item` dni
 			where parent=%s {condition}
-			group by item_code""".format(
+			group by name""".format(
 				condition=condition, custom_fields=custom_fields
 			),
 			tuple([self.delivery_note] + rows),
 			as_dict=1,
 		)
+
+		item_codes = [d.item_code for d in res]
+		# get retail skus and them to the result
+		retail_skus = frappe.db.get_list('Item', filters={'item_code': ['in', item_codes]}, fields=['item_code', 'ifw_retailskusuffix'])
+		for r in res:
+			for sku in retail_skus:
+				if r.item_code == sku.item_code:
+					r.ifw_retailskusuffix = sku.ifw_retailskusuffix
 
 		ps_item_qty = dict([[d.item_code, d.qty] for d in self.get("items")])
 		no_of_cases = cint(self.to_case_no) - cint(self.from_case_no) + 1
