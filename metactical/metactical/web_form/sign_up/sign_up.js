@@ -57,7 +57,7 @@ frappe.ready(function () {
             frappe.web_form.on("inteli_phone_no", (field, value) => {
               frappe.web_form.set_value("phone_no", phone_no.getNumber());
             });
-
+            
             if (frappe.web_form.get_value("branch") != "Online") {
               frappe.web_form.on("bank_transit_no", (field, value) => {
               // show tooltip if transit digit are not 5
@@ -148,12 +148,9 @@ frappe.ready(function () {
             return false;
           } else if (error == intlTelInputUtils.validationError.TOO_LONG) {
             frappe.msgprint("The phone number is too long");
+            return false;
           }
-        } else {
-          let data = frappe.web_form.get_values();
-          data.phone_no = phone_no.getNumber();
-        }
-
+        } 
 
         // Validate zip code for canada
         if (frappe.web_form.get_value("country") == "Canada") {
