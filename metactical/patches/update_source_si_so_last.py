@@ -19,11 +19,11 @@ def execute():
             if not sales_invoice_list:
                 has_data = False
             else:
-                frappe.enqueue(update_source, sales_invoices_list=sales_invoice_list, queue="long")
+                frappe.enqueue(update_source, sales_invoices_list=sales_invoice_list, doctype=doctype, queue="long")
                 start = start +limit
 
-def update_source(sales_invoices_list):
-    for sales_invoice in sales_invoices_list:
-        frappe.db.set_value("Sales Invoice", sales_invoice.name, "source", "Store - camo - downtown", update_modified=False)
+def update_source(sales_invoices_list, doctype):
+    for doc in sales_invoices_list:
+        frappe.db.set_value(doctype, doc.name, "source", "Store - camo - downtown", update_modified=False)
     
     frappe.db.commit()
