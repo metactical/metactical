@@ -29,7 +29,6 @@ class SalesOrderCustom(SalesOrder):
 			)
 			queue_action(self, "submit", timeout=2000)
 		else:
-			msgprint("The other save button")
 			super().save()
 
 	def validate(self):
