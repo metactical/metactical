@@ -23,7 +23,7 @@ def execute():
                 start = start +limit
 
 def update_source(sales_invoices_list):
-    for sales_invoice in sales_invoice_list:
+    for sales_invoice in sales_invoices_list:
         frappe.db.set_value("Sales Invoice", sales_invoice.name, "source", "Store - camo - downtown", update_modified=False)
     
     frappe.db.commit()
