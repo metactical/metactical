@@ -9,7 +9,7 @@ def execute():
 
         while has_data:
             sales_invoice_list = frappe.db.get_list(
-                "Sales Invoice",
+                doctype,
                 filters={"customer_group": "Retail", "source": ""},
                 fields=["name"],
                 start=start,
