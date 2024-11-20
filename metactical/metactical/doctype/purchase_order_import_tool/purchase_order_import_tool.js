@@ -24,17 +24,17 @@ metactical.PurchaseOrderImportTool = class PurchaseOrderImportTool extends erpne
 	}
 
 	refresh() {
-		if (frm.doc.docstatus == 0 && !frm.doc.__islocal) {
-			frm.add_custom_button(__('Start Import'), function() {
+		if (this.frm.doc.docstatus == 0 && !this.frm.doc.__islocal) {
+			this.frm.add_custom_button(__('Start Import'), function() {
 				frappe.call({
 					method: "runserverobj",
 					freeze: true,
 					args: {
-						docs: frm.doc,
+						docs: this.frm.doc,
 						method: "submit"
 					},
 					callback: function(r) {
-						frm.reload_doc();
+						this.frm.reload_doc();
 					}
 				});
 			})
