@@ -8,6 +8,7 @@ from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_f
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 
 class ItemPriceFromExcel(Document):
+	@frappe.whitelist()
 	def submit(self):
 		frappe.msgprint(
 			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
