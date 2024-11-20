@@ -11,6 +11,7 @@ from frappe.utils.xlsxutils import make_xlsx
 from metactical.metactical.report.pricing_rule_report___v1.pricing_rule_report___v1 import execute
 
 class PricingRuleFromExcel(Document):
+	@frappe.whitelist()
 	def submit(self):
 		frappe.msgprint(
 			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
