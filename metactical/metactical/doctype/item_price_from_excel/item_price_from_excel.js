@@ -11,6 +11,9 @@ frappe.ui.form.on('Item Price From Excel', {
 					docs: frm.doc,
 					method: "submit"
 				},
+				callback: function(r) {
+					frm.reload_doc();
+				}
 			});
 		})
 	}
