@@ -9,8 +9,23 @@ from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
 from erpnext.accounts.utils import convert_to_list
+from frappe.model.docstatus import DocStatus
 
 class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def on_cancel(self):
 		# Metactical Customization: Relink payment entries to sales orders when sales invoice is cancelled
 		if self.doctype in ["Sales Invoice", "Purchase Invoice"]:
