@@ -13,7 +13,7 @@ from metactical.custom_scripts.utils.metactical_utils import queue_action
 
 class CustomPurchaseOrder(PurchaseOrder):
 	def save(self):
-		if self.docstatus == DocStatus.submitted() and len(self.items) > 25 and \
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 100 and \
 			self.ais_queue_status and self.ais_queue_status != "Queued":
 			msgprint(
 				_(
