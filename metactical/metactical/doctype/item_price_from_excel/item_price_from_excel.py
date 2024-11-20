@@ -114,7 +114,8 @@ class ItemPriceFromExcel(Document):
 						"price_list_rate": price,
 					})
 					try:
-						doc.save()
+						if price:
+							doc.save()
 					except Exception as e:
 						frappe.log_error(frappe.get_traceback())
 						error_log = frappe.new_doc("Item Price From Excel Error")
