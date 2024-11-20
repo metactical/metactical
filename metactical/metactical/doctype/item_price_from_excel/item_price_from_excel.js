@@ -3,18 +3,20 @@
 
 frappe.ui.form.on('Item Price From Excel', {
 	refresh: function(frm) {
-		frm.add_custom_button(__('Import'), function() {
-			frappe.call({
-				method: "runserverobj",
-				freeze: true,
-				args: {
-					docs: frm.doc,
-					method: "submit"
-				},
-				callback: function(r) {
-					frm.reload_doc();
-				}
-			});
-		})
+		if (frm.doc.docstatus == 0 && !frm.doc.__islocal) {
+			frm.add_custom_button(__('Start Import'), function() {
+				frappe.call({
+					method: "runserverobj",
+					freeze: true,
+					args: {
+						docs: frm.doc,
+						method: "submit"
+					},
+					callback: function(r) {
+						frm.reload_doc();
+					}
+				});
+			})
+		}
 	}
 });
