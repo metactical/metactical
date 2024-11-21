@@ -2,6 +2,7 @@ import frappe
 from erpnext.stock.doctype.packing_slip.packing_slip import PackingSlip
 from frappe.utils import cint, flt
 from frappe.model import no_value_fields
+from frappe import _	
 
 class CustomPackingSlip(PackingSlip):
 	def on_submit(self):
@@ -53,7 +54,6 @@ class CustomPackingSlip(PackingSlip):
 				ch.ifw_retailskusuffix = item.ifw_retailskusuffix
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
-				ch.dn_detail = item.name
 				ch.description = item.description
 				ch.dn_detail = item.name
 				ch.batch_no = item.batch_no

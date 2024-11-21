@@ -57,7 +57,6 @@ metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.Tra
 
 frappe.ui.form.on('Sales Orders From Excel', {
 	refresh: function(frm) {
-		
 	},
 	setup: function(frm) {
 		frm.set_query('company_address', function(doc) {
