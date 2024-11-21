@@ -184,7 +184,7 @@ def get_columns(filters):
 		{
 			"fieldname": "valid_from",
 			"fieldtype": "Date",
-			"label": "Valid From",
+			"label": "Valid FromDate",
 			"width": 120
 		},
 		{
