@@ -17,15 +17,8 @@ from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
 
 def queue_action(self, action, **kwargs):
-	"""Run an action in background. If the action has an inner function,
-	like _submit for submit, it will call that instead"""
-	# call _submit instead of submit, so you can override submit to call
-	# run_delayed based on some action
-	# See: Stock Reconciliation
+	#Run an action in background
 	from frappe.utils.background_jobs import enqueue
-
-	if hasattr(self, '_' + action):
-		action = '_' + action
 
 	if file_lock.lock_exists(self.get_signature()):
 		frappe.throw(_('This document is currently queued for execution. Please try again'),

@@ -1,7 +1,5 @@
 frappe.ui.form.on('Pick List', {
 	refresh: function(frm){
-		console.log({"socket": frappe.socketio});
-		
 		//Code for custom cancel button that saves cancel reason first
 		if(frm.doc.docstatus == 1){
 			frm.page.clear_secondary_action();
@@ -16,17 +14,6 @@ frappe.ui.form.on('Pick List', {
 			frm.set_value('pl_text', '');
 		}
 		dashboard_pick_list_doctype(frm, "Sales Order");
-
-		if (frm.doc.docstatus == 0){
-			frm.add_custom_button("Submit", () => {
-				frappe.call({
-					method: "metactical.custom_scripts.pick_list.pick_list.submit_pick_list",
-					args: {
-						"doc": frm.doc.name
-					},
-				})
-			});
-		}
 
 	},
 	

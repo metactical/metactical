@@ -10,14 +10,23 @@ from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_f
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe.utils.xlsxutils import make_xlsx
 from metactical.metactical.report.pricing_rule_report___v1.pricing_rule_report___v1 import execute
+from frappe import _, msgprint
+from frappe.model.docstatus import DocStatus
 
 class PricingRuleFromExcel(Document):
-	def submit(self):
-		frappe.msgprint(
-			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
-			the system will add a comment about the error on this document and revert to the Draft stage"""
-		)
-		queue_action(self, "submit", timeout=2000)
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
 	
 	def validate(self):
 		file_content = self.check_file()
