@@ -73,24 +73,3 @@ metactical.PurchaseOrderImportTool = class PurchaseOrderImportTool extends erpne
 };
 
 extend_cscript(cur_frm.cscript, new metactical.PurchaseOrderImportTool({frm: cur_frm}));
-
-frappe.ui.form.on('Purchase Order Import Tool', {
-	refresh: function(frm) {
-		if (frm.doc.docstatus == 0 && !frm.doc.__islocal) {
-			var doc = frm.doc;
-			frm.add_custom_button(__('Start Import'), function() {
-				frappe.call({
-					method: "runserverobj",
-					freeze: true,
-					args: {
-						docs: doc,
-						method: "submit"
-					},
-					callback: function(r) {
-						frm.reload_doc();
-					}
-				});
-			})
-		}
-	}
-});
