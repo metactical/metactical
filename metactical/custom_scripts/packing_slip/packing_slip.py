@@ -54,7 +54,6 @@ class CustomPackingSlip(PackingSlip):
 				ch.ifw_retailskusuffix = item.ifw_retailskusuffix
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
-				ch.dn_detail = item.name
 				ch.description = item.description
 				ch.dn_detail = item.name
 				ch.batch_no = item.batch_no

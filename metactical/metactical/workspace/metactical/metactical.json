@@ -1,1019 +1,1019 @@
 {
- "charts": [],
- "content": "[{\"id\":\"Qei47OACFO\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Metactical</span>\",\"col\":12}},{\"id\":\"nSBQ-WK7Vv\",\"type\":\"card\",\"data\":{\"card_name\":\"Stock Management\",\"col\":4}},{\"id\":\"eVP1IJpnpW\",\"type\":\"card\",\"data\":{\"card_name\":\"Pick Lists and Packing\",\"col\":4}},{\"id\":\"Y3THNEW2zM\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"dAU-MaJSwN\",\"type\":\"card\",\"data\":{\"card_name\":\"Bulk Updates\",\"col\":4}},{\"id\":\"qI7139Fmn5\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Items\",\"col\":4}},{\"id\":\"Yme2Sx3yX1\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Reports\",\"col\":4}},{\"id\":\"JIzfBRvj_a\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"m2R32o75kD\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"1YbgcT7H5-\",\"type\":\"card\",\"data\":{\"card_name\":\"Data Analytics\",\"col\":4}}]",
- "creation": "2024-08-11 07:28:17.664552",
- "custom_blocks": [],
- "docstatus": 0,
- "doctype": "Workspace",
- "for_user": "",
- "hide_custom": 0,
- "idx": 0,
- "is_hidden": 0,
- "label": "Metactical",
- "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Management",
-   "link_count": 15,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Cycle Count",
-   "link_count": 0,
-   "link_to": "Cycle Count",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Cycle Count V2",
-   "link_count": 0,
-   "link_to": "Cycle Count V2",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Entry User Permissions",
-   "link_count": 0,
-   "link_to": "Stock Entry User Permissions",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Reconciliation Report",
-   "link_count": 0,
-   "link_to": "Stock Reconciliation Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Summary With STE Info",
-   "link_count": 0,
-   "link_to": "Stock Summary With STE Info",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Dead Stock Report",
-   "link_count": 0,
-   "link_to": "Dead Stock Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "STE Draft Report",
-   "link_count": 0,
-   "link_to": "STE Draft Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Reconciliation Report - Positive",
-   "link_count": 0,
-   "link_to": "Stock Reconciliation Report - Positive",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Reconciliation Report - Negative",
-   "link_count": 0,
-   "link_to": "Stock Reconciliation Report - Negative",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Stock Balance With Purchase Rates",
-   "link_count": 0,
-   "link_to": "Stock Balance With Purchase Rates",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Dead Stock Report V2",
-   "link_count": 0,
-   "link_to": "Dead Stock Report V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Unreconciled Stock Report",
-   "link_count": 0,
-   "link_to": "Warehouse Stock Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item Price Excel - V1",
-   "link_count": 0,
-   "link_to": "Price Lists - V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item Price Excel - V2",
-   "link_count": 0,
-   "link_to": "Item Price Excel - V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item Price Excel - V3",
-   "link_count": 0,
-   "link_to": "Item Price Excel - V3",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Location Updator",
-   "link_count": 0,
-   "link_to": "MT Item Location Updator",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "STE Packing Slip",
-   "link_count": 0,
-   "link_to": "STE Packing Slip",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "HR",
-   "link_count": 8,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Employee Sign Up Invitation",
-   "link_count": 0,
-   "link_to": "Employee Sign Up Invitation",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Employee Self Sign Up",
-   "link_count": 0,
-   "link_to": "Employee Sign Up",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Payment Cycle",
-   "link_count": 0,
-   "link_to": "Payment Cycle",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Clockin Log",
-   "link_count": 0,
-   "link_to": "Clockin Log",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Roll Report",
-   "link_count": 0,
-   "link_to": "Roll Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Roll Report - Monthly",
-   "link_count": 0,
-   "link_to": "Roll report - Monthly",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Full Time Log Report",
-   "link_count": 0,
-   "link_to": "Full Time Log",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Employee Roll Report",
-   "link_count": 0,
-   "link_to": "Employee Roll Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Bulk Updates",
-   "link_count": 3,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Sales Order Import Tool",
-   "link_count": 0,
-   "link_to": "Sales Orders From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Price Import Tool",
-   "link_count": 0,
-   "link_to": "Item Price From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Import Tool",
-   "link_count": 0,
-   "link_to": "Item From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": " Purchase Order Import Tool",
-   "link_count": 0,
-   "link_to": "Purchase Order Import Tool",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pricing Rule Import Tool",
-   "link_count": 0,
-   "link_to": "Pricing Rule From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Other Items",
-   "link_count": 4,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "End of Day Closing",
-   "link_count": 0,
-   "link_to": "End of Day Closing",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Suspended Invoice",
-   "link_count": 0,
-   "link_to": "Suspended Invoice",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "City Symbol",
-   "link_count": 0,
-   "link_to": "City Symbol",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Shipstation API Requests",
-   "link_count": 0,
-   "link_to": "Shipstation API Requests",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Sales Reports",
-   "link_count": 18,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item-Wise Sales Invoice Report",
-   "link_count": 0,
-   "link_to": "Item-Wise Sales Invoice Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report RASUSA - Full V1",
-   "link_count": 0,
-   "link_to": "Sales Report RASUSA - Full V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report - Stores",
-   "link_count": 0,
-   "link_to": "Sales Report - Stores",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report - Full V8",
-   "link_count": 0,
-   "link_to": "Sales Report - Full V8",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report USA - V1",
-   "link_count": 0,
-   "link_to": "Sales Report - USA",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "End of Day Report",
-   "link_count": 0,
-   "link_to": "End of Day Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "End of Day Report - V2",
-   "link_count": 0,
-   "link_to": "End of Day Report - V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "End of Day Report - V3",
-   "link_count": 0,
-   "link_to": "End of Day Report - V3",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "End of Day Report - V4",
-   "link_count": 0,
-   "link_to": "End of Day Report - V4",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "End Of Day Report - V4 Franchise",
-   "link_count": 0,
-   "link_to": "End of Day Report - V4 Franchise",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Register",
-   "link_count": 0,
-   "link_to": "Metactical Sales Register",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report - Stores V2",
-   "link_count": 0,
-   "link_to": "Sales Report - Stores V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report Based on Delivery Note",
-   "link_count": 0,
-   "link_to": "Sales Report Based on Delivery Note",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report - For Admins",
-   "link_count": 0,
-   "link_to": "Sales Report - For Admins",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report - Stores V3",
-   "link_count": 0,
-   "link_to": "Sales Report - Stores V3",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report by Location",
-   "link_count": 0,
-   "link_to": "Sales Report by Location",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report V9",
-   "link_count": 0,
-   "link_to": "Sales Report V9",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Detailed Sales Report - V1",
-   "link_count": 0,
-   "link_to": "Detailed Sales Report V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Detailed Sales Report - V2",
-   "link_count": 0,
-   "link_to": "Detailed Sales Report - V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Sales Report With Item Class Suggest",
-   "link_count": 0,
-   "link_to": "Sales Report with Item Class Suggest",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Store Credits",
-   "link_count": 0,
-   "link_to": "Store Credits",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Pricing Rule Report - V1",
-   "link_count": 0,
-   "link_to": "Pricing Rule Report - V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item Locations",
-   "link_count": 0,
-   "link_to": "Item Locations",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Other Reports",
-   "link_count": 14,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "POS Discount Report",
-   "link_count": 0,
-   "link_to": "POS Discount Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Payments Status",
-   "link_count": 0,
-   "link_to": "Payments Status",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Ready to Ship - Orders",
-   "link_count": 0,
-   "link_to": "Ready to Ship - Orders",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Supplier Status Report",
-   "link_count": 0,
-   "link_to": "Supplier Status Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Buying - Auto Create PO Values",
-   "link_count": 0,
-   "link_to": "Buying - Auto Create PO Values",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Open Purchase Orders",
-   "link_count": 0,
-   "link_to": "Open Purchase Orders",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Queued Docs With Errors",
-   "link_count": 0,
-   "link_to": "Queued Docs With Errors",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Queued Documents Status",
-   "link_count": 0,
-   "link_to": "Queued Documents Status",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Unsynced Delivery Notes With SS",
-   "link_count": 0,
-   "link_to": "Unsynced Delivery Notes With SS",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Supplier Status Report",
-   "link_count": 0,
-   "link_to": "Supplier List",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "QBO Import Report",
-   "link_count": 0,
-   "link_to": "QBO Import Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Returns and Store Credits - POS",
-   "link_count": 0,
-   "link_to": "Returns and Store Credits - POS",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Returns and Store Credits - Non POS",
-   "link_count": 0,
-   "link_to": "Returns and Store Credits - Non POS",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item Price Change Report",
-   "link_count": 0,
-   "link_to": "Price Change Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Settings",
-   "link_count": 7,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Time tracker Screen Settings",
-   "link_count": 0,
-   "link_to": "Time Tracker Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Search Settings",
-   "link_count": 0,
-   "link_to": "Item Search Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Settings",
-   "link_count": 0,
-   "link_to": "Stock Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pick List Settings",
-   "link_count": 0,
-   "link_to": "Pick List Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Shipstation Settings",
-   "link_count": 0,
-   "link_to": "Shipstation Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Packing Settings",
-   "link_count": 0,
-   "link_to": "Packing Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Material Request User Permission",
-   "link_count": 0,
-   "link_to": "Material Request User Permission",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pick Lists and Packing",
-   "link_count": 10,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Electronic Pick List",
-   "link_count": 0,
-   "link_to": "picklist-page",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Packing Page",
-   "link_count": 0,
-   "link_to": "packing-page",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Packing Page V2",
-   "link_count": 0,
-   "link_to": "packing-page-v2",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Packing Page V3",
-   "link_count": 0,
-   "link_to": "packing-page-v3",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Packing Page V4",
-   "link_count": 0,
-   "link_to": "packing-page-v4",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Packing Slip",
-   "link_count": 0,
-   "link_to": "packing-slip",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Pick List Totes",
-   "link_count": 0,
-   "link_to": "Picklist Tote",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Pick List Status Report",
-   "link_count": 0,
-   "link_to": "Pick List Status",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "STE Packing Page",
-   "link_count": 0,
-   "link_to": "ste-packing-page",
-   "link_type": "Page",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "STE Packing Slip",
-   "link_count": 0,
-   "link_to": "STE Packing Slip",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Data Analytics",
-   "link_count": 1,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Current Stock Report - V1",
-   "link_count": 0,
-   "link_to": "Current Stock Report - V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Item Details Report - V1",
-   "link_count": 0,
-   "link_to": "Item Details Report - V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Supplier Purchase Order - V1",
-   "link_count": 0,
-   "link_to": "Supplier Purchase Order - V1",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  }
- ],
- "modified": "2024-10-24 10:43:15.209163",
- "modified_by": "Administrator",
- "module": "Metactical",
- "name": "Metactical",
- "number_cards": [],
- "owner": "Administrator",
- "parent_page": "",
- "public": 1,
- "quick_lists": [],
- "roles": [],
- "sequence_id": 16.0,
- "shortcuts": [],
- "title": "Metactical"
-}
+  "charts": [],
+  "content": "[{\"id\":\"Qei47OACFO\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Metactical</span>\",\"col\":12}},{\"id\":\"nSBQ-WK7Vv\",\"type\":\"card\",\"data\":{\"card_name\":\"Stock Management\",\"col\":4}},{\"id\":\"eVP1IJpnpW\",\"type\":\"card\",\"data\":{\"card_name\":\"Pick Lists and Packing\",\"col\":4}},{\"id\":\"Y3THNEW2zM\",\"type\":\"card\",\"data\":{\"card_name\":\"HR\",\"col\":4}},{\"id\":\"dAU-MaJSwN\",\"type\":\"card\",\"data\":{\"card_name\":\"Bulk Updates\",\"col\":4}},{\"id\":\"qI7139Fmn5\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Items\",\"col\":4}},{\"id\":\"Yme2Sx3yX1\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Reports\",\"col\":4}},{\"id\":\"JIzfBRvj_a\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}},{\"id\":\"m2R32o75kD\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"1YbgcT7H5-\",\"type\":\"card\",\"data\":{\"card_name\":\"Data Analytics\",\"col\":4}}]",
+  "creation": "2024-08-11 07:28:17.664552",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "for_user": "",
+  "hide_custom": 0,
+  "idx": 0,
+  "is_hidden": 0,
+  "label": "Metactical",
+  "links": [
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Stock Management",
+    "link_count": 15,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Cycle Count",
+    "link_count": 0,
+    "link_to": "Cycle Count",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Cycle Count V2",
+    "link_count": 0,
+    "link_to": "Cycle Count V2",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Stock Entry User Permissions",
+    "link_count": 0,
+    "link_to": "Stock Entry User Permissions",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Stock Reconciliation Report",
+    "link_count": 0,
+    "link_to": "Stock Reconciliation Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Stock Summary With STE Info",
+    "link_count": 0,
+    "link_to": "Stock Summary With STE Info",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Dead Stock Report",
+    "link_count": 0,
+    "link_to": "Dead Stock Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "STE Draft Report",
+    "link_count": 0,
+    "link_to": "STE Draft Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Stock Reconciliation Report - Positive",
+    "link_count": 0,
+    "link_to": "Stock Reconciliation Report - Positive",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Stock Reconciliation Report - Negative",
+    "link_count": 0,
+    "link_to": "Stock Reconciliation Report - Negative",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Stock Balance With Purchase Rates",
+    "link_count": 0,
+    "link_to": "Stock Balance With Purchase Rates",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Dead Stock Report V2",
+    "link_count": 0,
+    "link_to": "Dead Stock Report V2",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Unreconciled Stock Report",
+    "link_count": 0,
+    "link_to": "Warehouse Stock Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Price Excel - V1",
+    "link_count": 0,
+    "link_to": "Price Lists - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Price Excel - V2",
+    "link_count": 0,
+    "link_to": "Item Price Excel - V2",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Price Excel - V3",
+    "link_count": 0,
+    "link_to": "Item Price Excel - V3",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Item Location Updator",
+    "link_count": 0,
+    "link_to": "MT Item Location Updator",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "STE Packing Slip",
+    "link_count": 0,
+    "link_to": "STE Packing Slip",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "HR",
+    "link_count": 8,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Employee Sign Up Invitation",
+    "link_count": 0,
+    "link_to": "Employee Sign Up Invitation",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Employee Self Sign Up",
+    "link_count": 0,
+    "link_to": "Employee Sign Up",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Payment Cycle",
+    "link_count": 0,
+    "link_to": "Payment Cycle",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Clockin Log",
+    "link_count": 0,
+    "link_to": "Clockin Log",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Roll Report",
+    "link_count": 0,
+    "link_to": "Roll Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Roll Report - Monthly",
+    "link_count": 0,
+    "link_to": "Roll report - Monthly",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Full Time Log Report",
+    "link_count": 0,
+    "link_to": "Full Time Log",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Employee Roll Report",
+    "link_count": 0,
+    "link_to": "Employee Roll Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Bulk Updates",
+    "link_count": 3,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Sales Order Import Tool",
+    "link_count": 0,
+    "link_to": "Sales Orders From Excel",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Item Price Import Tool",
+    "link_count": 0,
+    "link_to": "Item Price From Excel",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Item Import Tool",
+    "link_count": 0,
+    "link_to": "Item From Excel",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": " Purchase Order Import Tool",
+    "link_count": 0,
+    "link_to": "Purchase Order Import Tool",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Pricing Rule Import Tool",
+    "link_count": 0,
+    "link_to": "Pricing Rule From Excel",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Other Items",
+    "link_count": 4,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "End of Day Closing",
+    "link_count": 0,
+    "link_to": "End of Day Closing",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Suspended Invoice",
+    "link_count": 0,
+    "link_to": "Suspended Invoice",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "City Symbol",
+    "link_count": 0,
+    "link_to": "City Symbol",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Shipstation API Requests",
+    "link_count": 0,
+    "link_to": "Shipstation API Requests",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Sales Reports",
+    "link_count": 18,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item-Wise Sales Invoice Report",
+    "link_count": 0,
+    "link_to": "Item-Wise Sales Invoice Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report RASUSA - Full V1",
+    "link_count": 0,
+    "link_to": "Sales Report RASUSA - Full V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report - Stores",
+    "link_count": 0,
+    "link_to": "Sales Report - Stores",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report - Full V8",
+    "link_count": 0,
+    "link_to": "Sales Report - Full V8",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report USA - V1",
+    "link_count": 0,
+    "link_to": "Sales Report - USA",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "End of Day Report",
+    "link_count": 0,
+    "link_to": "End of Day Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "End of Day Report - V2",
+    "link_count": 0,
+    "link_to": "End of Day Report - V2",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "End of Day Report - V3",
+    "link_count": 0,
+    "link_to": "End of Day Report - V3",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "End of Day Report - V4",
+    "link_count": 0,
+    "link_to": "End of Day Report - V4",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "End Of Day Report - V4 Franchise",
+    "link_count": 0,
+    "link_to": "End of Day Report - V4 Franchise",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Register",
+    "link_count": 0,
+    "link_to": "Metactical Sales Register",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report - Stores V2",
+    "link_count": 0,
+    "link_to": "Sales Report - Stores V2",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report Based on Delivery Note",
+    "link_count": 0,
+    "link_to": "Sales Report Based on Delivery Note",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report - For Admins",
+    "link_count": 0,
+    "link_to": "Sales Report - For Admins",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report - Stores V3",
+    "link_count": 0,
+    "link_to": "Sales Report - Stores V3",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report by Location",
+    "link_count": 0,
+    "link_to": "Sales Report by Location",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report V9",
+    "link_count": 0,
+    "link_to": "Sales Report V9",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Detailed Sales Report - V1",
+    "link_count": 0,
+    "link_to": "Detailed Sales Report V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Detailed Sales Report - V2",
+    "link_count": 0,
+    "link_to": "Detailed Sales Report - V2",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Sales Report With Item Class Suggest",
+    "link_count": 0,
+    "link_to": "Sales Report with Item Class Suggest",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Store Credits",
+    "link_count": 0,
+    "link_to": "Store Credits",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Pricing Rule Report - V1",
+    "link_count": 0,
+    "link_to": "Pricing Rule Report - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Locations",
+    "link_count": 0,
+    "link_to": "Item Locations",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Other Reports",
+    "link_count": 14,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "POS Discount Report",
+    "link_count": 0,
+    "link_to": "POS Discount Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Payments Status",
+    "link_count": 0,
+    "link_to": "Payments Status",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Ready to Ship - Orders",
+    "link_count": 0,
+    "link_to": "Ready to Ship - Orders",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Supplier Status Report",
+    "link_count": 0,
+    "link_to": "Supplier Status Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Buying - Auto Create PO Values",
+    "link_count": 0,
+    "link_to": "Buying - Auto Create PO Values",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Open Purchase Orders",
+    "link_count": 0,
+    "link_to": "Open Purchase Orders",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Queued Docs With Errors",
+    "link_count": 0,
+    "link_to": "Queued Docs With Errors",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Queued Documents Status",
+    "link_count": 0,
+    "link_to": "Queued Documents Status",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Unsynced Delivery Notes With SS",
+    "link_count": 0,
+    "link_to": "Unsynced Delivery Notes With SS",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Supplier Status Report",
+    "link_count": 0,
+    "link_to": "Supplier List",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "QBO Import Report",
+    "link_count": 0,
+    "link_to": "QBO Import Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Returns and Store Credits - POS",
+    "link_count": 0,
+    "link_to": "Returns and Store Credits - POS",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Returns and Store Credits - Non POS",
+    "link_count": 0,
+    "link_to": "Returns and Store Credits - Non POS",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Price Change Report",
+    "link_count": 0,
+    "link_to": "Price Change Report",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Settings",
+    "link_count": 7,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Time tracker Screen Settings",
+    "link_count": 0,
+    "link_to": "Time Tracker Settings",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Item Search Settings",
+    "link_count": 0,
+    "link_to": "Item Search Settings",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Stock Settings",
+    "link_count": 0,
+    "link_to": "Stock Settings",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Pick List Settings",
+    "link_count": 0,
+    "link_to": "Pick List Settings",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Shipstation Settings",
+    "link_count": 0,
+    "link_to": "Shipstation Settings",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Packing Settings",
+    "link_count": 0,
+    "link_to": "Packing Settings",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Material Request User Permission",
+    "link_count": 0,
+    "link_to": "Material Request User Permission",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Pick Lists and Packing",
+    "link_count": 10,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Electronic Pick List",
+    "link_count": 0,
+    "link_to": "picklist-page",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Packing Page",
+    "link_count": 0,
+    "link_to": "packing-page",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Packing Page V2",
+    "link_count": 0,
+    "link_to": "packing-page-v2",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Packing Page V3",
+    "link_count": 0,
+    "link_to": "packing-page-v3",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Packing Page V4",
+    "link_count": 0,
+    "link_to": "packing-page-v4",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Packing Slip",
+    "link_count": 0,
+    "link_to": "packing-slip",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Pick List Totes",
+    "link_count": 0,
+    "link_to": "Picklist Tote",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Pick List Status Report",
+    "link_count": 0,
+    "link_to": "Pick List Status",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "STE Packing Page",
+    "link_count": 0,
+    "link_to": "ste-packing-page",
+    "link_type": "Page",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "STE Packing Slip",
+    "link_count": 0,
+    "link_to": "STE Packing Slip",
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 0,
+    "label": "Data Analytics",
+    "link_count": 1,
+    "link_type": "DocType",
+    "onboard": 0,
+    "type": "Card Break"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Current Stock Report - V1",
+    "link_count": 0,
+    "link_to": "Current Stock Report - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Item Details Report - V1",
+    "link_count": 0,
+    "link_to": "Item Details Report - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   },
+   {
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Supplier Purchase Order - V1",
+    "link_count": 0,
+    "link_to": "Supplier Purchase Order - V1",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+   }
+  ],
+  "modified": "2024-10-24 10:43:15.209163",
+  "modified_by": "Administrator",
+  "module": "Metactical",
+  "name": "Metactical",
+  "number_cards": [],
+  "owner": "Administrator",
+  "parent_page": "",
+  "public": 1,
+  "quick_lists": [],
+  "roles": [],
+  "sequence_id": 16.0,
+  "shortcuts": [],
+  "title": "Metactical"
+ }

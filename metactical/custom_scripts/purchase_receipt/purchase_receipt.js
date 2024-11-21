@@ -9,7 +9,7 @@ frappe.ui.form.on("Purchase Receipt", {
 	},
 	refresh: function(frm) {
 		frm.add_custom_button("Print", function() {
-			var print_format = "Purchase Receipt Barcode - V2";
+			var print_format = "PR Report V5";
 			var w = window.open(frappe.urllib.get_full_url("/api/method/frappe.utils.print_format.download_pdf?"
 				+ "doctype=" + encodeURIComponent("Purchase Receipt")
 				+ "&name=" + encodeURIComponent(frm.doc.name)

@@ -6,8 +6,23 @@ from frappe import _, msgprint
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe.model.mapper import get_mapped_doc
 from metactical.utils.shipping.shipping import make_shipment
+from frappe.model.docstatus import DocStatus
 
 class DeliveryNoteCustom(DeliveryNote):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def on_update(self):
 		if self.docstatus == 0:
 			create_shipstation_orders(self.name)
