@@ -140,9 +140,6 @@ doc_events = {
 	# "RabbitMQ Config": {
 	# 	"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
 	# }, 
-	"Payment Entry": {
-		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
-	},
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
 	},
