@@ -18,22 +18,6 @@ frappe.ui.form.on('Pricing Rule From Excel', {
 				},
 			});
 		}
-
-		if (frm.doc.docstatus == 0 && !frm.doc.__islocal) {
-			frm.add_custom_button(__('Start Import'), function() {
-				frappe.call({
-					method: "runserverobj",
-					freeze: true,
-					args: {
-						docs: frm.doc,
-						method: "submit"
-					},
-					callback: function(r) {
-						frm.reload_doc();
-					}
-				});
-			})
-		}
 	},
 	download_template(frm) {
 		var dialog = new frappe.ui.Dialog({

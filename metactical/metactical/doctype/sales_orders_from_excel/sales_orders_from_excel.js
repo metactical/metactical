@@ -57,20 +57,7 @@ metactical.SalesOrdersFromExcel = class SalesOrdersFromExcel extends erpnext.Tra
 
 frappe.ui.form.on('Sales Orders From Excel', {
 	refresh: function(frm) {
-		if (frm.doc.docstatus == 0 && !frm.doc.__islocal) {
-			frm.add_custom_button(__('Start Import'), function() {
-				frappe.call({
-					method: "metactical.metactical.doctype.sales_orders_from_excel.sales_orders_from_excel.submit_sales_order_from_excel",
-					args: {
-						"doc": frm.doc.name
-					},
-					freeze: true,
-					callback: function(r) {
-						frm.reload_doc();
-					}
-				});
-			})
-		}
+		
 	},
 	setup: function(frm) {
 		frm.set_query('company_address', function(doc) {
