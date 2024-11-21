@@ -4,6 +4,7 @@
 import frappe
 from frappe.model.document import Document
 import os
+import datetime
 from frappe import _
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
@@ -192,6 +193,7 @@ class PricingRuleFromExcel(Document):
 			"Nov": "11",
 			"Dec": "12"
 		}
+
 		date = date.split("-")
 		return f"20{date[2]}-{months[date[1]]}-{date[0]}"
 
@@ -203,7 +205,7 @@ class PricingRuleFromExcel(Document):
 		else:
 			item_code = row[1]
 			retail_sku = frappe.db.get_value("Item", item_code, "ifw_retailskusuffix")
-		
+
 		if not item_code and item_code is not None:
 			frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
 		elif item_code is None:
@@ -349,7 +351,13 @@ def download_template(price_list, export_type, import_based_on="Retail SKU"):
 		# Build data rows
 		for d in data:
 			item_identifier = d.get("item_code") if import_based_on == "ERP SKU" else d.get("retail_sku")	
-			discount = d.get('discount_percentage') if d.get('rate_or_discount') == 'Discount Percentage' else d.get('rate')			
+			discount = d.get('discount_percentage') if d.get('rate_or_discount') == 'Discount Percentage' else d.get('rate')	
+			if d.get("valid_from"):
+				
+				d["valid_from"] = change_date_format2(d.get("valid_from"))
+			if d.get("valid_upto"):
+				d["valid_upto"] = change_date_format2(d.get("valid_upto"))
+
 			row = [
 				d.get("title"), item_identifier, d.get("item_name"), d.get("price_list_rate"), d.get("rate_or_discount"),
 				discount, d.get("after_discount"), d.get("enabled"),
@@ -369,3 +377,14 @@ def download_template(price_list, export_type, import_based_on="Retail SKU"):
 		"type": "binary",
 		"filename": "Pricing Rule Template.xlsx"
 	})
+
+# convert date format from 2014-08-31 to 31-Aug-14 
+def change_date_format2(date):
+	if (type(date) == datetime.date):
+		date = date.strftime("%Y-%m-%d")
+	elif not date:
+		return ""
+
+	months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+	date = date.split("-")
+	return f"{date[2]}-{months[int(date[1])-1]}-{date[0][2:]}"
