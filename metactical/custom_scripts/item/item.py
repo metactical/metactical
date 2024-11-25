@@ -4,7 +4,7 @@ from metactical.metactical.doctype.item_inventory_output.item_inventory_output i
 def on_update(doc, method):
     # Retrieve the document state before the update
     doc_before_update = doc.get_doc_before_save()
-    original_deduct_qty = doc_before_update.custom_neb_website_deduct_qty
+    original_deduct_qty = doc_before_update.custom_neb_website_deduct_qty if doc_before_update else []
     original_deduct_dict = {lead.lead_source: lead.qty for lead in original_deduct_qty} if original_deduct_qty else {}
     current_lead_sources = []
     removed_lead_sources = []
@@ -40,3 +40,6 @@ def on_update(doc, method):
     # Check for removed lead sources and trigger updates for them
     elif removed_lead_sources:
         frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+
+
+
