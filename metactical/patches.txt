@@ -11,3 +11,6 @@ execute:frappe.db.sql("UPDATE `tabReport` set disabled = 0, prepared_report = 1 
 execute:frappe.db.sql("CREATE INDEX docstatus on `tabPick List` (docstatus)")
 execute:frappe.db.sql("CREATE INDEX warehouse on `tabPick List Item` (warehouse)")
 execute:frappe.db.sql("UPDATE `tabDocField` SET reqd=0 WHERE fieldname='weight' AND parent='Shipment Parcel Template'")
+metactical.patches.update_source_si_so_last
+
+
