@@ -3,6 +3,7 @@ from frappe.core.doctype.prepared_report.prepared_report import PreparedReport, 
 from frappe.utils.background_jobs import enqueue 
 
 class CustomPreparedReport(PreparedReport):
+    # Metactical Customization: Changed the timeout value from 1500 to 6000
     def after_insert(self):
         enqueue(
 			generate_report,
