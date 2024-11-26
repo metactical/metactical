@@ -1,6 +1,9 @@
 import frappe
 
 def execute():
+    if not frappe.db.exists("Lead Source", "Store - camo - downtown"):
+        return
+
     doctypes = ["Sales Invoice", "Sales Order"]
     for doctype in doctypes:
         limit = 1000
