@@ -169,7 +169,8 @@ override_doctype_class = {
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
 	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
-	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
+	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport"
 }
 
 # Scheduled Tasks
