@@ -80,11 +80,15 @@ class PricingRuleFromExcel(Document):
 		header = data[0]
 		price_list = header[3]
 		indexes = self.get_column_indexes(header)
+		error_messages = ""
 
 		try:
 			for row in data[1:]:
 				# Prepare pricing rule data and get retail SKU
-				pricing_rule_dict, retail_sku = self.get_pricing_rule(row, indexes, price_list)
+				pricing_rule_dict, retail_sku, message = self.get_pricing_rule(row, indexes, price_list)
+				if not retail_sku:
+					error_messages += message + "\n"
+					continue
 
 				# Check for existing rules with the same price list, SKU, and priority
 				rules = frappe.db.get_list("Pricing Rule", 
@@ -106,6 +110,11 @@ class PricingRuleFromExcel(Document):
 		
 			# Commit changes
 			frappe.db.commit()
+
+			# Log error messages
+			if error_messages:
+				frappe.log_error(title=f"pricing rule import error - {self.name}", message=error_messages)
+				frappe.msgprint("Some rows failed to import. Please refer to the error log for more information.")
 		
 		# Roll back on error and log traceback
 		except Exception:
@@ -205,11 +214,17 @@ class PricingRuleFromExcel(Document):
 		else:
 			item_code = row[1]
 			retail_sku = frappe.db.get_value("Item", item_code, "ifw_retailskusuffix")
-
-		if not item_code and item_code is not None:
-			frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
-		elif item_code is None:
-			frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
+			
+		# if not item_code and item_code is not None:
+		# 	frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
+		# elif item_code is None:
+		# 	frappe.throw(f"Item with Retail SKU Suffix <b>{row[1]}</b> not found")
+		if not item_code:
+			if self.import_based_on == "Retail SKU":
+				message=f"Item with Retail SKU Suffix *{retail_sku}* not found"
+			else:
+				message=f"Item with Item Code *{item_code}* not found"
+			return None, None, message
 
 		data = {
 			"title": row[indexes["title"]],
@@ -233,7 +248,7 @@ class PricingRuleFromExcel(Document):
 			]
 		}
 
-		return data, retail_sku
+		return data, retail_sku, ""
 		
 	@frappe.whitelist()
 	def get_preview_from_template(doc):
@@ -255,7 +270,10 @@ class PricingRuleFromExcel(Document):
 		pricing_rules_list = []
 		columns = []
 		for i, row in enumerate(data):
-			pricing_rule, retail_sku = doc.get_pricing_rule(row, indexes, price_list)
+			pricing_rule, retail_sku, message = doc.get_pricing_rule(row, indexes, price_list)
+			if not retail_sku:
+				continue
+
 			if not columns:
 				columns = doc.get_columns(pricing_rule)
 			
