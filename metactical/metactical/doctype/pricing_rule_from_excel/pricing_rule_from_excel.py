@@ -101,15 +101,17 @@ class PricingRuleFromExcel(Document):
 					for rule in rules:
 						pricing_rule = frappe.get_doc("Pricing Rule", rule.name)
 						pricing_rule.update(pricing_rule_dict)
+						pricing_rule.flags.ignore_validate = True
 						pricing_rule.save()
 				else:
 					pricing_rule = frappe.get_doc(pricing_rule_dict)
 
 					# Insert new pricing rule
+					pricing_rule.flags.ignore_validate = True
 					pricing_rule.insert()
 		
-			# Commit changes
-			frappe.db.commit()
+					# Commit changes
+					frappe.db.commit()
 
 			# Log error messages
 			if error_messages:
