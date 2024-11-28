@@ -112,19 +112,19 @@ class PricingRuleFromExcel(Document):
 					# Insert new pricing rule
 					pricing_rule.flags.ignore_validate = True
 					new_rules.append(pricing_rule)
-		
-				if len(existing_rules) % 1000 == 0:
+
+				if existing_rules and len(existing_rules) % 1000 == 0:
 					frappe.enqueue(update_existing_prs, existing_rules=existing_rules, queue="long", job_name="update_existing_prs")
 					existing_rules = []
 
-				if len(new_rules) % 1000 == 0:
+				if new_rules and len(new_rules) % 1000 == 0:
 					frappe.enqueue(create_new_prs, prs_list=new_rules, queue="long", job_name="create_new_prs")
 					new_rules = []
 
 			# Create new pricing rules
 			if new_rules:
 				frappe.enqueue(create_new_prs, prs_list=new_rules, queue="long", job_name="create_new_prs")
-			
+
 			# Update existing pricing rules
 			if existing_rules:
 				frappe.enqueue(update_existing_prs, existing_rules=existing_rules, queue="long", job_name="update_existing_prs")
@@ -431,9 +431,9 @@ def change_date_format2(date):
 def create_new_prs(prs_list):
 	for pr in prs_list:
 		pr.insert()
-		frappe.db.commit()
+	frappe.db.commit()
 
 def update_existing_prs(existing_rules):
 	for rule in existing_rules:
 		rule.save()
-		frappe.db.commit()
+	frappe.db.commit()
