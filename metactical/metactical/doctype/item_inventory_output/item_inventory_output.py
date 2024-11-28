@@ -58,15 +58,10 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 		lead_sources = frappe.get_all('Lead Source', pluck='name', filters={"custom_neb_price_list": ["in", price_lists]})
 
 		# Check for existing Item Inventory Output, create new if not found
-		item_inventory_output = frappe.db.get_value('Item Inventory Output', {'name': item_code})
-		if not item_inventory_output:
-			item_inventory_output = frappe.new_doc('Item Inventory Output')
-			item_inventory_output.item_code = item_code
-		else:
-			item_inventory_output = frappe.get_doc('Item Inventory Output', item_inventory_output)
-			item_inventory_output.item_inventory_output_list = []
-
+		data = {}
+		item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'name': item_code})
 		retail_sku = frappe.db.get_value('Item', item_code, 'ifw_retailskusuffix')
+		data = []
 
 		# Loop through each lead source to calculate quantity to send
 		for lead_source in lead_sources:
@@ -88,14 +83,46 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 				"qty": qty_to_send_to_sb,
 				"ifw_retailskusuffix": retail_sku
 			})
-			item_inventory_output.item_inventory_output_list.append(item_inventory_output_data)
+
+			data.append(item_inventory_output_data)
 
 		# Save changes to Item Inventory Output
 		total_available_qty = sum(net_available_bins.values())
-		item_inventory_output.qoh = total_available_qty
-		item_inventory_output.save()
+
+		if not item_inventory_output_doc:
+			item_inventory_output = frappe.new_doc('Item Inventory Output')
+			item_inventory_output.item_code = item_code
+			item_inventory_output.qoh = total_available_qty
+			item_inventory_output.item_inventory_output_list = data
+			try:
+				item_inventory_output.insert()
+			except:
+				item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'item_code': item_code})
+				if item_inventory_output_doc:
+					update_doc(item_inventory_output_doc, total_available_qty, data)
+		else:
+			item_inventory_output = frappe.get_doc('Item Inventory Output', item_inventory_output_doc)
+			item_inventory_output.qoh = total_available_qty
+			item_inventory_output.item_inventory_output_list = data
+
+			try:
+				item_inventory_output.save()
+			except:
+				if item_inventory_output_doc:
+					update_doc(item_inventory_output_doc, total_available_qty, data)
+
 		frappe.db.commit()
 
 	except Exception as e:
-		frappe.log_error(title="Item Inventory Output Update Failed", message=frappe.get_traceback())
+		frappe.log_error(title=f"Item Inventory Output Update Failed - {item_code}", message=frappe.get_traceback())
+		frappe.db.rollback()
+
+def update_doc(docname, total_available_qty, data):
+	try:
+		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
+		item_inventory_output.item_inventory_output_list = data
+		item_inventory_output.qoh = total_available_qty
+		item_inventory_output.save()
+	except Exception as e:
+		frappe.log_error(title=f"Item Inventory Output Update Failed - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
