@@ -11,7 +11,7 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		if self.purchase_order:
 			for d in self.items:
 				d.purchase_order = self.purchase_order
-				d.purchase_order_item = frappe.db.get_value("Purchase Order Item", {"item_code": d.item_code, "parent": d.purchase_order}, "name")
+				d.purchase_order_item = frappe.db.get_value("Purchase Order Item", {"item_code": d.item_code, "name":d.purchase_order_item, "parent": d.purchase_order}, "name")
 				if not d.purchase_order_item:
 					frappe.throw("Purchase Order Missing for Item {} at Row {}".format(d.item_code, str(d.idx)))
 	
