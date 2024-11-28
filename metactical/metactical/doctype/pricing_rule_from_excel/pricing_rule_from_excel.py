@@ -104,6 +104,7 @@ class PricingRuleFromExcel(Document):
 						pricing_rule.flags.ignore_validate = True
 						pricing_rule.save()
 				else:
+					pricing_rule_dict["naming_series"] = self.pr_naming_series
 					pricing_rule = frappe.get_doc(pricing_rule_dict)
 
 					# Insert new pricing rule
