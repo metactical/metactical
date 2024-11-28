@@ -135,13 +135,18 @@ doc_events = {
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	},
-	"RabbitMQ Config": {
-		"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
-	}, 
+	# "RabbitMQ Config": {
+	# 	"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
+	# }, 
 	"Payment Entry": {
-		"on_submit": "metactical.custom_scripts.payment_entry.payment_entry.on_submit",
-		"before_submit": "metactical.custom_scripts.payment_entry.payment_entry.before_submit",
+		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
+	"Stock Ledger Entry": {
+		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+	},
+	"Item": {
+		"on_update": "metactical.custom_scripts.item.item.on_update"
+	}
 }
 
 # DocType Class
@@ -164,7 +169,8 @@ override_doctype_class = {
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
 	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
-	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
+	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport"
 }
 
 # Scheduled Tasks
@@ -174,9 +180,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
-    "all": [
-        "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-    ],
+#	"all": [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+#	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -214,7 +220,6 @@ override_whitelisted_methods = {
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
-	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }
@@ -269,6 +274,6 @@ jinja = {
 }
 
 
-app_include_python = [
-    "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-]
+# app_include_python = [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+# ]

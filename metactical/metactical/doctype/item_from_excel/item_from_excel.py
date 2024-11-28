@@ -9,11 +9,27 @@ from metactical.custom_scripts.utils.metactical_utils import queue_action
 from openpyxl import load_workbook
 from io import BytesIO
 from metactical.metactical.doctype.item_price_from_excel.item_price_from_excel import ItemPriceFromExcel
+from frappe import _, msgprint
+from frappe.model.docstatus import DocStatus
 # from erpnext.controllers.item_variant import (
 # 	make_variant_item_code
 # )
 
 class ItemFromExcel(Document):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def validate(self):
 		file_content = self.check_file()
 		item_doctype_meta = frappe.get_meta("Item")
@@ -269,13 +285,6 @@ class ItemFromExcel(Document):
 			frappe.log_error(title="Error creating items", message=frappe.get_traceback())
 			frappe.throw(f"Error creating items: {e}")
 			self.db_set("ais_queueu_comment", e)
-
-	def submit(self):
-		frappe.msgprint(
-			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
-			the system will add a comment about the error on this document and revert to the Draft stage"""
-		)
-		queue_action(self, "submit", timeout=2000)
 
 	def read_file(self):
 		file_path = self.excel_file

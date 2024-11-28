@@ -23,8 +23,23 @@ from frappe import _, msgprint, bold
 from frappe.utils.nestedset import get_descendants_of
 from erpnext.stock.doctype.packed_item.packed_item import is_product_bundle
 import re
+from frappe.model.docstatus import DocStatus
 
 class CustomPickList(PickList):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.locations) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+			
 	def validate(self):
 		super(CustomPickList, self).validate()
 		self.check_for_existing_draft()
@@ -296,21 +311,16 @@ class CustomPickList(PickList):
 		if save:
 			self.save()
 
-	def submit(self):
-		if len(self.locations) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-
 	def validate_stock_qty(self):
 		from erpnext.stock.doctype.batch.batch import get_batch_qty
+		shipping_items = frappe.db.get_all('Pick List Shipping Item', fields=["item"], pluck='item')
+		
 
 		for row in self.get("locations"):
+			# Metactical Customization: Skip shipping items
+			if row.item_code in shipping_items:
+				continue
+
 			# Metactical Customization: If is product budle, validate individual items
 			if is_product_bundle(row.item_code):
 				bundle_items = frappe.get_all('Product Bundle Item', filters={'parent': row.item_code}, fields=['item_code', 'qty'])
@@ -591,3 +601,17 @@ def create_delivery_note(source_name, target_doc=None):
 
 	#frappe.msgprint(_("Delivery Note(s) created for the Pick List"))
 	return delivery_note
+
+@frappe.whitelist()
+def submit_pick_list(doc):
+	# Metactical Customization: Submit pick list in background if more than 10 items
+	doc = frappe.get_doc("Pick List", doc)
+	if len(doc.locations) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()

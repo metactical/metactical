@@ -4,15 +4,24 @@ from frappe import _
 from metactical.custom_scripts.utils.metactical_utils import (
 	get_customer_address, 
 	create_usaepay_log,
-	format_json_for_html
+	format_json_for_html,
+	get_usaepay_account
 )
 
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
 
-def get_transaction_from_usaepay(usaepay_transaction_key, headers):	
-	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
+def get_transaction_from_usaepay(usaepay_transaction_key, headers, merchant_id=None):	
+	if merchant_id:
+		usaepay_account = get_usaepay_account(None, merchant_id)
+	else:
+		usaepay_account = get_usaepay_account(usaepay_transaction_key)
 
+	print(usaepay_account)	
+	if not usaepay_account:
+		return None 
+
+	usaepay_url = usaepay_account.get("usaepay_url")
 	if not usaepay_url:
 		frappe.throw(_("USAePay URL not set in Metactical Settings"))
 
@@ -31,9 +40,9 @@ def get_transaction_from_usaepay(usaepay_transaction_key, headers):
 	
 	return None
 
-def get_token_hash(metactical_settings):
-	api_key = metactical_settings.get("api_key")
-	pin = metactical_settings.get("pin")
+def get_token_hash(usaepay_account):
+	api_key = usaepay_account.get("api_key")
+	pin = usaepay_account.get("pin")
 	seed = str(int(time.time()))
 
 	if not api_key or not pin:
@@ -117,29 +126,27 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 		response = json.loads(response.text)
 		frappe.throw(_("Failed to make adjustment in USAePay: {0}").format(response.get("error")))
 
-def get_customer_detail(customer_key, headers):
-	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
-	if not usaepay_url:
-		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+# def get_customer_detail(customer_key, headers):
+# 	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
+# 	if not usaepay_url:
+# 		frappe.throw(_("USAePay URL not set in Metactical Settings"))
 
-	url += "/customers/" + customer_key
-	response = requests.get(url, headers=headers)
+# 	url += "/customers/" + customer_key
+# 	response = requests.get(url, headers=headers)
 
-	if response.status_code == 200:
-		customer = json.loads(response.text)
-		if customer.get("error"):
-			frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(cstr(customer.get("error"))))
+# 	if response.status_code == 200:
+# 		customer = json.loads(response.text)
+# 		if customer.get("error"):
+# 			frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(cstr(customer.get("error"))))
 
-		return customer
-	else:
-		response = json.loads(response.text)
-		frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(response.get("error")))
-
+# 		return customer
+# 	else:
+# 		response = json.loads(response.text)
+# 		frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(response.get("error")))
 
 @frappe.whitelist()
 def receive_customer_data():
 	response = frappe.form_dict
-
 	event_body = response.get("event_body")
 	transaction_key = event_body["object"]["key"]
 
@@ -159,17 +166,18 @@ def receive_customer_data():
 	# webhook's response will be added to a temporary doc and then will be processed when the SO is created.
 	# This is to avoid the case where the webhook response comes before the SO is created in the ERP
 	else:
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
-		token_hash = get_token_hash(metactical_settings)
+		usaepay_account = get_usaepay_account(merchant_id=event_body["merchant"]["merch_key"])
+		if not usaepay_account:
+			return 
 
+		token_hash = get_token_hash(usaepay_account)
 		headers = {
 			"Content-Type": "application/json",
 			"Authorization": token_hash
 		}
 
 		transaction = event_body["object"]["key"]
-		transaction = get_transaction_from_usaepay(transaction, headers)
+		transaction = get_transaction_from_usaepay(transaction, headers, event_body["merchant"]["merch_key"])
 		if not transaction:
 			return
 
@@ -179,7 +187,7 @@ def receive_customer_data():
 			doctype = "Sales Order"
 		else:
 			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "marchant_id": event_body["merchant"]["merch_key"]}):
-				lead_source = frappe.db.get_value("USAePay Merchant ID", {"merchant_id": event_body["merchant"]["merch_key"]}, "lead_source")
+				lead_source = usaepay_account.lead_source
 
 				frappe.get_doc({
 					"doctype": "SO USAePay Transaction", 
@@ -241,7 +249,6 @@ def process_sales_order(event_body, transaction_key):
 	
 	# create USAePay log
 	log = create_log(sales_order, event_body)
-	
 	create_payment_entry(sales_order, event_body, log)
 
 def process_payment_entry(event_body, transaction_key):
@@ -373,11 +380,11 @@ def process_credit_card_tokens(event_body, customer):
 
 		# if the credit card is new, add it to the customer's credit card tokens
 		if is_cc_new:
-			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key)
+			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body)
 		frappe.db.commit()
 
-def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key):
-	headers, usaepay_url = get_headers()
+def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body):
+	headers, usaepay_url = get_headers(event_body)
 	token = get_card_token(usaepay_url, transaction_key, headers)
 	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
 
@@ -391,25 +398,34 @@ def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, 
 		"cc_number": credit_card_used_in_transaction["number"],
 	}).insert()
 
-def get_headers():
-	metactical_settings = frappe.get_single("Metactical Settings")
-	usaepay_url = metactical_settings.get("usaepay_url")
-	if not usaepay_url:
-		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+def get_headers(transaction=None, lead_source=None):
+	if lead_source:
+		usaepay_account = get_usaepay_account(None, None, lead_source)
+	elif transaction and "merchant" in transaction:
+		merchant_id = transaction["merchant"]["merch_key"]
+		usaepay_account = get_usaepay_account(None, merchant_id)
+	elif transaction:
+		usaepay_account = get_usaepay_account(transaction["object"]["key"])
+	else:
+		usaepay_account = get_usaepay_account()
+
+	if not usaepay_account:
+		return "", ""
 
 	# Generate token hash
-	token_hash = get_token_hash(metactical_settings)
+	usaepay_url = usaepay_account.get("usaepay_url")
+	token_hash = get_token_hash(usaepay_account)
 	headers = {
 		"Content-Type": "application/json",
 		"Authorization": token_hash
 	}
 	return headers, usaepay_url
 
-def get_token_hash(metactical_settings, pin=None):
-	api_key = metactical_settings.get("api_key")
+def get_token_hash(usaepay_account, pin=None):
+	api_key = usaepay_account.get("api_key")
 
 	if not pin:
-		pin = metactical_settings.get("pin")
+		pin = usaepay_account.get("pin")
 	
 	seed = str(int(time.time()))
 	if not api_key or not pin:
@@ -440,17 +456,19 @@ def make_payment(customer, amount, token, payment_entry=None):
 		customer_names = frappe.db.get_value("Customer", customer, ["first_name", "last_name"], as_dict=1)
 		addresses["billing"] = get_mapped_address(addresses["billing"], customer_names)
 
-	headers, usaepay_url = get_headers()
-
+	# get lead source and reference doctype
 	references = frappe.get_doc("Payment Entry", payment_entry).references
 	reference = None
 	reference_doctype = None
+	lead_source = None
 
 	if len(references) == 1:
 		if references[0].reference_doctype in ["Sales Order", "Sales Invoice"]:
 			reference = references[0].reference_name
 			reference_doctype = references[0].reference_doctype
-
+			lead_source = frappe.db.get_value(references[0].reference_doctype, references[0].reference_name, "source")
+	
+	headers, usaepay_url = get_headers(lead_source=lead_source)
 	if not reference:
 		reference = payment_entry
 
@@ -478,10 +496,13 @@ def make_payment(customer, amount, token, payment_entry=None):
 		response = requests.post(usaepay_url + "/transactions", headers=headers, data=json.dumps(payload))
 		handle_payment_response(response, log)
 		frappe.db.set_value("Payment Entry", payment_entry, "reference_no", log.transaction_key)
+		
+		if reference_doctype == "Sales Order":
+			frappe.db.set_value("Sales Order", reference, "neb_usaepay_transaction_key", log.transaction_key)
 
 		# submit payment entry
 		frappe.get_doc("Payment Entry", payment_entry).submit()
-
+		
 	except Exception as e:
 		handle_payment_exception(e, log)
 
@@ -530,28 +551,13 @@ def get_mapped_address(address, customer_name):
 		"phone": address.get("phone"),
 	}
 
-def get_headers():
-	metactical_settings = frappe.get_single("Metactical Settings")
-	usaepay_url = metactical_settings.get("usaepay_url")
-	if not usaepay_url:
-		frappe.throw(_("USAePay URL not set in Metactical Settings"))
-
-	# Generate token hash
-	token_hash = get_token_hash(metactical_settings)
-
-	headers = {
-		"Content-Type": "application/json",
-		"Authorization": token_hash
-	}
-
-	return headers, usaepay_url
-
 @frappe.whitelist()
 def get_usaepay_transaction_detail(transaction, docname):
 	try:
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
-		token_hash = get_token_hash(metactical_settings)
+		lead_source = frappe.db.get_value("Sales Order", docname, "source")
+		usaepay_account = get_usaepay_account(transaction_key=transaction, lead_source=lead_source)
+		usaepay_url = usaepay_account.get("usaepay_url")
+		token_hash = get_token_hash(usaepay_account)
 
 		headers = {
 			"Content-Type": "application/json",
@@ -597,12 +603,11 @@ def refund_payment(docname, refund_reason, refund_amount):
 	try:
 		sales_order = frappe.get_doc("Sales Order", docname)
 		usaepay_transaction_key = sales_order.get("neb_usaepay_transaction_key")
-		
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
+		usaepay_account = get_usaepay_account(transaction_key=sales_order.neb_usaepay_transaction_key ,lead_source=sales_order.source)
+		usaepay_url = usaepay_account.get("usaepay_url")
 
 		# Generate token hash
-		token_hash = get_token_hash(metactical_settings)
+		token_hash = get_token_hash(usaepay_account)
 
 		headers = {
 			"Content-Type": "application/json",
@@ -633,10 +638,10 @@ def refund_payment(docname, refund_reason, refund_amount):
 				if "cardholder" in refund_response.get("creditcard"):
 					card_holder = refund_response.get("creditcard").get("cardholder")
 					frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully for <b>{card_holder}</b>.")
-				else:
-					frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully.")
-			else:
-				frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully.")
+				# else:
+					# frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully.")
+			# else:
+				# frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully.")
 
 			return refund_response, log.name
 		else:
@@ -661,11 +666,11 @@ def adjust_payment(docname, advance_paid=None):
 	try:
 		sales_order = frappe.get_doc("Sales Order", docname)
 		usaepay_transaction_key = sales_order.get("neb_usaepay_transaction_key")
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
+		usaepay_account = get_usaepay_account(transaction_key=sales_order.neb_usaepay_transaction_key ,lead_source=sales_order.source)
+		usaepay_url = usaepay_account.get("usaepay_url")
 
 		# Generate token hash
-		token_hash = get_token_hash(metactical_settings)
+		token_hash = get_token_hash(usaepay_account)
 
 		headers = {
 			"Content-Type": "application/json",
@@ -704,12 +709,23 @@ def adjust_payment(docname, advance_paid=None):
 		# frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to adjust payment: {0}".format(e), title="Error")
 
-def void_payment_in_usaepay(doctype, docname, reference_no):
-	metactical_settings = frappe.get_single("Metactical Settings")
-	usaepay_url = metactical_settings.get("usaepay_url")
+def void_payment_in_usaepay(doc):
+	doctype = doc.doctype
+	docname = doc.name
+	reference_no = doc.reference_no
+
+	# get lead source
+	lead_source = None
+	for ref in doc.references:
+		if ref.reference_doctype in ["Sales Order", "Sales Invoice"]:
+			lead_source = frappe.db.get_value(ref.reference_doctype, ref.reference_name, "source")
+			break
+
+	usaepay_account = get_usaepay_account(transaction_key=reference_no, lead_source=lead_source)
+	usaepay_url = usaepay_account.get("usaepay_url")
 
 	# Generate token hash
-	token_hash = get_token_hash(metactical_settings)
+	token_hash = get_token_hash(usaepay_account)
 
 	headers = {
 		"Content-Type": "application/json",
@@ -799,3 +815,6 @@ def add_to_log(log):
 		"reference_docname": invoice,
 		"date": frappe.utils.now()
 	}).insert()
+
+def get_lead_source(transaction_key):
+	return frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": usaepay_transaction_key}, "source")

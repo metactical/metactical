@@ -9,6 +9,20 @@ def scrub_data():
 	scrub_contacts()
 	scrub_address()
 	scrub_customer()
+
+def scrub_user_and_employee():
+	scrub_employee_checkin()
+	scrub_shift_assignment()
+	scrub_employee()
+	scrub_clockin_log()
+	scrub_checkin_request_modification()
+	scrub_user_permission()
+	scrub_employee_from_user_permission()
+	scrub_route_history()
+	scrub_activity_log()
+	scrub_access_log()
+	scrub_user()
+
 	
 def scrub_delivery_notes():
 	max_offset = frappe.db.sql("""
@@ -59,7 +73,7 @@ def scrub_delivery_notes():
 		""")
 		
 		current_offset += 1000
-	print("Delivery notes scubd successfully")
+	print("Delivery notes scrubd successfully")
 
 def scrub_payment_entries():
 	max_offset = frappe.db.sql("""
@@ -102,7 +116,7 @@ def scrub_payment_entries():
 				payment.party_type = 'Customer' AND payment.name in ({payment_entries})
 		""")
 		current_offset += 1000
-	print("Payment Entries scubd successfully")
+	print("Payment Entries scrubd successfully")
 		
 def scrub_sales_orders():
 	max_offset = frappe.db.sql("""
@@ -151,7 +165,7 @@ def scrub_sales_orders():
 			WHERE sorder.name in ({sales_orders})
 		""")
 		current_offset += 1000
-	print("Sales Orders scubd successfully")
+	print("Sales Orders scrubd successfully")
 
 def scrub_sales_invoices():
 	max_offset = frappe.db.sql("""
@@ -201,7 +215,7 @@ def scrub_sales_invoices():
 				invoice.name in ({sales_invoices})
 		""")
 		current_offset += 1000
-	print("Sales Invoices scubd successfully")
+	print("Sales Invoices scrubd successfully")
 
 def scrub_pick_lists():
 	max_offset = frappe.db.sql("""
@@ -239,7 +253,7 @@ def scrub_pick_lists():
 				picklist.name in ({pick_lists})
 		""")
 		current_offset += 1000
-	print("Pick Lists scubd successfully")
+	print("Pick Lists scrubd successfully")
 
 def scrub_contacts():
 	max_offset = frappe.db.sql("""
@@ -312,7 +326,7 @@ def scrub_contacts():
 				name in ({contacts_sql})
 		""")
 		current_offset += 1000
-	print("Contacts scubd successfully")
+	print("Contacts scrubd successfully")
 
 def scrub_address():
 	max_offset = frappe.db.sql("""
@@ -368,7 +382,8 @@ def scrub_address():
 			WHERE address.name in ({address_sql})
 		""")
 		current_offset += 1000
-	print("Addresses scubd successfully")
+	print("Addresses scrubd successfully")
+
 
 def scrub_customer():
 	max_offset = frappe.db.sql("""
@@ -411,4 +426,446 @@ def scrub_customer():
 				customer.last_name IS NOT NULL AND customer.last_name != "" AND customer.name in ({customer_sql})
 		""")
 		current_offset += 1000
-	print("Customers scubd successfully")
+	print("Customers scrubd successfully")
+
+def scrub_employee_checkin():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(employee_checkin.name) AS total
+					FROM
+						`tabEmployee Checkin` AS employee_checkin
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		checkins = frappe.db.sql(f"""
+			SELECT 
+				employee_checkin.name 
+			FROM 
+				`tabEmployee Checkin` AS employee_checkin
+			ORDER BY 
+				employee_checkin.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		employee_checkins = ""
+		for row in checkins:
+			employee_checkins += f"'{row.name}',"
+		employee_checkins = employee_checkins[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabEmployee Checkin` employee_checkin
+			SET
+				employee_checkin.employee = MD5(employee_checkin.employee),
+				employee_checkin.employee_name = SUBSTRING(MD5(employee_checkin.employee_name), 1, 8)
+			WHERE
+				employee_checkin.name in ({employee_checkins})
+		""")
+		current_offset += 1000
+	print("Employee Checkins scrubd successfully")
+
+def scrub_shift_assignment():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(shift_assignment.name) AS total
+					FROM
+						`tabShift Assignment` AS shift_assignment
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		assignments = frappe.db.sql(f"""
+			SELECT 
+				shift_assignment.name 
+			FROM 
+				`tabShift Assignment` AS shift_assignment
+			ORDER BY 
+				shift_assignment.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		shift_assignments = ""
+		for row in assignments:
+			shift_assignments += f"'{row.name}',"
+		shift_assignments = shift_assignments[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabShift Assignment` shift_assignment
+			SET
+				shift_assignment.employee = MD5(shift_assignment.employee),
+				shift_assignment.employee_name = SUBSTRING(MD5(shift_assignment.employee_name), 1, 8)
+			WHERE
+				shift_assignment.name in ({shift_assignments})
+		""")
+		current_offset += 1000
+	print("Shift Assignments scrubd successfully")
+
+def scrub_employee():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(employee.name) AS total
+					FROM
+						`tabEmployee` AS employee
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		employees = frappe.db.sql(f"""
+			SELECT 
+				employee.name 
+			FROM 
+				`tabEmployee` AS employee
+			ORDER BY 
+				employee.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		employee_sql = ""
+		for row in employees:
+			row_name = row.name.replace("'", "''")
+			employee_sql += "'" + row_name + "',"
+		employee_sql = employee_sql[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabEmployee` employee SET 
+				first_name = SUBSTRING(MD5(first_name), 1, 8),
+				last_name = SUBSTRING(MD5(last_name), 1, 8),
+				name = MD5(name),
+				employee_name = CONCAT(first_name, ' ', last_name),
+				personal_email = CONCAT(SUBSTRING(MD5(personal_email), 1, 8), '@test.com'),
+				company_email = CONCAT(SUBSTRING(MD5(company_email), 1, 8), '@test.com'),
+				prefered_email = CONCAT(SUBSTRING(MD5(prefered_email), 1, 8), '@test.com'),
+				cell_number = SUBSTRING(CAST(SHA(cell_number) AS CHAR), 1, 10),
+				current_address = SUBSTRING(MD5(current_address), 1, 8),
+				permanent_address = SUBSTRING(MD5(permanent_address), 1, 8),
+				ais_sin_no = SUBSTRING(MD5(ais_sin_no), 1, 8),
+				person_to_be_contacted = SUBSTRING(MD5(person_to_be_contacted), 1, 8),
+				emergency_phone_number = SUBSTRING(CAST(SHA(emergency_phone_number) AS CHAR), 1, 10),
+				user_id = CONCAT(SUBSTRING(MD5(user_id), 1, 8), '@test.com'),
+				reports_to = MD5(reports_to),
+				expense_approver = CONCAT(SUBSTRING(MD5(expense_approver), 1, 8), '@test.com'),
+				shift_request_approver = CONCAT(SUBSTRING(MD5(shift_request_approver), 1, 8), '@test.com'),
+				leave_approver = CONCAT(SUBSTRING(MD5(leave_approver), 1, 8), '@test.com'),
+				pan_number = SUBSTRING(MD5(pan_number), 1, 8),
+				bank_name = SUBSTRING(MD5(bank_name), 1, 8),
+				bank_ac_no = SUBSTRING(CAST(SHA(bank_ac_no) AS CHAR), 1, 10),
+				ifsc_code = SUBSTRING(MD5(ifsc_code), 1, 8),
+				micr_code = SUBSTRING(MD5(micr_code), 1, 8),
+				ais_bank_transit = SUBSTRING(CAST(SHA(ais_bank_transit) AS CHAR), 1, 5),
+				ais_bank_institution = SUBSTRING(MD5(ais_bank_institution), 1, 3),
+				iban = SUBSTRING(MD5(iban), 1, 8),
+				passport_number = SUBSTRING(MD5(passport_number), 1, 8),
+				bio = SUBSTRING(MD5(bio), 1, 8)
+			WHERE 
+				employee.name in ({employee_sql})
+		""")
+		current_offset += 1000
+	print("Employees scrubd successfully")
+
+def scrub_clockin_log():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(clockin_log.name) AS total
+					FROM
+						`tabClockin Log` AS clockin_log
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		logs = frappe.db.sql(f"""
+			SELECT 
+				clockin_log.name 
+			FROM 
+				`tabClockin Log` AS clockin_log
+			ORDER BY 
+				clockin_log.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		clockin_logs = ""
+		for row in logs:
+			clockin_logs += f"'{row.name}',"
+		clockin_logs = clockin_logs[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabClockin Log` clockin_log
+			SET
+				clockin_log.user = CONCAT(SUBSTRING(MD5(clockin_log.user), 1, 8), '@test.com')
+			WHERE
+				clockin_log.name in ({clockin_logs})
+		""")
+		current_offset += 1000
+	print("Clockin Logs scrubd successfully")
+
+def scrub_checkin_request_modification():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(checkin_request_modification.name) AS total
+					FROM
+						`tabCheckin Request Modification` AS checkin_request_modification
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		modifications = frappe.db.sql(f"""
+			SELECT 
+				checkin_request_modification.name 
+			FROM 
+				`tabCheckin Request Modification` AS checkin_request_modification
+			ORDER BY 
+				checkin_request_modification.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		checkin_request_modifications = ""
+		for row in modifications:
+			checkin_request_modifications += f"'{row.name}',"
+		checkin_request_modifications = checkin_request_modifications[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabCheckin Request Modification` checkin_request_modification
+			SET
+				checkin_request_modification.user = CONCAT(SUBSTRING(MD5(checkin_request_modification.user), 1, 8), '@test.com')
+			WHERE
+				checkin_request_modification.name in ({checkin_request_modifications})
+		""")
+		current_offset += 1000
+	print("Checkin Request Modifications scrubd successfully")
+
+def scrub_user_permission():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(user_permission.name) AS total
+					FROM
+						`tabUser Permission` AS user_permission
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		permissions = frappe.db.sql(f"""
+			SELECT 
+				user_permission.name 
+			FROM 
+				`tabUser Permission` AS user_permission
+			ORDER BY 
+				user_permission.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		user_permissions = ""
+		for row in permissions:
+			user_permissions += f"'{row.name}',"
+		user_permissions = user_permissions[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabUser Permission` user_permission
+			SET
+				user_permission.user = CONCAT(SUBSTRING(MD5(user_permission.user), 1, 8), '@test.com')
+			WHERE
+				user_permission.name in ({user_permissions})
+		""")
+		current_offset += 1000
+	print("User Permissions scrubd successfully")
+
+def scrub_employee_from_user_permission():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(user_permission.name) AS total
+					FROM
+						`tabUser Permission` AS user_permission
+					WHERE
+						user_permission.allow = 'Employee'
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		permissions = frappe.db.sql(f"""
+			SELECT 
+				user_permission.name 
+			FROM 
+				`tabUser Permission` AS user_permission
+			WHERE
+				user_permission.allow = 'Employee'
+			ORDER BY 
+				user_permission.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		user_permissions = ""
+		for row in permissions:
+			user_permissions += f"'{row.name}',"
+		user_permissions = user_permissions[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabUser Permission` user_permission
+			SET
+				user_permission.for_value = MD5(user_permission.for_value)
+			WHERE
+				user_permission.name in ({user_permissions})
+		""")
+		current_offset += 1000
+	print("Employee User Permissions scrubd successfully")
+
+def scrub_route_history():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(route_history.name) AS total
+					FROM
+						`tabRoute History` AS route_history
+					""", as_dict=1)[0].total
+	current_offset = 0
+	while current_offset < max_offset:
+		users = frappe.db.sql(f"""
+			SELECT 
+				route_history.name 
+			FROM 
+				`tabRoute History` AS route_history
+			ORDER BY 
+				route_history.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		user_sql = ""
+		for row in users:
+			row_name = row.name.replace("'", "''")
+			user_sql += "'" + row_name + "',"
+		user_sql = user_sql[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabRoute History` route_history SET 
+				user = CONCAT(SUBSTRING(MD5(route_history.user), 1, 8), '@test.com')
+			WHERE 
+				route_history.name in ({user_sql})
+		""")
+		current_offset += 1000
+	print("Route history scrubd successfully")
+
+def scrub_activity_log():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(activity_log.name) AS total
+					FROM
+						`tabActivity Log` AS activity_log
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		users = frappe.db.sql(f"""
+			SELECT 
+				activity_log.name 
+			FROM 
+				`tabActivity Log` AS activity_log
+			ORDER BY 
+				activity_log.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		user_sql = ""
+		for row in users:
+			row_name = row.name.replace("'", "''")
+			user_sql += "'" + row_name + "',"
+		user_sql = user_sql[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabActivity Log` activity_log SET 
+				user = CONCAT(SUBSTRING(MD5(activity_log.user), 1, 8), '@test.com'),
+				full_name = SUBSTRING(MD5(activity_log.full_name), 1, 8)
+			WHERE 
+				activity_log.name in ({user_sql})
+		""")
+		current_offset += 1000
+	print("Activity Log scrubd successfully")
+
+def scrub_access_log():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(access_log.name) AS total
+					FROM
+						`tabAccess Log` AS access_log
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		users = frappe.db.sql(f"""
+			SELECT 
+				access_log.name 
+			FROM 
+				`tabAccess Log` AS access_log
+			ORDER BY 
+				access_log.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		user_sql = ""
+		for row in users:
+			row_name = row.name.replace("'", "''")
+			user_sql += "'" + row_name + "',"
+		user_sql = user_sql[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabAccess Log` access_log SET 
+				user = CONCAT(SUBSTRING(MD5(access_log.user), 1, 8), '@test.com')
+			WHERE 
+				access_log.name in ({user_sql})
+		""")
+		current_offset += 1000
+	print("Access Log scrubd successfully")
+
+def scrub_user():
+	max_offset = frappe.db.sql("""
+					SELECT
+						COUNT(user.name) AS total
+					FROM
+						`tabUser` AS user
+					""", as_dict=1)[0].total;
+	
+	current_offset = 0
+	while current_offset < max_offset:
+		users = frappe.db.sql(f"""
+			SELECT 
+				user.name 
+			FROM 
+				`tabUser` AS user
+			WHERE
+				user.name <> 'Administrator'
+			ORDER BY 
+				user.creation
+			LIMIT 1000
+			OFFSET {current_offset}
+		""", as_dict=1)
+	
+		user_sql = ""
+		for row in users:
+			row_name = row.name.replace("'", "''")
+			user_sql += "'" + row_name + "',"
+		user_sql = user_sql[:-1]
+		
+		frappe.db.sql(f"""
+			UPDATE `tabUser` user SET 
+				first_name = SUBSTRING(MD5(first_name), 1, 8),
+				middle_name = SUBSTRING(MD5(middle_name), 1, 8),
+				last_name = SUBSTRING(MD5(last_name), 1, 8),
+				name = CONCAT(SUBSTRING(MD5(name), 1, 8), '@test.com'),
+				username = SUBSTRING(MD5(username), 1, 8),
+				full_name = CONCAT(first_name, ' ', last_name),
+				email = CONCAT(SUBSTRING(MD5(email), 1, 8), '@test.com'),
+				phone = SUBSTRING(CAST(SHA(phone) AS CHAR), 1, 5),
+				interest = SUBSTRING(MD5(interest), 1, 8),
+				bio = SUBSTRING(MD5(bio), 1, 8),
+				mobile_no = SUBSTRING(CAST(SHA(mobile_no) AS CHAR), 1, 5),
+				email_signature = SUBSTRING(MD5(email_signature), 1, 8)
+			WHERE 
+				user.name in ({user_sql})
+		""")
+		current_offset += 1000
+	print("Users scrubd successfully")

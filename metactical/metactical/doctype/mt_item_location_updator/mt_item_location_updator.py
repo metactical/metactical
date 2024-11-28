@@ -5,8 +5,24 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils.xlsxutils import read_xls_file_from_attached_file, read_xlsx_file_from_attached_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action, read_file
+from frappe import _, msgprint
+from frappe.model.docstatus import DocStatus
 
 class MTItemLocationUpdator(Document):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def validate(self):
 		file_content = self.check_file()
 		self.validate_file(file_content)
@@ -23,13 +39,6 @@ class MTItemLocationUpdator(Document):
 		except Exception as e:
 			frappe.rollback()
 			frappe.throw(f"Error updating Item: {e}")
-
-	def submit(self):
-		frappe.msgprint(
-			"""The task has been enqueued as a background job. In case there is any issue on processing in background, 
-			the system will add a comment about the error on this document and revert to the Draft stage"""
-		)
-		queue_action(self, "submit", timeout=2000)
 
 	def validate_file(self, file_content, only_validate=True):
 		header = file_content[0]

@@ -30,8 +30,24 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 		adjust_amount
 	)
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
+from frappe.model.docstatus import DocStatus
 
 class SalesOrderCustom(SalesOrder):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def validate(self):
 		super(SalesOrderCustom, self).validate()
 		self.pull_reserved_qty()
@@ -48,17 +64,6 @@ class SalesOrderCustom(SalesOrder):
 					'warehouse': row.warehouse}, 'reserved_qty')
 				row.update({'sal_reserved_qty': reserved_qty})
 
-	def submit(self):
-		if len(self.items) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-	
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(SalesOrderCustom, self).set_status(update, status, update_modified)
 
@@ -94,6 +99,20 @@ class SalesOrderCustom(SalesOrder):
 		}
 		process_credit_card_tokens(obj, self.customer)
 		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
+
+	def on_submit(self):
+		super(SalesOrderCustom, self).on_submit()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+
+	def on_cancel(self):
+		super(SalesOrderCustom, self).on_cancel()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
 @frappe.whitelist()
 def save_cancel_reason(**args):
@@ -239,3 +258,17 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		doclist.set_payment_schedule()
 
 	return doclist
+
+@frappe.whitelist()
+def submit_order(doc):
+	# Metactical Customization: Submit order in background if more than 10 items
+	doc = frappe.get_doc("Sales Order", doc)
+	if len(doc.items) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()

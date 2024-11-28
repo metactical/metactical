@@ -30,6 +30,7 @@ def get_item_master(items):
 			if item_doc.get('barcodes') is not None:
 				for barcode in item_doc.barcodes:
 					barcodes.append(barcode.barcode)
+			item["ifw_retailskusufix"] = item_doc.get("ifw_retailskusuffix")
 			item["item_barcode"] = barcodes
 			item["shipping_height"] = item_doc.get("ais_shipping_height") or 0
 			item["shipping_width"] = item_doc.get("ais_shipping_width") or 0

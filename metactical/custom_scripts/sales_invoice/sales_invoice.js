@@ -4,7 +4,6 @@ frappe.ui.form.on('Sales Invoice', {
 			frm.set_value("neb_payment_completed_at", null)
 
 		frm.trigger("update_custom_buttons")
-
 		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	validate: function(frm){

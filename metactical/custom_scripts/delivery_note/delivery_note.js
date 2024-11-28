@@ -18,3 +18,4 @@ cur_frm.cscript.make_shipment = function () {
         frm: cur_frm
     })
 }
+

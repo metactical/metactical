@@ -93,7 +93,8 @@ def make_payment_request(**args):
 	return pr.as_dict()
 
 def get_email_content(ref_doc, amount):
-	payment_form_url = frappe.db.get_single_value("Metactical Settings", "payment_form_url")
+	lead_source = ref_doc.source
+	payment_form_url = frappe.db.get_value("USAePay Accounts", lead_source, "payment_form_url")
 	customer_address = get_customer_address(ref_doc.customer)
 
 	if not customer_address.get("billing") and not customer_address.get("shipping"):
