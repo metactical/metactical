@@ -269,11 +269,9 @@ class PricingRuleFromExcel(Document):
 
 		pricing_rules_list = []
 		columns = []
-		messages = ""
 		for i, row in enumerate(data):
 			pricing_rule, retail_sku, message = doc.get_pricing_rule(row, indexes, price_list)
 			if not retail_sku:
-				messages += message + "\n"
 				continue
 
 			if not columns:
