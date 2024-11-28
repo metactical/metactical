@@ -58,7 +58,6 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 		lead_sources = frappe.get_all('Lead Source', pluck='name', filters={"custom_neb_price_list": ["in", price_lists]})
 
 		# Check for existing Item Inventory Output, create new if not found
-		data = {}
 		item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'name': item_code})
 		retail_sku = frappe.db.get_value('Item', item_code, 'ifw_retailskusuffix')
 		data = []
