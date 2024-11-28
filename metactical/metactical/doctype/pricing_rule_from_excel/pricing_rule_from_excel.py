@@ -81,6 +81,8 @@ class PricingRuleFromExcel(Document):
 		price_list = header[3]
 		indexes = self.get_column_indexes(header)
 		error_messages = ""
+		new_rules = []
+		existing_rules = []
 
 		try:
 			for row in data[1:]:
@@ -102,17 +104,30 @@ class PricingRuleFromExcel(Document):
 						pricing_rule = frappe.get_doc("Pricing Rule", rule.name)
 						pricing_rule.update(pricing_rule_dict)
 						pricing_rule.flags.ignore_validate = True
-						pricing_rule.save()
+						existing_rules.append(pricing_rule)
 				else:
 					pricing_rule_dict["naming_series"] = self.pr_naming_series
 					pricing_rule = frappe.get_doc(pricing_rule_dict)
 
 					# Insert new pricing rule
 					pricing_rule.flags.ignore_validate = True
-					pricing_rule.insert()
+					new_rules.append(pricing_rule)
 		
-					# Commit changes
-					frappe.db.commit()
+				if len(existing_rules) % 1000 == 0:
+					frappe.enqueue(update_existing_prs, existing_rules=existing_rules, queue="long", job_name="update_existing_prs")
+					existing_rules = []
+
+				if len(new_rules) % 1000 == 0:
+					frappe.enqueue(create_new_prs, prs_list=new_rules, queue="long", job_name="create_new_prs")
+					new_rules = []
+
+			# Create new pricing rules
+			if new_rules:
+				frappe.enqueue(create_new_prs, prs_list=new_rules, queue="long", job_name="create_new_prs")
+			
+			# Update existing pricing rules
+			if existing_rules:
+				frappe.enqueue(update_existing_prs, existing_rules=existing_rules, queue="long", job_name="update_existing_prs")
 
 			# Log error messages
 			if error_messages:
@@ -411,3 +426,14 @@ def change_date_format2(date):
 	months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 	date = date.split("-")
 	return f"{date[2]}-{months[int(date[1])-1]}-{date[0][2:]}"
+
+
+def create_new_prs(prs_list):
+	for pr in prs_list:
+		pr.insert()
+		frappe.db.commit()
+
+def update_existing_prs(existing_rules):
+	for rule in existing_rules:
+		rule.save()
+		frappe.db.commit()
