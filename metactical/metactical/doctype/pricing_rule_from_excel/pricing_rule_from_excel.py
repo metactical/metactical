@@ -104,8 +104,8 @@ class PricingRuleFromExcel(Document):
 					# Insert new pricing rule
 					pricing_rule.insert()
 		
-			# Commit changes
-			frappe.db.commit()
+				# Commit changes
+				frappe.db.commit()
 		
 		# Roll back on error and log traceback
 		except Exception:
