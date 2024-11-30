@@ -19,7 +19,7 @@ def on_sle_update(doc, method):
 		else:
 			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
 
-	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, queue='default')
+	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
 
 def get_all_bins(item_code):
 	all_bins = frappe.get_all(
@@ -30,7 +30,10 @@ def get_all_bins(item_code):
 
 	return all_bins
 	
-def update_item_inventory_output(item_code, net_available_bins = {}):
+def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None):
+	if not voucher_type:
+		voucher_type = 'Sales Order'
+
 	try:
 		# get price lists from the item price list
 		price_lists = frappe.get_all(
@@ -95,10 +98,10 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 			item_inventory_output.item_inventory_output_list = data
 			try:
 				item_inventory_output.insert()
-			except:
+			except frappe.DuplicateEntryError:
 				item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'item_code': item_code})
 				if item_inventory_output_doc:
-					update_doc(item_inventory_output_doc, total_available_qty, data)
+					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
 		else:
 			item_inventory_output = frappe.get_doc('Item Inventory Output', item_inventory_output_doc)
 			item_inventory_output.qoh = total_available_qty
@@ -108,20 +111,20 @@ def update_item_inventory_output(item_code, net_available_bins = {}):
 				item_inventory_output.save()
 			except:
 				if item_inventory_output_doc:
-					update_doc(item_inventory_output_doc, total_available_qty, data)
+					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
 
 		frappe.db.commit()
 
 	except Exception as e:
-		frappe.log_error(title=f"Item Inventory Output Update Failed - {item_code}", message=frappe.get_traceback())
+		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
 
-def update_doc(docname, total_available_qty, data):
+def update_doc(docname, total_available_qty, data, item_code, voucher_type):
 	try:
 		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
 		item_inventory_output.item_inventory_output_list = data
 		item_inventory_output.qoh = total_available_qty
 		item_inventory_output.save()
 	except Exception as e:
-		frappe.log_error(title=f"Item Inventory Output Update Failed - {item_code}", message=frappe.get_traceback())
+		frappe.log_error(title=f"Inventory Update Failed ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
