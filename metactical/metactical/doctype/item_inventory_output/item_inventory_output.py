@@ -108,11 +108,11 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			item_inventory_output.qoh = total_available_qty
 			item_inventory_output.item_inventory_output_list = data
 
-			# try:
-			# 	item_inventory_output.save()
-			# except:
-			# 	if item_inventory_output_doc:
-			update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
+			try:
+				item_inventory_output.save()
+			except:
+				if item_inventory_output_doc:
+				update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
 
 		frappe.db.commit()
 
