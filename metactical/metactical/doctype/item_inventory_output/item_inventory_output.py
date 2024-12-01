@@ -119,12 +119,17 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
 
-def update_doc(docname, total_available_qty, data, item_code, voucher_type):
+def update_doc(docname, total_available_qty, data, item_code, voucher_type, round=0):
 	try:
 		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
 		item_inventory_output.item_inventory_output_list = data
 		item_inventory_output.qoh = total_available_qty
 		item_inventory_output.save()
+		
 	except Exception as e:
-		frappe.log_error(title=f"Inventory Update Failed ({voucher_type}) - {item_code}", message=frappe.get_traceback())
-		frappe.db.rollback()
+		if round > 5:
+			frappe.log_error(title=f"Inventory Update Faile ({voucher_type}) - {item_code}", message=frappe.get_traceback())
+			return
+		else:
+			time.sleep(3)
+			update_doc(docname, total_available_qty, data, item_code, voucher_type, round+1)
