@@ -149,6 +149,8 @@ class CanadaPost():
 			for c in range(parcel.count - exists.get(parcel.name, 0)):
 				body = frappe.render_template(
 					"metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
+				# temp fix to replae the special character which was causing errors
+				body = body.replace("é", "e")
 				response = self.get_response(
 					f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
 																									   'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
