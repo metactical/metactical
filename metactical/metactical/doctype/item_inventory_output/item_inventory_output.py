@@ -125,10 +125,9 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 		item_inventory_output.item_inventory_output_list = data
 		item_inventory_output.qoh = total_available_qty
 		item_inventory_output.save()
-		
 	except Exception as e:
 		if round > 5:
-			frappe.log_error(title=f"Inventory Update Faile ({voucher_type}) - {item_code}", message=frappe.get_traceback())
+			frappe.log_error(title=f"Inventory Update Failed ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 			return
 		else:
 			time.sleep(3)
