@@ -47,7 +47,8 @@ doctype_js = {
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
-	"Warehouse": "custom_scripts/warehouse/warehouse.js"
+	"Warehouse": "custom_scripts/warehouse/warehouse.js",
+	"Contact": "custom_scripts/contact/contact.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -255,7 +256,8 @@ jinja = {
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
-		"metactical.barcode_generator.get_barcode_for_print_format"
+		"metactical.barcode_generator.get_barcode_for_print_format",
+		"get_customer_info:metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
 	]
 }
 
