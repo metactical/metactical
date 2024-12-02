@@ -72,19 +72,28 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
-										COUNT(pli.name) AS qty_item,
-										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} SEPARATOR '<br>') AS locations
+										CASE
+											WHEN bundle.name IS NOT NULL THEN COUNT(DISTINCT bundle_item.name)
+											ELSE COUNT(pli.name)
+										END AS qty_item,
+										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} 
+											SEPARATOR '<br>') AS locations
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
 										`tabPick List` AS pl ON pl.name = pli.parent
 									LEFT JOIN
-										`tabItem` AS item ON item.name = pli.item_code
+										`tabProduct Bundle` AS bundle ON bundle.new_item_code = pli.item_code
+									LEFT JOIN
+										`tabProduct Bundle Item` AS bundle_item ON bundle_item.parent = bundle.name
+									LEFT JOIN
+										`tabItem` AS item ON item.name = pli.item_code OR item.name = bundle_item.item_code
 									LEFT JOIN
 										`tabSales Order` AS sales_order ON sales_order.name = pli.sales_order
 									WHERE
 										pl.docstatus = 0 AND pli.warehouse = '{warehouse}'
-										AND item.is_stock_item = 1 AND sales_order.status <> 'On Hold'
+										AND (item.is_stock_item = 1 OR bundle.name IS NOT NULL)
+										AND sales_order.status <> 'On Hold'
 										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
@@ -110,17 +119,44 @@ def get_items(pick_list, warehouse, user, tote):
 	if is_being_picked is None or is_being_picked == '':
 		items = frappe.db.sql("""SELECT
 										pli.name, pli.parent AS pick_list, pli.item_code, pli.item_name, item.image,
-										pli.ifw_location AS locations, pli.qty, bin.actual_qty
+										pli.ifw_location AS locations, pli.qty, bin.actual_qty,
+										CASE 
+											WHEN bundle.name IS NOT NULL THEN 1 
+											ELSE 0 
+										END AS is_product_bundle
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
 										`tabItem` AS item ON item.item_code = pli.item_code
 									LEFT JOIN
+										`tabProduct Bundle` AS bundle ON bundle.new_item_code = item.name
+									LEFT JOIN
 										`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
 									WHERE
-										pli.parent = %(pick_list)s AND pli.item_code not in """ + not_include + """
+										pli.parent = %(pick_list)s
+										AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
 									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
+		for item in items:
+			if item.is_product_bundle == 1:
+				bundled_items = frappe.db.sql("""
+								SELECT
+								  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
+								  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
+								  	bin.actual_qty, 1 AS is_product_bundle
+								FROM
+									`tabProduct Bundle Item` AS bundle_item
+								LEFT JOIN
+								  	`tabItem` AS item ON item.name = bundle_item.item_code
+								LEFT JOIN
+									`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
+								WHERE
+									bundle_item.parent = %(bundle)s
+								ORDER BY item.ifw_location
+								""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
+				items.remove(item)
+				items.extend(bundled_items)
+			
 		for item in items:
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
