@@ -86,6 +86,7 @@ frappe.ui.form.on('Sales Invoice', {
 			},
 			callback: function(r){
 				if(r.message){
+					console.log(r.message, frm.doc.debit_to, r.message != frm.doc.debit_to);
 					if (r.message != frm.doc.debit_to){
 						frm.set_value("debit_to", r.message);
 						frm.trigger("get_advances")

@@ -269,6 +269,7 @@ jinja = {
 		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
+		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
 	]
 }

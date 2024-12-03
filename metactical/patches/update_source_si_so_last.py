@@ -1,6 +1,9 @@
 import frappe
 
 def execute():
+    if not frappe.db.exists("Lead Source", "Store - camo - downtown"):
+        return
+
     doctypes = ["Sales Invoice", "Sales Order"]
     for doctype in doctypes:
         limit = 1000
@@ -8,7 +11,7 @@ def execute():
         has_data = True
 
         while has_data:
-            sales_invoice_list = frappe.db.get_list(
+            docs_list = frappe.db.get_list(
                 doctype,
                 filters={"customer_group": "Retail", "source": ""},
                 fields=["name"],
@@ -16,11 +19,14 @@ def execute():
                 page_length=limit,
             )
 
-            if not sales_invoice_list:
+            if len(docs_list) < limit:
                 has_data = False
-            else:
-                frappe.enqueue(update_source, sales_invoices_list=sales_invoice_list, doctype=doctype, queue="long")
-                start = start +limit
+            
+            if not docs_list:
+                break
+            
+            frappe.enqueue(update_source, sales_invoices_list=docs_list, doctype=doctype, queue="long")
+            start = start +limit
 
 def update_source(sales_invoices_list, doctype):
     for doc in sales_invoices_list:
