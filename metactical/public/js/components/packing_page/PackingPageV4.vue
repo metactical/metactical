@@ -238,7 +238,7 @@
 			  callback: (r) => {
 				if (r.message) {
 				  if (values.item_weight && values.item_weight > 0) cur_item.net_weight = values.item_weight;
-				  this.packItem(cur_item, barcode, amount, cur_item.dn_detail);
+				  this.packItem(cur_item, barcode, amount);
 				} else {
 				  frappe.msgprint("Error updating values");
 				}
