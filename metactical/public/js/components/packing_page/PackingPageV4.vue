@@ -105,7 +105,7 @@
 			pending_item.qty += 1;
 			item.qty -= 1;
 			if (item.qty === 0) {
-			  this.packed_items = this.packed_items.filter((i) => i.item_code !== item.item_code);
+			  this.packed_items = this.packed_items.filter((i) => i.dn_detail !== item.dn_detail);
 			  if (this.packed_items.length === 0) {
 				$(".pack-items-btn").addClass("d-none");
 			  }
@@ -113,7 +113,7 @@
 			return false;
 		  }
 		});
-		this.reGenerateCurrentItem(item);
+		this.reGenerateCurrentItem(item, true);
 	  },
   
 	  showPackedItems() {
@@ -194,20 +194,20 @@
   
 		let barcode_found = false;
 		this.pending_items.forEach((cur_item) => {
-		  if (cur_item.item_barcode.includes(barcode) && me.current_item.dn_detail == cur_item.dn_detail) {
-			if (amount > cur_item.qty) {
-			  frappe.throw(`You can only add a maximum of ${cur_item.qty} items`);
-			}
-			frappe.utils.play_sound("alert");
-  
-			const fields = me.getMeasurementFields(cur_item);
-			if (fields.length > 0 && me.ask_shipment_info) {
-			  me.showMeasurementDialog(fields, cur_item, barcode, amount);
-			} else {
-			  me.packItem(cur_item, barcode, amount);
-			}
-			barcode_found = true;
-			return
+      if (cur_item.item_barcode.indexOf(barcode) != -1) {
+        if (amount > cur_item.qty) {
+          frappe.throw(`You can only add a maximum of ${cur_item.qty} items`);
+        }
+        frappe.utils.play_sound("alert");
+    
+        const fields = me.getMeasurementFields(cur_item);
+        if (fields.length > 0 && me.ask_shipment_info) {
+          me.showMeasurementDialog(fields, cur_item, barcode, amount);
+        } else {
+          me.packItem(cur_item, barcode, amount);
+        }
+        barcode_found = true;
+        throw "Break";
 		  }
 		});
   
@@ -238,7 +238,7 @@
 			  callback: (r) => {
 				if (r.message) {
 				  if (values.item_weight && values.item_weight > 0) cur_item.net_weight = values.item_weight;
-				  this.packItem(cur_item, barcode, amount);
+				  this.packItem(cur_item, barcode, amount, cur_item.dn_detail);
 				} else {
 				  frappe.msgprint("Error updating values");
 				}
@@ -261,18 +261,20 @@
 		}
   
 		if (cur_item.qty === 0) {
-		  this.reGenerateCurrentItem();
+		  this.reGenerateCurrentItem(cur_item);
 		} else {
 		  this.reGenerateCurrentItem(cur_item);
 		}
 		$(".pack-items-btn").removeClass("d-none");
 	  },
   
-	  reGenerateCurrentItem(item = null) {
-		if (!item) {
-		  const index = this.pending_items.findIndex((i) => i.dn_detail === this.current_item.dn_detail);
+	  reGenerateCurrentItem(item = null, reverting = false) {
+		if (item.qty == 0 && !reverting) {
+		  const index = this.pending_items.findIndex((i) => i.dn_detail === item.dn_detail);
 		  this.pending_items.splice(index, 1);
 		}
+
+    var item = item.qty == 0 ? null : item;
   
 		if (this.pending_items.length > 0) {
 		  if (item) {
