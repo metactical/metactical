@@ -3,6 +3,17 @@ import frappe
 from frappe.model.mapper import get_mapped_doc
 from frappe import _
 
+@frappe.whitelist()
+def get_enabled_providers():
+	enabled_providers = []
+	# Check if Canada Post is enabled
+	if '1' == frappe.db.get_value('Canada Post', 'Canada Post', 'enabled'):
+		enabled_providers.append("Canada Post")
+	
+	# Check if Purolator enabled
+	if frappe.db.exists("Purolator Settings", {"enabled": 1}):
+		enabled_providers.append("Purolator")
+	return enabled_providers
 
 @frappe.whitelist()
 def get_rate(name, provider='Canada Post', context=None):

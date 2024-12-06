@@ -11,9 +11,7 @@
 							name="carrier_service"
 							:value="selectedService">
 								<option>&nbsp;</option>
-								<!-- {% for opt in options %} -->
 								<option v-for="option in canadaPostRates.options" :value="'carrier_service_' + option.key">{{ option.val }}</option>
-								<!-- {% endfor %}-->
 						</select>
 						<div class="select-icon ">
 							<svg class="icon  icon-sm" style="">
@@ -26,40 +24,46 @@
 				</div>
 			</div>
 		</div>
-		<!-- {% for row in data %} -->
-		<table v-for="row in canadaPostRates.data" class="table table-bordered" :data-row-name="row.name">
-			<tr>
-				<th>
-					{{ __("Row") }} # {{ row.idx }}
-					{{ __("Count") }} # {{ row.count }}
-				</th>
-				<th>{{ __("Service") }}</th>
-				<th>{{ __("Base Price") }}</th>
-				<th>{{ __("Total") }}</th>
-				<th>{{ __("Guaranteed Delivery") }}</th>
-				<th>{{ __("Expected Transit Time") }}</th>
-				<th>{{ __("Expected Delivery Date") }}</th>
-			</tr>
-			<tr v-for="(item, idx) in row.items">
-				<td>
-					<input type="radio" :name="'carrier_service_' + item.carrier_service" 
-						:checked="selectedService === 'carrier_service_' + item.carrier_service"
-						v-on:change="select_service('carrier_service_' + item.carrier_service, 'check')"
-						:value="item.carrier_service" 
-						:data-service-name="item.service_name">
-				</td>
-				<td>{{ item.service_name }}</td>
-				<td>{{ item.base }}</td>
-				<td>{{ item.shipment_amount }}</td>
-				<td>{{ item.guaranteed_delivery ? "Yes" : "No" }}</td>
-				<td>{{ item.expected_transit_time }}</td>
-				<td>{{ item.expected_delivery_date }}</td>
-			</tr>
-		</table>
+		<div v-for="(carrier_rates, carrier_service) in rates">
+			<table v-for="row in carrier_rates.rates.data" class="table table-bordered" :data-row-name="row.name">
+				<tr>
+					<th>
+						{{ __("Row") }} # {{ row.idx }}
+						{{ __("Count") }} # {{ row.count }}
+					</th>
+					<th>{{ __("Service") }}</th>
+					<th>{{ __("Base Price") }}</th>
+					<th>{{ __("Total") }}</th>
+					<th>{{ __("Guaranteed Delivery") }}</th>
+					<th>{{ __("Expected Transit Time") }}</th>
+					<th>{{ __("Expected Delivery Date") }}</th>
+				</tr>
+				<tr v-for="(item, idx) in row.items">
+					<td>
+						<input type="radio" :name="carrier_service + '_' + item.carrier_service" 
+							:checked="selectedService === carrier_service + '_' + item.carrier_service"
+							v-on:change="select_service(carrier_service + '_' + item.carrier_service, 'check')"
+							:value="item.carrier_service" 
+							:data-service-name="item.service_name">
+					</td>
+					<td>{{ item.service_name }}</td>
+					<td>{{ item.base }}</td>
+					<td>{{ item.shipment_amount }}</td>
+					<td>{{ item.guaranteed_delivery ? "Yes" : "No" }}</td>
+					<td>{{ item.expected_transit_time }}</td>
+					<td>{{ item.expected_delivery_date }}</td>
+				</tr>
+			</table>
+		</div>
 		<div class="col-xs-12">
 			<button class="btn btn-primary btn-sm" @click="create_shipments()" :disabled="creatingShipments">
 				Create Shipment(s)
 			</button>
+		</div>
+	</div>
+	<div v-else>
+		<div class="loading-animation">
+			<p><center>{{ loadingMessage }}...</center></p>
 		</div>
 	</div>
 </template>
@@ -71,7 +75,13 @@ export default {
 			ratesLoaded: false,
 			canadaPostRates: {},
 			selectedService: '',
-			creatingShipments: false
+			creatingShipments: false,
+			loadingMessage: '',
+			enabledProviders: [],
+			rates: {},
+			minimumRate: 0,
+			minimumProvider: '',
+			minimumService: ''
 		}
 	},
 	props: {
@@ -86,33 +96,64 @@ export default {
 	methods: {
 		init() {
 			let me = this;
+			me.loadingMessage = 'Fetching providers'
 			frappe.call({
-				method: "metactical.utils.shipping.shipping.get_rate",
-				args: {
-					"name": me.doc.frm.docname
-				},
+				method: "metactical.utils.shipping.shipping.get_enabled_providers",
+				freeze: true,
 				callback: function(ret){
-					me.ratesLoaded = true;
-					console.log(ret);
-					me.canadaPostRates = ret.message;
-
-					// Select the least expensive service by default
-					let min_value = 0;
-					let last_id;
-					me.canadaPostRates.data.forEach(row => {
-						row.items.forEach((item, idx) => {
-							if (flt(item.shipment_amount) < min_value || min_value == 0) {
-								min_value = flt(item.shipment_amount)
-								last_id = item.carrier_service
-							}
-						})
-					})
-					if (last_id) {
-						me.selectedService = 'carrier_service_' + last_id;
+					me.enabledProviders = ret.message;
+					console.log("Enabled Providers: ", me.enabledProviders);
+					if(me.enabledProviders.length > 0){
+						me.get_rates();
 					}
-					console.log("Selected Service: ", me.selectedService);
+					else{
+						frappe.throw(__("No shipping providers are enabled"));
+					}
 				}
 			});
+		},
+
+		get_rates(){
+			let me = this;
+			me.rates = {};
+			for (let provider of me.enabledProviders) {
+				me.loadingMessage = `Loading rates for ${provider}`;
+				let provider_key = provider.toLowerCase().replace(/\s+/g, '_');
+				// Add any additional logic needed for each provider here
+				frappe.call({
+					method: "metactical.utils.shipping.shipping.get_rate",
+					args: {
+						"name": me.doc.frm.docname,
+						"provider": provider
+					},
+					callback: function(ret){
+						me.rates[provider_key] = {
+							"label": provider,
+							"rates": ret.message
+						}
+
+						me.ratesLoaded = true;
+						console.log(ret);
+						me.canadaPostRates = ret.message;
+
+						// Select the least expensive service by default
+						let min_value = 0;
+						let last_id;
+						me.rates[provider_key].rates.data.forEach(row => {
+							row.items.forEach((item, idx) => {
+								if (flt(item.shipment_amount) < me.minimumRate || me.minimumRate == 0) {
+									me.minimumRate = flt(item.shipment_amount)
+									me.minimumProvider = provider_key;
+									me.minimumService = item.carrier_service;
+								}
+							})
+						})
+						me.selectedService = me.minimumProvider + '_' + me.minimumService;
+						console.log("Selected Service: ", me.selectedService);
+					}
+				});
+			}
+			console.log("Rates: ", me.rates);
 		},
 
 		select_service(id, method){
