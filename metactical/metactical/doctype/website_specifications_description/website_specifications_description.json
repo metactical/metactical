@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-12-05 07:34:25.899575",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "label",
+  "description",
+  "image"
+ ],
+ "fields": [
+  {
+   "fieldname": "label",
+   "fieldtype": "Link",
+   "label": "Label",
+   "options": "Website Specifications Label"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "in_preview": 1,
+   "label": "Description",
+   "length": 4000
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach",
+   "label": "Image"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-12-06 06:00:59.662979",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Website Specifications Description",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "description"
+}
