@@ -41,5 +41,9 @@ def on_update(doc, method):
     elif removed_lead_sources:
         frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
 
-
-
+@frappe.whitelist()
+def copy_specification_from_item_group(item_group):
+    return frappe.db.get_list(
+        "MT Item Website Specification", filters={"parent": item_group}, fields=["label", "mandatory"]
+        )
+            
