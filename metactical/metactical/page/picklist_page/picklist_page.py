@@ -78,7 +78,8 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 											ELSE COUNT(pli.name)
 										END AS qty_item,
 										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} 
-											SEPARATOR '<br>') AS locations
+											SEPARATOR '<br>') AS locations,
+										DATE_FORMAT(sales_order.transaction_date, '%d-%m-%Y') AS order_date
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
