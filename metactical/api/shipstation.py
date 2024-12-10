@@ -456,14 +456,14 @@ def update_shipment(delivey_note, shipment_details):
 			shipment_details['width'] = shipment_details.get('width', 0) * 2.54
 			shipment_details['height'] = shipment_details.get("height", 0) * 2.54
 
-		shipment.shipment_parcel = []
-		shipment.append('shipment_parcel', {
-			'length': shipment_details.get('length'),
-			'width': shipment_details.get('width'),
-			'height': shipment_details.get('height'),
-			'weight': shipment_details.get('weight'),
-			'count': 1
-		})
+		if len(shipment.shipment_parcel) == 0:
+			shipment.append('shipment_parcel', {
+				'length': shipment_details.get('length'),
+				'width': shipment_details.get('width'),
+				'height': shipment_details.get('height'),
+				'weight': shipment_details.get('weight'),
+				'count': 1
+			})
 		try:
 			shipment.submit()
 		except Exception as e:
