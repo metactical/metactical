@@ -687,6 +687,7 @@ class PicklistPage{
 	load_to_pick(){
 		const me = this;
 		var items = metactical.pick_list.items_to_pick;
+		console.log("Items: ", items);
 		var items_template = frappe.render_template('items_to_pick', {"items": items})
 		if(strip(items_template) == ""){
 			this.wrapper.find('.to-pick-ul').html(frappe.render_template('submit_button'));
@@ -935,38 +936,53 @@ class PicklistPage{
 	
 	submit_pick_list(){
 		const me = this;
-		//Make the non-picked items zero
-		for(var i in metactical.pick_list.items_to_pick){
-			var item = metactical.pick_list.items_to_pick[i];
-			var item_exists = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
-			if(item_exists.length == 0){
-				let new_item = $.extend(true, {}, item);
-				new_item.picked_qty = 0;
-				metactical.pick_list.picked_items.push(new_item);
+		let all_items_picked = true;
+		// Check that all items have been picked, otherwise raise an error
+		console.log("Items to pick: ", metactical.pick_list.items_to_pick);
+		for (let item of metactical.pick_list.items_to_pick) {
+			if (item.qty > 0) {
+				all_items_picked = false;
+				break;
 			}
 		}
-		frappe.call({
-			"method": "metactical.metactical.page.picklist_page.picklist_page.submit_pick_list",
-			"freeze": true,
-			"args": {
-				"items": metactical.pick_list.picked_items,
-			},
-			"callback": function(ret){
-				frappe.show_alert({
-					message: __('Pick List Submitted'),
-					indicator: 'green'
-				});
-				metactical.pick_list.picked_items = [];
-				metactical.pick_list.to_pick = [];
-				metactical.pick_list.current_pick = '';
-				if(metactical.pick_list.is_tote){
-					me.list_totes();
-				}
-				else{
-					me.list_orders();
+		if(!all_items_picked) {
+			frappe.throw("Please pick all items on the Pick List before submitting");
+		}
+		else{
+			//Make the non-picked items zero
+			for(var i in metactical.pick_list.items_to_pick){
+				var item = metactical.pick_list.items_to_pick[i];
+				var item_exists = metactical.pick_list.picked_items.filter((itm) => itm.item_code == item.item_code);
+				if(item_exists.length == 0){
+					let new_item = $.extend(true, {}, item);
+					new_item.picked_qty = 0;
+					metactical.pick_list.picked_items.push(new_item);
 				}
 			}
-		});
+			frappe.call({
+				"method": "metactical.metactical.page.picklist_page.picklist_page.mark_as_picked",
+				"freeze": true,
+				"args": {
+					"items": metactical.pick_list.picked_items,
+					"user": frappe.session.user
+				},
+				"callback": function(ret){
+					frappe.show_alert({
+						message: __('Pick List Submitted'),
+						indicator: 'green'
+					});
+					metactical.pick_list.picked_items = [];
+					metactical.pick_list.to_pick = [];
+					metactical.pick_list.current_pick = '';
+					if(metactical.pick_list.is_tote){
+						me.list_totes();
+					}
+					else{
+						me.list_orders();
+					}
+				}
+			});
+		}
 	}
 	
 	close_pick_list(pick_list){
