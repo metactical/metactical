@@ -4,6 +4,7 @@
 import frappe
 import sys, time
 from frappe.model.document import Document
+import time
 
 class ItemInventoryOutput(Document):
 	pass
