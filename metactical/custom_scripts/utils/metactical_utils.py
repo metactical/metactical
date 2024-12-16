@@ -12,6 +12,7 @@ from openpyxl.utils import get_column_letter
 from frappe.utils.xlsxutils import handle_html, ILLEGAL_CHARACTERS_RE
 from io import BytesIO
 import re, os
+from datetime import datetime
 
 from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
@@ -279,3 +280,15 @@ def read_file(file_path):
 			file_content = file.get_content()
 		
 		return file_content, extn
+
+def remove_tz_from_date(date):
+	if not date:
+		return None
+	
+	# Truncate to six digits
+	date_str_fixed = date[:26] + "Z"
+	parsed_date = datetime.strptime(date_str_fixed, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+	# Output the formatted datetime (customize the format as needed)
+	formatted_date = parsed_date.strftime("%Y-%m-%d")
+	return formatted_date
