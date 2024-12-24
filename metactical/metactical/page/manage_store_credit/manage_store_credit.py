@@ -241,6 +241,7 @@ def transfer_store_credit(**kwargs):
             "doctype": "Sales Invoice",
             "customer": frappe.db.get_value("Sales Invoice", sales_invoice, "customer"),
             "is_return": 1,
+            "update_outstanding_for_self": 0,
             "neb_store_credit_beneficiary": customer,
             "return_against": sales_invoice,
             "posting_date": frappe.utils.nowdate(),
