@@ -30,6 +30,14 @@ def get_all_bins(item_code):
 		fields=["warehouse", "actual_qty", "reserved_qty"]
 	)
 
+	other_active_warehouse_bins = frappe.get_all(
+		'Bin', 
+		filters={'item_code': item_code, "warehouse":["like", "%activestock%"]}, 
+		fields=["warehouse", "actual_qty", "reserved_qty"]
+	)
+
+	all_bins.extend(other_active_warehouse_bins)
+
 	return all_bins
 	
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None):
