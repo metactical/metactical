@@ -505,8 +505,7 @@ def create_pick_list(source_name, target_doc=None):
 
 		target.qty = qty_to_be_picked
 		target.stock_qty = qty_to_be_picked * flt(source.conversion_factor)
-		# Metactical Customization: Default pick qty take delivered qty into consideration
-		target.picked_qty = flt(source.qty) - flt(source.delivered_qty)
+		target.picked_qty = qty_to_be_picked
 
 	def update_packed_item_qty(source, target, source_parent) -> None:
 		qty = flt(source.qty)
