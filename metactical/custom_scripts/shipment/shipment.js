@@ -134,31 +134,7 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 			})
 		}
 		this.rateDialog.enable_primary_action()
-		console.log("Body: ", this.rateDialog.$body[0]);
 		new metactical.shipment_rate.ShipmentPopUp(this.rateDialog.$body[0]);
-		/*this.rateDialog.$body.html(frappe.render_template('shipment_rate', this.rates))
-		this.rateDialog.$body.find(`select[name="carrier_service"]`).on('change', () => {
-			let val = this.rateDialog.$body.find(`select[name="carrier_service"]`).val()
-			if (!val) {
-				return
-			}
-			this.rateDialog.$body.find(`input[value="${val}"]`).prop('checked', true)
-		})
-		// Select Defalut.
-		let min_value = 0;
-		let last_id;
-		this.rates.data.forEach(row => {
-			row.items.forEach(item => {
-				if (flt(item.shipment_amount) < min_value || min_value == 0) {
-					min_value = flt(item.shipment_amount)
-					last_id = item.carrier_service
-				}
-			})
-		})
-		if (last_id) {
-			this.rateDialog.$body.find(`select[name="carrier_service"]`).val(last_id).trigger('change')
-		}
-		// end select default*/
 		this.rateDialog.show()
 	}
 	

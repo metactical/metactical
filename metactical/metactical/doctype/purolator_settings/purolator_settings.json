@@ -9,8 +9,11 @@
  "engine": "InnoDB",
  "field_order": [
   "enabled",
+  "column_break_amapd",
+  "is_sandbox",
   "section_break_arnjm",
   "api_key",
+  "billing_account",
   "column_break_lk9uv",
   "api_password"
  ],
@@ -42,11 +45,26 @@
    "in_list_view": 1,
    "label": "API Password",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_amapd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_sandbox",
+   "fieldtype": "Check",
+   "label": "Is Sandbox"
+  },
+  {
+   "fieldname": "billing_account",
+   "fieldtype": "Data",
+   "label": "Billing Account"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-03 01:10:33.069804",
+ "modified": "2024-12-16 04:37:56.735047",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purolator Settings",
