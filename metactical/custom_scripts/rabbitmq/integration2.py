@@ -93,7 +93,7 @@ def start_consumer(rounds=0):
         # Attempt to reconnect with a delay
 
         start_consumer()
-        post_to_rocket_chat("RabbitMQ consumption started")
+        post_to_rocket_chat([], "RabbitMQ receiver is now running.", rmq=True)
     except Exception as e:
         error_message = f"Error during RMQ message consumption: {str(e)}"
         post_to_rocket_chat([], error_message, rmq=True)
