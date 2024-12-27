@@ -34,7 +34,7 @@ def queue_action(self, action, **kwargs):
 	enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 		action=action, **kwargs)
 		
-def post_to_rocket_chat(doc, msg, failed=False):
+def post_to_rocket_chat(doc, msg, failed=False, rmq=False):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
 		if not rocket_chat_settings.rocket_notification:
@@ -47,13 +47,16 @@ def post_to_rocket_chat(doc, msg, failed=False):
 			'X-User-Id': rocket_chat_settings.user_id
 		}
 
-		url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
-		message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
-						administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
-		
-		if failed:
-			message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
-						\n[{0}]({1})'.format(get_url(url), get_url(url))
+		if not rmq:
+			url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
+			message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
+							administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
+			
+			if failed:
+				message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
+							\n[{0}]({1})'.format(get_url(url), get_url(url))
+		else:
+			message = msg
 
 		payload = {
 			'channel': "#"+channel_name,
@@ -286,7 +289,14 @@ def remove_tz_from_date(date):
 		return None
 	
 	# Truncate to six digits
-	date_str_fixed = date[:26] + "Z"
+	# '%Y-%m-%dT%H:%M:%S.%fZ'  check if the date has this format
+	# if not, add the missing part
+	if len(date) == 19:
+		date_str_fixed = date + ".000000Z"
+	elif len(date) >= 26:
+		date_str_fixed = date[:26] + "Z"
+
+
 	parsed_date = datetime.strptime(date_str_fixed, "%Y-%m-%dT%H:%M:%S.%fZ")
 
 	# Output the formatted datetime (customize the format as needed)
