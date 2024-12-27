@@ -564,7 +564,7 @@ class PicklistPage{
 				});
 				me.wrapper.find('.pl-barcode').on('focusout', function(){
 					var barcode = $('input[data-fieldname="pl_barcode"]').val();
-					if(barcode != ''){
+					if(barcode != '' && barcode != filter){
 						me.list_orders(filter=barcode);
 					}
 				});
@@ -687,7 +687,6 @@ class PicklistPage{
 	load_to_pick(){
 		const me = this;
 		var items = metactical.pick_list.items_to_pick;
-		console.log("Items: ", items);
 		var items_template = frappe.render_template('items_to_pick', {"items": items})
 		if(strip(items_template) == ""){
 			this.wrapper.find('.to-pick-ul').html(frappe.render_template('submit_button'));
@@ -938,7 +937,6 @@ class PicklistPage{
 		const me = this;
 		let all_items_picked = true;
 		// Check that all items have been picked, otherwise raise an error
-		console.log("Items to pick: ", metactical.pick_list.items_to_pick);
 		for (let item of metactical.pick_list.items_to_pick) {
 			if (item.qty > 0) {
 				all_items_picked = false;
