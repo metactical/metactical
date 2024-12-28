@@ -3,7 +3,13 @@ from requests.auth import HTTPBasicAuth
 import frappe
 from requests import Session
 from zeep.transports import Transport
-from metactical.utils.shipping.canada_post import CanadaPost
+import re
+import logging
+from frappe.utils import get_files_path
+import base64
+
+# logging.basicConfig(level=logging.DEBUG)
+# logging.getLogger('zeep').setLevel(logging.DEBUG)
 
 class Purolator:
 	def __init__(self):
@@ -21,9 +27,22 @@ class Purolator:
 				'is_sandbox': settings.is_sandbox,
 				'billing_account': settings.billing_account
 			})
+	
+	def breakdown_phone_number(self, phone_number):
+		pattern = re.compile(r'^\+?1?[-.\s]?(\d{3})[-.\s]?(\d{3})[-.\s]?(\d{4})$')
+		
+		match = pattern.match(phone_number)
+		
+		if match:
+			country_code = '1'
+			area_code = match.group(1)
+			phone = match.group(2) + match.group(3)
+			return country_code, area_code, phone
+		else:
+			raise frappe.throw("Invalid phone number format for Canada/US")
 
 
-	def create_pwss_soap_client(self, wsdl_url):
+	def create_pwss_soap_client(self, wsdl_url, reference):
 		"""Creates a SOAP Client with the appropriate authentication and header information"""
 		session = Session()
 		session.auth = HTTPBasicAuth(self.settings['api_key'], self.settings['api_password'])
@@ -41,7 +60,7 @@ class Purolator:
 				xsd.Element('{http://purolator.com/pws/datatypes/v2}RequestReference', xsd.String())
 			])
 		)
-		header_value = header(Version='2.0', Language='en', GroupID='xxx', RequestReference='Rating Example')
+		header_value = header(Version='2.0', Language='en', GroupID='xxx', RequestReference=reference)
 		client.set_default_soapheaders([header_value])
 
 		return client
@@ -55,7 +74,7 @@ class Purolator:
 		else:
 			wsdl_url = 'https://webservices.purolator.com/EWS/V2/Estimating/EstimatingService.asmx?wsdl'
 		
-		client = self.create_pwss_soap_client(wsdl_url)
+		client = self.create_pwss_soap_client(wsdl_url, docname)
 
 		shipment = frappe.get_doc("Shipment", docname)
 		sender_postal_code = frappe.db.get_value("Address", shipment.pickup_address_name, "pincode").replace(" ", "")
@@ -96,7 +115,6 @@ class Purolator:
 						'expected_transit_time': estimate.EstimatedTransitDays,
 						'expected_delivery_date': estimate.ExpectedDeliveryDate,
 					})
-					#print(f"{estimate.ServiceID} is available for ${estimate.TotalPrice}")
 
 			if items:
 				data.append({
@@ -116,7 +134,7 @@ class Purolator:
 		else:
 			wsdl_url = 'https://webservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
 		
-		client = self.create_pwss_soap_client(wsdl_url)
+		client = self.create_pwss_soap_client(wsdl_url, docname)
 
 		shipment = frappe.get_doc("Shipment", docname)
 
@@ -125,6 +143,7 @@ class Purolator:
 
 		sender_street_number = sender_address.address_line1.split(" ")[0]
 		sender_street_name = " ".join(sender_address.address_line1.split(" ")[1:])
+		sender_country_code, sender_area_code, sender_phone = self.breakdown_phone_number(sender_address.phone)
 
 		receiver_street_number = receiver_address.address_line1.split(" ")[0]
 		receiver_street_name = " ".join(receiver_address.address_line1.split(" ")[1:])
@@ -142,7 +161,12 @@ class Purolator:
 						'City': sender_address.city,
 						'Province': sender_address.state,
 						'Country': frappe.db.get_value("Country", sender_address.country, "code"),
-						'PostalCode': sender_address.pincode.replace(" ", "")
+						'PostalCode': sender_address.pincode.replace(" ", ""),
+						'PhoneNumber': {
+							'CountryCode': sender_country_code,
+							'AreaCode': sender_area_code,
+							'Phone': sender_phone
+						}
 					}
 				},
 				'ReceiverInformation': {
@@ -189,11 +213,11 @@ class Purolator:
 				},
 				'PaymentInformation': {
 					'PaymentType': "Sender",
-					'SenderAccountNumber': self.settings['billing_account'],
+					'RegisteredAccountNumber': self.settings['billing_account'],
 					'BillingAccountNumber': self.settings['billing_account']
 				},
 				'PickupInformation': {
-					'PickupType': 'DropOff'
+					'PickupType': 'PreScheduled'
 				},
 				'TrackingReferenceInformation': {
 					'Reference1': docname
@@ -201,11 +225,83 @@ class Purolator:
 			},
 			'PrinterType': 'Thermal'
 		}
-		#print(request)
-		response = client.service.ValidateShipment(request)
-		response = client.service.CreateShipment(request)
-		return response
 
+		validate_shipment = client.service.ValidateShipment(Shipment=request["Shipment"])
+		if not validate_shipment.body.ValidShipment:
+			frappe.throw(str(validate_shipment.body))
+		else:
+			create_shipment = client.service.CreateShipment(Shipment=request["Shipment"])
+			if create_shipment.body.ResponseInformation.Errors is None:
+				shipment_pin = create_shipment.body.ShipmentPIN.Value
+				response = self.get_documents(docname, shipment_pin)
+				return response
+			else:
+				frappe.throw(str(create_shipment.body))
+
+	def get_documents(self, docname, pin):
+		if self.settings.is_sandbox:
+			wsdl_url = 'https://devwebservices.purolator.com/PWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+		else:
+			wsdl_url = 'https://webservices.purolator.com/PWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+
+		client = self.create_pwss_soap_client(wsdl_url, docname)
+
+		header = xsd.Element(
+				'{http://purolator.com/pws/datatypes/v1}RequestContext',
+				xsd.ComplexType([
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
+				])
+			)
+		header_value = header(Version='1.3', Language='en', GroupID='xxx', RequestReference=docname)
+
+		request_data = {
+			'DocumentCriterium': {
+				'DocumentCriteria': {
+					'PIN': {
+						'Value': pin
+					}, 
+					'DocumentTypes': {
+						'DocumentType': "DomesticBillOfLading"
+					}
+				}
+			},
+			'OutputType': 'PDF',
+			'Synchronous': True
+		}
+
+		response = client.service.GetDocuments(_soapheaders=[header_value], **request_data)
+		documents = response.body.Documents.Document
+		for document in documents:
+			for detail in document.DocumentDetails.DocumentDetail:
+				self.write_file(docname, detail.Data)
+		return response
+	
+	def write_file(self, docname, data, file_name=None, field_name=None):
+		if not file_name:
+			file_name = f'{docname}.pdf'
+		file_path = get_files_path(f"{file_name}", is_private=True)
+		binary_data = base64.b64decode(data)
+
+		with open(file_path, 'wb') as f:
+			f.write(binary_data)
+			# f.close()
+
+		file_doc = frappe.new_doc('File')
+		file_doc.update({
+			'file_name': f"{file_name}",
+			'file_url': file_path.replace(frappe.get_site_path(), ''),
+			'is_private': 1,
+			'folder': 'Home/Attachments',
+			'attached_to_doctype': 'Shipment',
+			'attached_to_name': docname,
+			'attached_to_field': field_name,
+			'file_size': data,
+		})
+		file_doc.insert(ignore_permissions=True)
+		return file_doc
 
 def test():
 	# cp = CanadaPost()
@@ -213,4 +309,5 @@ def test():
 	# print(ret)
 	purolator = Purolator()
 	ret = purolator.create_shipment("SHIPMENT-00124", "PurolatorExpressEvening")
+	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 	print(ret)
