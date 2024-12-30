@@ -8,7 +8,8 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "label"
+  "label",
+  "descriptions"
  ],
  "fields": [
   {
@@ -16,14 +17,20 @@
    "fieldtype": "Data",
    "label": "Label",
    "unique": 1
+  },
+  {
+   "fieldname": "descriptions",
+   "fieldtype": "Table",
+   "label": "Descriptions",
+   "options": "Website Spec Label Descriptions"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-05 13:33:37.875216",
+ "modified": "2024-12-30 12:32:38.044376",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "Website Specifications Label",
+ "name": "Website Specification Label",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
