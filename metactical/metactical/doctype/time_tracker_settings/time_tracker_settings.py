@@ -14,7 +14,6 @@ class TimeTrackerSettings(Document):
 
 	def generate_pay_cycles(self):
 		start_date = self.start_date #datetime(2023, 1, 30) # specify your start date
-		
 		one_year = timedelta(days=365)
 		start_date_object = datetime.strptime(self.start_date, '%Y-%m-%d').date()
 		end_date = start_date_object + one_year #datetime(2024, 1, 30) # specify your end date
@@ -34,7 +33,7 @@ class TimeTrackerSettings(Document):
 				start_date_object += timedelta(days=1)
 			
 			use_delta_one = not use_delta_one
-
+		
 		from_dates = date_array[::2]
 		to_dates = date_array[1::2]
 		date_pairs = []

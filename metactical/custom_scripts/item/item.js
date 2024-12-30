@@ -1,12 +1,12 @@
 frappe.ui.form.on("Item", {
       refresh: function (frm) {
-            cur_frm.fields_dict['neb_website_specifications'].grid.get_field('description_link').get_query = function(doc, cdt, cdn) {
-                  var row = locals[cdt][cdn];
-                  var options = ["", row.label]
+            cur_frm.fields_dict['neb_website_specifications'].grid.get_field('description').get_query = function(doc, cdt, cdn) {
+                  var d = locals[cdt][cdn];
                   return {
-                        filters:[
-                              ['Website Specifications Description', 'label', 'in', options.join(",")]
-                        ]
+                        query: "metactical.custom_scripts.website_item.website_item.get_website_label_descriptions",
+                        filters: {
+                              parent: d.label
+                        }
                   }
             }
       },
