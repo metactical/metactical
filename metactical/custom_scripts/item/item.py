@@ -2,6 +2,11 @@ import frappe
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 
 def on_update(doc, method):
+    # check website specification values
+    validate_website_specifications(doc)
+    sync_website_specifications(doc)
+
+    # Trigger update for item inventory output if deduct_qty has been updated
     # Retrieve the document state before the update
     doc_before_update = doc.get_doc_before_save()
     original_deduct_qty = doc_before_update.custom_neb_website_deduct_qty if doc_before_update else []
@@ -40,6 +45,66 @@ def on_update(doc, method):
     # Check for removed lead sources and trigger updates for them
     elif removed_lead_sources:
         frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+
+def validate_website_specifications(doc):
+    for spec in doc.neb_website_specifications:
+        if not spec.label:
+            frappe.throw("<b>Label</b> is required for Website Specification at row <b>{0}</b>".format(spec.idx))
+        if spec.mandatory and not spec.description:
+            frappe.throw("<b>Description</b> is required for Website Specification at row <b>{0}</b>".format(spec.idx))
+    
+def sync_website_specifications(doc):
+    doc_before_update = doc.get_doc_before_save()
+    original_website_specifications = doc_before_update.neb_website_specifications
+
+    if not original_website_specifications and not doc.neb_website_specifications:
+        return
+
+    original_website_specifications_dict = {spec.label: spec.description for spec in original_website_specifications} if original_website_specifications else {}
+    current_website_specifications = {spec.label: spec.description for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
+
+    # Check for removed/updated website specifications
+    removed_website_specifications = []
+    for old_label, old_description in original_website_specifications_dict.items():
+        found = False
+        for current_label, current_description in current_website_specifications.items():
+            if old_label == current_label and old_description == current_description:
+                found = True
+                break
+
+        if not found:
+            removed_website_specifications.append(old_label)
+
+    # Check for added website specifications
+    added_website_specifications = []
+    for current_label, current_description in current_website_specifications.items():
+        found = False
+        for old_label, old_description in original_website_specifications_dict.items():
+            if old_label == current_label and old_description == current_description:
+                found = True
+                break
+
+        if not found:
+            added_website_specifications.append(current_label)
+
+    # recreate the website specifications in the "Website Item" doctype if there is a change in the Item form
+    if added_website_specifications or removed_website_specifications:
+        website_items = frappe.get_all("Website Item", filters={"item_code": doc.item_code}, fields=["name"])
+        if website_items:
+            for item in website_items:
+                website_item = frappe.get_doc("Website Item", item.name)
+                website_item.neb_website_specifications = []
+                website_item.save()
+
+                for spec in doc.neb_website_specifications:
+                    website_spec = frappe.new_doc("MT Item Website Specification")
+                    website_spec.label = spec.label
+                    website_spec.description = spec.description
+                    website_spec.mandatory = spec.mandatory
+                    website_spec.parent = website_item.name
+                    website_spec.parenttype = website_item.doctype
+                    website_spec.parentfield = "neb_website_specifications"
+                    website_spec.save()
 
 @frappe.whitelist()
 def copy_specification_from_item_group(item_group):
