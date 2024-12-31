@@ -108,7 +108,7 @@ def sync_website_specifications(doc):
 
 @frappe.whitelist()
 def copy_specification_from_item_group(item_group):
-    return frappe.db.get_list(
+    return frappe.db.get_all(
         "MT Item Website Specification", filters={"parent": item_group}, fields=["label", "mandatory"]
         )
             
