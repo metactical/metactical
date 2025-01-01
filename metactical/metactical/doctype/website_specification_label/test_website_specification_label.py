@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestWebsiteSpecificationsLabel(FrappeTestCase):
+class TestWebsiteSpecificationLabel(FrappeTestCase):
 	pass
