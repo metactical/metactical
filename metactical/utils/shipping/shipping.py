@@ -34,20 +34,28 @@ def create_shipping(name, provider='Canada Post', carrier_service=None, service_
 		cp = CanadaPost()
 		response = cp.create_shipping(name, carrier_service, service_name)
 		if response:
-			doc = frappe.get_doc('Shipment', name)
-			
-			delivery_notes = []
-			for row in doc.shipment_delivery_note:
-				if row.delivery_note not in delivery_notes:
-					delivery_notes.append(row.delivery_note)
-
-			for delivery_note in delivery_notes:
-				dn = frappe.get_doc('Delivery Note', delivery_note)
-				if dn.docstatus == 0:
-					dn.submit()
+			update_delivery_notes(name)
 		return response
 	elif provider == "Purolator":
 		purolator = Purolator()
+		response = purolator.create_shipment(name, service_name)
+		if len(response.body.ResponseInformation.Errors.Error) == 0:
+			update_delivery_notes(name)
+
+def update_delivery_notes(docname):
+	doc = frappe.get_doc('Shipment', docname)	
+	delivery_notes = []
+
+	for row in doc.shipment_delivery_note:
+		if row.delivery_note not in delivery_notes:
+			delivery_notes.append(row.delivery_note)
+
+	for delivery_note in delivery_notes:
+		dn = frappe.get_doc('Delivery Note', delivery_note)
+		if dn.docstatus == 0:
+			dn.submit()
+
+
 
 
 @frappe.whitelist()

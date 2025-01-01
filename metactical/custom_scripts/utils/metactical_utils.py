@@ -269,13 +269,18 @@ def check_si_payment_status_for_so(sales_order):
 	return all_invoices_paid
 
 def read_file(file_path):
-		extn = os.path.splitext(file_path)[1][1:]
+	extn = os.path.splitext(file_path)[1][1:]
 
-		file_content = None
+	file_content = None
 
-		file_name = frappe.db.get_value("File", {"file_url": file_path})
-		if file_name:
-			file = frappe.get_doc("File", file_name)
-			file_content = file.get_content()
-		
-		return file_content, extn
+	file_name = frappe.db.get_value("File", {"file_url": file_path})
+	if file_name:
+		file = frappe.get_doc("File", file_name)
+		file_content = file.get_content()
+	
+	return file_content, extn
+
+def get_state_code(state):
+	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
+	return symbol
+

@@ -7,6 +7,9 @@ import re
 import logging
 from frappe.utils import get_files_path
 import base64
+from metactical.custom_scripts.utils.metactical_utils import get_state_code
+import ast
+from six import string_types
 
 # logging.basicConfig(level=logging.DEBUG)
 # logging.getLogger('zeep').setLevel(logging.DEBUG)
@@ -79,9 +82,13 @@ class Purolator:
 		shipment = frappe.get_doc("Shipment", docname)
 		sender_postal_code = frappe.db.get_value("Address", shipment.pickup_address_name, "pincode").replace(" ", "")
 		customer_address = frappe.get_doc("Address", shipment.delivery_address_name)
+		state = customer_address.state
+		if len(state) > 2:
+			state = get_state_code(state)
+
 		receiver_address = {
 			"City": customer_address.city,
-			"Province": customer_address.state.upper(),
+			"Province": state.upper(),
 			"Country": frappe.db.get_value("Country", customer_address.country, "code").upper(),
 			"PostalCode": customer_address.pincode.replace(" ", "")
 		}
@@ -129,6 +136,10 @@ class Purolator:
 		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
 	
 	def create_shipment(self, docname, selected_service):
+
+		if isinstance(selected_service, string_types) and selected_service.startswith('{'):
+			selected_service = ast.literal_eval(selected_service)
+
 		if self.settings.is_sandbox:
 			wsdl_url = 'https://devwebservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
 		else:
@@ -148,9 +159,16 @@ class Purolator:
 		receiver_street_number = receiver_address.address_line1.split(" ")[0]
 		receiver_street_name = " ".join(receiver_address.address_line1.split(" ")[1:])
 
+		sender_state = sender_address.state
+		if len(sender_state) > 2:
+			sender_state = get_state_code(sender_state)
+
+		receiver_state = receiver_address.state
+		if len(receiver_state) > 2:
+			receiver_state = get_state_code(receiver_state)
+
 		request = {
 			'Shipment': {
-				'ShipmentDate': '2024-12-30',
 				'SenderInformation': {
 					'Address': {
 						'Name': shipment.pickup_company,
@@ -159,7 +177,7 @@ class Purolator:
 						'StreetName': sender_street_name,
 						'StreetType': "Street",
 						'City': sender_address.city,
-						'Province': sender_address.state,
+						'Province': sender_state,
 						'Country': frappe.db.get_value("Country", sender_address.country, "code"),
 						'PostalCode': sender_address.pincode.replace(" ", ""),
 						'PhoneNumber': {
@@ -171,13 +189,13 @@ class Purolator:
 				},
 				'ReceiverInformation': {
 					'Address': {
-						'Name': shipment.delivery_customer,
+						'Name': frappe.db.get_value('Customer', shipment.delivery_customer, 'customer_name'),
 						'Company': receiver_address.company,
 						'StreetNumber': receiver_street_number,
 						'StreetName': receiver_street_name,
 						'StreetType': "Street",
 						'City': receiver_address.city,
-						'Province': receiver_address.state,
+						'Province': receiver_state,
 						'Country': frappe.db.get_value("Country", receiver_address.country, "code"),
 						'PostalCode': receiver_address.pincode.replace(" ", "")
 					}
@@ -188,7 +206,7 @@ class Purolator:
 						'WeightUnit': 'kg'
 					},
 					'TotalPieces': len(shipment.shipment_parcel),
-					'ServiceID': selected_service,
+					'ServiceID': selected_service[shipment.shipment_parcel[0].name],
 					'Description': shipment.shipment_type,
 					'PiecesInformation': {
 						'Piece': [{
@@ -225,6 +243,7 @@ class Purolator:
 			},
 			'PrinterType': 'Thermal'
 		}
+		print(request)
 
 		validate_shipment = client.service.ValidateShipment(Shipment=request["Shipment"])
 		if not validate_shipment.body.ValidShipment:
@@ -233,6 +252,7 @@ class Purolator:
 			create_shipment = client.service.CreateShipment(Shipment=request["Shipment"])
 			if create_shipment.body.ResponseInformation.Errors is None:
 				shipment_pin = create_shipment.body.ShipmentPIN.Value
+				print(create_shipment)
 				response = self.get_documents(docname, shipment_pin)
 				return response
 			else:
@@ -308,6 +328,6 @@ def test():
 	# ret = cp.get_rate(name="SHIPMENT-00124")
 	# print(ret)
 	purolator = Purolator()
-	ret = purolator.create_shipment("SHIPMENT-00124", "PurolatorExpressEvening")
+	ret = purolator.create_shipment("SHIPMENT-00127", '{"da2pusruq6": "PurolatorGround"}')
 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 	print(ret)
