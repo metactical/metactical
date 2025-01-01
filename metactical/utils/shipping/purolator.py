@@ -254,6 +254,8 @@ class Purolator:
 				shipment_pin = create_shipment.body.ShipmentPIN.Value
 				print(create_shipment)
 				response = self.get_documents(docname, shipment_pin)
+				shipment.ais_shipment_status = "Shipped"
+				shipment.save()
 				return response
 			else:
 				frappe.throw(str(create_shipment.body))
@@ -294,10 +296,11 @@ class Purolator:
 
 		response = client.service.GetDocuments(_soapheaders=[header_value], **request_data)
 		documents = response.body.Documents.Document
+		files = []
 		for document in documents:
 			for detail in document.DocumentDetails.DocumentDetail:
-				self.write_file(docname, detail.Data)
-		return response
+				files.append(self.write_file(docname, detail.Data))
+		return files
 	
 	def write_file(self, docname, data, file_name=None, field_name=None):
 		if not file_name:
@@ -310,9 +313,10 @@ class Purolator:
 			# f.close()
 
 		file_doc = frappe.new_doc('File')
+		file_url = file_path.replace(frappe.get_site_path(), '')
 		file_doc.update({
 			'file_name': f"{file_name}",
-			'file_url': file_path.replace(frappe.get_site_path(), ''),
+			'file_url': file_url,
 			'is_private': 1,
 			'folder': 'Home/Attachments',
 			'attached_to_doctype': 'Shipment',
@@ -321,13 +325,13 @@ class Purolator:
 			'file_size': data,
 		})
 		file_doc.insert(ignore_permissions=True)
-		return file_doc
+		return file_doc.file_url
 
-def test():
-	# cp = CanadaPost()
-	# ret = cp.get_rate(name="SHIPMENT-00124")
-	# print(ret)
-	purolator = Purolator()
-	ret = purolator.create_shipment("SHIPMENT-00127", '{"da2pusruq6": "PurolatorGround"}')
-	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
-	print(ret)
+# def test():
+# 	# cp = CanadaPost()
+# 	# ret = cp.get_rate(name="SHIPMENT-00124")
+# 	# print(ret)
+# 	purolator = Purolator()
+# 	ret = purolator.create_shipment("SHIPMENT-00127", '{"da2pusruq6": "PurolatorGround"}')
+# 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
+# 	print(ret)

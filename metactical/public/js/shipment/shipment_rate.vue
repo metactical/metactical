@@ -95,7 +95,6 @@ export default {
 				freeze: true,
 				callback: function(ret){
 					me.enabledProviders = ret.message;
-					console.log("Enabled Providers: ", me.enabledProviders);
 					if(me.enabledProviders.length > 0){
 						me.get_rates();
 					}
@@ -111,7 +110,7 @@ export default {
 			me.rates = {};
 			me.tabsData = [];
 			for (let provider of me.enabledProviders) {
-				me.loadingMessage = `Loading rates for ${provider}`;
+				me.loadingMessage = `Loading rates...`;
 				let provider_key = provider.toLowerCase().replace(/\s+/g, '_');
 				// Add any additional logic needed for each provider here
 				frappe.call({
@@ -139,7 +138,6 @@ export default {
 								"label": `${provider} - ${option.val}`
 							});
 						});
-						console.log(ret);
 						me.canadaPostRates = ret.message;
 						me.selectKey = me.rateOptions.length;
 						
@@ -178,8 +176,6 @@ export default {
 					}
 				});
 			}
-			console.log("Rates: ", me.rates);
-			console.log("Default Selected: ", me.selectedServices);
 		},
 
 		select_service(){
@@ -189,36 +185,23 @@ export default {
 			this.selectedCarrier = selected.getAttribute("data-carrier");
 			this.selectedServiceName = selected.getAttribute("data-service");
 			this.selectedProvider = selected.getAttribute("data-provider");
-			//this.selectedService = id;
-			console.log("Selected Carrier: ", this.selectedCarrier, " Selected Service: ", this.selectedServiceName,
-				" Seelcted Provider: ", this.selectedProvider
-			);
 		},
 
 		create_shipments(){
 			let me = this;
 			this.creatingShipments = true;
-			console.log("Selected: ", this.selectedServices);
 			if(Object.keys(this.selectedServices).length > 0){
 				let carrier_service = {}
 				let service_name = {}
 				let provider = '';
-				// this.canadaPostRates.data.forEach(row => {
-				// 	row.items.forEach(item => {
-				// 		if (this.selectedService === 'carrier_service_' + item.carrier_service) {
-				// 			carrier_service[row.name] = item.carrier_service;
-				// 			service_name[row.name] = item.service_name;
-				// 		}
-				// 	});
-				// });
+				
 				for (const row in this.selectedServices) {
 					let piece = this.selectedServices[row];
-					console.log("Piece: ", piece);
 					provider = piece.selectedProvider;
 					carrier_service[piece.piece_name] = piece.selectedCarrier;
 					service_name[piece.piece_name] = piece.selectedServiceName
 				}
-				console.log("Provider: ", provider, " Carrier: ", carrier_service, " Service: ", service_name);
+
 				frappe.call({
 					method: "metactical.utils.shipping.shipping.create_shipping",
 					args: {

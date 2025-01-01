@@ -81,13 +81,11 @@ export default {
 		},
 
 		isSelectedService(count, item) {
-			//console.log("Count: ", count, " Item: ", item, " Selected: ", this.selectedServices);
 			let selectedProvider = this.selectedServices[count]["selectedProvider"]
 			let selectedCarrier = this.selectedServices[count]["selectedCarrier"]
 			let selectedServiceName = this.selectedServices[count]["selectedServicename"]
 			if(selectedProvider == item.provider && selectedCarrier == item.carrier_service 
 				&& selectedServiceName == item.service_name) {
-				console.log("Is true");
 				return true;
 			}
 			else{
@@ -97,7 +95,6 @@ export default {
 
 		selectService(count, piece_name, item){
 			this.$emit('update-selected-service', { count, piece_name, item });
-			console.log("Selected: ", this.selectedServices[count]);
 		}
 	},
 };

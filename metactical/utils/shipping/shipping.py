@@ -39,8 +39,9 @@ def create_shipping(name, provider='Canada Post', carrier_service=None, service_
 	elif provider == "Purolator":
 		purolator = Purolator()
 		response = purolator.create_shipment(name, service_name)
-		if len(response.body.ResponseInformation.Errors.Error) == 0:
+		if response:
 			update_delivery_notes(name)
+		return response
 
 def update_delivery_notes(docname):
 	doc = frappe.get_doc('Shipment', docname)	
