@@ -428,51 +428,52 @@ def check_si_payment_status_for_so(sales_order):
 	return all_invoices_paid
 
 def get_customer_email_and_phone(customer):
-    contacts = frappe.db.sql("""select c.email_id, phone, c.mobile_no
+	contacts = frappe.db.sql("""select c.email_id, phone, c.mobile_no
 								from `tabContact` c
 								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
 								INNER Join `tabCustomer` cs on dl.link_name=cs.name
 								where  dl.link_doctype="Customer" and cs.name = "{0}"
-                                ORDER BY c.creation desc
-                                """.format(customer), as_dict=True)
-            
+								ORDER BY c.creation desc
+								""".format(customer), as_dict=True)
+			
 
-    if len(contacts):
-        return contacts
-    else:
-        return None
+	if len(contacts):
+		return contacts
+	else:
+		return None
 
 def search_customer_by_phone_email(phone_number, email):
-    email_filter = ""
-    if email:
-        email_filter = f"AND c.email_id like '%{email}%'"
-    
-    phone_filter = ""
-    if phone_number:
-        phone_filter = f"AND (c.phone like '%{phone_number}%' or c.mobile_no like '%{phone_number}%')"
+	email_filter = ""
+	if email:
+		email_filter = f"AND c.email_id like '%{email}%'"
+	
+	phone_filter = ""
+	if phone_number:
+		phone_filter = f"AND (c.phone like '%{phone_number}%' or c.mobile_no like '%{phone_number}%')"
 
-    customers = frappe.db.sql(f"""select cs.name
-                                from `tabContact` c
-                                INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
-                                INNER Join `tabCustomer` cs on dl.link_name=cs.name
-                                where  dl.link_doctype="Customer" {email_filter} {phone_filter}
-                                """, as_dict=True)
+	customers = frappe.db.sql(f"""select cs.name
+								from `tabContact` c
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" {email_filter} {phone_filter}
+								""", as_dict=True)
 
-    if len(customers):
-        return [customer.get('name') for customer in customers]
-    else:
-        return None
+	if len(customers):
+		return [customer.get('name') for customer in customers]
+	else:
+		return None
+	
 def read_file(file_path):
-		extn = os.path.splitext(file_path)[1][1:]
+	extn = os.path.splitext(file_path)[1][1:]
 
-		file_content = None
+	file_content = None
 
-		file_name = frappe.db.get_value("File", {"file_url": file_path})
-		if file_name:
-			file = frappe.get_doc("File", file_name)
-			file_content = file.get_content()
-		
-		return file_content, extn
+	file_name = frappe.db.get_value("File", {"file_url": file_path})
+	if file_name:
+		file = frappe.get_doc("File", file_name)
+		file_content = file.get_content()
+	
+	return file_content, extn
 
 def remove_tz_from_date(date):
 	if not date:
@@ -494,3 +495,7 @@ def remove_tz_from_date(date):
 	# Output the formatted datetime (customize the format as needed)
 	formatted_date = parsed_date.strftime("%Y-%m-%d")
 	return formatted_date
+
+def get_state_code(state):
+	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
+	return symbol

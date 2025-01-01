@@ -7,6 +7,7 @@ from frappe.utils import get_files_path
 from six import string_types
 import ast
 from PyPDF2 import PdfFileMerger
+from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
 
 
@@ -338,8 +339,8 @@ class CanadaPost():
 		
 		for groups in response["groups"]["group"]:
 			if isinstance(groups, list):
-				 for group in groups:
-					 all_shipments.append(group["group-id"])
+				for group in groups:
+					all_shipments.append(group["group-id"])
 			else:
 				all_shipments.append(groups["group-id"])
 		for shipment in shipments:
@@ -450,8 +451,3 @@ class CanadaPost():
 			else:
 				frappe.throw(
 					res, title=f"Error from Provider Server, Code: {r.status_code}")
-
-
-def get_state_code(state):
-	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
-	return symbol
