@@ -55,7 +55,10 @@ def validate_website_specifications(doc):
     
 def sync_website_specifications(doc):
     doc_before_update = doc.get_doc_before_save()
-    original_website_specifications = doc_before_update.neb_website_specifications
+    if not doc_before_update:
+        original_website_specifications = []
+    else:
+        original_website_specifications = doc_before_update.neb_website_specifications
 
     if not original_website_specifications and not doc.neb_website_specifications:
         return
