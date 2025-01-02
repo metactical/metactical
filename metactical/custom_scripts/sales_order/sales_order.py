@@ -53,7 +53,7 @@ class SalesOrderCustom(SalesOrder):
 		self.pull_reserved_qty()
 		
 		if self.po_no and not self.neb_usaepay_transaction_key:
-			self.get_transaction_key()
+			self.neb_usaepay_transaction_key = get_transaction_key(self.lead_source, self.po_no, self.customer)
 
 	def pull_reserved_qty(self):
 		for row in self.items:
@@ -89,31 +89,6 @@ class SalesOrderCustom(SalesOrder):
 		# Metactical Customization: Added
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
-
-			
-	def get_transaction_key(self):
-		if not self.po_no:
-			return
-
-		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":self.po_no, "lead_source": self.source})
-		if not so_usaepay_transaction:
-			so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": self.po_no, "lead_source": self.source})
-			if not so_usaepay_transaction:
-				return
-
-		usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
-		self.neb_usaepay_transaction_key = usaepay_transaction.transaction_key
-
-		obj = {
-			"object": {
-				"key": usaepay_transaction.transaction_key,
-				"creditcard": {
-					"number": usaepay_transaction.credit_card
-				}
-			}
-		}
-		process_credit_card_tokens(obj, self.customer)
-		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 
 @frappe.whitelist()
 def save_cancel_reason(**args):
@@ -263,171 +238,27 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	return doclist
 
 @frappe.whitelist()
-def get_usaepay_transaction_detail(transaction, docname):
-	try:
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
-		token_hash = get_token_hash(metactical_settings)
-
-		headers = {
-			"Content-Type": "application/json",
-			"Authorization": token_hash
-		}
-
-		transaction = get_transaction_from_usaepay(transaction, headers)
-
-		# refunds
-		refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
-		if refunds:
-			transaction["refunds"] = refunds
-			
-			total_refund = sum([flt(refund.get("refund_amount")) for refund in refunds])
-			if total_refund:
-				transaction["available_amount"] = float(transaction.get("amount")) - total_refund
-		else:
-			transaction["refunds"] = []
-			transaction["available_amount"] = transaction.get("amount")
-
-		if transaction:
-			frappe.response["transaction"] = transaction
-		else:
-			frappe.throw("Transaction not found in USAePay")
-
-		return transaction
-		 
-	except Exception as e:
-		frappe.log_error(title="USAePay Transaction Detail Error", message=frappe.get_traceback())
-		frappe.msgprint("Unable to get USAePay transaction detail: {0}".format(e), title="Error")
-
-@frappe.whitelist()
-def refund_payment(docname, refund_reason, refund_amount):
-	user_roles = get_usaepay_roles()
-	if not any(role in frappe.get_roles() for role in user_roles.get("refund")):
-		frappe.msgprint("You are not authorized to refund payment", title="Error")
+def get_transaction_key(source, po_no, customer):
+	if not po_no:
 		return
 
-	# log = create_usaepay_log(payload, refund_response, "Sales Order", docname, refund_amount, "Refund", refund_reason)
-	log = create_usaepay_log("Sales Order", docname, "Refund")
+	so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":po_no, "lead_source": source})
+	if not so_usaepay_transaction:
+		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": po_no, "lead_source": source})
+		if not so_usaepay_transaction:
+			return
 
-	try:
-		sales_order = frappe.get_doc("Sales Order", docname)
-		usaepay_transaction_key = sales_order.get("neb_usaepay_transaction_key")
-		
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
+	usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
 
-		# Generate token hash
-		token_hash = get_token_hash(metactical_settings)
-
-		headers = {
-			"Content-Type": "application/json",
-			"Authorization": token_hash
+	obj = {
+		"object": {
+			"key": usaepay_transaction.transaction_key,
+			"creditcard": {
+				"number": usaepay_transaction.credit_card
+			}
 		}
-
-		# get transaction details from USAePay
-		transaction = get_transaction_from_usaepay(usaepay_transaction_key, headers)
-		if transaction:
-			# Generate card token
-			card_token = get_card_token(usaepay_url, transaction.get("key"), headers)
-			transaction["creditcard"]["number"] = card_token
-
-			# process refund
-			payload, refund_response = create_refund(transaction, refund_amount, usaepay_url, headers)
-
-			log.request = format_json_for_html(payload)
-			log.response = format_json_for_html(refund_response)
-			log.amount = refund_amount
-			log.transaction_key = payload.get("trankey")
-			log.refund_transaction_key = refund_response.get("key")
-			log.refund_reason = refund_reason
-			log.save()
-
-			# create USAePay log
-			refunded_amount = refund_amount if refund_amount else transaction["amount"]
-
-			card_holder = "for <b>" + refund_response.get("creditcard").get("cardholder") +"</b>" if refund_response.get("creditcard") else ""
-			frappe.msgprint(f"<b>{refund_response['auth_amount']}</b> is refunded successfully {card_holder}.")
-
-			return refund_response, log.name
-		else:
-			frappe.response["success"] = False
-			frappe.response["message"] = "Transaction not found in USAePay"
-			return None, None
-
-	except Exception as e:
-		frappe.log_error(title="Refund Payment Error", message=frappe.get_traceback())
-		frappe.throw("Unable to refund payment: {0}".format(e))
-
-@frappe.whitelist()
-def adjust_payment(docname, advance_paid=None):
-	user_roles = get_usaepay_roles()
-	if not any(role in frappe.get_roles() for role in user_roles.get("adjust")):
-		frappe.msgprint("You are not authorized to refund payment", title="Error")
-		return
+	}
+	process_credit_card_tokens(obj, customer)
+	frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 	
-	# create USAePay log
-	log = create_usaepay_log("Sales Order", docname, "Adjustment")
-
-	try:
-		sales_order = frappe.get_doc("Sales Order", docname)
-		usaepay_transaction_key = sales_order.get("neb_usaepay_transaction_key")
-		metactical_settings = frappe.get_single("Metactical Settings")
-		usaepay_url = metactical_settings.get("usaepay_url")
-
-		# Generate token hash
-		token_hash = get_token_hash(metactical_settings)
-
-		headers = {
-			"Content-Type": "application/json",
-			"Authorization": token_hash
-		}
-
-		# get transaction details from USAePay
-		transaction = get_transaction_from_usaepay(usaepay_transaction_key, headers)
-
-		if transaction:
-			# update log
-			frappe.db.set_value("USAePay Log", log.name, "transaction_key", transaction.get("key"))
-
-			# process the adjustment
-			amount = advance_paid if advance_paid else sales_order.grand_total
-			payload, adjust_response = adjust_amount(sales_order.grand_total, transaction, usaepay_url, headers)
-			
-			log.request = format_json_for_html(payload)
-			log.response = format_json_for_html(adjust_response)
-			log.amount = amount
-			log.transaction_key = payload.get("trankey")
-			log.save()
-
-			frappe.response["message"] = f"Payment adjusted successfully. New amount is <b>{adjust_response['auth_amount']}</b>"
-			frappe.response["success"] = True
-		else:
-			log.log = f"Transaction {usaepay_transaction_key} not found in USAePay"
-			log.save()
-
-			frappe.response["success"] = False
-			frappe.response["message"] = "Transaction not found in USAePay"
-	
-	except Exception as e:
-		log = frappe.get_doc("USAePay Log", log.name)
-		log.log = f"Unable to adjust payment: {e}"
-		log.save()
-
-		frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
-		frappe.msgprint("Unable to adjust payment: {0}".format(e), title="Error")
-
-@frappe.whitelist()
-def get_usaepay_roles():
-	try:
-		metactical_settings = frappe.get_single("Metactical Settings")
-		
-		refund = metactical_settings.get("roles_to_refund")
-		adjust = metactical_settings.get("roles_to_adjust_payment")
-
-		return {
-			"refund": [role.role for role in refund],
-			"adjust": [role.role for role in adjust]
-		}
-	except Exception as e:
-		frappe.log_error(title="USAePay Roles Error", message=frappe.get_traceback())
-		frappe.msgprint("Unable to get USAePay roles: {0}".format(e), title="Error")
+	return usaepay_transaction.transaction_key

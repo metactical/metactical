@@ -7,7 +7,7 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_det
 def receive_rmq_data(parsedContent):
 	try:
 		# from metactical.custom_scripts.utils.loggedinuser import parsedContent
-
+		
 		# Assign the shipping province and country based on the parsed content.
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
 		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
@@ -69,6 +69,12 @@ def receive_rmq_data(parsedContent):
 		if parsedContent["PaymentGateway"] != "interacetransfer":
 			if order.neb_usaepay_transaction_key:
 				payment = create_payment(payment_detail, order, company)
+			else:
+				from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
+				transaction_key = get_transaction_key(order.source, order.po_no, order.customer)
+				if transaction_key:
+					frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
+					payment = create_payment(payment_detail, order, company)
 
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
