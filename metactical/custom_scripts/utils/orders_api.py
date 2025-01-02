@@ -6,6 +6,8 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_det
 
 def receive_rmq_data(parsedContent):
 	try:
+		# from metactical.custom_scripts.utils.loggedinuser import parsedContent
+
 		# Assign the shipping province and country based on the parsed content.
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
 		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
@@ -65,7 +67,8 @@ def receive_rmq_data(parsedContent):
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 		if parsedContent["PaymentGateway"] != "interacetransfer":
-			payment = create_payment(payment_detail, order, company)
+			if order.neb_usaepay_transaction_key:
+				payment = create_payment(payment_detail, order, company)
 
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
@@ -251,7 +254,7 @@ def create_order(order_detail, customer, gateway, shipping_address_doc, billing_
 		"order_type": "Shopping Cart",
 		"po_date": remove_tz_from_date(order_detail['order_date']),
 		"po_no": order_detail["order_id"],
-		"items": process_items(order_detail['items'], shipping_item=order_detail['shipping_item']),
+		"items": process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail),
 		"source": order_detail['source'],
 		"taxes_and_charges": order_detail['taxes_and_charges'],
 		"delivery_date": calculate_delivery_date(order_detail['order_date']),
@@ -388,6 +391,8 @@ def create_payment(payment_detail, order, company):
 
 	account = get_bank_cash_account(company=company, mode_of_payment=card_type)
 	new_payment.paid_to = account["account"]
+	new_payment.reference_no = order.neb_usaepay_transaction_key
+	new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
 
 	new_payment.submit()
 	frappe.db.commit()
@@ -459,12 +464,16 @@ def get_taxes_and_charges(province, country):
 	else:
 		return "Alberta - ICL"
 		
-def process_items(items, shipping_item):
+def process_items(items, shipping_item, order_detail):
 	items_list = []
 	for item in items:
+		item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item['retailSku']}, "name")
+		if not item_code:
+			frappe.throw(f"Item with retail SKU {item['retailSku']} not found for order {order_detail['order_id']}")
+
 		new_item = frappe.get_doc({
 			"doctype": "Sales Order Item",
-			"item_code": item['sku'],
+			"item_code": item_code,
 			"qty": item['quantity'],
 			"rate": item['unitPrice'],
 			"warehouse": "W01-WHS-Active Stock - ICL"
