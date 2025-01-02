@@ -17,7 +17,6 @@ def get_transaction_from_usaepay(usaepay_transaction_key, headers, merchant_id=N
 	else:
 		usaepay_account = get_usaepay_account(usaepay_transaction_key)
 
-	print(usaepay_account)	
 	if not usaepay_account:
 		return None 
 
