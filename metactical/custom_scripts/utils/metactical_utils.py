@@ -165,7 +165,7 @@ def get_customer_payment_information(customer, payment_entry, reference_no=None)
 			break
 
 	if frappe.db.exists("Customer CC", customer):
-		tokens = frappe.get_list("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
+		tokens = frappe.get_all("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
 
 	usaepay_settings = get_usaepay_account(reference_no, None, lead_source)
 	payment_form_url = usaepay_settings.payment_form_url
