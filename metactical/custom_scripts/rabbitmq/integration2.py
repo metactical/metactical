@@ -84,16 +84,17 @@ def start_consumer(rounds=0):
         # Set up the consumer
         channel.basic_consume(queue=rabbitmq_queue, on_message_callback=callback)
 
+        post_to_rocket_chat([], "RabbitMQ receiver is now running.", rmq=True)
         channel.start_consuming()
 
     except pika.exceptions.StreamLostError as e:
         error_message = f"RMQ Stream connection lost: {str(e)}"
         frappe.log_error(error_message, "RabbitMQ Consumption Error")
         post_to_rocket_chat([], error_message, rmq=True)
+        
         # Attempt to reconnect with a delay
-
-        start_consumer()
         post_to_rocket_chat([], "RabbitMQ receiver is now running.", rmq=True)
+        start_consumer()
     except Exception as e:
         error_message = f"Error during RMQ message consumption: {str(e)}"
         post_to_rocket_chat([], error_message, rmq=True)
