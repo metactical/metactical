@@ -53,7 +53,7 @@ class SalesOrderCustom(SalesOrder):
 		self.pull_reserved_qty()
 		
 		if self.po_no and not self.neb_usaepay_transaction_key:
-			self.neb_usaepay_transaction_key = get_transaction_key(self.lead_source, self.po_no, self.customer)
+			self.neb_usaepay_transaction_key = get_transaction_key(self.source, self.po_no, self.customer)
 
 	def pull_reserved_qty(self):
 		for row in self.items:
