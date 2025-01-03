@@ -7,7 +7,7 @@
                         <div class="col-md-4">
                             <div class="form-group">
                                 <input type="tel" class="form-control" id="search-phone_number"
-                                    :readonly="freeze_fields" v-input="onPhoneChange">
+                                    :readonly="freeze_fields">
                                 <input type="hidden" id="search-country_code" v-model="customer.phone_number">
                             </div>
                         </div>

@@ -1,44 +1,14 @@
 frappe.ui.form.on("Item", {
-      onload_post_render: function (frm) {
-            $('body input[data-fieldname="description"]').on("focus", function(e){
-                  console.log(e.target)
-                  console.log($(this).val())
-            })
-      },
-      onload: function (frm) {
-            $('body input[data-fieldname="description"]').on("focus", function(e){
-                  console.log(e.target)
-                  console.log($(this).val())
-            })
-      },
       refresh: function (frm) {
-            // cur_frm.fields_dict["neb_website_specifications"].grid.get_field(
-            //       "description"
-            // ).get_query = function (doc, cdt, cdn) {
-            //       var d = locals[cdt][cdn];
-            //       return {
-            //             query: "metactical.custom_scripts.website_item.website_item.get_website_label_descriptions",
-            //             filters: {
-            //                   parent: d.label,
-            //             },
-            //       };
-            // };
-            
-            // Trigger this function when the form is refreshed or reloaded
-            
-            // console.log(
-            // var input = $(
-            //       cur_frm.fields_dict["neb_website_specifications"].grid.wrapper
-            // ).find("");
-            // $('input[data-fieldname="description"]').on(input, function () {
-            //       console.log("focus");
-            // });
-            
-            // $.each(cur_frm.fields_dict, (field, obj) =>{
-            //       if (field.includes("neb_website_specifications")){
-            //             console.log(obj);
-            //       }
-            // })
+            cur_frm.fields_dict['neb_website_specifications'].grid.get_field('description').get_query = function(doc, cdt, cdn) {
+                  var d = locals[cdt][cdn];
+                  return {
+                        query: "metactical.custom_scripts.website_item.website_item.get_website_label_descriptions",
+                        filters: {
+                              parent: d.label
+                        }
+                  }
+            }
       },
       neb_copy_from_item_group: function (frm) {
             if (!frm.doc.item_group) {

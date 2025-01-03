@@ -2,13 +2,29 @@ from metactical.utils.shipping.canada_post import CanadaPost
 import frappe
 from frappe.model.mapper import get_mapped_doc
 from frappe import _
+from metactical.utils.shipping.purolator import Purolator
 
+@frappe.whitelist()
+def get_enabled_providers():
+	enabled_providers = []
+	# Check if Canada Post is enabled
+	if '1' == frappe.db.get_value('Canada Post', 'Canada Post', 'enabled'):
+		enabled_providers.append("Canada Post")
+	
+	# Check if Purolator enabled
+	if frappe.db.exists("Purolator Settings", {"enabled": 1}):
+		enabled_providers.append("Purolator")
+	return enabled_providers
 
 @frappe.whitelist()
 def get_rate(name, provider='Canada Post', context=None):
 	if provider=="Canada Post":
 		cp = CanadaPost()
 		response = cp.get_rate(name, context)
+		return response
+	if provider == "Purolator":
+		purolator = Purolator()
+		response = purolator.get_rate(name)
 		return response
 
 
@@ -18,18 +34,29 @@ def create_shipping(name, provider='Canada Post', carrier_service=None, service_
 		cp = CanadaPost()
 		response = cp.create_shipping(name, carrier_service, service_name)
 		if response:
-			doc = frappe.get_doc('Shipment', name)
-			
-			delivery_notes = []
-			for row in doc.shipment_delivery_note:
-				if row.delivery_note not in delivery_notes:
-					delivery_notes.append(row.delivery_note)
-
-			for delivery_note in delivery_notes:
-				dn = frappe.get_doc('Delivery Note', delivery_note)
-				if dn.docstatus == 0:
-					dn.submit()
+			update_delivery_notes(name)
 		return response
+	elif provider == "Purolator":
+		purolator = Purolator()
+		response = purolator.create_shipment(name, service_name)
+		if response:
+			update_delivery_notes(name)
+		return response
+
+def update_delivery_notes(docname):
+	doc = frappe.get_doc('Shipment', docname)	
+	delivery_notes = []
+
+	for row in doc.shipment_delivery_note:
+		if row.delivery_note not in delivery_notes:
+			delivery_notes.append(row.delivery_note)
+
+	for delivery_note in delivery_notes:
+		dn = frappe.get_doc('Delivery Note', delivery_note)
+		if dn.docstatus == 0:
+			dn.submit()
+
+
 
 
 @frappe.whitelist()

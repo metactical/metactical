@@ -4,6 +4,7 @@
 import frappe
 import sys, time
 from frappe.model.document import Document
+import time
 
 class ItemInventoryOutput(Document):
 	pass
@@ -28,6 +29,14 @@ def get_all_bins(item_code):
 		filters={'item_code': item_code, "warehouse":["like", "%active stock%"]}, 
 		fields=["warehouse", "actual_qty", "reserved_qty"]
 	)
+
+	other_active_warehouse_bins = frappe.get_all(
+		'Bin', 
+		filters={'item_code': item_code, "warehouse":["like", "%activestock%"]}, 
+		fields=["warehouse", "actual_qty", "reserved_qty"]
+	)
+
+	all_bins.extend(other_active_warehouse_bins)
 
 	return all_bins
 	

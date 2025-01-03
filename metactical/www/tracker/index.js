@@ -116,7 +116,6 @@ function onLogin() {
         method: "metactical.api.clockin.get_pay_cycle_data",
         args: {},
         callback: function(r){
-			console.log({"paycycle": r.message.pay_cycles});
 			if (r.message.pay_cycle_data_exists) {
                 payCycles = r.message.pay_cycles
                 prevPayCycles = r.message.pay_cycles.length - 1
@@ -441,10 +440,26 @@ function displayDateDetails(date, clockins) {
 
                 <div class="d-none"><p class="font-weight-bold">Clocked In: </p><span class="clockin-time-24">${clockins[i].from_time}</span></div>
                 <div class="d-none"><p class="font-weight-bold">Clocked Out: </p><span class="clockout-time-24">${clockins[i].to_time}</span></div>
-                <span class="name d-none">${clockins[i].name}</span>
+                <div class="d-none"><span class="full-date">${date}</span></div>
+				<span class="name d-none">${clockins[i].name}</span>
             </div>
         `)
     }
+
+	// If no time has been tracked for that day
+	if(clockins.length == 0){
+		dateDetails.append(`
+            <div class="clockin-log">
+                <div><p class="font-weight-bold">Clocked In: </p><span class="clockin-time-12">00:00 AM</span></div>
+                <div><p class="font-weight-bold">Clocked Out: </p><span class="clockout-time-12">00:00 AM</span></div>    
+
+                <div class="d-none"><p class="font-weight-bold">Clocked In: </p><span class="clockin-time-24">${date} 00:00:00</span></div>
+                <div class="d-none"><p class="font-weight-bold">Clocked Out: </p><span class="clockout-time-24">${date} 00:00:00</span></div>
+				<div class="d-none"><span class="full-date">${date}</span></div>
+                <span class="name d-none"></span>
+            </div>
+        `)
+	}
 }
 
 function sliceTime(time) {
@@ -527,7 +542,7 @@ $("body").on("click", "#submit-time-change", function (event) {
     const currentCheckOut12 = selectedClockinLog.find('.clockout-time-12').text()
 
     const log_name = selectedClockinLog.find(".name.d-none").text()
-
+	const full_date = selectedClockinLog.find('.full-date').text()
     frappe.call({
         method: "metactical.api.clockin.send_details_change_request",
         args: {
@@ -538,7 +553,8 @@ $("body").on("click", "#submit-time-change", function (event) {
             "checkOutTimeMilitary": checkOutTimeMilitary,
             "currentCheckIn12": currentCheckIn12,
             "currentCheckOut12": currentCheckOut12,
-            "date": selectedDate
+            "date": selectedDate,
+			"full_date": full_date
         },
         callback: r => {
             $("#change-details-modal").modal("hide")
