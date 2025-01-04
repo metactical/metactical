@@ -59,6 +59,8 @@ class CanadaPost():
 
 		if pickup_address_doc.pincode is None or pickup_address_doc.pincode == "":
 			frappe.throw(f"Postal code needed in billing address {pickup_address_doc.name}")
+		else:
+			pickup_address_doc.pincode = pickup_address_doc.pincode.upper()
 
 		if len(pickup_address_doc.state) > 2:
 			pickup_address_doc.state = get_state_code(pickup_address_doc.state)
