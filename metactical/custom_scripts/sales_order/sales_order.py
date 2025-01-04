@@ -53,7 +53,7 @@ class SalesOrderCustom(SalesOrder):
 		self.pull_reserved_qty()
 		
 		if self.po_no and not self.neb_usaepay_transaction_key:
-			self.get_transaction_key()
+			self.neb_usaepay_transaction_key = get_transaction_key(self.source, self.po_no, self.customer)
 
 	def pull_reserved_qty(self):
 		for row in self.items:
@@ -89,31 +89,6 @@ class SalesOrderCustom(SalesOrder):
 		# Metactical Customization: Added
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
-
-			
-	def get_transaction_key(self):
-		if not self.po_no:
-			return
-
-		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":self.po_no, "lead_source": self.source})
-		if not so_usaepay_transaction:
-			so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": self.po_no, "lead_source": self.source})
-			if not so_usaepay_transaction:
-				return
-
-		usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
-		self.neb_usaepay_transaction_key = usaepay_transaction.transaction_key
-
-		obj = {
-			"object": {
-				"key": usaepay_transaction.transaction_key,
-				"creditcard": {
-					"number": usaepay_transaction.credit_card
-				}
-			}
-		}
-		process_credit_card_tokens(obj, self.customer)
-		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 
 	def on_submit(self):
 		super(SalesOrderCustom, self).on_submit()
@@ -287,3 +262,29 @@ def submit_order(doc):
 		queue_action(doc, "submit", timeout=2000)
 	else:
 		doc._submit()
+
+@frappe.whitelist()
+def get_transaction_key(source, po_no, customer):
+	if not po_no:
+		return
+
+	so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":po_no, "lead_source": source})
+	if not so_usaepay_transaction:
+		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": po_no, "lead_source": source})
+		if not so_usaepay_transaction:
+			return
+
+	usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
+
+	obj = {
+		"object": {
+			"key": usaepay_transaction.transaction_key,
+			"creditcard": {
+				"number": usaepay_transaction.credit_card
+			}
+		}
+	}
+	process_credit_card_tokens(obj, customer)
+	frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
+	
+	return usaepay_transaction.transaction_key

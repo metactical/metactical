@@ -55,7 +55,10 @@ def validate_website_specifications(doc):
     
 def sync_website_specifications(doc):
     doc_before_update = doc.get_doc_before_save()
-    original_website_specifications = doc_before_update.neb_website_specifications
+    if not doc_before_update:
+        original_website_specifications = []
+    else:
+        original_website_specifications = doc_before_update.neb_website_specifications
 
     if not original_website_specifications and not doc.neb_website_specifications:
         return
@@ -94,6 +97,7 @@ def sync_website_specifications(doc):
             for item in website_items:
                 website_item = frappe.get_doc("Website Item", item.name)
                 website_item.neb_website_specifications = []
+                website_item.website_specifications = []
                 website_item.save()
 
                 for spec in doc.neb_website_specifications:
@@ -105,6 +109,14 @@ def sync_website_specifications(doc):
                     website_spec.parenttype = website_item.doctype
                     website_spec.parentfield = "neb_website_specifications"
                     website_spec.save()
+
+                    main_website_spec = frappe.new_doc("Item Website Specification")
+                    main_website_spec.label = spec.label
+                    main_website_spec.description = spec.description
+                    main_website_spec.parent = website_item.name
+                    main_website_spec.parenttype = website_item.doctype
+                    main_website_spec.parentfield = "website_specifications"
+                    main_website_spec.save()
 
 @frappe.whitelist()
 def copy_specification_from_item_group(item_group):

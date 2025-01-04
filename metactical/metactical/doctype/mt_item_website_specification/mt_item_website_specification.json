@@ -41,6 +41,13 @@
    "in_list_view": 1,
    "label": "Mandatory",
    "read_only_depends_on": "eval:parent.doctype != \"Item Group\""
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order",
+   "non_negative": 1
   }
  ],
  "istable": 1,
