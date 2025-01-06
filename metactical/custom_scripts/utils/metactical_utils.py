@@ -485,7 +485,7 @@ def remove_tz_from_date(date):
 	date_str_fixed = date
 	if len(date) == 19:
 		date_str_fixed = date + ".000000Z"
-	elif len(date) >= 26:
+	elif len(date) > 26:
 		date_str_fixed = date[:26] + "Z"
 	elif len(date) > 19 and len(date) < 26:
 		date_str_fixed = date + "0" * (26 - len(date)) + "Z"
