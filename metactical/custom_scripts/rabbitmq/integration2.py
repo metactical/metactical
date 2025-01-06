@@ -9,6 +9,7 @@ from pika.exchange_type import ExchangeType
 import os
 import frappe
 import json
+from metactical.custom_scripts.utils.metactical_utils import post_to_rocket_chat
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -100,6 +101,7 @@ class RMQConsumer(object):
         :param Exception err: The error
 
         """
+        post_to_rocket_chat([], f"RMQ connection open failed: {err}", rmq=True)
         LOGGER.error('Connection open failed: %s', err)
         self.reconnect()
 
@@ -117,6 +119,7 @@ class RMQConsumer(object):
         if self._closing:
             self._connection.ioloop.stop()
         else:
+            post_to_rocket_chat([], f"RMQ connection closed: {reason}", rmq=True)
             LOGGER.warning('Connection closed, reconnect necessary: %s', reason)
             self.reconnect()
 
@@ -266,6 +269,8 @@ class RMQConsumer(object):
 
         """
         LOGGER.info('QOS set to: %d', self._prefetch_count)
+
+        post_to_rocket_chat([], "RabbitMQ receiver is now running.", rmq=True)
         self.start_consuming()
 
     def start_consuming(self):
@@ -451,6 +456,8 @@ class ReconnectingRMQConsumer(object):
             except KeyboardInterrupt:
                 self._consumer.stop()
                 break
+
+            post_to_rocket_chat([], "RabbitMQ receiver is reconnecting.", rmq=True)
             self._maybe_reconnect()
 
     def _maybe_reconnect(self):
