@@ -10,6 +10,7 @@ import base64
 from metactical.custom_scripts.utils.metactical_utils import get_state_code
 import ast
 from six import string_types
+from frappe import _
 
 # logging.basicConfig(level=logging.DEBUG)
 # logging.getLogger('zeep').setLevel(logging.DEBUG)
@@ -107,7 +108,7 @@ class Purolator:
 
 			response = client.service.GetQuickEstimate(**request)
 			response = response.body
-			print(response)
+			#print(response)
 
 			# Check if the response is valid and contains ShipmentEstimates
 			if response and hasattr(response, 'ShipmentEstimates') and hasattr(response.ShipmentEstimates, 'ShipmentEstimate'):
@@ -254,8 +255,21 @@ class Purolator:
 				shipment_pin = create_shipment.body.ShipmentPIN.Value
 				print(create_shipment)
 				response = self.get_documents(docname, shipment_pin)
+				shipment.shipments = []
+				row = 0
+				for pin in create_shipment.body.PiecePINs.PIN:
+					shipment.append("shipments", {
+						"service_provider": "Purolator",
+						"shipment_id": pin.Value,
+						"carrier_service": selected_service[shipment.shipment_parcel[0].name],
+						"row_id": shipment.shipment_parcel[row].name,
+						"carrier_status": "created",
+						"service_name": selected_service[shipment.shipment_parcel[0].name]
+					})
+					row += 1
 				shipment.ais_shipment_status = "Shipped"
 				shipment.save()
+				frappe.db.set_value("Shipment", shipment.name, "service_provider", "Purolator")
 				return response
 			else:
 				frappe.throw(str(create_shipment.body))
@@ -326,12 +340,23 @@ class Purolator:
 		})
 		file_doc.insert(ignore_permissions=True)
 		return file_doc.file_url
+	
+	def void_shipment(self, docname, shipments):
+		if not shipments:
+			frappe.throw(_("Please select min one shipment"))
+		if isinstance(shipments, string_types) and shipments.startswith('['):
+			shipments = ast.literal_eval(shipments)
+
+		doc = frappe.get_doc('Shipment', docname)
+		to_be_remove = []
+		# for shipment in doc.get('shipments', {'name': ('in', shipments or [])}):
+
 
 # def test():
 # 	# cp = CanadaPost()
 # 	# ret = cp.get_rate(name="SHIPMENT-00124")
 # 	# print(ret)
 # 	purolator = Purolator()
-# 	ret = purolator.create_shipment("SHIPMENT-00127", '{"da2pusruq6": "PurolatorGround"}')
+# 	ret = purolator.create_shipment("SHIPMENT-00124", '{"pst77s2v95": "PurolatorGround", "pst731vlmj": "PurolatorGround"}')
 # 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 # 	print(ret)
