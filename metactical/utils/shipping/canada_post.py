@@ -182,6 +182,7 @@ class CanadaPost():
 						self.set_price(row, link)
 				row.db_insert()
 		doc.ais_shipment_status = "Shipped"
+		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
 		doc.save()
 		# Merger PDFs.
 		if files:
@@ -390,11 +391,13 @@ class CanadaPost():
 		file_doc.insert(ignore_permissions=True)
 		return file_doc
 
-	def avoid_shpment(self, name, shipments_name):
-		if not shipments_name:
-			frappe.throw(_("Please select min one shipment"))
+	def avoid_shpment(self, name, shipments_name=[]):
 		if isinstance(shipments_name, string_types) and shipments_name.startswith('['):
 			shipments_name = ast.literal_eval(shipments_name)
+
+		if len(shipments_name) == 0:
+			frappe.throw(_("Please select min one shipment"))
+		
 		doc = frappe.get_doc('Shipment', name)
 		to_be_remove = []
 		for shipment in doc.get('shipments', {'name': ('in', shipments_name or [])}):
@@ -405,7 +408,10 @@ class CanadaPost():
 				to_be_remove.append(shipment)
 		for row in to_be_remove:
 			doc.remove(row)
-		doc.ais_shipment_status = "Not Shipped"
+
+		if len(doc.shipments) == 0:
+			doc.ais_shipment_status = "Not Shipped"
+
 		doc.save()
 		return doc.as_dict()
 

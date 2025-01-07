@@ -251,26 +251,31 @@ class Purolator:
 			frappe.throw(str(validate_shipment.body))
 		else:
 			create_shipment = client.service.CreateShipment(Shipment=request["Shipment"])
+			print(create_shipment)
 			if create_shipment.body.ResponseInformation.Errors is None:
-				shipment_pin = create_shipment.body.ShipmentPIN.Value
-				print(create_shipment)
-				response = self.get_documents(docname, shipment_pin)
 				shipment.shipments = []
-				row = 0
-				for pin in create_shipment.body.PiecePINs.PIN:
+				piece_row = 0
+				labels = []
+				for row in create_shipment.body.PiecePINs.PIN:
+					shipment_pin = row.Value
+					print(f"Shipment Pin: {shipment_pin}")
+					label = self.get_documents(docname, shipment_pin)[0]
+					labels.append(label)
 					shipment.append("shipments", {
 						"service_provider": "Purolator",
-						"shipment_id": pin.Value,
+						"shipment_id": shipment_pin,
 						"carrier_service": selected_service[shipment.shipment_parcel[0].name],
-						"row_id": shipment.shipment_parcel[row].name,
+						"row_id": shipment.shipment_parcel[piece_row].name,
 						"carrier_status": "created",
-						"service_name": selected_service[shipment.shipment_parcel[0].name]
+						"service_name": selected_service[shipment.shipment_parcel[0].name],
+						"label": label
 					})
-					row += 1
+					piece_row += 1
+
 				shipment.ais_shipment_status = "Shipped"
 				shipment.save()
 				frappe.db.set_value("Shipment", shipment.name, "service_provider", "Purolator")
-				return response
+				return labels
 			else:
 				frappe.throw(str(create_shipment.body))
 
@@ -313,7 +318,7 @@ class Purolator:
 		files = []
 		for document in documents:
 			for detail in document.DocumentDetails.DocumentDetail:
-				files.append(self.write_file(docname, detail.Data))
+				files.append(self.write_file(docname, detail.Data, file_name=f"{pin}.pdf"))
 		return files
 	
 	def write_file(self, docname, data, file_name=None, field_name=None):
@@ -341,22 +346,49 @@ class Purolator:
 		file_doc.insert(ignore_permissions=True)
 		return file_doc.file_url
 	
-	def void_shipment(self, docname, shipments):
-		if not shipments:
-			frappe.throw(_("Please select min one shipment"))
+	def void_shipment(self, docname, shipments=[]):
 		if isinstance(shipments, string_types) and shipments.startswith('['):
 			shipments = ast.literal_eval(shipments)
 
+		if len(shipments) == 0:
+			frappe.throw(_("Please select min one shipment"))
+
 		doc = frappe.get_doc('Shipment', docname)
-		to_be_remove = []
-		# for shipment in doc.get('shipments', {'name': ('in', shipments or [])}):
+		to_be_removed = []
+		for shipment in doc.get('shipments', {'name': ('in', shipments or [])}):
+			if self.settings.is_sandbox:
+				wsdl_url = 'https://devwebservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
+			else:
+				wsdl_url = 'https://webservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
+			
+			client = self.create_pwss_soap_client(wsdl_url, docname)
 
+			request_data = {
+				'PIN': {
+					'Value': shipment.shipment_id
+				}
+			}
+			response = client.service.VoidShipment(**request_data)
+			if response.body.ShipmentVoided:
+				to_be_removed.append(shipment)
+			else:
+				frappe.throw(str(response))
 
-# def test():
-# 	# cp = CanadaPost()
-# 	# ret = cp.get_rate(name="SHIPMENT-00124")
-# 	# print(ret)
-# 	purolator = Purolator()
-# 	ret = purolator.create_shipment("SHIPMENT-00124", '{"pst77s2v95": "PurolatorGround", "pst731vlmj": "PurolatorGround"}')
-# 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
-# 	print(ret)
+		for shipment in to_be_removed:
+			doc.remove(shipment)
+
+		if len(doc.shipments) == 0:
+			doc.ais_shipment_status = "Not Shipped"
+		
+		doc.save()
+		return doc.as_dict()
+
+def test():
+	# cp = CanadaPost()
+	# ret = cp.get_rate(name="SHIPMENT-00124")
+	# print(ret)
+	purolator = Purolator()
+	ret = purolator.create_shipment("SHIPMENT-00124", '{"pst77s2v95": "PurolatorGround", "pst731vlmj": "PurolatorGround"}')
+	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
+	#ret = purolator.void_shipment('SHIPMENT-00128', '["bcobed5l9v"]')
+	print(ret)

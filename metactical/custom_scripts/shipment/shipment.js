@@ -57,10 +57,20 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 			}),
 			primary_action_label: __('Void'),
 			primary_action: values => {
-				frappe.xcall('metactical.utils.shipping.shipping.avoid_shpment', {
-					name: this.frm.docname,
-					shipments_name: Object.keys(values).filter(r => values[r])
-				})
+				frappe.call({
+					method: 'metactical.utils.shipping.shipping.avoid_shpment',
+					args: {
+						name: this.frm.docname,
+						provider: this.frm.doc.service_provider,
+						shipments_name: Object.keys(values).filter(r => values[r])
+					},
+					freeze: true,
+					callback: function(res){
+
+					}
+				});
+				console.log("Name: ", this.frm.docname, " Provider: ", this.frm.doc.service_provider,
+					" Shipments: ", Object.keys(values).filter(r => values[r]))
 				d.hide()
 				this.frm.reload_doc()
 			}
