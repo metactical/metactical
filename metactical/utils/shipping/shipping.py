@@ -65,6 +65,10 @@ def avoid_shpment(name, provider='Canada Post', shipments_name=None):
 		cp = CanadaPost()
 		response = cp.avoid_shpment(name, shipments_name)
 		return response
+	elif provider == "Purolator":
+		purolator = Purolator()
+		response = purolator.void_shipment(name, shipments_name)
+		return response
 
 
 @frappe.whitelist()
