@@ -15,7 +15,7 @@ def execute(filters=None):
 	data = get_data(filters)
 
 	# add totals to the end of the data
-	data = add_totals(data, columns)
+	data = add_totals(data)
 
 	return columns, data
 
