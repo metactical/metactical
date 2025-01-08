@@ -13,7 +13,28 @@ def execute(filters=None):
 	data=[]
 
 	data = get_data(filters)
+
+	# add totals to the end of the data
+	data = add_totals(data, columns)
+
 	return columns, data
+
+def add_totals(data):
+	totals = {
+		"current_qty": 0,
+		"quantity_difference": 0,
+		"qty": 0,
+		"amount_difference": 0,
+	}
+
+	for row in data:
+		for key in totals:
+			totals[key] += flt(row.get(key), 0)
+
+	totals["item_name"] = "Totals"
+	data.append(totals)
+
+	return data
 
 
 def get_column():

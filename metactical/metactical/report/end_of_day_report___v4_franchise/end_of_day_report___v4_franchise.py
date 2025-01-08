@@ -38,7 +38,7 @@ def execute(filters=None):
 		total_without_tax = sum([row["total_without_tax"] for row in totals])
 		total_mtd = sum([row["total_mtd"] for row in totals])
 		total_pmtd = sum([row["total_pmtd"] for row in totals])
-		total_cash_sales = sum([row["cash_sales"] for row in totals])
+		total_cash_sales = sum([row["cash_sales"] for row in totals]) if totals[0].get("cash_sales") else 0
 
 	data.append({
 		"location": location, 
@@ -134,7 +134,7 @@ def export_to_excel(date):
 
 	
 def get_all_franchises():
-	franchise_settings = frappe.get_list("Item Search Settings Franchise", "*")
+	franchise_settings = frappe.get_all("Item Search Settings Franchise", "*")
 	item_search_settings = {}
 
 	# group the settings by franchise
