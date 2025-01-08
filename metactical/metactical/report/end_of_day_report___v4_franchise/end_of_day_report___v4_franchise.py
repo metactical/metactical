@@ -13,6 +13,7 @@ def execute(filters=None):
 	total_without_tax = 0
 	total_mtd = 0
 	total_pmtd = 0
+	total_cash_sales = 0
 	location = ""
 
 	# get all the frachise companies and their settings
@@ -38,13 +39,15 @@ def execute(filters=None):
 		total_without_tax = sum([row["total_without_tax"] for row in totals])
 		total_mtd = sum([row["total_mtd"] for row in totals])
 		total_pmtd = sum([row["total_pmtd"] for row in totals])
+		total_cash_sales = sum([row["cash_sales"] for row in totals])
 
 	data.append({
 		"location": location, 
 		"total_with_tax": total_with_tax, 
 		"total_without_tax": total_without_tax,
 		"total_mtd": total_mtd,
-		"total_pmtd": total_pmtd
+		"total_pmtd": total_pmtd,
+		"cash_sales": total_cash_sales
 	})
 
 	return columns, data
@@ -62,6 +65,12 @@ def get_columns(filters):
 			"fieldname": "total_without_tax",
 			"fieldtype": "Currency",
 			"label": "Total Without Tax",
+			"width": 140
+		},
+		{
+			"fieldname": "cash_sales",
+			"fieldtype": "Currency",
+			"label": "Cash Sales",
 			"width": 140
 		},
 		{
