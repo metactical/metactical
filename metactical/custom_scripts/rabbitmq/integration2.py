@@ -101,8 +101,9 @@ class RMQConsumer(object):
         :param Exception err: The error
 
         """
+        LOGGER.info('Connection open failed: %s', err)
+        connect_to_frappe()
         post_to_rocket_chat([], f"RMQ connection open failed: {err}", rmq=True)
-        LOGGER.error('Connection open failed: %s', err)
         self.reconnect()
 
     def on_connection_closed(self, _unused_connection, reason):
@@ -119,8 +120,9 @@ class RMQConsumer(object):
         if self._closing:
             self._connection.ioloop.stop()
         else:
+            LOGGER.info('Connection closed, reconnect necessary: %s', reason)
+            connect_to_frappe()
             post_to_rocket_chat([], f"RMQ connection closed: {reason}", rmq=True)
-            LOGGER.warning('Connection closed, reconnect necessary: %s', reason)
             self.reconnect()
 
     def reconnect(self):
@@ -457,6 +459,7 @@ class ReconnectingRMQConsumer(object):
                 self._consumer.stop()
                 break
 
+            connect_to_frappe()
             post_to_rocket_chat([], "RabbitMQ receiver is reconnecting.", rmq=True)
             self._maybe_reconnect()
 
@@ -478,24 +481,30 @@ class ReconnectingRMQConsumer(object):
         return self._reconnect_delay
 
 
+def connect_to_frappe():
+    try:
+        # # Find the position of the target substring
+        target = "frappe-bench"
+        current_path =  os.path.abspath(__file__)
+
+        pos = current_path.find(target)
+        if pos != -1:
+            result = current_path[:pos]+target+"/sites"  # If target found, return the string up to the target
+        else:
+            result = current_path  # If target not found, return the whole string
+
+        # Change the current working directory to the site directory
+        os.chdir(result)
+        frappe.init(site='deverp.metactical.com')
+        frappe.connect()
+
+    except Exception as e:
+        LOGGER.info(f"Error connecting to Frappe: {str(e)}")
+
 def main():
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
-    # # Find the position of the target substring
-    target = "frappe-bench"
-    current_path =  os.path.abspath(__file__)
-
-    pos = current_path.find(target)
-    if pos != -1:
-        result = current_path[:pos]+target+"/sites"  # If target found, return the string up to the target
-    else:
-        result = current_path  # If target not found, return the whole string
-
-    # Change the current working directory to the site directory
-    os.chdir(result)
-    frappe.init(site='deverp.metactical.com')
-    frappe.connect()
-
+    connect_to_frappe()
     # RabbitMQ connection parameters
     config = frappe.get_doc('RabbitMQ Config')
 
