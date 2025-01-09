@@ -70,6 +70,8 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	location_order = "DESC"
 	if sort_by == "locations":
 		location_order = sort_order
+	elif sort_by == "order_date":
+		sort_by = "transaction_date"
 
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
