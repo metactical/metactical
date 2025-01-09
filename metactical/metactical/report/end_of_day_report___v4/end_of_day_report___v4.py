@@ -9,6 +9,8 @@ from dateutil.relativedelta import relativedelta
 def execute(filters=None):
 	columns, data = [], []
 	columns = get_columns(filters)
+
+	filters.end_date = filters.get("date")
 	item_search_settings = frappe.get_doc("Item Search Settings")
 
 	# Get Canada and US data
@@ -16,24 +18,9 @@ def execute(filters=None):
 
 	# Get USA data
 	us_data = get_us_data(item_search_settings, filters)
-
 	if len(us_data) > 0:
 		data.append({"Location": "USA"})
 		data.extend(us_data)
-
-	###### ------ New report (End of Day Report - v4 Franchise) created for qc1 and rameen data ------ ###### 
-	
-	# # Get Rameen data
-	# rameen_data = get_rameen_data(item_search_settings, filters)
-	# if len(rameen_data) > 0:
-	# 	data.append({"Location": "Rameen"})
-	# 	data.extend(rameen_data)
-
-	# # Get QC1 data
-	# qc1_data = get_qc1_data(item_search_settings, filters)
-	# if len(qc1_data) > 0:
-	# 	data.append({"Location": "QC1"})
-	# 	data.extend(qc1_data)
 		
 	return columns, data
 	
@@ -51,6 +38,12 @@ def get_columns(filters):
 			"fieldtype": "Currency",
 			"label": "Total Without Tax",
 			"width": 140
+		},
+		{
+			"fieldname": "cash_sales",
+			"fieldtype": "Currency",
+			"label": "Cash Sales",
+			"width": 120
 		},
 		{
 			"fieldname": "space",
@@ -77,15 +70,27 @@ def get_ca_data(filters):
 	data = []
 	#Get stores data
 	# data.append({"Location": "Stores"})
-	stores_data, total_stores_with_tax, total_stores_without_tax, stores_total_mtd, stores_total_pmtd = get_website_stores_data(filters, "Stores")
-	
+	total_data = get_website_stores_data(filters, "Stores")
+	stores_data = total_data[0]
+	total_stores_with_tax = total_data[1]
+	total_stores_without_tax = total_data[2]
+	stores_total_mtd = total_data[3]
+	stores_total_pmtd = total_data[4]
+	total_cash_sales = total_data[5]
+
 	# sort the data based on the array given
 	order = [ "Store - Camo - Downtown", "Store - Camo - Edmonds", "Store - Camo - Victoria","Store - Camo - Queen", "Store - Gorilla - Vancouver"]
 	stores_data = sorted(stores_data, key=lambda x: order.index(x.get("name")))
 	data.extend(stores_data)
 
 	data.append({"Location": "Online"})
-	web_data, total_web_with_tax, total_web_without_tax, web_total_mtd, web_total_pmtd = get_website_stores_data(filters, "Website")
+	total_data = get_website_stores_data(filters, "Website")
+	# web_data, total_web_with_tax, total_web_without_tax, web_total_mtd, web_total_pmtd
+	web_data = total_data[0]
+	total_web_with_tax = total_data[1]
+	total_web_without_tax = total_data[2]
+	web_total_mtd = total_data[3]
+	web_total_pmtd = total_data[4]
 
 	order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD"]
 	web_data = sorted(web_data, key=lambda x: order.index(x.get("name")))
@@ -96,9 +101,11 @@ def get_ca_data(filters):
 	data.append({
 		"location": "Stores - Total", 
 		"total_with_tax": total_stores_with_tax, 
+		"cash_sales": total_cash_sales,
 		"total_without_tax": total_stores_without_tax,
 		"total_mtd": stores_total_mtd,
-		"total_pmtd": stores_total_pmtd
+		"total_pmtd": stores_total_pmtd,
+	
 	})
 	data.append({
 		"location": "Websites - Total", 
@@ -111,8 +118,9 @@ def get_ca_data(filters):
 		"location": "CAD Total",
 		"total_with_tax": total_stores_with_tax + total_web_with_tax,
 		"total_without_tax": total_stores_without_tax + total_web_without_tax,
+		"cash_sales": total_cash_sales,
 		"total_mtd": stores_total_mtd + web_total_mtd,
-		"total_pmtd": stores_total_pmtd + web_total_pmtd
+		"total_pmtd": stores_total_pmtd + web_total_pmtd,
 	})
 	
 	return data
@@ -123,6 +131,7 @@ def get_website_stores_data(filters, location):
 	total_without_tax = 0
 	total_mtd = 0
 	total_pmtd = 0
+	total_cash_sales = 0
 	
 	date = filters.get("date")
 	sources = frappe.db.get_list("Lead Source", 
@@ -215,10 +224,43 @@ def get_website_stores_data(filters, location):
 				row.update({
 					"total_pmtd": 0.0
 				})
+
+			if location == "Stores":
+				#Get cash sales
+				cash_sales = get_cash_sales(source.name, filters.date)
+				total_cash_sales += cash_sales
+				row.update({
+					"cash_sales": cash_sales
+				})
 				
 			#Add row to data
 			data.append(row)
-	return data, total_with_tax, total_without_tax, total_mtd, total_pmtd 
+			
+	return (data, total_with_tax, total_without_tax, total_mtd, total_pmtd, total_cash_sales)
+
+def get_cash_sales(lead_source, date):
+	sales_invoice_payments = frappe.db.sql("""
+		SELECT COALESCE(SUM(amount), 0) AS paid_amount
+		FROM `tabSales Invoice Payment`
+		JOIN `tabSales Invoice` ON `tabSales Invoice`.name = `tabSales Invoice Payment`.parent
+		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.neb_payment_completed_at = %s
+		AND `tabSales Invoice`.docstatus = 1 AND `tabSales Invoice Payment`.mode_of_payment="Cash"
+	""", (lead_source, date), as_dict=1)
+
+	# payment_entries = frappe.db.sql("""
+	# 	SELECT COALESCE(SUM(`tabPayment Entry`.paid_amount), 0) AS paid_amount
+	# 	FROM `tabPayment Entry Reference`
+	# 	JOIN `tabPayment Entry` ON `tabPayment Entry`.name = `tabPayment Entry Reference`.parent
+	# 	JOIN `tabSales Invoice` ON `tabPayment Entry Reference`.reference_name = `tabSales Invoice`.name
+	# 	WHERE `tabSales Invoice`.source = %s
+	# 	AND `tabPayment Entry`.docstatus = 1 
+	# 	AND `tabPayment Entry`.mode_of_payment = "Cash"
+	# 	AND `tabSales Invoice`.docstatus = 1
+	# 	AND `tabSales Invoice`.neb_payment_completed_at = %s
+	# """, (lead_source, date), as_dict=1)
+
+	# return sales_invoice_payments[0].paid_amount + payment_entries[0].paid_amount if len(sales_invoice_payments) > 0 else 0
+	return sales_invoice_payments[0].paid_amount if len(sales_invoice_payments) > 0 else 0
 
 def get_us_data(item_search_settings, filters):
 	us_data = []
