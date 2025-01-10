@@ -19,8 +19,9 @@ def execute(filters=None):
 		},
 		{
 			"fieldname": "currency",
-			"fieldtype": "Currency",
+			"fieldtype": "Link",
 			"label": "Currency",
+			"options": "Currency",
 			"default": "CAD"
 		}
 	]
