@@ -333,9 +333,8 @@ class CustomPickList(PickList):
 					if row.qty > bin_qty:
 						frappe.throw(
 							_(
-								"At Row #{0}: The picked quantity {1} for the product budle item {2} is greater than available stock {3} in the warehouse {5}."
-							).format(row.idx, bundle_item.item_code, bundle_item.qty,  bold(row.warehouse)),
-							title=_("Insufficient Stock"),
+								"At Row #{0}: The picked quantity {1} for the product budle item {2} is greater than available stock {3} in the warehouse {4}."
+							).format(row.idx, row.qty, bold(bundle_item.item_code), bin_qty, bold(row.warehouse)),
 						)
 			else:
 				if row.batch_no and not row.qty:
@@ -519,9 +518,15 @@ def create_pick_list(source_name, target_doc=None):
 	
 	# Metactical Customization: Add bundled item instead of breaking it down to it's individual items
 	def should_pick_order_item(item) -> bool:
+		is_stock_item = True
+
+		if not is_product_bundle(item.item_code):
+			is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
+
 		return (
 			abs(item.delivered_qty) < abs(item.qty)
 			and item.delivered_by_supplier != 1
+			and is_stock_item
 		)
 	
 	# Metactcal Customization: Add warehouse, sales order and source to item map
