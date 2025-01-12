@@ -328,6 +328,10 @@ class PicklistPage{
 					{
 						fieldname: "locations",
 						label: "Locations"
+					},
+					{
+						fieldname: "order_date",
+						label: "Order Date"
 					}
 				],
 				sort_by: "qty_item",
@@ -511,6 +515,12 @@ class PicklistPage{
 					},
 					render_input: true
 				});
+				
+				let sort_labels = {
+					"qty_item": "QtyItems",
+					"locations": "Locations",
+					"order_date": "Order Date"
+				}
 
 				me.sort_selector = new frappe.ui.SortSelector({
 					parent: $('.pl-sort-selector'),
@@ -523,10 +533,14 @@ class PicklistPage{
 							{
 								fieldname: "locations",
 								label: "Locations"
+							},
+							{
+								fieldname: "order_date",
+								label: "Order Date"
 							}
 						],
-						sort_by: "qty_item",
-						sort_by_label: "QtyItems",
+						sort_by: sort_by,
+						sort_by_label: sort_labels[sort_by],
 						sort_order: sort_order
 					},
 					sort_by: sort_by,
