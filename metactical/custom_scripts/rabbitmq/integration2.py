@@ -337,6 +337,7 @@ class RMQConsumer(object):
 
     def process_message(self, message):
         # Retrieve the RabbitMQ Mapping doctype
+        connect_to_frappe()
         frappe.log_error(title="new_message", message=message)
         mappings = frappe.get_all("RabbitMQ Mapping", fields=["message_type", "method_call"])
         
