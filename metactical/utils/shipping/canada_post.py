@@ -182,8 +182,8 @@ class CanadaPost():
 						self.set_price(row, link)
 				row.db_insert()
 		doc.ais_shipment_status = "Shipped"
-		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
 		doc.save()
+		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
 		# Merger PDFs.
 		if files:
 			files = [self.pdf_merge(files, doc).file_url]
