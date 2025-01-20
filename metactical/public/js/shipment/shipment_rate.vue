@@ -2,7 +2,7 @@
 	<div v-if="ratesLoaded" id="shipment-dialog">
 		<div class="col-xs-12">
 			<div class="form-group">
-				<div class="clearfix"> <label class="control-label" style="padding-right: 0px;">{{ __("Select for All") }}</label> </div>
+				<!--<div class="clearfix"> <label class="control-label" style="padding-right: 0px;">{{ __("Select for All") }}</label> </div>-->
 				<div class="control-input-wrapper">
 					<div class="control-input flex align-center">
 						<select type="text"
