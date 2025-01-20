@@ -79,70 +79,58 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 	}
 
 	fetch_rate() {
-		if (!this.rateDialog){
-			this.rateDialog = new frappe.ui.Dialog({
-				title: __("Shipping Rates"),
-				size: 'large',
-				minimizable: true
-			})
-			new metactical.shipment_rate.ShipmentPopUp(this);
-			this.rateDialog.show();
-		}
-		/*frappe.xcall("metactical.utils.shipping.shipping.get_rate", {
-			name: this.frm.docname,
-			provider: this.frm.doc.service_provider
-		}).then(r => {
-			if (r) {
-				this.show_rate(r)
-			}
-		})*/
+		this.rateDialog = new frappe.ui.Dialog({
+			title: __("Shipping Rates"),
+			size: 'large',
+			minimizable: true
+		})
+		new metactical.shipment_rate.ShipmentPopUp(this);
+		this.rateDialog.show();
 	}
 
 	show_rate(rates) {
 		this.rates = rates
-		if (!this.rateDialog) {
-			this.rateDialog = new frappe.ui.Dialog({
-				title: __("Choose best one."),
-				size: 'large',
-				minimizable: true,
-				primary_action: () => {
-					this.rateDialog.disable_primary_action()
-					let carrier_service = {}
-					let service_name = {}
-					$(this.rateDialog.body).find('[name^="carrier_service_"]:checked').each(function () {
-						carrier_service[$(this).closest('table').attr('data-row-name')] = $(this).val()
-						service_name[$(this).closest('table').attr('data-row-name')] = $(this).attr("data-service-name");
-						console.log({"this": $(this)});
-						console.log({"carrier_service": carrier_service, "service_name": $(this).attr("data-service-name")});
+		this.rateDialog = new frappe.ui.Dialog({
+			title: __("Choose best one."),
+			size: 'large',
+			minimizable: true,
+			primary_action: () => {
+				this.rateDialog.disable_primary_action()
+				let carrier_service = {}
+				let service_name = {}
+				$(this.rateDialog.body).find('[name^="carrier_service_"]:checked').each(function () {
+					carrier_service[$(this).closest('table').attr('data-row-name')] = $(this).val()
+					service_name[$(this).closest('table').attr('data-row-name')] = $(this).attr("data-service-name");
+					console.log({"this": $(this)});
+					console.log({"carrier_service": carrier_service, "service_name": $(this).attr("data-service-name")});
+				})
+				if ($.isEmptyObject(carrier_service)) {
+					frappe.msgprint(__("Please select min one."))
+					return
+				}
+				frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
+					name: this.frm.docname,
+					provider: this.frm.doc.service_provider,
+					carrier_service: carrier_service,
+					service_name: service_name
+				}).then(r => {
+					this.rateDialog.enable_primary_action()
+					this.rateDialog.hide()
+					this.frm.reload_doc()
+					let html = ''
+					r.forEach(file => {
+						html += `<embed src="${file}" type="application/pdf" frameBorder="0" scrolling="auto"
+						height="100%"
+						width="100%"
+					></embed>`
 					})
-					if ($.isEmptyObject(carrier_service)) {
-						frappe.msgprint(__("Please select min one."))
-						return
-					}
-					frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
-						name: this.frm.docname,
-						provider: this.frm.doc.service_provider,
-						carrier_service: carrier_service,
-						service_name: service_name
-					}).then(r => {
-						this.rateDialog.enable_primary_action()
-						this.rateDialog.hide()
-						this.frm.reload_doc()
-						let html = ''
-						r.forEach(file => {
-							html += `<embed src="${file}" type="application/pdf" frameBorder="0" scrolling="auto"
-							height="100%"
-							width="100%"
-						></embed>`
-						})
-						let newWindow = window.open('', '_new')
-						newWindow.document.write(html)
-						newWindow.document.close()
-					})
-				},
-				primary_action_label: __(`Create Shipment<small>(s)</small>`)
-			})
-		}
+					let newWindow = window.open('', '_new')
+					newWindow.document.write(html)
+					newWindow.document.close()
+				})
+			},
+			primary_action_label: __(`Create Shipment<small>(s)</small>`)
+		})
 		this.rateDialog.enable_primary_action()
 		new metactical.shipment_rate.ShipmentPopUp(this.rateDialog.$body[0]);
 		this.rateDialog.show()
