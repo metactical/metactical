@@ -99,6 +99,7 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 										AND (item.is_stock_item = 1 OR bundle.name IS NOT NULL)
 										AND sales_order.status <> 'On Hold'
 										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
+										AND pl.ais_source <> 'Website - GPD'
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
 									ORDER BY 
