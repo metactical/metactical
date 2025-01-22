@@ -11,6 +11,7 @@ from metactical.custom_scripts.utils.metactical_utils import get_state_code
 import ast
 from six import string_types
 from frappe import _
+import json
 
 # logging.basicConfig(level=logging.DEBUG)
 # logging.getLogger('zeep').setLevel(logging.DEBUG)
@@ -108,10 +109,10 @@ class Purolator:
 
 			response = client.service.GetQuickEstimate(**request)
 			response = response.body
-			#print(response)
 
 			# Check if the response is valid and contains ShipmentEstimates
-			if response and hasattr(response, 'ShipmentEstimates') and hasattr(response.ShipmentEstimates, 'ShipmentEstimate'):
+			if response and hasattr(response, 'ShipmentEstimates') and hasattr(response.ShipmentEstimates, 'ShipmentEstimate') \
+				and len(response.ShipmentEstimates.ShipmentEstimate) > 0:
 				for estimate in response.ShipmentEstimates.ShipmentEstimate:
 					options[estimate.ServiceID] = estimate.ServiceID
 					items.append({
@@ -123,6 +124,10 @@ class Purolator:
 						'expected_transit_time': estimate.EstimatedTransitDays,
 						'expected_delivery_date': estimate.ExpectedDeliveryDate,
 					})
+			elif response and hasattr(response, 'ResponseInformation') and hasattr(response.ResponseInformation, 'Errors') \
+				and len(response.ResponseInformation.Errors) > 0:
+				error = self.render_error(response.ResponseInformation.Errors)
+				frappe.throw(error)
 
 			if items:
 				data.append({
@@ -131,9 +136,6 @@ class Purolator:
 					'count': row.count,
 					'items': items,
 				})
-			else:
-				print("ShipmentEstimate property is not set in the response.")
-				print(response)
 		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
 	
 	def create_shipment(self, docname, selected_service):
@@ -248,10 +250,10 @@ class Purolator:
 
 		validate_shipment = client.service.ValidateShipment(Shipment=request["Shipment"])
 		if not validate_shipment.body.ValidShipment:
-			frappe.throw(str(validate_shipment.body))
+			errors = self.render_error(validate_shipment.body.ResponseInformation.Errors)
+			frappe.throw(errors)
 		else:
 			create_shipment = client.service.CreateShipment(Shipment=request["Shipment"])
-			print(create_shipment)
 			if create_shipment.body.ResponseInformation.Errors is None:
 				shipment.shipments = []
 				piece_row = 0
@@ -277,7 +279,8 @@ class Purolator:
 				frappe.db.set_value("Shipment", shipment.name, "service_provider", "Purolator")
 				return labels
 			else:
-				frappe.throw(str(create_shipment.body))
+				errors = self.render_error(create_shipment.body.ResponseInformation.Errors)
+				frappe.throw(errors)
 
 	def get_documents(self, docname, pin):
 		if self.settings.is_sandbox:
@@ -372,7 +375,8 @@ class Purolator:
 			if response.body.ShipmentVoided:
 				to_be_removed.append(shipment)
 			else:
-				frappe.throw(str(response))
+				errors = self.render_error(response.body.ResponseInformation.Errors)
+				frappe.throw(errors)
 
 		for shipment in to_be_removed:
 			doc.remove(shipment)
@@ -382,13 +386,29 @@ class Purolator:
 		
 		doc.save()
 		return doc.as_dict()
+	
+	def render_error(self, errors):
+		ret = """
+				<table class="table table-bordered">
+					<tr>
+						<th>Code</th>
+						<th> Description </th>
+					</tr>"""
 
+		for error in errors.Error:
+			ret += f"""<tr>
+							<th>{error.Code}</th>
+							<td>{error.Description}</td>
+						</tr>"""
+		ret += """</table>"""
+		return ret
 def test():
 	# cp = CanadaPost()
 	# ret = cp.get_rate(name="SHIPMENT-00124")
 	# print(ret)
 	purolator = Purolator()
-	ret = purolator.create_shipment("SHIPMENT-00124", '{"pst77s2v95": "PurolatorGround", "pst731vlmj": "PurolatorGround"}')
+	ret = purolator.create_shipment("SHIPMENT-00140", '{"hl16dou0bg": "PurolatorGround"}')
 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 	#ret = purolator.void_shipment('SHIPMENT-00128', '["bcobed5l9v"]')
+	#ret = purolator.get_rate('SHIPMENT-00139')
 	print(ret)
