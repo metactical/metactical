@@ -5,3 +5,4 @@ pika
 pandas
 tqdm
 zeep
+PyMuPDF

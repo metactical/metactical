@@ -12,9 +12,9 @@ import ast
 from six import string_types
 from frappe import _
 import json
-
-# logging.basicConfig(level=logging.DEBUG)
-# logging.getLogger('zeep').setLevel(logging.DEBUG)
+import requests
+import re
+import fitz
 
 class Purolator:
 	def __init__(self):
@@ -321,17 +321,17 @@ class Purolator:
 		files = []
 		for document in documents:
 			for detail in document.DocumentDetails.DocumentDetail:
-				files.append(self.write_file(docname, detail.Data, file_name=f"{pin}.pdf"))
+				binary_data = base64.b64decode(detail.Data)
+				files.append(self.write_file('Shipment', docname, binary_data, file_name=f"{pin}.pdf"))
 		return files
 	
-	def write_file(self, docname, data, file_name=None, field_name=None):
+	def write_file(self, doctype, docname, data, file_name=None, field_name=None):
 		if not file_name:
 			file_name = f'{docname}.pdf'
 		file_path = get_files_path(f"{file_name}", is_private=True)
-		binary_data = base64.b64decode(data)
-
+		
 		with open(file_path, 'wb') as f:
-			f.write(binary_data)
+			f.write(data)
 			# f.close()
 
 		file_doc = frappe.new_doc('File')
@@ -341,7 +341,7 @@ class Purolator:
 			'file_url': file_url,
 			'is_private': 1,
 			'folder': 'Home/Attachments',
-			'attached_to_doctype': 'Shipment',
+			'attached_to_doctype': doctype,
 			'attached_to_name': docname,
 			'attached_to_field': field_name,
 			'file_size': data,
@@ -387,6 +387,90 @@ class Purolator:
 		doc.save()
 		return doc.as_dict()
 	
+	def consolidate_shipments(self, manifest_doc):
+		manifest_date = frappe.db.get_value("Manifest", manifest_doc, 'pickup_date')
+		if self.settings.is_sandbox:
+			wsdl_url = "https://devwebservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl"
+		else:
+			wsdl_url = "https://webservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl"
+
+		client = self.create_pwss_soap_client(wsdl_url, manifest_doc)
+		response = client.service.Consolidate()
+		if response.body.Consolidate:
+			return self.get_manifest_document(manifest_doc, manifest_date)
+		else:
+			return response
+
+	def get_manifest_document(self, manifest_docname, manifest_date):
+		po_number = None
+		shipments = []
+		if self.settings.is_sandbox:
+			wsdl_url = 'https://devwebservices.purolator.com/EWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+		else:
+			wsdl_url = 'https://webservices.purolator.com/EWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+
+		client = self.create_pwss_soap_client(wsdl_url, manifest_docname)
+
+		header = xsd.Element(
+				'{http://purolator.com/pws/datatypes/v1}RequestContext',
+				xsd.ComplexType([
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
+					xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
+				])
+			)
+		header_value = header(Version='1.3', Language='en', GroupID='xxx', RequestReference=manifest_docname)
+		request = {
+			'ShipmentManifestDocumentCriterium': {
+				'ShipmentManifestDocumentCriteria': {
+					'ManifestDate': manifest_date
+				}
+			}
+		}
+		response = client.service.GetShipmentManifestDocument(_soapheaders=[header_value], **request)
+		if response.body.ManifestBatches:
+			manifests = response.body.ManifestBatches.ManifestBatch
+			for manifest in manifests:
+				manifest_docs = manifest.ManifestBatchDetails.ManifestBatchDetail
+				for manifest_doc in manifest_docs:
+					url = manifest_doc.URL
+					response = requests.get(url)
+					if response.status_code == 200:
+						content = response.content
+						print({"content": content})
+						self.write_file("Manifest", manifest_docname, content, f"manifest_{manifest_docname}.pdf")
+						po_number = self.extract_manifest_no(content)
+						
+						doc = frappe.get_doc("Manifest", manifest_docname)
+						for item in doc.items:
+							shipments.append(item.shipment_id)
+					else:
+						frappe.log_error(message=f"Failed to download content from {url}", title="Purolator Manifet Error")
+		return shipments, po_number
+
+	def extract_manifest_no(self, content):
+		document = fitz.open(stream=content, filetype="pdf")
+		text = ''
+		for page_num in range(len(document)):
+			page = document.load_page(page_num)
+			text += page.get_text()
+
+		match = re.search(r'Manifest Number:\s*(\d+)', text)
+		if match:
+			return match.group(1)
+		return None
+	
+	def update_manifest(self, docname, po_number):
+		if po_number is None:
+			po_number = docname
+
+		doc = frappe.get_doc("Manifest", docname)
+		doc.update({
+			""
+		})
+		
+	
 	def render_error(self, errors):
 		ret = """
 				<table class="table table-bordered">
@@ -402,13 +486,15 @@ class Purolator:
 						</tr>"""
 		ret += """</table>"""
 		return ret
+	
 def test():
 	# cp = CanadaPost()
 	# ret = cp.get_rate(name="SHIPMENT-00124")
 	# print(ret)
 	purolator = Purolator()
-	ret = purolator.create_shipment("SHIPMENT-00140", '{"hl16dou0bg": "PurolatorGround"}')
+	#ret = purolator.create_shipment("SHIPMENT-00140", '{"hl16dou0bg": "PurolatorGround"}')
 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 	#ret = purolator.void_shipment('SHIPMENT-00128', '["bcobed5l9v"]')
 	#ret = purolator.get_rate('SHIPMENT-00139')
+	ret = purolator.consolidate_shipments('MF-10-17-2023-201952', '2025-01-23')
 	print(ret)
