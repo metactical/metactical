@@ -9,7 +9,8 @@
  "field_order": [
   "label",
   "mandatory",
-  "description"
+  "description",
+  "sort_order"
  ],
  "fields": [
   {
@@ -26,12 +27,19 @@
    "depends_on": "eval:parent.doctype != \"Item Group\";",
    "fetch_from": "description_link.description",
    "fieldname": "description",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Description",
-   "options": "Website Specifications Description",
-   "print_width": "300px",
-   "read_only_depends_on": "eval:parent.doctype == \"Item Group\";"
+   "mandatory_depends_on": "eval:doc.mandatory && parent.doctype != 'Item Group'"
+  },
+  {
+   "depends_on": "eval:parent.doctype != \"Item Group\";",
+   "fetch_from": "description_link.description",
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description",
+   "mandatory_depends_on": "eval:doc.mandatory && parent.doctype != 'Item Group'"
   },
   {
    "columns": 2,
@@ -41,11 +49,18 @@
    "in_list_view": 1,
    "label": "Mandatory",
    "read_only_depends_on": "eval:parent.doctype != \"Item Group\""
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order",
+   "non_negative": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2024-12-30 12:19:31.807479",
+ "modified": "2025-01-23 23:22:27.030769",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "MT Item Website Specification",
