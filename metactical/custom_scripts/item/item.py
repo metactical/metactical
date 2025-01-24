@@ -123,4 +123,12 @@ def copy_specification_from_item_group(item_group):
     return frappe.db.get_all(
         "MT Item Website Specification", filters={"parent": item_group}, fields=["label", "mandatory"]
         )
-            
+
+@frappe.whitelist()
+def get_website_label_descriptions(label):
+    frappe.msgprint(label)
+    desc =  frappe.db.get_list(
+        "Website Specification Label", filters={"label": label}
+        )
+    
+    frappe.msgprint(desc)
