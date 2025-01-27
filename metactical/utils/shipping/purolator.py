@@ -1,7 +1,7 @@
 from zeep import Client, Settings, xsd
 from requests.auth import HTTPBasicAuth
 import frappe
-from requests import Session
+from requests import Session, Request
 from zeep.transports import Transport
 import re
 import logging
@@ -15,6 +15,15 @@ import json
 import requests
 import re
 import fitz
+import os
+
+class PostTransport(Transport):
+	def load(self, url, data=None):
+		request = Request('GET', url, params=data)
+		prepared_request = self.session.prepare_request(request)
+		response = self.session.send(prepared_request, timeout=self.load_timeout)
+		response.raise_for_status()
+		return response.content
 
 class Purolator:
 	def __init__(self):
@@ -49,13 +58,16 @@ class Purolator:
 
 	def create_pwss_soap_client(self, wsdl_url, reference):
 		"""Creates a SOAP Client with the appropriate authentication and header information"""
-		session = Session()
+		session = requests.Session()
 		session.auth = HTTPBasicAuth(self.settings['api_key'], self.settings['api_password'])
 		transport = Transport(session=session)
 		settings = Settings(strict=False, xml_huge_tree=True)
+
+		current_file_path = os.path.abspath(__file__)
+		wsdl_url = f"{os.path.dirname(current_file_path)}/{wsdl_url}"
 		client = Client(wsdl=wsdl_url, transport=transport, settings=settings)
 
-		#Define the SOAP Envelope Headers
+		# Define the SOAP Envelope Headers
 		header = xsd.Element(
 			'{http://purolator.com/pws/datatypes/v2}RequestContext',
 			xsd.ComplexType([
@@ -75,9 +87,9 @@ class Purolator:
 		options = {}
 
 		if self.settings.is_sandbox:
-			wsdl_url = 'https://devwebservices.purolator.com/EWS/V2/Estimating/EstimatingService.asmx?wsdl'
+			wsdl_url = "wsdl/develop/EstimatingService.wsdl"
 		else:
-			wsdl_url = 'https://webservices.purolator.com/EWS/V2/Estimating/EstimatingService.asmx?wsdl'
+			wsdl_url = "wsdl/production/EstimatingService.wsdl"
 		
 		client = self.create_pwss_soap_client(wsdl_url, docname)
 
@@ -144,9 +156,9 @@ class Purolator:
 			selected_service = ast.literal_eval(selected_service)
 
 		if self.settings.is_sandbox:
-			wsdl_url = 'https://devwebservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
+			wsdl_url = 'wsdl/develop/ShippingService.wsdl'
 		else:
-			wsdl_url = 'https://webservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
+			wsdl_url = 'wsdl/production/ShippingService.wsdl'
 		
 		client = self.create_pwss_soap_client(wsdl_url, docname)
 
@@ -284,9 +296,9 @@ class Purolator:
 
 	def get_documents(self, docname, pin):
 		if self.settings.is_sandbox:
-			wsdl_url = 'https://devwebservices.purolator.com/PWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+			wsdl_url = 'wsdl/develop/ShippingDocumentsService.wsdl'
 		else:
-			wsdl_url = 'https://webservices.purolator.com/PWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+			wsdl_url = 'wsdl/production/ShippingDocumentsService.wsdl'
 
 		client = self.create_pwss_soap_client(wsdl_url, docname)
 
@@ -360,9 +372,9 @@ class Purolator:
 		to_be_removed = []
 		for shipment in doc.get('shipments', {'name': ('in', shipments or [])}):
 			if self.settings.is_sandbox:
-				wsdl_url = 'https://devwebservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
+				wsdl_url = 'wsdl/develop/ShippingService.wsdl'
 			else:
-				wsdl_url = 'https://webservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl'
+				wsdl_url = 'wsdl/production/ShippingService.wsdl'
 			
 			client = self.create_pwss_soap_client(wsdl_url, docname)
 
@@ -390,9 +402,9 @@ class Purolator:
 	def consolidate_shipments(self, manifest_doc):
 		manifest_date = frappe.db.get_value("Manifest", manifest_doc, 'pickup_date')
 		if self.settings.is_sandbox:
-			wsdl_url = "https://devwebservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl"
+			wsdl_url = "wsdl/develop/ShippingService.wsdl"
 		else:
-			wsdl_url = "https://webservices.purolator.com/EWS/V2/Shipping/ShippingService.asmx?wsdl"
+			wsdl_url = "wsdl/production/ShippingService.wsdl"
 
 		client = self.create_pwss_soap_client(wsdl_url, manifest_doc)
 		response = client.service.Consolidate()
@@ -405,9 +417,9 @@ class Purolator:
 		po_number = None
 		shipments = []
 		if self.settings.is_sandbox:
-			wsdl_url = 'https://devwebservices.purolator.com/EWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+			wsdl_url = 'wsdl/develop/ShippingDocumentsService.wsdl'
 		else:
-			wsdl_url = 'https://webservices.purolator.com/EWS/V1/ShippingDocuments/ShippingDocumentsService.asmx?wsdl'
+			wsdl_url = 'wsdl/production/ShippingDocumentsService.wsdl'
 
 		client = self.create_pwss_soap_client(wsdl_url, manifest_docname)
 
@@ -495,6 +507,6 @@ def test():
 	#ret = purolator.create_shipment("SHIPMENT-00140", '{"hl16dou0bg": "PurolatorGround"}')
 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 	#ret = purolator.void_shipment('SHIPMENT-00128', '["bcobed5l9v"]')
-	#ret = purolator.get_rate('SHIPMENT-00139')
-	ret = purolator.consolidate_shipments('MF-10-17-2023-201952', '2025-01-23')
+	ret = purolator.get_rate('SHIPMENT-00142')
+	#ret = purolator.consolidate_shipments('MF-10-17-2023-201952', '2025-01-23')
 	print(ret)

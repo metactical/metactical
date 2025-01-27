@@ -147,7 +147,7 @@ def get_shipments(pickup_date, warehouse, service_provider):
 					LEFT JOIN
 						`tabShipment` AS shipment ON shipment.name = cps.parent
 					WHERE
-						shipment.po_number IS NULL AND shipment.pickup_date = %(pickup_date)s
+						(shipment.po_number IS NULL OR shipment.po_number = "") AND shipment.pickup_date = %(pickup_date)s
 						AND warehouse = %(warehouse)s AND shipment.service_provider = %(service_provider)s
 				""", {"pickup_date": pickup_date, "warehouse": warehouse, 
 		  			"service_provider": service_provider}, as_dict=1)
