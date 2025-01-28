@@ -551,6 +551,12 @@ def get_column(filters,conditions):
 				"fieldname": "stock_uom",
 				"fieldtype": "Data",
 				"width": 100,
+			},
+			{
+				"label": _("RelatedSKU"),
+				"fieldname": "custom_ais_related_sku",
+				"fieldtype": "Data",
+				"width": 150,
 			}
 		]
 		
@@ -931,7 +937,7 @@ def get_master(conditions="", filters={}):
 				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
 				s.ifw_supplier_qoh, i.stock_uom, i.purchase_uom, i.lead_time_days,
 				i.min_order_qty, i.safety_stock, i.variant_of, i.ais_poreorderqty,
-				i.ais_poreorderlevel, i.creation, i.item_group
+				i.ais_poreorderlevel, i.creation, i.item_group, i.custom_ais_related_sku
 			from 
 				`tabItem Supplier` s 
 			inner join 
