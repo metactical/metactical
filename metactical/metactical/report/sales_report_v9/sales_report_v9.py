@@ -33,6 +33,7 @@ def execute(filters=None):
 		row = {}
 		row["ifw_retailskusuffix"] = i.get("ifw_retailskusuffix")
 		row["custom_ais_related_sku"] = i.get("custom_ais_related_sku")
+		row["brand"] = i.get("brand")
 		row["item_name"] = i.get("item_name")
 		row["item_code"] = i.get("item_code")
 		item_groups = get_item_group_parents(i.get("item_group"))
@@ -397,6 +398,13 @@ def get_column(filters,conditions):
 				"label": _("RelatedSKU"),
 				"fieldname": "custom_ais_related_sku",
 				"fieldtype": "Data",
+				"width": 150,
+			},
+			{
+				"label": _("Brand"),
+				"fieldname": "brand",
+				"fieldtype": "Link",
+				"options": "Brand",
 				"width": 150,
 			}
 		]
@@ -814,7 +822,8 @@ def get_master(conditions="", filters={}):
 				country_of_origin,customs_tariff_number, ifw_duty_rate,
 				ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
 				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
-				s.ifw_supplier_qoh, i.stock_uom, i.item_group, i.custom_ais_related_sku
+				s.ifw_supplier_qoh, i.stock_uom, i.item_group, i.custom_ais_related_sku,
+				i.brand
 			from 
 				`tabItem Supplier` s 
 			inner join 
