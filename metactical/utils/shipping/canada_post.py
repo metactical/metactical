@@ -131,7 +131,7 @@ class CanadaPost():
 					'count': parcel.count,
 					'items': items,
 				})
-		return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
+		return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()], "supports_multiple": True}
 
 	def create_shipping(self, name, carrier_service, service_name):
 		if carrier_service is None:
