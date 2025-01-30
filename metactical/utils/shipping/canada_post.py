@@ -107,6 +107,11 @@ class CanadaPost():
 			if (parcel.count - exists.get(parcel.name, 0)) < 1:
 				continue
 			context.parcel = parcel
+			context.parcel.weight = round(float(context.parcel.weight), 2)
+			context.parcel.height = round(float(context.parcel.height), 2)
+			context.parcel.length = round(float(context.parcel.length), 2)
+			context.parcel.width = round(float(context.parcel.width), 2)
+
 			body = frappe.render_template(
 				"metactical/utils/shipping/templates/canada_post/request/get_rate.xml", context)
 			response = self.get_response("/rs/ship/price", body, {'Accept': 'application/vnd.cpc.ship.rate-v4+xml',
@@ -154,6 +159,11 @@ class CanadaPost():
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
 			context.parcel.service_name = service_name.get(parcel.name)
+			context.parcel.weight = round(float(context.parcel.weight), 2)
+			context.parcel.height = round(float(context.parcel.height), 2)
+			context.parcel.length = round(float(context.parcel.length), 2)
+			context.parcel.width = round(float(context.parcel.width), 2)
+
 			for c in range(parcel.count - exists.get(parcel.name, 0)):
 				body = frappe.render_template(
 					"metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
