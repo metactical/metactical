@@ -1,8 +1,8 @@
 <template>
 	<div v-if="ratesLoaded" id="shipment-dialog">
 		<div class="col-xs-12">
-			<div class="form-group">
-				<!--<div class="clearfix"> <label class="control-label" style="padding-right: 0px;">{{ __("Select for All") }}</label> </div>-->
+			<!--<div class="form-group">
+				<div class="clearfix"> <label class="control-label" style="padding-right: 0px;">{{ __("Select for All") }}</label> </div>
 				<div class="control-input-wrapper">
 					<div class="control-input flex align-center">
 						<select type="text"
@@ -29,7 +29,7 @@
 					<div class="control-value like-disabled-input" style="display: none;">Company</div>
 					<p class="help-box small text-muted"></p>
 				</div>
-			</div>
+			</div>-->
 		</div>
 		<Tabs :tabs="tabsData" 
 			:selectedServices="selectedServices"  
