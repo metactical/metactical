@@ -7,6 +7,7 @@ from frappe.utils import get_files_path
 from six import string_types
 import ast
 from PyPDF2 import PdfFileMerger
+from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
 
 
@@ -50,6 +51,11 @@ class CanadaPost():
 		delivery_address_doc = frappe.get_doc(
 			'Address', doc.delivery_address_name).as_dict()
 		delivery_address_doc.state = get_state_code(delivery_address_doc.state)
+		if delivery_address_doc.pincode is None or delivery_address_doc.pincode == "":
+			frappe.throw(f"Postal code needed in shipping address {delivery_address_doc.name}")
+		else:
+			delivery_address_doc.pincode = delivery_address_doc.pincode.upper()
+
 		pickup_address_doc = frappe.get_doc(
 			'Address', doc.pickup_address_name).as_dict()
 		
@@ -58,6 +64,8 @@ class CanadaPost():
 
 		if pickup_address_doc.pincode is None or pickup_address_doc.pincode == "":
 			frappe.throw(f"Postal code needed in billing address {pickup_address_doc.name}")
+		else:
+			pickup_address_doc.pincode = pickup_address_doc.pincode.upper()
 
 		if len(pickup_address_doc.state) > 2:
 			pickup_address_doc.state = get_state_code(pickup_address_doc.state)
@@ -175,6 +183,7 @@ class CanadaPost():
 				row.db_insert()
 		doc.ais_shipment_status = "Shipped"
 		doc.save()
+		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
 		# Merger PDFs.
 		if files:
 			files = [self.pdf_merge(files, doc).file_url]
@@ -338,8 +347,8 @@ class CanadaPost():
 		
 		for groups in response["groups"]["group"]:
 			if isinstance(groups, list):
-				 for group in groups:
-					 all_shipments.append(group["group-id"])
+				for group in groups:
+					all_shipments.append(group["group-id"])
 			else:
 				all_shipments.append(groups["group-id"])
 		for shipment in shipments:
@@ -382,11 +391,13 @@ class CanadaPost():
 		file_doc.insert(ignore_permissions=True)
 		return file_doc
 
-	def avoid_shpment(self, name, shipments_name):
-		if not shipments_name:
-			frappe.throw(_("Please select min one shipment"))
+	def avoid_shpment(self, name, shipments_name=[]):
 		if isinstance(shipments_name, string_types) and shipments_name.startswith('['):
 			shipments_name = ast.literal_eval(shipments_name)
+
+		if len(shipments_name) == 0:
+			frappe.throw(_("Please select min one shipment"))
+		
 		doc = frappe.get_doc('Shipment', name)
 		to_be_remove = []
 		for shipment in doc.get('shipments', {'name': ('in', shipments_name or [])}):
@@ -397,7 +408,10 @@ class CanadaPost():
 				to_be_remove.append(shipment)
 		for row in to_be_remove:
 			doc.remove(row)
-		doc.ais_shipment_status = "Not Shipped"
+
+		if len(doc.shipments) == 0:
+			doc.ais_shipment_status = "Not Shipped"
+
 		doc.save()
 		return doc.as_dict()
 
@@ -450,8 +464,3 @@ class CanadaPost():
 			else:
 				frappe.throw(
 					res, title=f"Error from Provider Server, Code: {r.status_code}")
-
-
-def get_state_code(state):
-	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
-	return symbol
