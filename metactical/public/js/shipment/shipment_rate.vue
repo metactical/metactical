@@ -122,13 +122,18 @@ export default {
 					callback: function(ret){
 						me.rates[provider_key] = {
 							"label": provider,
-							"rates": ret.message
+							"rates": ret.message,
+							"supports_multiple": ret.message.supports_multiple,
+							"no_of_parcels": ret.message.data.length
 						}
 
 						me.tabsData.push({
 							"title": provider,
-							"rates": ret.message
+							"rates": ret.message,
+							"supports_multiple": ret.message.supports_multiple,
+							"no_of_parcels": ret.message.data.length
 						})
+						console.log("TabsData: ", me.tabsData);
 						
 						ret.message.options.forEach(option => {
 							me.rateOptions.push({

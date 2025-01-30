@@ -148,7 +148,10 @@ class Purolator:
 					'count': row.count,
 					'items': items,
 				})
-		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
+
+		# Because with Purilator you can only select a single service even with multiple pieces,
+		# combine the two rates into a single one to remove confusion
+		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()], "supports_multiple": False}
 	
 	def create_shipment(self, docname, selected_service):
 
