@@ -12,7 +12,7 @@
     </div>
     <div class="tab-content">
         <div v-if="tabs[activeTab]">
-			<table v-for="row in tabs[activeTab].rates.data" class="table table-bordered" :data-row-name="row.name">
+			<table v-for="row in tabs[activeTab].rates" class="table table-bordered" :data-row-name="row.parcel_name">
 				<tr>
 					<!-- <th>
 						{{ __("Row") }} # {{ row.idx }}
@@ -34,7 +34,7 @@
 					<th>{{ __("Expected Transit Time") }}</th>
 					<th>{{ __("Expected Delivery Date") }}</th>
 				</tr>
-				<tr v-for="(item, idx) in row.items">
+				<tr v-for="(item, idx) in row.services">
 					<td>
 						<input type="radio"
 							:name="item.provider.replace(/\s+/g, '') + '_' + row.count"
@@ -44,7 +44,7 @@
 							:data-service-name="item.service_name"
 							:data-provider="item.provider"
 							:data-carrier="item.carrier_service"
-							@change="selectService(row.count, row.name, item)"
+							@change="selectService(row.count, row.parcel_name, item)"
 							>
 					</td>
 					<td>{{ item.service_name }}</td>
@@ -90,16 +90,17 @@ export default {
 		},
 
 		isSelectedService(count, item) {
-			let selectedProvider = this.selectedServices[count]["selectedProvider"]
-			let selectedCarrier = this.selectedServices[count]["selectedCarrier"]
-			let selectedServiceName = this.selectedServices[count]["selectedServicename"]
-			if(selectedProvider == item.provider && selectedCarrier == item.carrier_service 
-				&& selectedServiceName == item.service_name) {
-				return true;
-			}
-			else{
-				return false;
-			}
+			// let selectedProvider = this.selectedServices[count]["selectedProvider"]
+			// let selectedCarrier = this.selectedServices[count]["selectedCarrier"]
+			// let selectedServiceName = this.selectedServices[count]["selectedServicename"]
+			// if(selectedProvider == item.provider && selectedCarrier == item.carrier_service 
+			// 	&& selectedServiceName == item.service_name) {
+			// 	return true;
+			// }
+			// else{
+			// 	return false;
+			// }
+			return false;
 		},
 
 		selectService(count, piece_name, item){
