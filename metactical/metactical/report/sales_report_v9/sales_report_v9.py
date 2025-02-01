@@ -1064,8 +1064,11 @@ def get_item_details(item, list_type="Selling", supplier=None):
 	if price_list is None or price_list  == "":
 		frappe.throw("Please set a default price list in stock Settings")
 
-	cond = "and price_list = '{}' and selling = 1".format(price_list)
-	if list_type == "Buying": cond= " and buying = 1"
+	cond = "and price_list = '{}'".format(price_list)
+	if list_type == "Buying": 
+		cond += " and buying = 1"
+	else:
+		cond += " and selling = 1"
 	rate = 0
 	date = frappe.utils.nowdate()
 	r = frappe.db.sql(f"""select price_list_rate from `tabItem Price`
