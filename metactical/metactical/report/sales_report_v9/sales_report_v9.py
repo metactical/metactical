@@ -1069,6 +1069,7 @@ def get_item_details(item, list_type="Selling", supplier=None):
 		cond += " and buying = 1"
 	else:
 		cond += " and selling = 1"
+	cond = frappe.db.escape(cond)
 	rate = 0
 	date = frappe.utils.nowdate()
 	r = frappe.db.sql(f"""select price_list_rate from `tabItem Price`
