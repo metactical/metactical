@@ -167,7 +167,7 @@ class CanadaPost():
 			context.parcel.length = round(float(context.parcel.length), 2)
 			context.parcel.width = round(float(context.parcel.width), 2)
 
-			for c in range(parcel.count - exists.get(parcel.name, 0)):
+			for c in range(parcel.idx - exists.get(parcel.name, 0)):
 				body = frappe.render_template(
 					"metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
 				# temp fix to replae the special character which was causing errors
