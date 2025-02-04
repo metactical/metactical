@@ -629,11 +629,11 @@ class PicklistPage{
 						me.list_items(metactical.pick_list.current_pick);
 					}
 				});
-				me.wrapper.find('.totes-list-div').on('click', 
-					function(){
-						metactical.pick_list.selected_totes.push(unescape($(this).attr('data-tote')));
-						me.list_items(metactical.pick_list.current_pick);
-				});
+				// me.wrapper.find('.totes-list-div').on('click', 
+				// 	function(){
+				// 		metactical.pick_list.selected_totes.push(unescape($(this).attr('data-tote')));
+				// 		me.list_items(metactical.pick_list.current_pick);
+				// });
 				me.wrapper.find('.back-to-pick').on('click', function(){
 					me.list_orders();
 				});
@@ -871,20 +871,20 @@ class PicklistPage{
 		const me = this;
 		this.items = this.wrapper.find('.to-pick-ul');
 		this.picked = this.wrapper.find('.picked-ul');
-		this.items.on('click', '.item-li', function(){
-			var item = $(this);
-			var picked = {
-				"item_code":  unescape(item.attr('data-item-code')),
-				"picked_qty": parseFloat(item.find(".pick-qty").html()),
-				"pick_list": unescape(item.attr('data-pick-list'))
-			}
-			let tote = item.attr('data-tote');
-			let is_tote = false;
-			if(typeof tote !== 'undefined' && tote !== false){
-				is_tote = true;
-			}
-			me.trigger_picked(picked, false, tote);
-		});
+		// this.items.on('click', '.item-li', function(){
+		// 	var item = $(this);
+		// 	var picked = {
+		// 		"item_code":  unescape(item.attr('data-item-code')),
+		// 		"picked_qty": parseFloat(item.find(".pick-qty").html()),
+		// 		"pick_list": unescape(item.attr('data-pick-list'))
+		// 	}
+		// 	let tote = item.attr('data-tote');
+		// 	let is_tote = false;
+		// 	if(typeof tote !== 'undefined' && tote !== false){
+		// 		is_tote = true;
+		// 	}
+		// 	me.trigger_picked(picked, false, tote);
+		// });
 		this.picked.on('click', '.item-li', function(){
 			var cur_item = $(this);
 			var item_code = unescape(cur_item.attr('data-item-code'));
