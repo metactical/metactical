@@ -55,6 +55,7 @@ class PicklistPage{
 			me.$selected_source.html(default_location);
 			metactical.pick_list.selected_warehouse = ret.message.default_warehouse;
 			metactical.pick_list.selected_source = default_location;
+			metactical.pick_list.no_for_manual = ret.message.no_for_manual;
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -918,7 +919,15 @@ class PicklistPage{
 									"picked_qty": 1,
 									"pick_list": to_pick[i].pick_list
 								}
-								me.trigger_picked(picked, true);
+
+								// If the qty is more than specified in settings, then
+								// can scan multiple items at same time
+								if(to_pick[i].qty >= metactical.pick_list.no_for_manual){
+									me.trigger_picked(picked, false);
+								}
+								else{
+									me.trigger_picked(picked, true);
+								}
 								frappe.utils.play_sound("alert");
 							}
 						}

@@ -13,6 +13,7 @@ def get_defaults(user):
 							{"user": frappe.session.user}, as_dict=1)
 	if len(defaults) > 0:
 		default_settings = defaults[0]
+	default_settings["no_for_manual"] = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
 	return default_settings
 
 @frappe.whitelist()
