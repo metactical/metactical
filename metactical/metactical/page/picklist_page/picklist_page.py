@@ -175,8 +175,9 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 				"locations": [location.strip() for location in locations],
 				"tote": tote
 			})
+		pl_text = frappe.db.get_value("Pick List", pick_list, "pl_text")
 		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
-		doc = {"name": items[0].pick_list, "items": items}
+		doc = {"name": items[0].pick_list, "pl_text": pl_text, "items": items}
 		return doc
 	else:
 		return 'Already Picked'
