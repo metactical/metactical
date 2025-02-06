@@ -680,7 +680,7 @@ class PicklistPage{
 				else{
 					metactical.pick_list.items_to_pick = ret.message.items;
 					me.wrapper.html(frappe.render_template('items_list',
-						{"pick_list_name": metactical.pick_list.current_pick}));
+						{"pick_list_name": metactical.pick_list.current_pick, "pl_text": ret.message.pl_text}));
 					me.item_barcode = frappe.ui.form.make_control({
 						parent: $('.item-barcode'),
 						df: {
