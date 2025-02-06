@@ -77,6 +77,7 @@ class CustomShipment(Shipment):
 			frappe.throw(_("Please enter Shipment Parcel information"))
 		'''if self.value_of_goods == 0:
 			frappe.throw(_("Value of goods cannot be 0"))'''
+		self.db_set("pickup_date", frappe.utils.nowdate())
 		self.db_set("status", "Submitted")
 		
 def set_source_and_customer_po(doc):
