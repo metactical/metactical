@@ -11,17 +11,15 @@
  "fields": [
   {
    "fieldname": "description",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Description",
-   "options": "Website Specifications Description",
-   "reqd": 1
+   "label": "Description"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-12-30 12:33:04.596604",
+ "modified": "2025-01-23 10:24:16.315418",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Spec Label Descriptions",
