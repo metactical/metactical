@@ -1,4 +1,5 @@
 import frappe
+import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 
 def on_update(doc, method):
@@ -63,15 +64,15 @@ def sync_website_specifications(doc):
     if not original_website_specifications and not doc.neb_website_specifications:
         return
 
-    original_website_specifications_dict = {spec.label: spec.description for spec in original_website_specifications} if original_website_specifications else {}
-    current_website_specifications = {spec.label: spec.description for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
+    original_website_specifications_dict = {spec.label: {"description": spec.description, "sort_order": spec.sort_order} for spec in original_website_specifications} if original_website_specifications else {}
+    current_website_specifications = {spec.label: {"description": spec.description, "sort_order": spec.sort_order} for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
 
     # Check for removed/updated website specifications
     removed_website_specifications = []
     for old_label, old_description in original_website_specifications_dict.items():
         found = False
         for current_label, current_description in current_website_specifications.items():
-            if old_label == current_label and old_description == current_description:
+            if old_label == current_label and old_description["description"] == current_description["description"] and old_description["sort_order"] == current_description["sort_order"]:
                 found = True
                 break
 
@@ -83,7 +84,7 @@ def sync_website_specifications(doc):
     for current_label, current_description in current_website_specifications.items():
         found = False
         for old_label, old_description in original_website_specifications_dict.items():
-            if old_label == current_label and old_description == current_description:
+            if old_label == current_label and old_description["description"] == current_description["description"] and old_description["sort_order"] == current_description["sort_order"]:
                 found = True
                 break
 
@@ -105,6 +106,7 @@ def sync_website_specifications(doc):
                     website_spec.label = spec.label
                     website_spec.description = spec.description
                     website_spec.mandatory = spec.mandatory
+                    website_spec.sort_order = spec.sort_order
                     website_spec.parent = website_item.name
                     website_spec.parenttype = website_item.doctype
                     website_spec.parentfield = "neb_website_specifications"
@@ -119,10 +121,24 @@ def sync_website_specifications(doc):
                     main_website_spec.save()
 
 @frappe.whitelist()
+def get_website_specification_description_options(labels):
+    labels = json.loads(labels)
+    return frappe.db.get_all("Website Spec Label Descriptions", filters={"parent": ["in", labels]}, fields=["description", "parent"])
+        
+@frappe.whitelist()
 def copy_specification_from_item_group(item_group):
-    return frappe.db.get_all(
+    web_spec_labels = frappe.db.get_all(
         "MT Item Website Specification", filters={"parent": item_group}, fields=["label", "mandatory"]
         )
+    
+    for spec in web_spec_labels:
+        if spec.label:
+            website_spec = frappe.get_doc("Website Specification Label", spec.label)
+            descriptions = [desc.description for desc in website_spec.descriptions]    
+            
+            spec.descriptions = descriptions
+                        
+    return web_spec_labels
 
 @frappe.whitelist()
 def get_website_label_descriptions(label):
