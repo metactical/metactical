@@ -55,6 +55,7 @@ class PicklistPage{
 			me.$selected_source.html(default_location);
 			metactical.pick_list.selected_warehouse = ret.message.default_warehouse;
 			metactical.pick_list.selected_source = default_location;
+			metactical.pick_list.no_for_manual = ret.message.no_for_manual;
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -471,8 +472,20 @@ class PicklistPage{
 		});
 	}
 	
-	list_orders(filter='', sort_by="qty_item", sort_order="desc"){
+	list_orders(filter='', sort_by="qty_item", sort_order="desc", is_reload=false){
 		const me = this;
+
+		// If it's a reload either by clicking refresh or going back, load the
+		// previous sort values
+		if(is_reload){
+			sort_by = metactical.pick_list.order_sort_by;
+			sort_order = metactical.pick_list.order_sort_order;
+		}
+		else{
+			metactical.pick_list.order_sort_by = sort_by;
+			metactical.pick_list.order_sort_order = sort_order;
+		}
+
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
@@ -509,7 +522,7 @@ class PicklistPage{
 							let source = me.pl_source.get_value();
 							if(source != ""){
 								metactical.pick_list.selected_source = source;
-								me.list_orders();
+								me.list_orders(filter=barcode, undefined, undefined, true);
 							}
 						}
 					},
@@ -549,6 +562,8 @@ class PicklistPage{
 						let barcode = $('input[data-fieldname="pl_barcode"]').val();
 						let selected_sort_by = me.sort_selector.sort_by;
 						let selected_sort_order = me.sort_selector.sort_order;
+						metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
+						metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
 						me.list_orders(barcode, selected_sort_by, selected_sort_order);
 					}
 				});
@@ -568,18 +583,18 @@ class PicklistPage{
 					me.load_home();
 				});
 				me.wrapper.find('.refresh-orders').on('click', function(){
-					me.list_orders();
+					me.list_orders(undefined, undefined, undefined, true);
 				});
 				me.wrapper.find('.pl-barcode').on('keypress', function(){
 					if(event.keyCode == 13){
 						var barcode = $('input[data-fieldname="pl_barcode"]').val();
-						me.list_orders(filter=barcode);
+						me.list_orders(filter=barcode, undefined, undefined, true);
 					}
 				});
 				me.wrapper.find('.pl-barcode').on('focusout', function(){
 					var barcode = $('input[data-fieldname="pl_barcode"]').val();
 					if(barcode != '' && barcode != filter){
-						me.list_orders(filter=barcode);
+						me.list_orders(filter=barcode, undefined, undefined, true);
 					}
 				});
 				me.wrapper.find('.pl-source').on('focusout', function(){
@@ -635,7 +650,7 @@ class PicklistPage{
 				// 		me.list_items(metactical.pick_list.current_pick);
 				// });
 				me.wrapper.find('.back-to-pick').on('click', function(){
-					me.list_orders();
+					me.list_orders(undefined, undefined, undefined, true);
 				});
 				me.wrapper.find('.refresh-totes').on('click', function(){
 					me.list_single_totes();
@@ -670,7 +685,7 @@ class PicklistPage{
 							primary_action: {
 								label: 'Reload List',
 								action: function(values){
-									me.list_orders();
+									me.list_orders(undefined, undefined, undefined, true);
 									this.hide();
 								}
 							}
@@ -679,7 +694,7 @@ class PicklistPage{
 				else{
 					metactical.pick_list.items_to_pick = ret.message.items;
 					me.wrapper.html(frappe.render_template('items_list',
-						{"pick_list_name": metactical.pick_list.current_pick}));
+						{"pick_list_name": metactical.pick_list.current_pick, "pl_text": ret.message.pl_text}));
 					me.item_barcode = frappe.ui.form.make_control({
 						parent: $('.item-barcode'),
 						df: {
@@ -918,7 +933,15 @@ class PicklistPage{
 									"picked_qty": 1,
 									"pick_list": to_pick[i].pick_list
 								}
-								me.trigger_picked(picked, true);
+
+								// If the qty is more than specified in settings, then
+								// can scan multiple items at same time
+								if(to_pick[i].qty >= metactical.pick_list.no_for_manual){
+									me.trigger_picked(picked, false);
+								}
+								else{
+									me.trigger_picked(picked, true);
+								}
 								frappe.utils.play_sound("alert");
 							}
 						}
@@ -990,7 +1013,7 @@ class PicklistPage{
 						me.list_totes();
 					}
 					else{
-						me.list_orders();
+						me.list_orders(undefined, undefined, undefined, true);
 					}
 				}
 			});
