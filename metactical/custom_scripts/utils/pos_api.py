@@ -1,9 +1,14 @@
 import frappe
 from metactical.custom_scripts.sales_order.sales_order import make_sales_invoice
+from metactical.custom_scripts.utils.metactical_utils import ( 
+	post_to_rocket_chat, queue_action
+)
+from frappe.utils import file_lock, now_datetime, get_url
 
 @frappe.whitelist(allow_guest=True)
 def receive_pos_data(*args, **kwargs):
     form_data = frappe.form_dict
+
     try:        
         # Do something with the data
         customer = get_customer(form_data)
@@ -13,27 +18,33 @@ def receive_pos_data(*args, **kwargs):
             frappe.enqueue(
                 submit_sales_order,
                 queue="default", # one of short, default, long
-                is_async=True, # if this is True, method is run in worker
-                now=True, # if this is True, method is run directly (not in a worker) 
-                job_name=None, # specify a job name
-                at_front=True, # put the job at the front of the queue
+                form_data=form_data,
+                at_front=True,
+                sales_order=sales_order
+            )
+                        
+            frappe.enqueue(
+                create_comments,
+                queue="default", # one of short, default, long
                 form_data=form_data,
                 sales_order=sales_order
             )
-                    
-        frappe.response["status"] = 200
-        frappe.response["sales_order"] = sales_order
+                
+        frappe.response["Status"] = 200
+        frappe.response["InvoiceId"] = sales_order
+        frappe.response["Message"] = []
     
     except Exception as e:
         frappe.log_error(title="pos_data", message=form_data)
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
-        frappe.response["status"] = 500
-        frappe.response["error"] = str(e)
+        frappe.clear_last_message()
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = [str(e)]
+        frappe.response["InvoiceId"] = None
            
 def create_sales_order(form_data, customer):
     items = form_data['Items']
     taxes = form_data['Taxes']
-    payment = form_data['Payment']
     
     so_data = {
         'doctype': 'Sales Order',
@@ -62,16 +73,10 @@ def submit_sales_order(sales_order, form_data):
         frappe.db.commit()    
     except Exception as e:
         frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
-        comments = get_comments(form_data)
-        for comment in comments:
-            frappe.get_doc({
-                'doctype': 'Comment',
-                'comment_by': comment['UserId'],
-                'comment': comment['Text'],
-                'reference_doctype': 'Sales Order',
-                'reference_name': sales_order.name,
-            }).insert()
-        return str(e)
+        url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
+        message = "Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+        post_to_rocket_chat(sales_order, message, pos=True)
+        return
     
     sales_invoice = None
     try:
@@ -79,31 +84,28 @@ def submit_sales_order(sales_order, form_data):
         frappe.db.commit()
     except Exception as e:
         frappe.log_error(title='Create Invoice Error', message=frappe.get_traceback())
-        comments = get_comments(form_data)
-        for comment in comments:
-            frappe.get_doc({
-                'doctype': 'Comment',
-                'comment_by': comment['UserId'],
-                'comment': comment['Text'],
-                'reference_doctype': 'Sales Order',
-                'reference_name': sales_order.name,
-            }).insert()
-        return str(e)
-        
-    try:
-        sales_invoice.submit()
-    except Exception as e:
-        frappe.log_error(title='Submit Invoice Error', message=frappe.get_traceback())
-        comments = get_comments(form_data)
-        for comment in comments:
-            frappe.get_doc({
-                'doctype': 'Comment',
-                'comment_by': comment['UserId'],
-                'comment': comment['Text'],
-                'reference_doctype': 'Sales Invoice',
-                'reference_name': sales_invoice.name,
-            }).insert()
-        return str(e)
+        url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
+        message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+        post_to_rocket_chat(sales_order, message, pos=True)
+        return
+    
+    if sales_invoice:
+        queue_action(sales_invoice, 'submit')
+
+    
+def create_comments(sales_order, form_data):
+    comments = get_comments(form_data)
+    for comment in comments:
+        frappe.get_doc({
+            'doctype': 'Comment',
+            'comment_by': comment['comment_by'],
+            'content': comment['comment'],
+            'reference_doctype': 'Sales Order',
+            "comment_type": "Comment",
+            'reference_name': sales_order,
+        }).insert()
+    
+    frappe.db.commit()
     
 def create_invoice(sales_order, form_data):
     sales_invoice = make_sales_invoice(sales_order.name)
