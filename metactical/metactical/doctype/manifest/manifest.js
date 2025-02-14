@@ -78,6 +78,7 @@ frappe.ui.form.on('Manifest', {
 					frappe.call({
 						method: "metactical.metactical.doctype.manifest.manifest.redownload_manifest",
 						args: {
+							"doctype": "Manifest",
 							"docname": frm.docname
 						},
 						freeze: true,

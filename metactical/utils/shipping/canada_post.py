@@ -236,11 +236,13 @@ class CanadaPost():
 		context.manifest_doc = doc
 		context.pickup_address_doc = frappe.get_doc("Address", doc.pickup_address)
 		context.pickup_contact_person_doc = frappe.get_doc("User", doc.pickup_contact_person)
-		context.group = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(doc.pickup_date, "%Y%m%d")}'
+		context.groups = self.get_shipments_groups(doc)
+		#context.group = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(doc.pickup_date, "%Y%m%d")}'
 		context.warehouse_doc = frappe.get_doc('Warehouse', doc.warehouse)
 		context.warehouse_doc.state = get_state_code(context.warehouse_doc.state)
 		body = frappe.render_template(
 			"metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
+		
 		response = self.get_response(
 				f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
 		
@@ -259,7 +261,7 @@ class CanadaPost():
 							manifest_file = self.get_response(
 									mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
 							if manifest_file.status_code == 200:
-								file_name = f"{manifest}.pdf"
+								file_name = f"manifest_{manifest}.pdf"
 								file_path = get_files_path(f"{file_name}", is_private=True)
 								with open(file_path, 'wb') as f:
 									f.write(manifest_file.content)
@@ -284,7 +286,18 @@ class CanadaPost():
 								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 		return shipment_ids, po_number
 							
-	
+	def get_shipments_groups(self, manifest_doc):
+		groups = []
+		pickup_dates = []
+		for row in manifest_doc.items:
+			pickup_date = frappe.db.get_value("Shipment", row.shipment, "pickup_date")
+			if pickup_date not in pickup_dates:
+				if isinstance(pickup_date, str):
+					pickup_date = datetime.strptime(pickup_date, "%Y-%m-%d")
+				groups.append(f'{manifest_doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(pickup_date, "%Y%m%d")}')
+		return groups
+
+
 	def get_shipment_manifest(shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
 		start_date = datetime.strftime(doc.creation, "%Y%m%d")
