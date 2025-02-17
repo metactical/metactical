@@ -237,7 +237,9 @@ class CanadaPost():
 		context.pickup_address_doc = frappe.get_doc("Address", doc.pickup_address)
 		context.pickup_contact_person_doc = frappe.get_doc("User", doc.pickup_contact_person)
 		context.groups = self.get_shipments_groups(doc)
-		#context.group = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(doc.pickup_date, "%Y%m%d")}'
+		if not context.groups or len(context.groups) == 0:
+			frappe.throw("Error: There are no shipments that have not been transmitted.")
+
 		context.warehouse_doc = frappe.get_doc('Warehouse', doc.warehouse)
 		context.warehouse_doc.state = get_state_code(context.warehouse_doc.state)
 		body = frappe.render_template(
@@ -295,10 +297,24 @@ class CanadaPost():
 				if isinstance(pickup_date, str):
 					pickup_date = datetime.strptime(pickup_date, "%Y-%m-%d")
 				groups.append(f'{manifest_doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(pickup_date, "%Y%m%d")}')
+
+		# Get available shipment groups and remove any that aren't available
+		available_groups = self.get_available_groups()
+		groups = [group for group in groups if group in available_groups]
 		return groups
 
+	def get_available_groups(self):
+		available_groups = []
+		response = self.get_response(
+			f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/group", None, 
+			headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
+		
+		for group in response["groups"]["group"]:
+			available_groups.append(group["group-id"])
+		
+		return available_groups
 
-	def get_shipment_manifest(shipment="SHIPMENT-00009"):
+	def get_shipment_manifest(self, shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
 		start_date = datetime.strftime(doc.creation, "%Y%m%d")
 		shipment_id = doc.shipments[0].shipment_id
@@ -490,3 +506,7 @@ class CanadaPost():
 			else:
 				frappe.throw(
 					res, title=f"Error from Provider Server, Code: {r.status_code}")
+
+def test():
+	cp = CanadaPost()
+	cp.create_manifest(manifest="MF-02-17-2025-235937")
