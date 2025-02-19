@@ -1,0 +1,153 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-02-18 17:49:27.378346",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "posting_date",
+  "posting_time",
+  "company",
+  "warehouse",
+  "column_break_64am2",
+  "reason_for_adjustment",
+  "section_queus",
+  "ais_queue_failed",
+  "ais_queue_status",
+  "ais_queueu_comment",
+  "column_break_jx87a",
+  "ais_queued_date",
+  "ais_queued_by",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "posting_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Posting Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_queus",
+   "fieldtype": "Section Break",
+   "label": "Queue"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "ais_queue_failed",
+   "fieldtype": "Check",
+   "label": "Queue Failed",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queue_status",
+   "fieldtype": "Select",
+   "label": "Queue Status",
+   "no_copy": 1,
+   "options": "Not Queued\nQueued\nFailed"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queueu_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_jx87a",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queued_date",
+   "fieldtype": "Datetime",
+   "label": "Queue Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queued_by",
+   "fieldtype": "Link",
+   "label": "Queued By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Stock Zeroing Tool V2",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_64am2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reason_for_adjustment",
+   "fieldtype": "Small Text",
+   "label": "Reason from Adjustment",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-02-18 17:58:12.451357",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Stock Zeroing Tool V2",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
