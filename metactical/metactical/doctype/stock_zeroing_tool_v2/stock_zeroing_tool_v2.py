@@ -143,6 +143,7 @@ def get_items_for_stock_reco(warehouse, company):
 			and IFNULL(i.disabled, 0) = 0
 			and i.is_stock_item = 1
 			and i.has_variants = 0
+			and i.has_serial_no = 0
 			and exists(
 				select name from `tabWarehouse` where lft >= {lft} and rgt <= {rgt} and name = bin.warehouse and is_group = 0
 			)
@@ -164,6 +165,7 @@ def get_items_for_stock_reco(warehouse, company):
 			and i.is_stock_item = 1
 			and i.has_variants = 0
 			and IFNULL(i.disabled, 0) = 0
+			and i.has_serial_no = 0
 			and id.company = %s
 		group by i.name
 	""",
