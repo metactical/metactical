@@ -33,14 +33,12 @@
   {
    "fieldname": "posting_time",
    "fieldtype": "Time",
-   "in_list_view": 1,
    "label": "Posting Time",
    "reqd": 1
   },
   {
    "fieldname": "company",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "Company",
    "options": "Company",
    "reqd": 1
@@ -128,7 +126,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-02-18 17:58:12.451357",
+ "modified": "2025-02-18 19:49:06.359215",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Stock Zeroing Tool V2",

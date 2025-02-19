@@ -997,7 +997,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Bulk Updates",
-   "link_count": 6,
+   "link_count": 7,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -1061,9 +1061,19 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Zeroing Tool",
+   "link_count": 0,
+   "link_to": "Stock Zeroing Tool V2",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-02-10 15:06:10.055796",
+ "modified": "2025-02-18 19:47:30.864841",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
