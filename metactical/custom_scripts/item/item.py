@@ -64,15 +64,15 @@ def sync_website_specifications(doc):
     if not original_website_specifications and not doc.neb_website_specifications:
         return
 
-    original_website_specifications_dict = {spec.label: {"description": spec.description, "sort_order": spec.sort_order} for spec in original_website_specifications} if original_website_specifications else {}
-    current_website_specifications = {spec.label: {"description": spec.description, "sort_order": spec.sort_order} for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
+    original_website_specifications_dict = {spec.label: {"description": spec.description} for spec in original_website_specifications} if original_website_specifications else {}
+    current_website_specifications = {spec.label: {"description": spec.description} for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
 
     # Check for removed/updated website specifications
     removed_website_specifications = []
     for old_label, old_description in original_website_specifications_dict.items():
         found = False
         for current_label, current_description in current_website_specifications.items():
-            if old_label == current_label and old_description["description"] == current_description["description"] and old_description["sort_order"] == current_description["sort_order"]:
+            if old_label == current_label and old_description["description"] == current_description["description"]:
                 found = True
                 break
 
@@ -84,7 +84,7 @@ def sync_website_specifications(doc):
     for current_label, current_description in current_website_specifications.items():
         found = False
         for old_label, old_description in original_website_specifications_dict.items():
-            if old_label == current_label and old_description["description"] == current_description["description"] and old_description["sort_order"] == current_description["sort_order"]:
+            if old_label == current_label and old_description["description"] == current_description["description"]:
                 found = True
                 break
 
@@ -106,7 +106,6 @@ def sync_website_specifications(doc):
                     website_spec.label = spec.label
                     website_spec.description = spec.description
                     website_spec.mandatory = spec.mandatory
-                    website_spec.sort_order = spec.sort_order
                     website_spec.parent = website_item.name
                     website_spec.parenttype = website_item.doctype
                     website_spec.parentfield = "neb_website_specifications"
