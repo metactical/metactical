@@ -158,6 +158,14 @@ class CanadaPost():
 		pickup_date = datetime.strftime(doc.pickup_date, "%Y%m%d")
 		context.pickup_date = pickup_date
 		context.group_id = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{pickup_date}'
+		context.options = []
+
+		if doc.custom_ais_require_signature:
+			context.options.append('SO')
+
+		if doc.custom_ais_do_not_safe_drop:
+			context.options.append('DNS')
+
 		for parcel in context.doc.shipment_parcel:
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
