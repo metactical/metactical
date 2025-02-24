@@ -30,7 +30,7 @@ def receive_pos_data(*args, **kwargs):
                 sales_order=sales_order
             )
                 
-        frappe.response["Status"] = 200
+        frappe.response["Status"] = "200"
         frappe.response["InvoiceId"] = sales_order
         frappe.response["Message"] = []
     
@@ -38,7 +38,7 @@ def receive_pos_data(*args, **kwargs):
         frappe.log_error(title="pos_data", message=form_data)
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
         frappe.clear_last_message()
-        frappe.response["Status"] = 500
+        frappe.response["Status"] = "500"
         frappe.response["Message"] = [str(e)]
         frappe.response["InvoiceId"] = None
            
