@@ -88,5 +88,14 @@
             </sku-list>
         </customs>
         {% endif %}
+		{% if options and options|length > 0 %}
+		<options>
+			{% for option in options %}
+			<option>
+				<option-code>{{ option }}</option-code>
+			</option>
+			{% endfor %}
+		</options>
+		{% endif %}
     </delivery-spec>
 </shipment>

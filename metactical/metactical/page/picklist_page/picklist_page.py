@@ -147,19 +147,21 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 			if item.is_product_bundle == 1:
 				bundled_items = frappe.db.sql("""
 								SELECT
-								  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
-								  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
-								  	bin.actual_qty, 1 AS is_product_bundle_item
+									bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
+									item.item_name, item.image, item.ifw_location AS locations, 
+									bundle_item.qty * %(item_qty)s AS qty,
+									bin.actual_qty, 1 AS is_product_bundle_item
 								FROM
 									`tabProduct Bundle Item` AS bundle_item
 								LEFT JOIN
-								  	`tabItem` AS item ON item.name = bundle_item.item_code
+									`tabItem` AS item ON item.name = bundle_item.item_code
 								LEFT JOIN
 									`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
 								WHERE
 									bundle_item.parent = %(bundle)s
 								ORDER BY item.ifw_location
-								""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
+								""", {"bundle": item.item_code, "pick_list": pick_list, 
+			  						"warehouse": warehouse, "item_qty": item.qty}, as_dict=1)
 				items.remove(item)
 				items.extend(bundled_items)
 		
