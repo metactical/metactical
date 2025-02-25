@@ -7,22 +7,22 @@ from frappe.utils import file_lock, now_datetime, get_url
 
 @frappe.whitelist(allow_guest=True)
 def receive_pos_data(*args, **kwargs):
-    form_data = frappe.form_dict
-
+    form_data = dict(frappe.form_dict)
+    
     try:        
         # Do something with the data
         customer = get_customer(form_data)
         sales_order = create_sales_order(form_data, customer)
-        
+                
         if sales_order:
             frappe.enqueue(
                 submit_sales_order,
                 queue="default", # one of short, default, long
-                form_data=form_data,
                 at_front=True,
+                form_data=form_data,
                 sales_order=sales_order
             )
-                        
+                                    
             frappe.enqueue(
                 create_comments,
                 queue="default", # one of short, default, long
@@ -33,7 +33,7 @@ def receive_pos_data(*args, **kwargs):
         frappe.response["Status"] = "200"
         frappe.response["InvoiceId"] = sales_order
         frappe.response["Message"] = []
-    
+            
     except Exception as e:
         frappe.log_error(title="pos_data", message=form_data)
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
@@ -60,18 +60,24 @@ def create_sales_order(form_data, customer):
     taxes = get_taxes(form_data)
     so_data.update({'taxes': taxes})
     
+    frappe.set_user(form_data['SalesPerson'])
+    
     sales_order = frappe.get_doc(so_data)
     sales_order.insert()
     frappe.db.commit()
+    
+    frappe.set_user("Administrator")
         
     return sales_order.name
 
 def submit_sales_order(sales_order, form_data):
+    frappe.set_user(form_data["SalesPerson"])
     try:
         sales_order = frappe.get_doc('Sales Order', sales_order)
         sales_order.submit()    
         frappe.db.commit()    
     except Exception as e:
+        frappe.set_user("Administrator")
         frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
@@ -83,6 +89,7 @@ def submit_sales_order(sales_order, form_data):
         sales_invoice = create_invoice(sales_order, form_data)
         frappe.db.commit()
     except Exception as e:
+        frappe.set_user("Administrator")
         frappe.log_error(title='Create Invoice Error', message=frappe.get_traceback())
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
@@ -91,8 +98,8 @@ def submit_sales_order(sales_order, form_data):
     
     if sales_invoice:
         queue_action(sales_invoice, 'submit')
+        frappe.set_user("Administrator")
 
-    
 def create_comments(sales_order, form_data):
     comments = get_comments(form_data)
     for comment in comments:
@@ -111,10 +118,12 @@ def create_invoice(sales_order, form_data):
     sales_invoice = make_sales_invoice(sales_order.name)
     sales_invoice.is_pos = 1
     sales_invoice.pos_profile = form_data['POSProfile'] + ' Operators'
+    frappe.set_user(form_data['SalesPerson'])
     payments = get_payments(form_data)
     sales_invoice.update({'payments': payments})
     sales_invoice.save()
-    
+
+    frappe.set_user("Administrator")    
     return sales_invoice
     
 def get_taxes(form_data):  
