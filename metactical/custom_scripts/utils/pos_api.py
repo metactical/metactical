@@ -9,6 +9,14 @@ from frappe.utils import file_lock, now_datetime, get_url
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
     
+    user_validation = validate_users(form_data)
+    if not user_validation["success"]:
+        frappe.response["Status"] = "500"
+        frappe.response["Message"] = [user_validation["error"]]
+        frappe.response["InvoiceId"] = None
+        frappe.response["Total"] = 0.0
+        return
+        
     try:        
         # Do something with the data
         customer = get_customer(form_data)
@@ -20,19 +28,20 @@ def receive_pos_data(*args, **kwargs):
                 queue="default", # one of short, default, long
                 at_front=True,
                 form_data=form_data,
-                sales_order=sales_order
+                sales_order=sales_order.name
             )
                                     
             frappe.enqueue(
                 create_comments,
                 queue="default", # one of short, default, long
                 form_data=form_data,
-                sales_order=sales_order
+                sales_order=sales_order.name
             )
                 
         frappe.response["Status"] = "200"
-        frappe.response["InvoiceId"] = sales_order
+        frappe.response["InvoiceId"] = sales_order.name
         frappe.response["Message"] = []
+        frappe.response["Total"] = float(sales_order.grand_total)
             
     except Exception as e:
         frappe.log_error(title="pos_data", message=form_data)
@@ -41,7 +50,52 @@ def receive_pos_data(*args, **kwargs):
         frappe.response["Status"] = "500"
         frappe.response["Message"] = [str(e)]
         frappe.response["InvoiceId"] = None
-           
+        frappe.response["Total"] = 0.0
+        
+def validate_users(form_data):
+    # Check if SalesPerson exists
+    if "SalesPerson" not in form_data:
+        return {"error": "SalesPerson is required", "success": False}
+    else:
+        if not frappe.db.exists('User', form_data['SalesPerson']):
+            return {"error": "User {0} does not exist".format(form_data['SalesPerson']), "success": False} 
+    
+    approvers = form_data["ApprovalList"]
+    pos_profile = form_data["POSProfile"] + ' Operators'
+    
+    if not frappe.db.exists('POS Profile', pos_profile):
+        return {"error": "POS Profile {0} does not exist".format(pos_profile), "success": False}
+
+    # get all users that are allowed to use the POS Profile
+    pos_profile_users = frappe.get_doc('POS Profile', pos_profile).applicable_for_users
+    users = {}
+    
+    for user in pos_profile_users:
+        users[user.user] = {
+            "ifw_is_main_pos_user": user.ifw_is_main_pos_user,
+            "ifw_max_discount_percent": user.ifw_max_discount_percent,
+        }
+        
+    if form_data["SalesPerson"] not in users:
+        return {"error": "User {0} is not allowed to make POS transactions for {1} profile".format(form_data["SalesPerson"], pos_profile), "success": False}
+        
+    # Check if approvers list is availble in the incoming api request
+    if "ApprovalList" not in form_data:
+        return {"success": True}   
+
+    for approver in approvers:
+        approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name')
+        if approver not in users:
+            return {"error": "User {0} is not allowed to approve POS transactions".format(approver), "success": False}
+        else:
+            if not users[approver]["ifw_is_main_pos_user"]:
+                return {"error": "User {0} is not allowed to approve Discounts in POS transactions for {1} profile".format(approver, pos_profile), "success": False}
+            if users[approver]["ifw_max_discount_percent"] < form_data['OverallDiscount']:
+                return {"error": "User {0} is not allowed to approve POS transactions with discount greater than {1}%".format(approver, users[approver]["ifw_max_discount_percent"]), "success": False}
+            
+    return {"success": True}
+                
+                   
 def create_sales_order(form_data, customer):
     items = form_data['Items']
     taxes = form_data['Taxes']
@@ -52,6 +106,8 @@ def create_sales_order(form_data, customer):
         'taxes_and_charges': form_data['TaxesAndChargesTemplate'],
         'delivery_date': frappe.utils.today(),
         'source': form_data['LeadSource'],
+        'additional_discount_percentage': form_data['OverallDiscount'],
+        "owner": form_data['SalesPerson'],
     }
     
     items = get_items(form_data)
@@ -59,16 +115,14 @@ def create_sales_order(form_data, customer):
     
     taxes = get_taxes(form_data)
     so_data.update({'taxes': taxes})
-    
+        
     frappe.set_user(form_data['SalesPerson'])
-    
     sales_order = frappe.get_doc(so_data)
     sales_order.insert()
-    frappe.db.commit()
-    
     frappe.set_user("Administrator")
-        
-    return sales_order.name
+    frappe.db.commit()
+            
+    return sales_order
 
 def submit_sales_order(sales_order, form_data):
     frappe.set_user(form_data["SalesPerson"])
@@ -82,6 +136,9 @@ def submit_sales_order(sales_order, form_data):
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
+        
+        add_payment_info_to_sales_order(sales_order, form_data)
+
         return
     
     sales_invoice = None
@@ -94,24 +151,49 @@ def submit_sales_order(sales_order, form_data):
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
+        
+        add_payment_info_to_sales_order(sales_order, form_data)
+
         return
     
     if sales_invoice:
         queue_action(sales_invoice, 'submit')
         frappe.set_user("Administrator")
 
+def add_payment_info_to_sales_order(sales_order, form_data):
+    if "Payment" not in form_data:
+        return
+    
+    message = ""
+    for payment in form_data['Payment']:
+        message += "Payment of <b>$ {0}</b> made using <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
+        
+    if message:
+        frappe.get_doc({
+            'doctype': 'Comment',
+            'comment_by': form_data['SalesPerson'],
+            'content': message,
+            'reference_doctype': 'Sales Order',
+            "comment_type": "Comment",
+            'reference_name': sales_order.name,
+        }).save(ignore_permissions=True)
+
 def create_comments(sales_order, form_data):
     comments = get_comments(form_data)
     for comment in comments:
+        commentor = frappe.db.get_value('User', {'full_name': comment['comment_by']}, 'email')
+        frappe.set_user(commentor)
         frappe.get_doc({
             'doctype': 'Comment',
+            'comment_email': commentor,
             'comment_by': comment['comment_by'],
             'content': comment['comment'],
             'reference_doctype': 'Sales Order',
             "comment_type": "Comment",
             'reference_name': sales_order,
-        }).insert()
+        }).save(ignore_permissions=True)
     
+    frappe.set_user("Administrator")
     frappe.db.commit()
     
 def create_invoice(sales_order, form_data):
@@ -152,6 +234,7 @@ def get_items(form_data):
             'item_code': item_code,
             'rate': rate,
             'qty': qty,
+            'discount_percentage': item['Discount'],
             'warehouse': 'W01-WHS-Active Stock - ICL',
         })
         
@@ -174,8 +257,8 @@ def get_customer(form_data):
         'last_name': form_data['Customer']['Name'].split(' ')[1],
         'customer_name': form_data['Customer']['Name'],
         'territory': 'All Territories',
-        'default_price_list': form_data['PriceList'],
-        'default_currency': frappe.db.get_value("Price List", form_data['PriceList'], 'currency'),
+        'default_price_list': form_data['PriceList'] if "PriceList" in form_data else "",
+        'default_currency': frappe.db.get_value("Price List", form_data['PriceList'], 'currency') if "PriceList" in form_data else "",
         'customer_type': 'Individual',
     })
         
@@ -196,8 +279,8 @@ def get_comments(form_data):
     comments = []
     for comment in form_data['Comments']:
         comments.append({
-            'comment_by': comment['UserId'],
-            'comment': comment['Text'],
+            'comment_by': comment['UserId'] if comment['UserId'] else 'Administrator',
+            'comment': comment['Text'] if comment['Text'] else 'No Comment',
         })
         
     return comments
