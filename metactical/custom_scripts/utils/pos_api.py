@@ -9,14 +9,14 @@ from frappe.utils import file_lock, now_datetime, get_url
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
     
-    user_validation = validate_approvals(form_data)
+    user_validation = validate_users(form_data)
     if not user_validation["success"]:
         frappe.response["Status"] = "500"
         frappe.response["Message"] = [user_validation["error"]]
         frappe.response["InvoiceId"] = None
         frappe.response["Total"] = 0.0
         return
-    
+        
     try:        
         # Do something with the data
         customer = get_customer(form_data)
@@ -52,15 +52,21 @@ def receive_pos_data(*args, **kwargs):
         frappe.response["InvoiceId"] = None
         frappe.response["Total"] = 0.0
         
-def validate_approvals(form_data):
-    if "ApprovalList" not in form_data:
-        return {"success": True}    
+def validate_users(form_data):
+    # Check if SalesPerson exists
+    if "SalesPerson" not in form_data:
+        return {"error": "SalesPerson is required", "success": False}
+    else:
+        if not frappe.db.exists('User', form_data['SalesPerson']):
+            return {"error": "User {0} does not exist".format(form_data['SalesPerson']), "success": False} 
     
     approvers = form_data["ApprovalList"]
     pos_profile = form_data["POSProfile"] + ' Operators'
+    
     if not frappe.db.exists('POS Profile', pos_profile):
         return {"error": "POS Profile {0} does not exist".format(pos_profile), "success": False}
-    
+
+    # get all users that are allowed to use the POS Profile
     pos_profile_users = frappe.get_doc('POS Profile', pos_profile).applicable_for_users
     users = {}
     
@@ -70,6 +76,13 @@ def validate_approvals(form_data):
             "ifw_max_discount_percent": user.ifw_max_discount_percent,
         }
         
+    if form_data["SalesPerson"] not in users:
+        return {"error": "User {0} is not allowed to make POS transactions for {1} profile".format(form_data["SalesPerson"], pos_profile), "success": False}
+        
+    # Check if approvers list is availble in the incoming api request
+    if "ApprovalList" not in form_data:
+        return {"success": True}   
+
     for approver in approvers:
         approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name')
         if approver not in users:
@@ -121,10 +134,11 @@ def submit_sales_order(sales_order, form_data):
         frappe.set_user("Administrator")
         frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
-        
-        add_payment_info_to_sales_order(sales_order, form_data)
         message = "Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
+        
+        add_payment_info_to_sales_order(sales_order, form_data)
+
         return
     
     sales_invoice = None
@@ -134,10 +148,12 @@ def submit_sales_order(sales_order, form_data):
     except Exception as e:
         frappe.set_user("Administrator")
         frappe.log_error(title='Create Invoice Error', message=frappe.get_traceback())
-        add_payment_info_to_sales_order(sales_order, form_data)
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
+        
+        add_payment_info_to_sales_order(sales_order, form_data)
+
         return
     
     if sales_invoice:
