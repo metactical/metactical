@@ -47,7 +47,9 @@ doctype_js = {
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
-	"Warehouse": "custom_scripts/warehouse/warehouse.js"
+	"Warehouse": "custom_scripts/warehouse/warehouse.js",
+	"Contact": "custom_scripts/contact/contact.js",
+	"Item": "custom_scripts/item/item.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -168,7 +170,8 @@ override_doctype_class = {
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
-	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport"
+	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
+	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 }
 
 # Scheduled Tasks
