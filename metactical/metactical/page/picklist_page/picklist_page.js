@@ -951,10 +951,11 @@ class PicklistPage{
 					}else{
 						me.item_barcode.set_value("");
 						frappe.utils.play_sound("error");
-						frappe.show_alert({
-							message: __("No items found. Scan barcode again."),
-							indicator: 'orange'
-						});
+						frappe.msgprint("No items found. Please scan barcode again.", "Wrong Barcode")
+						// frappe.show_alert({
+						// 	message: __("No items found. Scan barcode again."),
+						// 	indicator: 'orange'
+						// });
 					}
 				}
 			}
