@@ -17,21 +17,11 @@ from metactical.metactical.doctype.item_inventory_output.item_inventory_output i
 from frappe.model.docstatus import DocStatus
 from metactical.custom_scripts.utils.metactical_utils import ( 
 	queue_action, 
-	format_json_for_html, 
-	create_usaepay_log,
 	check_si_payment_status_for_so
 )
 from metactical.custom_scripts.usaepay.usaepay_api import (
 	process_credit_card_tokens
 )
-
-from metactical.custom_scripts.usaepay.usaepay_api import (
-		get_transaction_from_usaepay, 
-		get_token_hash, 
-		create_refund, 
-		get_card_token, 
-		adjust_amount
-	)
 
 class SalesOrderCustom(SalesOrder):
 	def save(self):
