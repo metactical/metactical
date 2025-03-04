@@ -36,7 +36,7 @@ def get_data(filters):
 	items = frappe.db.sql(f"""
 		SELECT
 			`tabItem`.item_code, 
-   			tabBin.actual_qty - tabBin.reserved_qty as quantity,
+   			sum(tabBin.actual_qty - tabBin.reserved_qty) as quantity,
 			`tabItem Price`.price_list_rate as rate,
 			`tabItem`.item_name,
 			`tabItem`.brand
@@ -53,6 +53,8 @@ def get_data(filters):
 			`tabItem`.has_variants = 0 and
 			`tabItem`.is_stock_item = 1 and
 			tabBin.actual_qty - tabBin.reserved_qty > 0
+		Group by 
+			`tabItem`.item_code
 	""", as_dict=1)
  
  
