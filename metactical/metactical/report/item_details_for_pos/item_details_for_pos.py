@@ -11,7 +11,7 @@ def execute(filters=None):
 	return columns, data
 
 def get_data(filters):
-	pos_profile = frappe.db.get_value("POS Profile", filters.get("pos_profile"), ["ifw_default_lead_source", "selling_price_list"], as_dict=True)
+	pos_profile = frappe.db.get_value("POS Profile", filters.get("pos_profile"), ["ifw_default_lead_source", "selling_price_list", "name"], as_dict=True)
 	price_list = pos_profile.selling_price_list
  
 	if not pos_profile.ifw_default_lead_source:
@@ -92,6 +92,7 @@ def get_data(filters):
 		item.barcodes = ", ".join([barcode[0] for barcode in barcodes]) if barcodes else ""
   
 		data.append({
+			"branch": pos_profile.name,
 			"product": item.item_code,
 			"quantity": item.quantity,
 			"price": item.rate,
