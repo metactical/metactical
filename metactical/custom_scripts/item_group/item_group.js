@@ -36,7 +36,7 @@ frappe.ui.form.on("Item Group", {
 
 function copy_specs(item_group, overwrite, add_missing_labels, sync_to_websites) {
     frappe.call({
-        method: "metactical.custom_scripts.item_group.item_group.copy_specification_from_item_group",
+        method: "metactical.custom_scripts.item_group.item_group.copy_specifications_to_items",
         args: {
             item_group: item_group,
             overwrite: overwrite,

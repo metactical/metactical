@@ -3,7 +3,7 @@ from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 
 
 @frappe.whitelist()
-def copy_specification_from_item_group(item_group, overwrite, add_missing_labels, sync_to_websites):
+def copy_specifications_to_items(item_group, overwrite, add_missing_labels, sync_to_websites):
     chunk_size = 2500
     start = 0
     webhook = frappe.get_doc("Webhook", {"webhook_doctype": "Item", "enabled": 1, "webhook_docevent": "on_update"})
@@ -38,7 +38,7 @@ def copy_specification_from_item_group(item_group, overwrite, add_missing_labels
                 start = start + chunk_size
                 
     except Exception as e:
-        frappe.log_error(title="Error in copy_specification_from_item_group", message=frappe.get_traceback())
+        frappe.log_error(title="Error in copy_specifications_to_items", message=frappe.get_traceback())
         frappe.msgprint(f"Error: {e}")    
 
 def process_item_specifications(items, web_spec_labels, overwrite, add_missing_labels, webhook, sync_to_websites):
