@@ -7,7 +7,11 @@ def copy_specifications_to_items(item_group, overwrite, add_missing_labels, sync
     chunk_size = 2500
     start = 0        
     webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "enabled": 1, "webhook_docevent": "on_update"})
-    
+    if webhook:
+        webhook = frappe.get_doc("Webhook", webhook)
+    else:
+        webhook = None
+        
     # Get a batch of items
     # Fetch specifications only once per batch
     web_spec_labels = frappe.get_doc('Item Group', item_group).get('neb_website_specifications')
@@ -105,10 +109,7 @@ def insert_web_specification(item_code, spec):
 def trigger_item_update(item_code, webhook):
     if webhook:
         
-        item = frappe.get_doc('Item', item_code)
-        webhook = frappe.get_doc('Webhook', webhook)
-        
-        print(f"Item {item_code} updated. Triggering webhook {webhook.name}...")
+        item = frappe.get_doc('Item', item_code)        
         enqueue_webhook(item, webhook)
         
 def update_website_items(item_code):
