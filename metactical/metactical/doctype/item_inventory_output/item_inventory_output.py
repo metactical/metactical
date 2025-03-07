@@ -1,6 +1,7 @@
 # Copyright (c) 2024, Techlift Technologies and contributors
 # For license information, please see license.txt
 
+import sys
 import frappe
 from frappe.model.document import Document
 import time
@@ -22,6 +23,22 @@ def on_sle_update(doc, method):
 
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
 
+	# Check if the item is a product bundle
+	product_bundle_parents = is_product_bundle_item(doc.item_code)
+	if product_bundle_parents:
+		for parent_item in product_bundle_parents:
+			all_bins = get_all_bins(parent_item)
+			net_available_bins = {}
+			for bin in all_bins:
+				if bin.warehouse == doc.warehouse and doc.voucher_type != 'Stock Reconciliation':
+					net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty + doc.actual_qty
+				elif bin.warehouse == doc.warehouse and doc.voucher_type == 'Stock Reconciliation':
+					net_available_bins[bin.warehouse] = doc.qty_after_transaction - bin.reserved_qty
+				else:
+					net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
+
+			frappe.enqueue(update_item_inventory_output, item_code=parent_item, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, queue='default')
+	
 def get_all_bins(item_code):
 	all_bins = frappe.get_all(
 		'Bin', 
@@ -109,7 +126,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 				item_inventory_output.insert()
 				frappe.db.commit()
 
-			except frappe.DuplicateEntryError:
+			except Exception as e:
 				item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'item_code': item_code})
 				if item_inventory_output_doc:
 					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
@@ -128,6 +145,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 	except Exception as e:
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
+  
 
 def update_doc(docname, total_available_qty, data, item_code, voucher_type, round=0):
 	try:
@@ -146,5 +164,18 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 			item_inventory_output.insert()
 			frappe.db.commit()
 		else:
-			time.sleep(3)
+			sys.stdout.flush()
+			time.sleep(2)
 			update_doc(docname, total_available_qty, data, item_code, voucher_type, round+1)
+
+def is_product_bundle_item(item_code):
+	product_bundle_items = frappe.get_all(
+		'Product Bundle Item',
+		filters={'item_code': item_code},
+		fields=['name', 'parent']
+	)
+	
+	if not product_bundle_items:
+		return None
+	
+	return list(set([x.parent for x in product_bundle_items]))
