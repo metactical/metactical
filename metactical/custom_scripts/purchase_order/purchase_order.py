@@ -38,7 +38,20 @@ class CustomPurchaseOrder(PurchaseOrder):
 				self.set_onload("ais_allow_tax_edit", True)
 			else:
 				self.set_onload("ais_allow_tax_edit", False)
-
+    
+	def validate(self):
+		super(CustomPurchaseOrder, self).validate()
+		self.set_missing_barcodes()
+        
+	def set_missing_barcodes(self):
+		for item in self.items:
+			if not item.barcode:
+				barcode = frappe.db.get_value("Item Barcode", {"parent": item.item_code}, "barcode")
+				if barcode:	
+					item.barcode = barcode
+				else:
+					frappe.msgprint(_("Barcode is not set for item {0}").format(item.item_code))
+        
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def shipping_address_query(doctype, txt, searchfield, start, page_len, filters):
