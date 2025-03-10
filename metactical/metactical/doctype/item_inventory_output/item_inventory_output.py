@@ -5,6 +5,7 @@ import frappe
 import sys, time
 from frappe.model.document import Document
 import time
+from collections import defaultdict
 
 class ItemInventoryOutput(Document):
 	pass
@@ -20,7 +21,7 @@ def on_sle_update(doc, method):
 			net_available_bins[bin.warehouse] = doc.qty_after_transaction - bin.reserved_qty
 		else:
 			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
-
+	
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
 
 def get_all_bins(item_code):
@@ -39,8 +40,48 @@ def get_all_bins(item_code):
 	all_bins.extend(other_active_warehouse_bins)
 
 	return all_bins
+
+def get_all_bins_for_product_bundle(parent_item):
+	bundle = frappe.get_doc('Product Bundle', parent_item)
+	bundle_items = {x.item_code: x.qty for x in bundle.items}  # Store item qty per bundle unit
+
+	all_bins = frappe.get_all(
+		'Bin', 
+		filters={'item_code': ["in", list(bundle_items.keys())], "warehouse": ["like", "%active stock%"]}, 
+		fields=["warehouse", "item_code", "actual_qty", "reserved_qty"]
+	)
+
+	other_active_warehouse_bins = frappe.get_all(
+		'Bin', 
+		filters={'item_code': ["in", list(bundle_items.keys())], "warehouse": ["like", "%activestock%"]}, 
+		fields=["warehouse", "item_code", "actual_qty", "reserved_qty"]
+	)
+
+	all_bins.extend(other_active_warehouse_bins)
+
+	# Dictionary to store available quantity of each item per warehouse
+	warehouse_item_qty = defaultdict(lambda: defaultdict(int))
+
+	for bin_entry in all_bins:
+		warehouse = bin_entry["warehouse"]
+		item_code = bin_entry["item_code"]
+		available_qty = bin_entry["actual_qty"] - bin_entry["reserved_qty"]
+		warehouse_item_qty[warehouse][item_code] += available_qty 
+
+	# Calculate the total available quantity of the bundle per warehouse
+	warehouse_bundle_qty = {}
+ 
+	for warehouse, item_qtys in warehouse_item_qty.items():
+		min_bundle_qty = float("inf")  # Find the limiting factor
+		for item_code, qty in item_qtys.items():
+			if item_code in bundle_items:  # Ensure item belongs to the bundle
+				min_bundle_qty = min(min_bundle_qty, qty // bundle_items[item_code])
+
+		warehouse_bundle_qty[warehouse] = min_bundle_qty 
+
+	return warehouse_bundle_qty  # Returns a dict {warehouse_name: available_bundle_qty}
 	
-def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None):
+def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False):
 	if not voucher_type:
 		voucher_type = 'Sales Order'
 
@@ -52,11 +93,12 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			pluck="price_list"
 		)
 
-		maintain_stock = frappe.db.get_value('Item', item_code, 'is_stock_item')
-		if not maintain_stock:
-			return
+		if not bundle:
+			maintain_stock = frappe.db.get_value('Item', item_code, 'is_stock_item')
+			if not maintain_stock:
+				return
 
-		if not net_available_bins:
+		if not net_available_bins and not bundle:
 			all_bins = get_all_bins(item_code)
 			net_available_bins = frappe._dict({x.warehouse: x.actual_qty - x.reserved_qty for x in all_bins})
 
@@ -110,7 +152,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 				item_inventory_output.insert()
 				frappe.db.commit()
 
-			except frappe.DuplicateEntryError:
+			except Exception as e:
 				item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'item_code': item_code})
 				if item_inventory_output_doc:
 					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
@@ -126,10 +168,17 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 				if item_inventory_output_doc:
 					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
 
+		if not bundle:
+			product_bundle_parents = is_product_bundle_item(item_code)
+			if product_bundle_parents:
+				for parent_item in product_bundle_parents:
+					all_bins = get_all_bins_for_product_bundle(parent_item)
+					update_item_inventory_output(parent_item, all_bins, voucher_type, bundle=True)
+		
 	except Exception as e:
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
-
+  
 def update_doc(docname, total_available_qty, data, item_code, voucher_type, round=0):
 	try:
 		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
@@ -150,3 +199,15 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 			sys.stdout.flush()
 			time.sleep(2)
 			update_doc(docname, total_available_qty, data, item_code, voucher_type, round+1)
+
+def is_product_bundle_item(item_code):
+	product_bundle_items = frappe.get_all(
+		'Product Bundle Item',
+		filters={'item_code': item_code},
+		fields=['name', 'parent']
+	)
+	
+	if not product_bundle_items:
+		return None
+	
+	return list(set([x.parent for x in product_bundle_items]))
