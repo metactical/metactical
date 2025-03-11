@@ -550,6 +550,10 @@ def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
 	
 	# Send the data to ShipStation
 	settings = get_settings()
+	
+	if len(settings) == 0:
+		frappe.throw("No shiptation settings found.")
+
 	orders_url = 'https://ssapi.shipstation.com/orders/createorder'
 	try:
 		response = requests.post(
@@ -577,6 +581,10 @@ def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
 				frappe.db.set_value("Address", sales_order.shipping_address_name, "custom_ais_address_verified", verification_status)
 				frappe.db.set_value("Sales Order", sales_order_name, "custom_ais_address_verified", verification_status)
 				frappe.msgprint(f"Shipping Address {verification_status}")
+
+			# Delete the order after the address verification
+			response = requests.delete(f'https://ssapi.shipstation.com/orders/{sorder.get("orderId")}',
+				auth=(settings[0].api_key, settings[0].get_password('api_secret')))
 	except requests.exceptions.HTTPError as e:
 		frappe.log_error(frappe.get_traceback(), "ShipStation Order Creation Error")
 		frappe.throw(f"Failed to create order in ShipStation: {str(e)}")
