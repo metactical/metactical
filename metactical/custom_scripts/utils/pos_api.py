@@ -8,7 +8,7 @@ from frappe.utils import file_lock, now_datetime, get_url
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
-    
+
     user_validation = validate_users(form_data)
     if not user_validation["success"]:
         frappe.response["Status"] = "500"
@@ -303,18 +303,22 @@ def get_customer(form_data):
 def create_contact(form_data, customer):
     frappe.set_user(form_data['SalesPerson'])
     try:
+        phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
         contact_info = {
             'doctype': 'Contact',
             'first_name': form_data['Customer']['Name'].split(' ')[0],
             'last_name': form_data['Customer']['Name'].split(' ')[1] if len(form_data['Customer']['Name'].split(' ')) > 1 else '',
             'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
-            'phone': form_data['Customer']['Phone'] if form_data['Customer']['Phone'] else '',
-            'mobile_no': form_data['Customer']['Phone'] if form_data['Customer']['Phone'] else '',
+            'phone': phone,
+            'mobile_no': phone
         }
         
         contact_info.update({'links': [{'link_doctype': 'Customer', 'link_name': customer.name}]})
-        contact_info.update({'phone_nos': [{'phone': form_data['Customer']['Phone'], 'is_primary_phone': 1, 'is_primary_mobile_no': 1}]})
-        contact_info.update({'email_ids': [{'email_id': form_data['Customer']['Email'], 'is_primary': 1}]})
+        if phone:
+            contact_info.update({'phone_nos': [{'phone': phone, 'is_primary_phone': 1, 'is_primary_mobile_no': 1}]})
+
+        if form_data['Customer']['Email']:
+            contact_info.update({'email_ids': [{'email_id': form_data['Customer']['Email'], 'is_primary': 1}]})
         
         contact = frappe.get_doc(contact_info)
         contact.save(ignore_permissions=True)
