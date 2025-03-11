@@ -49,6 +49,11 @@ frappe.ui.form.on('Sales Order', {
 			frm.add_custom_button(__('To Drop Ship'), () => frm.events.change_to_drop_ship(frm), __('Change'));
 			frm.add_custom_button(__('Warehouse'), () => frm.events.change_warehouse(frm), __('Change'));
 		}
+
+		// For verifying the address with shipstation
+		if(!frm.doc.__islocal){
+			frm.add_custom_button(__("Verify Shipping Address"), () => frm.events.verify_address(frm));
+		}
 		
 		cur_frm.fields_dict["section_break_48"].collapse(0);
 	},
@@ -334,7 +339,20 @@ frappe.ui.form.on('Sales Order', {
 		frm.set_indicator_formatter('item_code',
 			function(doc) { return (doc.actual_qty>=doc.qty) ? "green" : "red" }
 		);
-    }
+    },
+
+	verify_address(frm) {
+		frappe.call({
+			method: "metactical.api.shipstation.verify_shipping_address",
+			args: {
+				"sales_order_name": frm.doc.name
+			},
+			freeze: true,
+			callback: function(ret){
+				frm.refresh_field("custom_ais_address_verified");
+			}
+		});
+	}
 });
 frappe.ui.form.on("Sales Order Item", {
 	delivered_by_supplier: function(frm, cdt, cdn){
