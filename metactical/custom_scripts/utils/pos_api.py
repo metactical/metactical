@@ -5,7 +5,7 @@ from metactical.custom_scripts.utils.metactical_utils import (
 )
 from frappe.utils import file_lock, now_datetime, get_url
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
     
