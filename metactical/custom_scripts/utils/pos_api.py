@@ -8,6 +8,7 @@ from frappe.utils import file_lock, now_datetime, get_url
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
+    frappe.log_error("POS Data", form_data)
 
     user_validation = validate_users(form_data)
     if not user_validation["success"]:
@@ -267,7 +268,7 @@ def get_items(form_data):
         item_code = item['ItemCode']
         rate = item['Rate']
         qty = item['Qty']
-        item_name = item['ItemName']
+        item_name = item['ItemName'] if 'ItemName' in item else ''
         
         item_info = {
             'item_code': item_code,
