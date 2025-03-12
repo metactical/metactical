@@ -22,8 +22,10 @@
 			</div>
 			<div class="col-md-3 packing-page-card">
 			  <section class="box packed-items">
-				<h4 class="section-title packed-items-count cursor-pointer" @click="showPackedItems">{{
-				  getTotalPackedItems }} Item(s) Packed</h4>
+				<div class="section-title packed-items-count">
+					<h5 class="cursor-pointer" @click="showPackedItems"> Item(s) Packed: <b>{{ getTotalPackedItems }}</b></h5>
+					<p> Items for Packing: {{ getTotalPackingItems }}</p>
+				</div>
 				<div class="section-wrapper">
 				  <packed-item @revertItem="revertItem" v-for="item in packed_items" :key="item.name"
 					:item="item"></packed-item>
@@ -81,6 +83,9 @@
 	  },
 	  getTotalPackedItems() {
 		return Object.values(this.all_packed_items).flat().reduce((total, item) => total + item.qty, 0);
+	  },
+	  getTotalPackingItems() {
+		return this.packed_items.reduce((total, item) => total + item.qty, 0);
 	  },
 	},
 	methods: {
@@ -292,10 +297,10 @@
 		  title: "Shipment Parcel",
 		  fields: [
 			{ fieldname: "parcel_template", fieldtype: "Link", options: "Shipment Parcel Template", label: "Parcel Template", onchange: () => this.updateParcelTemplate(dialog) },
-			{ fieldname: "gross_weight_pkg", label: "Box Gross Weight", fieldtype: "Float", reqd: 1 },
-			{ fieldname: "height", label: "Box Height", fieldtype: "Float", reqd: 1 },
-			{ fieldname: "width", label: "Width", fieldtype: "Float", reqd: 1 },
-			{ fieldname: "length", label: "Length", fieldtype: "Float", reqd: 1 },
+			{ fieldname: "gross_weight_pkg", label: "Box Gross Weight (kg)", fieldtype: "Float", reqd: 1 },
+			{ fieldname: "height", label: "Box Height (cm)", fieldtype: "Float", reqd: 1 },
+			{ fieldname: "width", label: "Width (cm)", fieldtype: "Float", reqd: 1 },
+			{ fieldname: "length", label: "Length (cm)", fieldtype: "Float", reqd: 1 },
 		  ],
 		  primary_action_label: "Pack",
 		  primary_action: (values) => this.saveForm(dialog),
