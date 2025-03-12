@@ -152,6 +152,14 @@ def submit_sales_order(sales_order, form_data):
     except Exception as e:
         frappe.set_user("Administrator")
         frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
+        
+        if type(sales_order) == str:
+            sales_order = frappe.get_doc('Sales Order', sales_order)
+        
+        # add comment to sales order
+        comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}    
+        create_comment(comment, form_data['SalesPerson'], sales_order.name)
+        
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
@@ -167,10 +175,17 @@ def submit_sales_order(sales_order, form_data):
     except Exception as e:
         frappe.set_user("Administrator")
         frappe.log_error(title='Create Invoice Error', message=frappe.get_traceback())
+        
+        # add comment to sales order
+        comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}
+        create_comment(comment, form_data['SalesPerson'], sales_order.name)
+        
+        # post to rocket chat
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
         message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
         
+        # add payment info to sales order
         add_payment_info_to_sales_order(sales_order, form_data)
 
         return
@@ -202,17 +217,20 @@ def create_comments(sales_order, form_data):
     for comment in comments:
         commentor = frappe.db.get_value('User', {'full_name': comment['comment_by']}, 'email')
         frappe.set_user(commentor)
-        frappe.get_doc({
-            'doctype': 'Comment',
-            'comment_email': commentor,
-            'comment_by': comment['comment_by'],
-            'content': comment['comment'],
-            'reference_doctype': 'Sales Order',
-            "comment_type": "Comment",
-            'reference_name': sales_order,
-        }).save(ignore_permissions=True)
-    
+        create_comment(comment, commentor, sales_order)
     frappe.set_user("Administrator")
+    frappe.db.commit()
+    
+def create_comment(comment, commentor, sales_order):
+    frappe.get_doc({
+        'doctype': 'Comment',
+        'comment_email': commentor,
+        'comment_by': comment['comment_by'],
+        'content': comment['comment'],
+        'reference_doctype': 'Sales Order',
+        "comment_type": "Comment",
+        'reference_name': sales_order,
+    }).save(ignore_permissions=True)
     frappe.db.commit()
     
 def create_invoice(sales_order, form_data):
@@ -249,14 +267,20 @@ def get_items(form_data):
         item_code = item['ItemCode']
         rate = item['Rate']
         qty = item['Qty']
+        item_name = item['ItemName']
         
-        items.append({
+        item_info = {
             'item_code': item_code,
             'rate': rate,
             'qty': qty,
             'discount_percentage': item['Discount'],
             'warehouse': 'W01-WHS-Active Stock - ICL',
-        })
+        }
+        
+        if item_code == "2":
+            item_info.update({'item_name': item_name})
+        
+        items.append(item_info)
         
     return items
     
