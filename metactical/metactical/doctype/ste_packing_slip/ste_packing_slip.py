@@ -174,3 +174,46 @@ def item_details(doctype, txt, searchfield, start, page_len, filters):
 		% ("%s", searchfield, "%s", get_match_cond(doctype), "%s", "%s"),
 		((filters or {}).get("stock_entry"), "%%%s%%" % txt, start, page_len),
 	)
+ 
+ 
+def get_item_details_for_print(items):
+	"""
+	Returns item details for print format
+	"""
+	item_details = []
+	item_codes = {}
+	for d in items:
+		if d.item_code not in item_codes:
+			item_codes[d.item_code] = d.as_dict()
+		else:
+			item_codes[d.item_code].qty += d.qty
+ 
+	item_codes_list = list(item_codes.keys())
+	item_codes_tuple = tuple(item_codes_list) if len(item_codes) > 1 else "('{}')".format(item_codes_list[0])
+	selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+ 
+	res = frappe.db.sql(f"""
+		SELECT ifw_retailskusuffix, item_name, ifw_location, item_code,
+		(SELECT barcode FROM `tabItem Barcode` WHERE parent = item_code ORDER BY idx LIMIT 1) AS barcode,
+		(Select price_list_rate from `tabItem Price` where item_code = item_code and price_list = '{selling_price_list}' order by creation desc limit 1) as item_price
+		FROM `tabItem` 
+		WHERE item_code IN {item_codes_tuple}
+	""", as_dict=True)
+	
+	for d in res:
+		item = item_codes[d.item_code]
+		item_details.append({
+			"item_code": d.item_code,
+			"item_name": d.item_name,
+			"barcode": d.barcode,
+			"qty": item.qty,
+			"item_price": d.item_price,
+			"ifw_retailskusuffix": d.ifw_retailskusuffix,
+			"ifw_location": d.ifw_location
+		})
+ 
+	return item_details
+                     
+                      
+  
+  
