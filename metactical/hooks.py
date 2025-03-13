@@ -274,7 +274,8 @@ jinja = {
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
 		"metactical.barcode_generator.get_barcode_for_print_format",
-		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
+		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info",
+		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 	]
 }
 
