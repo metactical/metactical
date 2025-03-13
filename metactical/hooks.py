@@ -269,13 +269,13 @@ jinja = {
 		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",
-		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
 		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info",
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
+		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
 	]
 }
 
