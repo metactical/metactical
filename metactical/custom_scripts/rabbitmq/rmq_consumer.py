@@ -340,7 +340,6 @@ class RMQConsumer(object):
     def process_message(self, message):
         # Retrieve the RabbitMQ Mapping doctype
         connect_to_frappe(self.site)
-        frappe.log_error(title="new_message", message=message)
         mappings = frappe.get_all("RabbitMQ Mapping", fields=["message_type", "method_call"])
         
         # Process the message based on its type
@@ -473,7 +472,7 @@ class ReconnectingRMQConsumer(object):
             reconnect_delay = self._get_reconnect_delay()
             LOGGER.info('Reconnecting after %d seconds', reconnect_delay)
             time.sleep(reconnect_delay)
-            self._consumer = RMQConsumer(self.username, self.password, self.server_ip, self._queue_name)
+            self._consumer = RMQConsumer(self.username, self.password, self.server_ip, self._queue_name, self.site)
 
     def _get_reconnect_delay(self):
         if self._consumer.was_consuming:
