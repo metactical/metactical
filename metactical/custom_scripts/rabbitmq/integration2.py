@@ -10,6 +10,7 @@ import os
 import frappe
 import json
 from metactical.custom_scripts.utils.metactical_utils import post_to_rocket_chat
+import argparse
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -34,7 +35,7 @@ class RMQConsumer(object):
     QUEUE = 'text'
     ROUTING_KEY = 'example.text'
 
-    def __init__(self, username, password, server_ip, queue_name):
+    def __init__(self, username, password, server_ip, queue_name, site):
         """Create a new instance of the consumer class, passing in the AMQP
         URL used to connect to RabbitMQ.
 
@@ -56,6 +57,7 @@ class RMQConsumer(object):
         # for higher consumer throughput
         self._prefetch_count = 1
         self.QUEUE = queue_name
+        self.site = site
 
     def connect(self):
         """This method connects to RabbitMQ, returning the connection handle.
@@ -102,8 +104,8 @@ class RMQConsumer(object):
 
         """
         LOGGER.info('Connection open failed: %s', err)
-        connect_to_frappe()
-        post_to_rocket_chat([], f"RMQ connection open failed: {err}", rmq=True)
+        connect_to_frappe(self.site)
+        post_to_rocket_chat([], f"RMQ connection open failed for site: {self.site} \n Error: {err}", rmq=True)
         self.reconnect()
 
     def on_connection_closed(self, _unused_connection, reason):
@@ -121,8 +123,8 @@ class RMQConsumer(object):
             self._connection.ioloop.stop()
         else:
             LOGGER.info('Connection closed, reconnect necessary: %s', reason)
-            connect_to_frappe()
-            post_to_rocket_chat([], f"RMQ connection closed: {reason}", rmq=True)
+            connect_to_frappe(self.site)
+            post_to_rocket_chat([], f"RMQ connection closed for site: {self.site} \n Reason: {reason}", rmq=True)
             self.reconnect()
 
     def reconnect(self):
@@ -272,7 +274,7 @@ class RMQConsumer(object):
         """
         LOGGER.info('QOS set to: %d', self._prefetch_count)
 
-        post_to_rocket_chat([], "RabbitMQ receiver is now running.", rmq=True)
+        post_to_rocket_chat([], f"RabbitMQ receiver is now running for site: {self.site}", rmq=True)
         self.start_consuming()
 
     def start_consuming(self):
@@ -337,7 +339,7 @@ class RMQConsumer(object):
 
     def process_message(self, message):
         # Retrieve the RabbitMQ Mapping doctype
-        connect_to_frappe()
+        connect_to_frappe(self.site)
         frappe.log_error(title="new_message", message=message)
         mappings = frappe.get_all("RabbitMQ Mapping", fields=["message_type", "method_call"])
         
@@ -355,7 +357,7 @@ class RMQConsumer(object):
                     # Log the error in ERPNext logs
                     error_message = f"Error processing RMQ message: {message}\nError: {str(e)}"
                     frappe.log_error(error_message, "RabbitMQ Message Processing Error")
-                    post_to_rocket_chat([], f"Error processing RMQ message: {str(e)}", rmq=True)
+                    post_to_rocket_chat([], f"Error processing RMQ message for site: {self.site} \n Error: {str(e)}", rmq=True)
 
         if not matched:
             error_message = f"No mapping found for message type: {message_type}"
@@ -443,14 +445,15 @@ class ReconnectingRMQConsumer(object):
 
     """
 
-    def __init__(self, queue_name, username, password, server_ip):
+    def __init__(self, queue_name, username, password, server_ip, site):
         self._reconnect_delay = 0
         self._queue_name = queue_name
         self.username = username
         self.password = password
         self._queue_name = queue_name
         self.server_ip = server_ip
-        self._consumer = RMQConsumer(username, password, server_ip, queue_name)
+        self.site = site
+        self._consumer = RMQConsumer(username, password, server_ip, queue_name, site)
 
     def run(self):
         while True:
@@ -460,8 +463,8 @@ class ReconnectingRMQConsumer(object):
                 self._consumer.stop()
                 break
 
-            connect_to_frappe()
-            post_to_rocket_chat([], "RabbitMQ receiver is reconnecting.", rmq=True)
+            connect_to_frappe(self.site)
+            post_to_rocket_chat([], f"RabbitMQ receiver is reconnecting for site: {self.site}", rmq=True)
             self._maybe_reconnect()
 
     def _maybe_reconnect(self):
@@ -482,39 +485,59 @@ class ReconnectingRMQConsumer(object):
         return self._reconnect_delay
 
 
-def connect_to_frappe():
+def connect_to_frappe(site):
     try:
         # # Find the position of the target substring
-        target = "frappe-bench"
+        # Get the current file's path
+        current_file = os.path.abspath(__file__)
+
+        # Extract path up to a specific directory
+        target_dir = "apps"
+        path_parts = current_file.split(os.sep)
+        truncated_path = ""
+
+        if target_dir in path_parts:
+            truncated_path = os.sep.join(path_parts[: path_parts.index(target_dir)])
+        else:
+            print("Directory not found in path")
+            
+        target = truncated_path
         current_path =  os.path.abspath(__file__)
 
         pos = current_path.find(target)
         if pos != -1:
             result = current_path[:pos]+target+"/sites"  # If target found, return the string up to the target
-        else:
-            result = current_path  # If target not found, return the whole string
 
         # Change the current working directory to the site directory
         os.chdir(result)
-        frappe.init(site='deverp.metactical.com')
+
+        frappe.init(site=site)
         frappe.connect()
 
     except Exception as e:
         LOGGER.info(f"Error connecting to Frappe: {str(e)}")
 
-def main():
+def main(site):
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-
-    connect_to_frappe()
+    connect_to_frappe(site)
+    
     # RabbitMQ connection parameters
-    config = frappe.get_doc('RabbitMQ Config')
-
+    try:
+        config = frappe.get_doc('RabbitMQ Config')
+    except Exception as e:
+        LOGGER.info(f"Error getting RMQ config: {str(e)}")
+        return
+    
     username = config.username
     password = config.password
     server_ip = config.server_ip
     queue_name = config.queue_name
-    consumer = ReconnectingRMQConsumer(queue_name, username, password, server_ip)
+    consumer = ReconnectingRMQConsumer(queue_name, username, password, server_ip, site)
     consumer.run()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description="Enter site name to start RMQ consumer")
+    parser.add_argument("site", type=str, help="full site name (eg. test.metactical.com)")
+    
+    args = parser.parse_args()
+    main(args.site)
