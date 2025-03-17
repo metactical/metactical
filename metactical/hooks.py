@@ -47,7 +47,9 @@ doctype_js = {
 	"Delivery Note": "custom_scripts/delivery_note/delivery_note.js",
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
-	"Warehouse": "custom_scripts/warehouse/warehouse.js"
+	"Warehouse": "custom_scripts/warehouse/warehouse.js",
+	"Contact": "custom_scripts/contact/contact.js",
+	"Item": "custom_scripts/item/item.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -55,6 +57,7 @@ doctype_list_js = {
 	"Stock Reconciliation": "custom_scripts/stock_reconciliation/stock_reconciliation_list.js",
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
+	"Pick List": "custom_scripts/pick_list/pick_list_list.js"
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -166,7 +169,9 @@ override_doctype_class = {
 	"Delivery Note": "metactical.custom_scripts.delivery_note.delivery_note.DeliveryNoteCustom",
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
-	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
+	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
+	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 }
 
 # Scheduled Tasks
@@ -193,7 +198,7 @@ scheduler_events = {
 # 	],
 	"cron": {
 		"15 * * * *": [
-			"metactical.custom_scripts.frappe/document.clear_queues_docs"
+			"metactical.custom_scripts.frappe.document.clear_queued_docs"
 		]
 	}
 }
@@ -216,7 +221,6 @@ override_whitelisted_methods = {
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
-	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }

@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "creation": "2024-12-05 14:13:26.793995",
+ "default_view": "List",
+ "description": "Table for Item that will be shown in Web Site",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "label",
+  "mandatory",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "label",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Label",
+   "options": "Website Specification Label",
+   "print_width": "150px",
+   "read_only_depends_on": "eval:parent.doctype == \"Item\";",
+   "width": "150px"
+  },
+  {
+   "depends_on": "eval:parent.doctype != \"Item Group\";",
+   "fetch_from": "description_link.description",
+   "fieldname": "description",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Description",
+   "print_width": "300px",
+   "read_only_depends_on": "eval:parent.doctype == \"Item Group\";"
+  },
+  {
+   "depends_on": "eval:parent.doctype != \"Item Group\";",
+   "fetch_from": "description_link.description",
+   "fieldname": "description",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Description",
+   "print_width": "300px",
+   "read_only_depends_on": "eval:parent.doctype == \"Item Group\";"
+  },
+  {
+   "columns": 2,
+   "default": "0",
+   "fieldname": "mandatory",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Mandatory",
+   "read_only_depends_on": "eval:parent.doctype != \"Item Group\""
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2025-02-20 11:03:20.694919",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "MT Item Website Specification",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -7,6 +7,7 @@ from frappe.utils import get_files_path
 from six import string_types
 import ast
 from PyPDF2 import PdfFileMerger
+from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
 
 
@@ -49,7 +50,15 @@ class CanadaPost():
 		doc.shipment_type = self.get_shipment_type(doc.shipment_type)
 		delivery_address_doc = frappe.get_doc(
 			'Address', doc.delivery_address_name).as_dict()
-		delivery_address_doc.state = get_state_code(delivery_address_doc.state)
+		
+		if len(delivery_address_doc.state) > 2:
+			delivery_address_doc.state = get_state_code(delivery_address_doc.state)
+
+		if delivery_address_doc.pincode is None or delivery_address_doc.pincode == "":
+			frappe.throw(f"Postal code needed in shipping address {delivery_address_doc.name}")
+		else:
+			delivery_address_doc.pincode = delivery_address_doc.pincode.upper()
+
 		pickup_address_doc = frappe.get_doc(
 			'Address', doc.pickup_address_name).as_dict()
 		
@@ -58,6 +67,8 @@ class CanadaPost():
 
 		if pickup_address_doc.pincode is None or pickup_address_doc.pincode == "":
 			frappe.throw(f"Postal code needed in billing address {pickup_address_doc.name}")
+		else:
+			pickup_address_doc.pincode = pickup_address_doc.pincode.upper()
 
 		if len(pickup_address_doc.state) > 2:
 			pickup_address_doc.state = get_state_code(pickup_address_doc.state)
@@ -99,6 +110,11 @@ class CanadaPost():
 			if (parcel.count - exists.get(parcel.name, 0)) < 1:
 				continue
 			context.parcel = parcel
+			context.parcel.weight = round(float(context.parcel.weight), 2)
+			context.parcel.height = round(float(context.parcel.height), 2)
+			context.parcel.length = round(float(context.parcel.length), 2)
+			context.parcel.width = round(float(context.parcel.width), 2)
+
 			body = frappe.render_template(
 				"metactical/utils/shipping/templates/canada_post/request/get_rate.xml", context)
 			response = self.get_response("/rs/ship/price", body, {'Accept': 'application/vnd.cpc.ship.rate-v4+xml',
@@ -146,9 +162,16 @@ class CanadaPost():
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
 			context.parcel.service_name = service_name.get(parcel.name)
-			for c in range(parcel.count - exists.get(parcel.name, 0)):
+			context.parcel.weight = round(float(context.parcel.weight), 2)
+			context.parcel.height = round(float(context.parcel.height), 2)
+			context.parcel.length = round(float(context.parcel.length), 2)
+			context.parcel.width = round(float(context.parcel.width), 2)
+
+			for c in range(parcel.idx - exists.get(parcel.name, 0)):
 				body = frappe.render_template(
 					"metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
+				# temp fix to replae the special character which was causing errors
+				body = body.replace("é", "e")
 				response = self.get_response(
 					f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
 																									   'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
@@ -173,6 +196,7 @@ class CanadaPost():
 				row.db_insert()
 		doc.ais_shipment_status = "Shipped"
 		doc.save()
+		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
 		# Merger PDFs.
 		if files:
 			files = [self.pdf_merge(files, doc).file_url]
@@ -212,11 +236,15 @@ class CanadaPost():
 		context.manifest_doc = doc
 		context.pickup_address_doc = frappe.get_doc("Address", doc.pickup_address)
 		context.pickup_contact_person_doc = frappe.get_doc("User", doc.pickup_contact_person)
-		context.group = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(doc.pickup_date, "%Y%m%d")}'
+		context.groups = self.get_shipments_groups(doc)
+		if not context.groups or len(context.groups) == 0:
+			frappe.throw("Error: There are no shipments that have not been transmitted.")
+
 		context.warehouse_doc = frappe.get_doc('Warehouse', doc.warehouse)
 		context.warehouse_doc.state = get_state_code(context.warehouse_doc.state)
 		body = frappe.render_template(
 			"metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
+		
 		response = self.get_response(
 				f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
 		
@@ -235,7 +263,7 @@ class CanadaPost():
 							manifest_file = self.get_response(
 									mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
 							if manifest_file.status_code == 200:
-								file_name = f"{manifest}.pdf"
+								file_name = f"manifest_{manifest}.pdf"
 								file_path = get_files_path(f"{file_name}", is_private=True)
 								with open(file_path, 'wb') as f:
 									f.write(manifest_file.content)
@@ -260,8 +288,33 @@ class CanadaPost():
 								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 		return shipment_ids, po_number
 							
-	
-	def get_shipment_manifest(shipment="SHIPMENT-00009"):
+	def get_shipments_groups(self, manifest_doc):
+		groups = []
+		pickup_dates = []
+		for row in manifest_doc.items:
+			pickup_date = frappe.db.get_value("Shipment", row.shipment, "pickup_date")
+			if pickup_date not in pickup_dates:
+				if isinstance(pickup_date, str):
+					pickup_date = datetime.strptime(pickup_date, "%Y-%m-%d")
+				groups.append(f'{manifest_doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(pickup_date, "%Y%m%d")}')
+
+		# Get available shipment groups and remove any that aren't available
+		available_groups = self.get_available_groups()
+		groups = [group for group in groups if group in available_groups]
+		return groups
+
+	def get_available_groups(self):
+		available_groups = []
+		response = self.get_response(
+			f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/group", None, 
+			headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
+		
+		for group in response["groups"]["group"]:
+			available_groups.append(group["group-id"])
+		
+		return available_groups
+
+	def get_shipment_manifest(self, shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
 		start_date = datetime.strftime(doc.creation, "%Y%m%d")
 		shipment_id = doc.shipments[0].shipment_id
@@ -336,8 +389,8 @@ class CanadaPost():
 		
 		for groups in response["groups"]["group"]:
 			if isinstance(groups, list):
-				 for group in groups:
-					 all_shipments.append(group["group-id"])
+				for group in groups:
+					all_shipments.append(group["group-id"])
 			else:
 				all_shipments.append(groups["group-id"])
 		for shipment in shipments:
@@ -380,11 +433,13 @@ class CanadaPost():
 		file_doc.insert(ignore_permissions=True)
 		return file_doc
 
-	def avoid_shpment(self, name, shipments_name):
-		if not shipments_name:
-			frappe.throw(_("Please select min one shipment"))
+	def avoid_shpment(self, name, shipments_name=[]):
 		if isinstance(shipments_name, string_types) and shipments_name.startswith('['):
 			shipments_name = ast.literal_eval(shipments_name)
+
+		if len(shipments_name) == 0:
+			frappe.throw(_("Please select min one shipment"))
+		
 		doc = frappe.get_doc('Shipment', name)
 		to_be_remove = []
 		for shipment in doc.get('shipments', {'name': ('in', shipments_name or [])}):
@@ -395,7 +450,10 @@ class CanadaPost():
 				to_be_remove.append(shipment)
 		for row in to_be_remove:
 			doc.remove(row)
-		doc.ais_shipment_status = "Not Shipped"
+
+		if len(doc.shipments) == 0:
+			doc.ais_shipment_status = "Not Shipped"
+
 		doc.save()
 		return doc.as_dict()
 
@@ -449,7 +507,6 @@ class CanadaPost():
 				frappe.throw(
 					res, title=f"Error from Provider Server, Code: {r.status_code}")
 
-
-def get_state_code(state):
-	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
-	return symbol
+def test():
+	cp = CanadaPost()
+	cp.create_manifest(manifest="MF-02-17-2025-235937")

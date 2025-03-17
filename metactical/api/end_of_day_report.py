@@ -16,7 +16,7 @@ def get_us_report_data(date):
 	total_web_pmtd = 0
 
 	sources = frappe.db.get_all("Lead Source", ['name', 'ais_report_label'])	
-	total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data = get_stores_report_data(date, sources)
+	total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data, cash_sales = get_stores_report_data(date, sources)
 			
 	# Get website data
 	for source in sources:
@@ -96,7 +96,8 @@ def get_us_report_data(date):
 		"total_with_tax": total_stores_with_tax, 
 		"total_without_tax": total_stores_without_tax,
 		"total_mtd": total_stores_mtd,
-		"total_pmtd": total_stores_pmtd
+		"total_pmtd": total_stores_pmtd,
+		"cash_sales": cash_sales
 	})
 	data.append({
 		"location": "Total Websites", 
@@ -110,7 +111,8 @@ def get_us_report_data(date):
 		"total_with_tax": total_stores_with_tax + total_web_with_tax,
 		"total_without_tax": total_stores_without_tax + total_web_without_tax,
 		"total_mtd": total_stores_mtd + total_web_mtd,
-		"total_pmtd": total_stores_pmtd + total_web_pmtd
+		"total_pmtd": total_stores_pmtd + total_web_pmtd, 
+		"cash_sales": cash_sales
 	})
 	return data
 
@@ -118,7 +120,7 @@ def get_us_report_data(date):
 @frappe.whitelist()
 def get_franchise_report_data(date):
 	source = frappe.db.get_all("Lead Source", ['name', 'ais_report_label'])
-	total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data = get_stores_report_data(date, source)
+	total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data, total_cash = get_stores_report_data(date, source)
 	
 	# totals row
 	data.append({
@@ -126,18 +128,22 @@ def get_franchise_report_data(date):
 		"total_with_tax": total_stores_with_tax, 
 		"total_without_tax": total_stores_without_tax,
 		"total_mtd": total_stores_mtd,
-		"total_pmtd": total_stores_pmtd
+		"total_pmtd": total_stores_pmtd,
+		"cash_sales": total_cash
 	})
 
 	return data
 
 
 def get_stores_report_data(date, sources):
+	from metactical.metactical.report.end_of_day_report___v4.end_of_day_report___v4 import get_cash_sales
+
 	data = []
 	total_stores_with_tax = 0
 	total_stores_without_tax = 0
 	total_stores_mtd = 0
 	total_stores_pmtd = 0
+	total_cash_sales = 0
 
 	# Get Stores data
 	for source in sources:
@@ -207,7 +213,12 @@ def get_stores_report_data(date, sources):
 				row.update({
 					"total_pmtd": 0.0
 				})
-				
+			
+			cash_sales = get_cash_sales(source.name, date)
+			row.update({
+				"cash_sales": cash_sales
+			})
+			total_cash_sales += cash_sales
 			data.append(row)
 	
-	return total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data
+	return total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data, total_cash_sales

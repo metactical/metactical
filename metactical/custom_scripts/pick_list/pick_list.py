@@ -23,8 +23,23 @@ from frappe import _, msgprint, bold
 from frappe.utils.nestedset import get_descendants_of
 from erpnext.stock.doctype.packed_item.packed_item import is_product_bundle
 import re
+from frappe.model.docstatus import DocStatus
 
 class CustomPickList(PickList):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.locations) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def before_save(self):
 		super(CustomPickList, self).before_save()
 		# Metactical Customization: removed auto location assignement. Will remove the whole
@@ -460,8 +475,7 @@ def create_pick_list(source_name, target_doc=None):
 
 		target.qty = qty_to_be_picked
 		target.stock_qty = qty_to_be_picked * flt(source.conversion_factor)
-		# Metactical Customization: Default pick qty take delivered qty into consideration
-		target.picked_qty = flt(source.qty) - flt(source.delivered_qty)
+		target.picked_qty = qty_to_be_picked
 
 	def update_packed_item_qty(source, target, source_parent) -> None:
 		qty = flt(source.qty)

@@ -2,6 +2,8 @@ import frappe
 from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime, cint
 from frappe import _, msgprint, is_whitelisted
+from metactical.custom_scripts.utils.metactical_utils import queue_action
+from frappe.model.docstatus import DocStatus
 
 class CustomPurchaseReceipt(PurchaseReceipt):
 	def validate(self):
@@ -9,42 +11,23 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		if self.purchase_order:
 			for d in self.items:
 				d.purchase_order = self.purchase_order
-				d.purchase_order_item = frappe.db.get_value("Purchase Order Item", {"item_code": d.item_code, "parent": d.purchase_order}, "name")
+				d.purchase_order_item = frappe.db.get_value("Purchase Order Item", {"item_code": d.item_code, "name":d.purchase_order_item, "parent": d.purchase_order}, "name")
 				if not d.purchase_order_item:
 					frappe.throw("Purchase Order Missing for Item {} at Row {}".format(d.item_code, str(d.idx)))
 	
-	def submit(self):
-		if len(self.items) > 100:
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 100 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
 			msgprint(
 				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
 				)
 			)
-			self.queue_action("submit", timeout=2000)
+			queue_action(self, "submit", timeout=2000)
 		else:
-			self._submit()
-	
-	def queue_action(self, action, **kwargs):
-		"""Run an action in background. If the action has an inner function,
-		like _submit for submit, it will call that instead"""
-		# call _submit instead of submit, so you can override submit to call
-		# run_delayed based on some action
-		# See: Stock Reconciliation
-		from frappe.utils.background_jobs import enqueue
-
-		if hasattr(self, '_' + action):
-			action = '_' + action
-
-		if file_lock.lock_exists(self.get_signature()):
-			frappe.throw(_('This document is currently queued for execution. Please try again'),
-				title=_('Document Queued'))
-		
-		frappe.db.set_value(self.doctype, self.name, 'ais_queue_status', 'Queued',  update_modified=False)
-		frappe.db.set_value(self.doctype, self.name, 'ais_queued_date', now_datetime(),  update_modified=False)
-		frappe.db.set_value(self.doctype, self.name, 'ais_queued_by', frappe.session.user,  update_modified=False)
-		self.lock()
-		enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
-			action=action, **kwargs)
+			super().save()
 
 def validate(self, method):
 	if self.set_warehouse:

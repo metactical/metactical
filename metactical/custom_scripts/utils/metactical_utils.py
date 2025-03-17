@@ -17,15 +17,8 @@ from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
 
 def queue_action(self, action, **kwargs):
-	"""Run an action in background. If the action has an inner function,
-	like _submit for submit, it will call that instead"""
-	# call _submit instead of submit, so you can override submit to call
-	# run_delayed based on some action
-	# See: Stock Reconciliation
+	#Run an action in background
 	from frappe.utils.background_jobs import enqueue
-
-	if hasattr(self, '_' + action):
-		action = '_' + action
 
 	if file_lock.lock_exists(self.get_signature()):
 		frappe.throw(_('This document is currently queued for execution. Please try again'),
@@ -276,13 +269,18 @@ def check_si_payment_status_for_so(sales_order):
 	return all_invoices_paid
 
 def read_file(file_path):
-		extn = os.path.splitext(file_path)[1][1:]
+	extn = os.path.splitext(file_path)[1][1:]
 
-		file_content = None
+	file_content = None
 
-		file_name = frappe.db.get_value("File", {"file_url": file_path})
-		if file_name:
-			file = frappe.get_doc("File", file_name)
-			file_content = file.get_content()
-		
-		return file_content, extn
+	file_name = frappe.db.get_value("File", {"file_url": file_path})
+	if file_name:
+		file = frappe.get_doc("File", file_name)
+		file_content = file.get_content()
+	
+	return file_content, extn
+
+def get_state_code(state):
+	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
+	return symbol
+

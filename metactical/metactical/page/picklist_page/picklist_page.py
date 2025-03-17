@@ -13,6 +13,7 @@ def get_defaults(user):
 							{"user": frappe.session.user}, as_dict=1)
 	if len(defaults) > 0:
 		default_settings = defaults[0]
+	default_settings["no_for_manual"] = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
 	return default_settings
 
 @frappe.whitelist()
@@ -36,7 +37,8 @@ def load_summary(warehouse, source):
 			LEFT JOIN
 				`tabSales Order` AS sales_order ON pli.sales_order = sales_order.name
 			WHERE
-				pli.warehouse = %(warehouse)s AND pl.docstatus = 0
+				pli.warehouse = %(warehouse)s AND pl.docstatus = 1
+				AND pl.status = 'Open'
 				AND sales_order.status <> 'On Hold'""" + where,
 			where_filter, as_dict=1)
 	
@@ -69,23 +71,31 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	location_order = "DESC"
 	if sort_by == "locations":
 		location_order = sort_order
+	elif sort_by == "order_date":
+		sort_by = "transaction_date"
 
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
 										COUNT(pli.name) AS qty_item,
-										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} SEPARATOR '<br>') AS locations
+										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} 
+											SEPARATOR '<br>') AS locations,
+										DATE_FORMAT(sales_order.transaction_date, '%d-%m-%Y') AS order_date
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
 										`tabPick List` AS pl ON pl.name = pli.parent
 									LEFT JOIN
+										`tabProduct Bundle` AS bundle ON bundle.new_item_code = pli.item_code
+									LEFT JOIN
 										`tabItem` AS item ON item.name = pli.item_code
 									LEFT JOIN
 										`tabSales Order` AS sales_order ON sales_order.name = pli.sales_order
 									WHERE
-										pl.docstatus = 0 AND pli.warehouse = '{warehouse}'
-										AND item.is_stock_item = 1 AND sales_order.status <> 'On Hold'
+										pl.docstatus = 1 AND pl.status = 'Open' AND pli.warehouse = '{warehouse}'
+										AND (item.is_stock_item = 1 OR bundle.name IS NOT NULL)
+										AND sales_order.status <> 'On Hold'
 										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
+										AND pl.ais_source <> 'Website - GPD'
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
 									ORDER BY 
@@ -96,7 +106,7 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	return pick_lists
 
 @frappe.whitelist()
-def get_items(pick_list, warehouse, user, tote):
+def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock - ICL", user="Administrator", tote="TOTEA03"):
 	is_being_picked = frappe.db.get_value('Pick List', pick_list, 'ais_picked_by')
 	shipped_items = frappe.db.sql("""SELECT item FROM `tabPick List Shipping Item`""", as_dict=1)
 	not_include = "("
@@ -110,17 +120,45 @@ def get_items(pick_list, warehouse, user, tote):
 	if is_being_picked is None or is_being_picked == '':
 		items = frappe.db.sql("""SELECT
 										pli.name, pli.parent AS pick_list, pli.item_code, pli.item_name, item.image,
-										pli.ifw_location AS locations, pli.qty, bin.actual_qty
+										pli.ifw_location AS locations, pli.qty, bin.actual_qty,
+										CASE 
+											WHEN bundle.name IS NOT NULL THEN 1 
+											ELSE 0 
+										END AS is_product_bundle
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
 										`tabItem` AS item ON item.item_code = pli.item_code
 									LEFT JOIN
+										`tabProduct Bundle` AS bundle ON bundle.new_item_code = item.name
+									LEFT JOIN
 										`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
 									WHERE
-										pli.parent = %(pick_list)s AND pli.item_code not in """ + not_include + """
+										pli.parent = %(pick_list)s
+										AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
 									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
+		# for item in items:
+		# 	if item.is_product_bundle == 1:
+		# 		bundled_items = frappe.db.sql("""
+		# 						SELECT
+		# 						  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
+		# 						  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
+		# 						  	bin.actual_qty, 1 AS is_product_bundle_item
+		# 						FROM
+		# 							`tabProduct Bundle Item` AS bundle_item
+		# 						LEFT JOIN
+		# 						  	`tabItem` AS item ON item.name = bundle_item.item_code
+		# 						LEFT JOIN
+		# 							`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
+		# 						WHERE
+		# 							bundle_item.parent = %(bundle)s
+		# 						ORDER BY item.ifw_location
+		# 						""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
+		# 		items.remove(item)
+		# 		items.extend(bundled_items)
+		
+			
 		for item in items:
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
@@ -132,8 +170,9 @@ def get_items(pick_list, warehouse, user, tote):
 				"locations": [location.strip() for location in locations],
 				"tote": tote
 			})
+		pl_text = frappe.db.get_value("Pick List", pick_list, "pl_text")
 		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
-		doc = {"name": items[0].pick_list, "items": items}
+		doc = {"name": items[0].pick_list, "pl_text": pl_text, "items": items}
 		return doc
 	else:
 		return 'Already Picked'
@@ -247,6 +286,45 @@ def submit_pick_list(items):
 		doc.update({"current_delivery_note": delivery_notes[doc.tote_items[0].pick_list]})
 		doc.save()			
 	return "Pick List Submitted"
+
+@frappe.whitelist()
+def mark_as_picked(items, user):
+	items = json.loads(items)
+	pick_lists = []
+	totes = []
+	delivery_notes = {}
+	for item in items:
+		item = frappe._dict(item)
+		if item.pick_list not in pick_lists:
+			pick_lists.append(item.pick_list)
+		if item.get('tote') is not None and item.get('tote') not in totes:
+			totes.append(item.tote)
+	
+	for pick_list in pick_lists:
+		doc = frappe.get_doc('Pick List', pick_list)
+		doc.update({
+			"status": "Picked",
+			"ais_picked_by": user
+		})
+		doc.save()
+		#Get associated delivery note
+		delivery_note = frappe.db.get_value('Delivery Note', {'pick_list': pick_list}, 'name')
+		delivery_notes.update({pick_list: delivery_note})
+	#Add to totes
+	for tote in totes:
+		doc = frappe.get_doc('Picklist Tote', tote)
+		for item in items:
+			item = frappe._dict(item)
+			if item.tote == tote:
+				doc.append('tote_items', {
+					"item": item.item_code,
+					"pick_list": item.pick_list,
+					"pick_list_item": item.name,
+					"qty": item.picked_qty
+				})
+		doc.update({"current_delivery_note": delivery_notes[doc.tote_items[0].pick_list]})
+		doc.save()			
+	return "Pick List Picked"
 	
 @frappe.whitelist()
 def close_pick_list(pick_list):
