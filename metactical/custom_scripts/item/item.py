@@ -1,5 +1,5 @@
 import frappe
-from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 
 def on_update(doc, method):
     # Retrieve the document state before the update
@@ -34,12 +34,13 @@ def on_update(doc, method):
         current_lead_sources = [source.lead_source for source in doc.custom_neb_website_deduct_qty]
 
     # Trigger update if deduct_qty was changed
-    if deduct_qty_updated:
-        frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
-
-    # Check for removed lead sources and trigger updates for them
-    elif removed_lead_sources:
-        frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+    if deduct_qty_updated or removed_lead_sources:
+        is_product_bundle = frappe.db.exists('Product Bundle', doc.item_code)
+        if is_product_bundle:
+            all_bins = get_all_bins_for_product_bundle(doc.item_code)
+            update_item_inventory_output(item_code=doc.item_code, net_available_bins=all_bins, bundle=True, voucher_type=doc.doctype)
+        else:
+            frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
 
 
 
