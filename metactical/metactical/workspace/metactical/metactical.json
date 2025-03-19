@@ -123,45 +123,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Bulk Updates",
-   "link_count": 3,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Sales Order Import Tool",
-   "link_count": 0,
-   "link_to": "Sales Orders From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Price Import Tool",
-   "link_count": 0,
-   "link_to": "Item Price From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Item Import Tool",
-   "link_count": 0,
-   "link_to": "Item From Excel",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": " Purchase Order Import Tool",
    "link_count": 0,
    "link_to": "Purchase Order Import Tool",
@@ -1024,16 +985,95 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 1,
+   "is_query_report": 0,
    "label": "Stock Balance Totals - Purchase Rates",
    "link_count": 0,
    "link_to": "Stock Balance Totals - Purchase Rates",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Bulk Updates",
+   "link_count": 7,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Order Import Tool",
+   "link_count": 0,
+   "link_to": "Sales Orders From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Price Import Tool",
+   "link_count": 0,
+   "link_to": "Item Price From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Import Tool",
+   "link_count": 0,
+   "link_to": "Item From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": " Purchase Order Import Tool",
+   "link_count": 0,
+   "link_to": "Purchase Order Import Tool",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pricing Rule Import Tool",
+   "link_count": 0,
+   "link_to": "Pricing Rule From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Class Import Tool",
+   "link_count": 0,
+   "link_to": "Item Class Import Tool",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Zeroing Tool",
+   "link_count": 0,
+   "link_to": "Stock Zeroing Tool V2",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-01-10 11:37:21.454002",
+ "modified": "2025-02-18 19:47:30.864841",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

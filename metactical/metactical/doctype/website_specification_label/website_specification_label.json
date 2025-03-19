@@ -9,6 +9,9 @@
  "engine": "InnoDB",
  "field_order": [
   "label",
+  "sort_order",
+  "is_a_search_filter",
+  "section_break_0mlim",
   "descriptions"
  ],
  "fields": [
@@ -23,11 +26,26 @@
    "fieldtype": "Table",
    "label": "Descriptions",
    "options": "Website Spec Label Descriptions"
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_a_search_filter",
+   "fieldtype": "Check",
+   "label": "Is A Search Filter"
+  },
+  {
+   "fieldname": "section_break_0mlim",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-30 12:32:38.044376",
+ "modified": "2025-02-25 07:33:20.678214",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Specification Label",

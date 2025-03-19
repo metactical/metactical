@@ -6,6 +6,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "no_for_manual",
   "default_settings",
   "shipping_items"
  ],
@@ -21,12 +22,17 @@
    "fieldtype": "Table",
    "label": "Shipping Items",
    "options": "Pick List Shipping Item"
+  },
+  {
+   "fieldname": "no_for_manual",
+   "fieldtype": "Int",
+   "label": "Manual Pick Enabled After Items"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2022-08-30 16:26:50.027983",
+ "modified": "2025-02-04 10:44:07.061236",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pick List Settings",
@@ -44,5 +50,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

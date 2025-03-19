@@ -76,7 +76,7 @@
                     <customs-number-of-units>{{ item.stock_qty|int }}</customs-number-of-units>
                     <customs-unit-of-measure>{% if item.stock_uom|upper in ("PCE","NMB","PAR","PKG","ENV","LTR","MLT","BOX","BAG","MTR","MMT","DZN","GRM","KGM","CTN","BIN","SET","BOT","TBE","KIT") %}{{item.stock_uom|upper}}{% else %}BOX{% endif %}</customs-unit-of-measure>
                     <customs-description>{{ item.description[:45] }}</customs-description>
-                    <sku>{{ frappe.db.get_value("Item", item.item_code, "ifw_sku") }}</sku>
+                    <sku>{{ frappe.db.get_value("Item", item.item_code, "ifw_retailskusuffix") }}</sku>
                     <unit-weight>{{ item.total_weight|int or (parcel.weight/item.stock_qty)|int }}</unit-weight>
                     <customs-value-per-unit>{{ item.weight_per_unit|int or 1 }}</customs-value-per-unit>
                     <country-of-origin>{{ frappe.db.get_value("Country", pickup_address_doc.country, "code").upper() }}</country-of-origin>
@@ -88,5 +88,14 @@
             </sku-list>
         </customs>
         {% endif %}
+		{% if options and options|length > 0 %}
+		<options>
+			{% for option in options %}
+			<option>
+				<option-code>{{ option }}</option-code>
+			</option>
+			{% endfor %}
+		</options>
+		{% endif %}
     </delivery-spec>
 </shipment>

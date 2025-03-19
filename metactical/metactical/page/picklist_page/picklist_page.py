@@ -13,6 +13,7 @@ def get_defaults(user):
 							{"user": frappe.session.user}, as_dict=1)
 	if len(defaults) > 0:
 		default_settings = defaults[0]
+	default_settings["no_for_manual"] = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
 	return default_settings
 
 @frappe.whitelist()
@@ -75,10 +76,7 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
-										CASE
-											WHEN bundle.name IS NOT NULL THEN COUNT(DISTINCT bundle_item.name)
-											ELSE COUNT(pli.name)
-										END AS qty_item,
+										COUNT(pli.name) AS qty_item,
 										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} 
 											SEPARATOR '<br>') AS locations,
 										DATE_FORMAT(sales_order.transaction_date, '%d-%m-%Y') AS order_date
@@ -89,9 +87,7 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 									LEFT JOIN
 										`tabProduct Bundle` AS bundle ON bundle.new_item_code = pli.item_code
 									LEFT JOIN
-										`tabProduct Bundle Item` AS bundle_item ON bundle_item.parent = bundle.name
-									LEFT JOIN
-										`tabItem` AS item ON item.name = pli.item_code OR item.name = bundle_item.item_code
+										`tabItem` AS item ON item.name = pli.item_code
 									LEFT JOIN
 										`tabSales Order` AS sales_order ON sales_order.name = pli.sales_order
 									WHERE
@@ -142,25 +138,25 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 										AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
 									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
-		for item in items:
-			if item.is_product_bundle == 1:
-				bundled_items = frappe.db.sql("""
-								SELECT
-								  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
-								  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
-								  	bin.actual_qty, 1 AS is_product_bundle_item
-								FROM
-									`tabProduct Bundle Item` AS bundle_item
-								LEFT JOIN
-								  	`tabItem` AS item ON item.name = bundle_item.item_code
-								LEFT JOIN
-									`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
-								WHERE
-									bundle_item.parent = %(bundle)s
-								ORDER BY item.ifw_location
-								""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
-				items.remove(item)
-				items.extend(bundled_items)
+		# for item in items:
+		# 	if item.is_product_bundle == 1:
+		# 		bundled_items = frappe.db.sql("""
+		# 						SELECT
+		# 						  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
+		# 						  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
+		# 						  	bin.actual_qty, 1 AS is_product_bundle_item
+		# 						FROM
+		# 							`tabProduct Bundle Item` AS bundle_item
+		# 						LEFT JOIN
+		# 						  	`tabItem` AS item ON item.name = bundle_item.item_code
+		# 						LEFT JOIN
+		# 							`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
+		# 						WHERE
+		# 							bundle_item.parent = %(bundle)s
+		# 						ORDER BY item.ifw_location
+		# 						""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
+		# 		items.remove(item)
+		# 		items.extend(bundled_items)
 		
 			
 		for item in items:
@@ -174,8 +170,9 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 				"locations": [location.strip() for location in locations],
 				"tote": tote
 			})
+		pl_text = frappe.db.get_value("Pick List", pick_list, "pl_text")
 		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
-		doc = {"name": items[0].pick_list, "items": items}
+		doc = {"name": items[0].pick_list, "pl_text": pl_text, "items": items}
 		return doc
 	else:
 		return 'Already Picked'

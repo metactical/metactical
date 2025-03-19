@@ -26,6 +26,7 @@ frappe.ui.form.on('Manifest', {
 					},
 					freeze: true,
 					callback: function(ret){
+						console.log("Ret: ", ret);
 						let shipments = ret.message.shipments;
 						if(!frm.doc.pickup_contact_person){
 							frm.set_value("pickup_contact_person", ret.message.pickup_contact_person);
@@ -77,6 +78,7 @@ frappe.ui.form.on('Manifest', {
 					frappe.call({
 						method: "metactical.metactical.doctype.manifest.manifest.redownload_manifest",
 						args: {
+							"doctype": "Manifest",
 							"docname": frm.docname
 						},
 						freeze: true,

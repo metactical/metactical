@@ -3,6 +3,7 @@ from erpnext.stock.doctype.packing_slip.packing_slip import PackingSlip
 from frappe.utils import cint, flt
 from frappe.model import no_value_fields
 from frappe import _	
+from metactical.barcode_generator import get_barcode_for_print_format
 
 class CustomPackingSlip(PackingSlip):
 	def on_submit(self):
@@ -133,3 +134,13 @@ class CustomPackingSlip(PackingSlip):
 			if res and len(res) > 0:
 				d.net_weight = res["weight_per_unit"]
 				d.weight_uom = res["weight_uom"]
+	
+def get_packing_slips_for_print(doc):
+	doc.barcode = get_barcode_for_print_format(doc.name)
+	packing_slips = frappe.get_all("Packing Slip", filters={"delivery_note": doc.name, "docstatus": 1}, fields="*", order_by="from_case_no desc")
+ 
+	for packing_slip in packing_slips:
+		packing_slip["items"] = frappe.get_all("Packing Slip Item", filters={"parent": packing_slip.name}, fields="*", order_by="idx desc")
+		packing_slip['barcode'] = get_barcode_for_print_format(packing_slip.name)
+ 
+	return frappe.render_template("metactical/metactical/print_format/dn_packing_slip___v1/dn_packing_slip_v1.html", {"doc": doc, "packing_slips": packing_slips})

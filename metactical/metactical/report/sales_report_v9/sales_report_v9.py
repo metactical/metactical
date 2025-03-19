@@ -32,6 +32,8 @@ def execute(filters=None):
 	for i in master:
 		row = {}
 		row["ifw_retailskusuffix"] = i.get("ifw_retailskusuffix")
+		row["custom_ais_related_sku"] = i.get("custom_ais_related_sku")
+		row["brand"] = i.get("brand")
 		row["item_name"] = i.get("item_name")
 		row["item_code"] = i.get("item_code")
 		item_groups = get_item_group_parents(i.get("item_group"))
@@ -324,7 +326,6 @@ def get_column(filters,conditions):
 				"options": "Customs Tariff Number",
 				"width": 100,
 			},
-
 			{
 				"label": _("Tags"),
 				"fieldname": "tag",
@@ -392,6 +393,19 @@ def get_column(filters,conditions):
 				"fieldname": "stock_uom",
 				"fieldtype": "Data",
 				"width": 100,
+			},
+			{
+				"label": _("RelatedSKU"),
+				"fieldname": "custom_ais_related_sku",
+				"fieldtype": "Data",
+				"width": 150,
+			},
+			{
+				"label": _("Brand"),
+				"fieldname": "brand",
+				"fieldtype": "Link",
+				"options": "Brand",
+				"width": 150,
 			}
 		]
 		
@@ -808,7 +822,8 @@ def get_master(conditions="", filters={}):
 				country_of_origin,customs_tariff_number, ifw_duty_rate,
 				ifw_discontinued,ifw_product_name_ci,ifw_item_notes,ifw_item_notes2,
 				ifw_po_notes, ais_poreorderqty, ais_poreorderlevel, 
-				s.ifw_supplier_qoh, i.stock_uom, i.item_group
+				s.ifw_supplier_qoh, i.stock_uom, i.item_group, i.custom_ais_related_sku,
+				i.brand
 			from 
 				`tabItem Supplier` s 
 			inner join 
@@ -1038,49 +1053,51 @@ def get_open_po_qty(item,supplier, warehouse=None):
 
 @frappe.whitelist()
 def get_item_details(item, list_type="Selling", supplier=None):
-	price_list = frappe.db.get_value("Stock Settings", "Stock Settings", "ais_default_price_list")
+	price_list = None
+	
+	if supplier is not None and supplier != "":
+		price_list = frappe.db.get_value("Supplier", supplier, "default_price_list")
+	
+	if price_list is None or price_list == "":
+		price_list = frappe.db.get_value("Stock Settings", "Stock Settings", "ais_default_price_list")
+
 	if price_list is None or price_list  == "":
 		frappe.throw("Please set a default price list in stock Settings")
-	cond = "and price_list = '{}' and selling = 1".format(price_list)
-	if list_type == "Buying": cond= " and buying = 1"
+
+	cond = "and price_list = {}".format(frappe.db.escape(price_list))
+	if list_type == "Buying": 
+		cond += " and buying = 1"
+	else:
+		cond += " and selling = 1"
 	rate = 0
 	date = frappe.utils.nowdate()
-	r = frappe.db.sql("select price_list_rate from `tabItem Price` \
-						where '{}' between valid_from and valid_upto and item_code = '{}' \
-						{} limit 1".format(date, item, cond))
+	r = frappe.db.sql(f"""select price_list_rate from `tabItem Price`
+						where '{date}' between valid_from and valid_upto and item_code = '{item}'
+						{cond} limit 1""")
 	if r:
 		if r[0][0]:
 			rate = r[0][0]
 	else:
-		r = frappe.db.sql("select price_list_rate from `tabItem Price` \
-							where (valid_from <= '{}' or valid_upto >= '{}') and item_code = '{}' \
-							{} limit 1".format(date, date, item, cond))
+		r = frappe.db.sql(f"""select price_list_rate from `tabItem Price`
+							where (valid_from <= '{date}' or valid_upto >= '{date}') and item_code = '{item}'
+							{cond} limit 1""")
 		if r:
 			if r[0][0]:
 				rate = r[0][0]
 		else:
-			r = frappe.db.sql("select price_list_rate from `tabItem Price` \
-								where valid_from IS NULL and valid_upto IS NULL and item_code = '{}' \
-								{} limit 1".format(item, cond))
+			r = frappe.db.sql(f"""select price_list_rate from `tabItem Price` 
+								where valid_from IS NULL and valid_upto IS NULL and item_code = '{item}' 
+								{cond} limit 1""")
 			if r:
 				if r[0][0]:
 					rate = r[0][0]
 	return rate
 
-def test():
-	today = getdate(nowdate())
-	last_month = getdate(str(datetime(today.year-1, 1,1)))
-	print(last_month.year)
-	print(today.year)
-	while last_month < today:
-		month = last_month.strftime("%B")
-		print(last_month.month)
-		print(last_month.year)
-		last_month = last_month + relativedelta(months=1)
-
 def get_us_data(filters):
 	item_search_settings = frappe.get_doc("Item Search Settings")
-	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
+	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "" \
+		and item_search_settings.get("api_key") is not None and item_search_settings.get("api_key") != "" \
+			and item_search_settings.get("api_secret") is not None and item_search_settings.get("api_secret") != "":
 		us_request = requests.get(item_search_settings.get("sales_report_url"), 
 						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params=filters)
