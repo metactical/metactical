@@ -49,7 +49,8 @@ doctype_js = {
 	"Task": "custom_scripts/task/task.js",
 	"Warehouse": "custom_scripts/warehouse/warehouse.js",
 	"Contact": "custom_scripts/contact/contact.js",
-	"Item": "custom_scripts/item/item.js"
+	"Item": "custom_scripts/item/item.js",
+	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -242,13 +243,6 @@ fixtures = [{
 			'Stock Settings-ais_sales_report_settings'
 		]]]
 	},
-	{
-		"dt": "Kanban Board",
-		"filters": [["name", "in", [
-			"Buying Board",
-			"Projects Status"
-		]]]
-	},
   	{
 		"dt": "Provinces"
 	},
@@ -258,6 +252,12 @@ fixtures = [{
 			"Store Credits - ICL",
 			"Store Credit - CAD - ICL",
 			"Store Credit - USD - ICL"
+		]]]
+	},
+	{
+		"dt": "Email Template",
+		"filters": [["name", "in", [
+			"POS User Welcome Email"
 		]]]
 	}
 ]
