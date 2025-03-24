@@ -126,10 +126,6 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 				})
 				new_req.insert(ignore_permissions=True)
 
-		
-	
-	
-
 def order_json(order, is_cancelled, settings):
 	#order = frappe.get_doc('Delivery Note', order_no)
 	
@@ -468,3 +464,129 @@ def update_shipment(delivey_note, shipment_details):
 			shipment.submit()
 		except Exception as e:
 			frappe.log_error(frappe.get_traceback())
+
+@frappe.whitelist()
+def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
+	# Fetch the Sales Order document
+	sales_order = frappe.get_doc('Sales Order', sales_order_name)
+	
+	# Extract customer address
+	customer_address = frappe.get_doc('Address', sales_order.customer_address)
+	customer_country = frappe.get_value('Country', customer_address.country, "code").upper()
+	
+	# Extract shipping address
+	shipping_address = frappe.get_doc('Address', sales_order.shipping_address_name)
+	shipping_country = frappe.get_value('Country', shipping_address.country, "code").upper()
+	
+	# Extract items
+	items = []
+	for item in sales_order.items:
+		items.append({
+			"lineItemKey": item.name,
+			"sku": item.item_code,
+			"name": item.item_name,
+			"quantity": int(item.qty),
+			"unitPrice": float(item.rate),
+			"warehouseLocation": None,
+			"options": None,
+			"productId": None,
+			"fulfillmentSku": None,
+			"adjustment": False,
+			"upc": None
+		})
+	
+	# Format the data for ShipStation
+	data = {
+		"orderNumber": sales_order.name,
+		"orderKey": sales_order.name,
+		"orderDate": str(sales_order.transaction_date),
+		"orderStatus": "awaiting_shipment",
+		"customerUsername": sales_order.customer,
+		"customerEmail": customer_address.email_id,
+		"billTo": {
+			"name": "{} {}".format(customer_address.ifw_first_name, customer_address.ifw_last_name),
+			"company": '',
+			"street1": customer_address.address_line1,
+			"street2": customer_address.address_line2,
+			"city": customer_address.city,
+			"state": customer_address.state,
+			"postalCode": customer_address.pincode,
+			"country": customer_country,
+			"phone": customer_address.phone,
+			"residential": None
+		},
+		"shipTo": {
+			"name": "{} {}".format(shipping_address.ifw_first_name, shipping_address.ifw_last_name),
+			"company": "",
+			"street1": shipping_address.address_line1,
+			"street2": shipping_address.address_line2,
+			"city": shipping_address.city,
+			"state": shipping_address.state,
+			"postalCode": shipping_address.pincode,
+			"country": shipping_country,
+			"phone": shipping_address.phone,
+			"residential": None
+		},
+		"items": items,
+		"amountPaid": sales_order.grand_total,
+		"taxAmount": float(sales_order.total_taxes_and_charges),
+		"customerNotes": None,
+		"internalNotes": None,
+		"gift": False,
+		"giftMessage": None,
+		"paymentMethod": None,
+		"requestedShippingService": None,
+		"carrierCode": None,
+		"serviceCode": None,
+		"packageCode": None,
+		"confirmation": "none",
+		"shipDate": None,
+		"weight": None,
+		"dimensions": None,
+		"advancedOptions": {
+			"storeId": None
+		}
+	}
+	
+	# Send the data to ShipStation
+	settings = get_settings()
+	
+	if len(settings) == 0:
+		frappe.throw("No shiptation settings found.")
+
+	orders_url = 'https://ssapi.shipstation.com/orders/createorder'
+	try:
+		response = requests.post(
+			orders_url,
+			auth=(settings[0].api_key, settings[0].get_password('api_secret')),
+			json=data
+		)
+		
+		# This will raise an HTTPError if the status code is 4xx/5xx
+		response.raise_for_status()
+		
+		# Handle the response
+		sorder = response.json()
+		if sorder.get('orderId'):
+			verification_status = None
+			address_verified = sorder.get('shipTo', {}).get('addressVerified')
+			if address_verified == "Address validated successfully":
+				verification_status = "Validated"
+			elif address_verified == "Address validation failed":
+				verification_status = "Validation Failed"
+			elif address_verified == "Address validation warning":
+				verification_status = "Partially Validated"
+
+			if verification_status is not None:
+				frappe.db.set_value("Address", sales_order.shipping_address_name, "custom_ais_address_verified", verification_status)
+				frappe.db.set_value("Sales Order", sales_order_name, "custom_ais_address_verified", verification_status)
+				frappe.msgprint(f"Shipping Address {verification_status}")
+
+				if verification_status == "Validated":
+					# Delete the order after the address verification
+					response = requests.delete(f'https://ssapi.shipstation.com/orders/{sorder.get("orderId")}',
+						auth=(settings[0].api_key, settings[0].get_password('api_secret')))
+	except requests.exceptions.HTTPError as e:
+		frappe.log_error(frappe.get_traceback(), "ShipStation Order Creation Error")
+		frappe.throw(f"Failed to create order in ShipStation: {str(e)}")
+

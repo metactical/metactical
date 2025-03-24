@@ -14,9 +14,18 @@
         <div v-if="tabs[activeTab]">
 			<table v-for="row in tabs[activeTab].rates.data" class="table table-bordered" :data-row-name="row.name">
 				<tr>
-					<th>
+					<!-- <th>
 						{{ __("Row") }} # {{ row.idx }}
 						{{ __("Count") }} # {{ row.count }}
+					</th> -->
+					<th>
+						Parcel No. 
+						<span v-if="!tabs[activeTab].supports_multiple">
+							{{ Array.from({ length: tabs[activeTab].no_of_parcels }, (_, i) => i + 1).join(', ') }}
+						</span>
+						<span v-else>
+							{{ row.count }}
+						</span>
 					</th>
 					<th>{{ __("Service") }}</th>
 					<th>{{ __("Base Price") }}</th>

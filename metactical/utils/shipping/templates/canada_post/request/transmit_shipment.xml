@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <transmit-set xmlns="http://www.canadapost.ca/ws/manifest-v8">
     <group-ids>
-        <group-id>{{ group }}</group-id>
+        {% for group in groups %}
+            <group-id>{{ group }}</group-id>
+        {% endfor %}
     </group-ids>
     {% if manifest_doc.drop_to_point %}
     <requested-shipping-point>{{ manifest_doc.point_zip_code|replace(' ','') }}</requested-shipping-point>
@@ -10,7 +12,7 @@
     <detailed-manifests>true</detailed-manifests>
     <method-of-payment>Account</method-of-payment>
     <manifest-address>
-        <manifest-company>{{ pickup_address_doc.ais_company or doc.pickup_company }}</manifest-company>
+        <manifest-company>{{ pickup_address_doc.ais_company or manifest_doc.pickup_company }}</manifest-company>
         <manifest-name>{{ pickup_contact_person_doc.full_name }}</manifest-name>
         <phone-number>{{ pickup_contact_person_doc.mobile_no }}</phone-number>
         <address-details>

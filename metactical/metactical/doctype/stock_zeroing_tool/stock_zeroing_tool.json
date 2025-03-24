@@ -1,0 +1,270 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2025-02-18 15:56:24.679766",
+ "default_view": "List",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "company",
+  "purpose",
+  "col1",
+  "posting_date",
+  "posting_time",
+  "set_posting_time",
+  "section_break_8",
+  "set_warehouse",
+  "section_break_22",
+  "scan_barcode",
+  "column_break_12",
+  "scan_mode",
+  "sb9",
+  "items",
+  "section_break_9",
+  "expense_account",
+  "column_break_13",
+  "difference_amount",
+  "accounting_dimensions_section",
+  "cost_center",
+  "dimension_col_break",
+  "amended_from",
+  "section_queus",
+  "ais_queue_failed",
+  "ais_queue_status",
+  "ais_queueu_comment",
+  "column_break_yfwh9",
+  "ais_queued_date",
+  "ais_queued_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "no_copy": 1,
+   "options": "SZERO-.YYYY.-",
+   "print_hide": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Stock Reconciliation",
+   "fieldname": "purpose",
+   "fieldtype": "Select",
+   "label": "Purpose",
+   "options": "Stock Reconciliation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "oldfieldname": "reconciliation_date",
+   "oldfieldtype": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "posting_time",
+   "fieldtype": "Time",
+   "in_list_view": 1,
+   "label": "Posting Time",
+   "oldfieldname": "reconciliation_time",
+   "oldfieldtype": "Time",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "set_posting_time",
+   "fieldtype": "Check",
+   "label": "Edit Posting Date and Time"
+  },
+  {
+   "fieldname": "section_break_8",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "set_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "depends_on": "eval:!doc.docstatus",
+   "fieldname": "section_break_22",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "scan_barcode",
+   "fieldtype": "Data",
+   "label": "Scan Barcode",
+   "options": "Barcode"
+  },
+  {
+   "fieldname": "column_break_12",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Disables auto-fetching of existing quantity",
+   "fieldname": "scan_mode",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Scan Mode"
+  },
+  {
+   "fieldname": "sb9",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_bulk_edit": 1,
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Stock Zeroing Tool Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_9",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Difference Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_13",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "difference_amount",
+   "fieldtype": "Currency",
+   "label": "Difference Amount",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "accounting_dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "dimension_col_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Stock Zeroing Tool",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_queus",
+   "fieldtype": "Section Break",
+   "label": "Queue"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "ais_queue_failed",
+   "fieldtype": "Check",
+   "label": "Queue Failed",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queue_status",
+   "fieldtype": "Select",
+   "label": "Queue Status",
+   "no_copy": 1,
+   "options": "Not Queued\nQueued\nFailed"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queueu_comment",
+   "fieldtype": "Small Text",
+   "label": "Queue Error",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_yfwh9",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queued_date",
+   "fieldtype": "Datetime",
+   "label": "Queue Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ais_queued_by",
+   "fieldtype": "Link",
+   "label": "Queued By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  }
+ ],
+ "icon": "fa fa-upload-alt",
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-02-18 17:36:01.552666",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Stock Zeroing Tool",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "posting_date",
+ "show_name_in_global_search": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

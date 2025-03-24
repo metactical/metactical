@@ -1,8 +1,8 @@
 <template>
 	<div v-if="ratesLoaded" id="shipment-dialog">
 		<div class="col-xs-12">
-			<div class="form-group">
-				<!--<div class="clearfix"> <label class="control-label" style="padding-right: 0px;">{{ __("Select for All") }}</label> </div>-->
+			<!--<div class="form-group">
+				<div class="clearfix"> <label class="control-label" style="padding-right: 0px;">{{ __("Select for All") }}</label> </div>
 				<div class="control-input-wrapper">
 					<div class="control-input flex align-center">
 						<select type="text"
@@ -29,7 +29,7 @@
 					<div class="control-value like-disabled-input" style="display: none;">Company</div>
 					<p class="help-box small text-muted"></p>
 				</div>
-			</div>
+			</div>-->
 		</div>
 		<Tabs :tabs="tabsData" 
 			:selectedServices="selectedServices"  
@@ -122,13 +122,18 @@ export default {
 					callback: function(ret){
 						me.rates[provider_key] = {
 							"label": provider,
-							"rates": ret.message
+							"rates": ret.message,
+							"supports_multiple": ret.message.supports_multiple,
+							"no_of_parcels": ret.message.data.length
 						}
 
 						me.tabsData.push({
 							"title": provider,
-							"rates": ret.message
+							"rates": ret.message,
+							"supports_multiple": ret.message.supports_multiple,
+							"no_of_parcels": ret.message.data.length
 						})
+						console.log("TabsData: ", me.tabsData);
 						
 						ret.message.options.forEach(option => {
 							me.rateOptions.push({

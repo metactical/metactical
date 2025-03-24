@@ -1,5 +1,6 @@
 import frappe
-from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
+import json
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 
 def on_update(doc, method):
     # check website specification values
@@ -39,12 +40,13 @@ def on_update(doc, method):
         current_lead_sources = [source.lead_source for source in doc.custom_neb_website_deduct_qty]
 
     # Trigger update if deduct_qty was changed
-    if deduct_qty_updated:
-        frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
-
-    # Check for removed lead sources and trigger updates for them
-    elif removed_lead_sources:
-        frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+    if deduct_qty_updated or removed_lead_sources:
+        is_product_bundle = frappe.db.exists('Product Bundle', doc.item_code)
+        if is_product_bundle:
+            all_bins = get_all_bins_for_product_bundle(doc.item_code)
+            update_item_inventory_output(item_code=doc.item_code, net_available_bins=all_bins, bundle=True, voucher_type=doc.doctype)
+        else:
+            frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
 
 def validate_website_specifications(doc):
     for spec in doc.neb_website_specifications:
@@ -63,15 +65,15 @@ def sync_website_specifications(doc):
     if not original_website_specifications and not doc.neb_website_specifications:
         return
 
-    original_website_specifications_dict = {spec.label: spec.description for spec in original_website_specifications} if original_website_specifications else {}
-    current_website_specifications = {spec.label: spec.description for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
+    original_website_specifications_dict = {spec.label: {"description": spec.description} for spec in original_website_specifications} if original_website_specifications else {}
+    current_website_specifications = {spec.label: {"description": spec.description} for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
 
     # Check for removed/updated website specifications
     removed_website_specifications = []
     for old_label, old_description in original_website_specifications_dict.items():
         found = False
         for current_label, current_description in current_website_specifications.items():
-            if old_label == current_label and old_description == current_description:
+            if old_label == current_label and old_description["description"] == current_description["description"]:
                 found = True
                 break
 
@@ -83,7 +85,7 @@ def sync_website_specifications(doc):
     for current_label, current_description in current_website_specifications.items():
         found = False
         for old_label, old_description in original_website_specifications_dict.items():
-            if old_label == current_label and old_description == current_description:
+            if old_label == current_label and old_description["description"] == current_description["description"]:
                 found = True
                 break
 
@@ -119,8 +121,30 @@ def sync_website_specifications(doc):
                     main_website_spec.save()
 
 @frappe.whitelist()
+def get_website_specification_description_options(labels):
+    labels = json.loads(labels)
+    return frappe.db.get_all("Website Spec Label Descriptions", filters={"parent": ["in", labels]}, fields=["description", "parent"])
+        
+@frappe.whitelist()
 def copy_specification_from_item_group(item_group):
-    return frappe.db.get_all(
+    web_spec_labels = frappe.db.get_all(
         "MT Item Website Specification", filters={"parent": item_group}, fields=["label", "mandatory"]
         )
+    
+    for spec in web_spec_labels:
+        if spec.label:
+            website_spec = frappe.get_doc("Website Specification Label", spec.label)
+            descriptions = [desc.description for desc in website_spec.descriptions]    
             
+            spec.descriptions = descriptions
+                        
+    return web_spec_labels
+
+@frappe.whitelist()
+def get_website_label_descriptions(label):
+    frappe.msgprint(label)
+    desc =  frappe.db.get_list(
+        "Website Specification Label", filters={"label": label}
+        )
+    
+    frappe.msgprint(desc)
