@@ -33,7 +33,7 @@ def queue_action(self, action, **kwargs):
 	enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 		action=action, **kwargs)
 		
-def post_to_rocket_chat(doc, msg, failed=False):
+def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
 		if not rocket_chat_settings.rocket_notification:
@@ -46,13 +46,18 @@ def post_to_rocket_chat(doc, msg, failed=False):
 			'X-User-Id': rocket_chat_settings.user_id
 		}
 
-		url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
-		message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
-						administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
-		
-		if failed:
-			message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
-						\n[{0}]({1})'.format(get_url(url), get_url(url))
+		if pos:	
+			message = msg
+		elif rmq:
+			message = msg
+		else:	
+			url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
+			message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
+							administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
+			
+			if failed:
+				message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
+							\n[{0}]({1})'.format(get_url(url), get_url(url))
 
 		payload = {
 			'channel': "#"+channel_name,
