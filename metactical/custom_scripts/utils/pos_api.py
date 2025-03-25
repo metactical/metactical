@@ -264,6 +264,7 @@ def get_taxes(form_data):
             
 def get_items(form_data):
     items = []
+    warehouse = frappe.db.get_value('POS Profile', form_data['POSProfile'] + ' Operators', 'warehouse')
     for item in form_data['Items']:
         item_code = item['ItemCode']
         rate = item['Rate']
@@ -272,10 +273,10 @@ def get_items(form_data):
         
         item_info = {
             'item_code': item_code,
-            'rate': rate,
+            'price_list_rate': rate,
             'qty': qty,
             'discount_percentage': item['Discount'],
-            'warehouse': 'W01-WHS-Active Stock - ICL',
+            'warehouse': warehouse if warehouse else 'W01-WHS-Active Stock - ICL'
         }
         
         if item_code == "2":
