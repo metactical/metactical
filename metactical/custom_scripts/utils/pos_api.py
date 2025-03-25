@@ -273,7 +273,7 @@ def get_items(form_data):
         
         item_info = {
             'item_code': item_code,
-            'rate': rate,
+            'price_list_rate': rate,
             'qty': qty,
             'discount_percentage': item['Discount'],
             'warehouse': warehouse if warehouse else 'W01-WHS-Active Stock - ICL'
