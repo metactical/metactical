@@ -259,7 +259,8 @@ jinja = {
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
-		"metactical.barcode_generator.get_barcode_for_print_format"
+		"metactical.barcode_generator.get_barcode_for_print_format",
+		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 	]
 }
 
