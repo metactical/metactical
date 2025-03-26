@@ -125,11 +125,12 @@ def create_sales_order(form_data, customer):
         'delivery_date': frappe.utils.today(),
         'company_address': company_address,
         'source': form_data['LeadSource'],
+        'ignore_pricing_rule': 1,
         'contact_person': frappe.db.get_value('Customer', customer, 'customer_primary_contact'),
         'additional_discount_percentage': form_data['OverallDiscount'],
         "owner": form_data['SalesPerson'],
     }
-    
+        
     items = get_items(form_data)
     so_data.update({'items': items})
     
@@ -138,7 +139,8 @@ def create_sales_order(form_data, customer):
         
     frappe.set_user(form_data['SalesPerson'])
     sales_order = frappe.get_doc(so_data)
-    sales_order.insert()
+
+    sales_order.insert(ignore_permissions=True)
     frappe.set_user("Administrator")
     frappe.db.commit()
             
@@ -278,7 +280,7 @@ def get_items(form_data):
             'discount_percentage': item['Discount'],
             'warehouse': warehouse if warehouse else 'W01-WHS-Active Stock - ICL'
         }
-        
+
         if item_code == "2":
             item_info.update({'item_name': item_name})
         
