@@ -74,12 +74,12 @@ def get_data(filters):
 				`tabPricing Rule` ON `tabPricing Rule`.name = `tabPricing Rule Item Code`.parent
 			WHERE
 				`tabPricing Rule Item Code`.item_code = '{item.item_code}'
-				AND `tabPricing Rule`.for_price_list = '{price_list}'
+				AND (`tabPricing Rule`.for_price_list = '{price_list}' or `tabPricing Rule`.for_price_list is NULL)
 				AND `tabPricing Rule`.disable = 0
 				AND `tabPricing Rule Item Code`.parent IS NOT NULL
+				AND `tabPricing Rule`.valid_upto >= CURDATE()
 			ORDER BY
-				`tabPricing Rule`.priority DESC,
-				`tabPricing Rule`.modified Desc
+				CAST(`tabPricing Rule`.priority AS UNSIGNED) DESC
 			LIMIT 1;
 		""", as_dict=1)
   
