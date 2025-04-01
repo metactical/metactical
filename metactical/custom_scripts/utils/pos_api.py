@@ -38,13 +38,23 @@ def receive_pos_data(*args, **kwargs):
         
         sales_order = sales_order["sales_order"]
         if sales_order:
-            frappe.enqueue(
-                submit_sales_order,
-                queue="default", # one of short, default, long
-                at_front=True,
-                form_data=form_data,
-                sales_order=sales_order.name
-            )
+            if len(form_data["Payment"]):
+                has_intrac_payment = False
+                for payment in form_data["Payment"]:
+                    if payment["ModeOfPayment"] == "Interac Etransfer":
+                        has_intrac_payment = True
+                        break
+                    
+                if not has_intrac_payment:
+                    frappe.enqueue(
+                        submit_sales_order,
+                        queue="default", # one of short, default, long
+                        at_front=True,
+                        form_data=form_data,
+                        sales_order=sales_order.name
+                    )
+                else:
+                    add_payment_info_to_sales_order(sales_order, form_data)
                                     
             frappe.enqueue(
                 create_comments,
@@ -203,8 +213,11 @@ def add_payment_info_to_sales_order(sales_order, form_data):
     
     message = ""
     for payment in form_data['Payment']:
-        message += "Payment of <b>$ {0}</b> made using <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
-        
+        if payment['ModeOfPayment'] == "Interac Etransfer":
+            message += "Payment of <b>$ {0}</b> will be made via <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
+        else:
+            message += "Payment of <b>$ {0}</b> made using <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
+		
     if message:
         frappe.get_doc({
             'doctype': 'Comment',
