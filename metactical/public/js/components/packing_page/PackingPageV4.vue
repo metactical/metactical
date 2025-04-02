@@ -259,7 +259,6 @@
 		let cur_packed_item = this.packed_items.find((item) => item.dn_detail === cur_item.dn_detail);
 		
 		await this.check_stock_availability(cur_item, cur_packed_item, amount).then((r) => {
-			console.log(r)
 			if (r) {
 				cur_item.qty -= amount;
 				if (cur_packed_item) {

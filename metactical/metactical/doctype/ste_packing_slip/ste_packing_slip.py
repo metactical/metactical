@@ -104,7 +104,6 @@ class STEPackingSlip(Document):
 
 		ste_details = self.get_details_for_packing()[0]
 		for item in ste_details:
-			print(item.s_warehouse)
 			if flt(item.qty) > flt(item.packed_qty):
 				ch = self.append("items", {})
 				ch.item_code = item.item_code
@@ -117,8 +116,6 @@ class STEPackingSlip(Document):
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
     
-				print(ch.as_dict())
-
 				# copy custom fields
 				for d in custom_fields:
 					if item.get(d.fieldname):
