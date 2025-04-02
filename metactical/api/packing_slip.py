@@ -36,6 +36,9 @@ def get_item_master(items):
 			item["shipping_width"] = item_doc.get("ais_shipping_width") or 0
 			item["shipping_length"] = item_doc.get("ais_shipping_length") or 0
 			item["weight"] = item_doc.get("weight_per_unit") or 0
+			item["s_warehouse"] = item.get("s_warehouse") or ""
+			item["t_warehouse"] = item.get("t_warehouse") or ""
+
 		temp_items.append(item)
 		
 	return temp_items
