@@ -255,22 +255,50 @@
 		dialog.show();
 	  },
   
-	  packItem(cur_item, barcode, amount = 1) {
-		cur_item.qty -= amount;
+	  async packItem(cur_item, barcode, amount = 1) {
 		let cur_packed_item = this.packed_items.find((item) => item.dn_detail === cur_item.dn_detail);
-		if (cur_packed_item) {
-		  cur_packed_item.qty += amount;
-		} else {
-		  cur_packed_item = { ...cur_item, qty: amount, item_barcode: barcode };
-		  this.packed_items.push(cur_packed_item);
+		
+		await this.check_stock_availability(cur_item, cur_packed_item, amount).then((r) => {
+			if (r) {
+				cur_item.qty -= amount;
+				if (cur_packed_item) {
+					cur_packed_item.qty += amount;
+				} else {
+					cur_packed_item = { ...cur_item, qty: amount, item_barcode: barcode };
+					this.packed_items.push(cur_packed_item);
+				}
+
+				if (cur_item.qty === 0) {
+					this.reGenerateCurrentItem(cur_item);
+				} else {
+					this.reGenerateCurrentItem(cur_item);
+				}
+				$(".pack-items-btn").removeClass("d-none");
+			}
+		})
+	  },
+
+	  async check_stock_availability(cur_item, cur_packed_item, amount) {
+		let in_stock = true;
+		if (cur_item.s_warehouse) {
+			await frappe.db.get_value("Bin", { item_code: cur_item.item_code, warehouse: cur_item.s_warehouse }, ["actual_qty", "reserved_qty"]).then((r) => {
+				var available_qty = r.message.actual_qty - r.message.reserved_qty;
+				var packed_qty = cur_packed_item ? cur_packed_item.qty : 0;
+
+				if (available_qty < (packed_qty + amount)) {
+					in_stock = false;
+					frappe.throw(`Cannot Transfer Qty ${amount} for Item ${cur_item.item_code}, Available Qty is ${available_qty}`);
+				}
+				else{
+					in_stock = true;
+				}
+			});
 		}
-  
-		if (cur_item.qty === 0) {
-		  this.reGenerateCurrentItem(cur_item);
-		} else {
-		  this.reGenerateCurrentItem(cur_item);
+		else{
+			in_stock = true;
 		}
-		$(".pack-items-btn").removeClass("d-none");
+
+		return in_stock;
 	  },
   
 	  reGenerateCurrentItem(item = null, reverting = false) {
