@@ -31,14 +31,18 @@ def send_welcome_email(user, profile):
                                                 "pos_url": pos_url,
                                                 "full_name": user_full_name
                                             })
-        
-        frappe.sendmail(
-            recipients=user,
-            subject=email_template.subject,
-            message=message
-        )
-        
-        frappe.msgprint(f"Welcome email sent to <b>{user_full_name}</b> for branch <b>{branch_name}</b>")
+        try:
+            frappe.sendmail(
+                recipients=user,
+                subject=email_template.subject,
+                message=message
+            )
+            frappe.msgprint(f"Welcome email sent to <b>{user_full_name}</b> for branch <b>{branch_name}</b>")
+
+        except Exception as ex:
+            frappe.msgprint(f"Error sending email: {ex}")
+            
+        frappe.response["url"] = f"{pos_url}?{branch_pairing}"
     elif not branch_pairing:
         frappe.throw(f"Unable to get branch pairing link for user <b>{user_full_name}</b> and branch <b>{branch_name}</b>")
     else:

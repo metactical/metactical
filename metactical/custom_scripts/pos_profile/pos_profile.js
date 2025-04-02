@@ -9,6 +9,12 @@ frappe.ui.form.on('POS Profile User', {
             },
             freeze: true,
             freeze_message: __("Sending Welcome Email..."),
+            callback: function(res) {
+                if (res.url){
+                    frappe.utils.copy_to_clipboard(res.url);
+                    frappe.set_alert(__("Branch Pairing Link Copied to Clipboard"), 5);
+                }
+            }
         });
     }
 });
