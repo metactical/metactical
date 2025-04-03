@@ -23,7 +23,7 @@ def get_data(filters):
 	if not price_list:
 		frappe.throw("Please set default price list in Stock Settings or POS Profile")
   
-	warehouses = frappe.db.get_list("SB Warehouse Inventory Sync", filters={"parent": pos_profile.ifw_default_lead_source}, fields=["warehouse"])
+	warehouses = frappe.db.get_all("SB Warehouse Inventory Sync", filters={"parent": pos_profile.ifw_default_lead_source}, fields=["warehouse"])
 	if not warehouses:
 		frappe.throw("No warehouses found for the selected in the <a href='/app/lead-source/{0}'>Lead Source</a>".format(pos_profile.ifw_default_lead_source))
  
@@ -74,12 +74,12 @@ def get_data(filters):
 				`tabPricing Rule` ON `tabPricing Rule`.name = `tabPricing Rule Item Code`.parent
 			WHERE
 				`tabPricing Rule Item Code`.item_code = '{item.item_code}'
-				AND `tabPricing Rule`.for_price_list = '{price_list}'
+				AND (`tabPricing Rule`.for_price_list = '{price_list}' or `tabPricing Rule`.for_price_list is NULL)
 				AND `tabPricing Rule`.disable = 0
 				AND `tabPricing Rule Item Code`.parent IS NOT NULL
+				AND `tabPricing Rule`.valid_upto >= CURDATE()
 			ORDER BY
-				`tabPricing Rule`.priority DESC,
-				`tabPricing Rule`.modified Desc
+				CAST(`tabPricing Rule`.priority AS UNSIGNED) DESC
 			LIMIT 1;
 		""", as_dict=1)
   
