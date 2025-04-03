@@ -189,11 +189,14 @@ class PicklistPage{
 				me.wrapper.find('.tote-list-div').on('click', function(){
 					let tote_div = $(this);
 					let tote = unescape(tote_div.attr('data-tote-list'));
-					me.scan_tote(tote, false);
-				});
-				me.wrapper.find('.tote-check').on('click', function(){
-					let tote_div = $(this);
-					let tote = unescape(tote_div.attr('data-tote-list'));
+					let selected_totes = metactical.pick_list.selected_totes;
+					let tote_check = tote_div.find(".tote-check");
+					if(selected_totes.indexOf(tote) == -1) {
+						tote_check.prop("checked", true);
+					}
+					else{
+						tote_check.prop("checked", false);
+					}
 					me.scan_tote(tote, false);
 				});
 				me.wrapper.find('.start-picking-btn').on('click', function(){
@@ -213,15 +216,11 @@ class PicklistPage{
 			if(scanned){
 				frappe.utils.play_sound("alert");
 			}
-			if(found_barcode.is(':checked')){
-				found_barcode.prop("checked", false);
-				selected_totes.pop(barcode);
+			if(selected_totes.indexOf(barcode) == -1){
+				selected_totes.push(barcode);
 			}
-			else{
-				found_barcode.prop("checked", true);
-				if(selected_totes.indexOf(barcode) == -1){
-					selected_totes.push(barcode);
-				}
+			else {
+				selected_totes.pop(barcode);
 			}
 			me.tote_barcode.set_value("");
 		}
@@ -351,13 +350,22 @@ class PicklistPage{
 		me.wrapper.find('.pl-list-div').on('click', function(){
 			let pl_div = $(this);
 			let pick_list = unescape(pl_div.attr('data-pick-list'));
-			me.select_pick(pick_list, false);
+			let pl_check = $(this).find('.pl-check');
+			let picked_pls = metactical.pick_list.selected_pick_lists;
+			if(picked_pls.indexOf(pick_list) != -1) {
+				pl_check.prop("checked", false);
+				me.select_pick(pick_list, false);
+			}
+			else{
+				pl_check.prop("checked", true);
+				me.select_pick(pick_list, false);
+			}
 		});
-		me.wrapper.find('.pl-check').on('click', function(){
-			let pl_div = $(this);
-			let pick_list = unescape(pl_div.attr('data-pick-list'));
-			me.select_pick(pick_list, false);
-		});
+		// me.wrapper.find('.pl-check').on('click', function(){
+		// 	let pl_div = $(this);
+		// 	let pick_list = unescape(pl_div.attr('data-pick-list'));
+		// 	me.select_pick(pick_list, false);
+		// });
 		me.wrapper.find('.pl-multi-barcode').on('keypress', function(){
 			if(event.keyCode == 13){
 				let barcode = me.pl_barcode.get_value();
@@ -382,26 +390,23 @@ class PicklistPage{
 			if(scanned){
 				frappe.utils.play_sound("alert");
 			}
-			if(found_barcode.is(':checked')){
-				found_barcode.prop("checked", false);
-				selected_pl.pop(barcode);
+			if(selected_pl.indexOf(barcode) == -1){
+				let no_of_totes = metactical.pick_list.selected_totes.length;
+				let no_of_pls = selected_pl.length;
+				if(no_of_pls < no_of_totes){
+					selected_pl.push(barcode);
+				}
+				else{
+					found_barcode.prop("checked", false);
+					frappe.utils.play_sound("error");
+					frappe.show_alert({
+						message: __("Error: Number of selected pick lists is more than selected totes"),
+						indicator: "orange"
+					});
+				}
 			}
 			else{
-				if(selected_pl.indexOf(barcode) == -1){
-					let no_of_totes = metactical.pick_list.selected_totes.length;
-					let no_of_pls = selected_pl.length;
-					if(no_of_pls < no_of_totes){
-						found_barcode.prop("checked", true);
-						selected_pl.push(barcode);
-					}
-					else{
-						frappe.utils.play_sound("error");
-						frappe.show_alert({
-							message: __("Error: Number of selected pick lists is more than selected totes"),
-							indicator: "orange"
-						});
-					}
-				}
+				selected_pl.pop(barcode);
 			}
 			me.pl_barcode.set_value("");
 		}
