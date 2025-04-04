@@ -22,8 +22,11 @@
                     </div>
                     <div class="col-md-3 packing-page-card">
                         <section class="box packed-items">
-                            <h4 class="section-title packed-items-count cursor-pointer" @click="showPackedItems">{{
-                                getTotalPackedItems }} Item(s) Packed</h4>
+                            <div class="section-title packed-items-count">
+                                <h5 class="cursor-pointer" @click="showPackedItems"> Item(s) Packed: <b>{{
+                                        getTotalPackedItems }}</b></h5>
+                                <p> Items for Packing: {{ getTotalPackingItems }}</p>
+                            </div>
                             <div class="section-wrapper">
                                 <packed-item @revertItem="revertItem" v-for="item in packed_items" :key="item.name"
                                     :item="item"></packed-item>
@@ -85,6 +88,9 @@ export default {
         getTotalPackedItems() {
             return Object.values(this.all_packed_items).flat().reduce((total, item) => total + item.qty, 0);
         },
+        getTotalPackingItems() {
+            return this.packed_items.reduce((total, item) => total + item.qty, 0);
+        },
     },
     methods: {
         refresh() {
@@ -128,48 +134,44 @@ export default {
 
             let packed_items = "";
             Object.entries(this.all_packed_items).forEach(([packing_slip, items]) => {
-                if (this.filters.stock_entry) 
-                    packed_items += `<h5 class="cursor-pointer" onclick="openSTEPackingSlip('${packing_slip}')">${packing_slip}</h5>`;
-                else
-                    packed_items += `<h5 class="cursor-pointer" onclick="openPackingSlip('${packing_slip}')">${packing_slip}</h5>`;
-                
-                    const parcel_details = this.packed_packing_slips[packing_slip];
+                packed_items += `<h5 class="cursor-pointer" onclick="openPackingSlip('${packing_slip}')">${packing_slip}</h5>`;
+                const parcel_details = this.packed_packing_slips[packing_slip];
                 if (parcel_details) {
                     packed_items += `
-              <table class='table table-bordered packing-slip-parcel my-0'>
-                <thead>
-                  <tr>
-                    <th>Box No.</th>
-                    <th>Template</th>
-                    <th class='text-center'>Gross Weight</th>
-                    <th class='text-center'>Height</th>
-                    <th class='text-center'>Width</th>
-                    <th class='text-center'>Length</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>${parcel_details.from_case_no}</td>
-                    <td>${parcel_details.custom_neb_parcel_template}</td>
-                    <td class='text-center'>${parcel_details.gross_weight_pkg}</td>
-                    <td class='text-center'>${parcel_details.custom_neb_box_height}</td>
-                    <td class='text-center'>${parcel_details.custom_neb_box_width}</td>
-                    <td class='text-center'>${parcel_details.custom_neb_box_length}</td>
-                  </tr>
-                </tbody>
-              </table>`;
+			  <table class='table table-bordered packing-slip-parcel my-0'>
+				<thead>
+				  <tr>
+					<th>Box No.</th>
+					<th>Template</th>
+					<th class='text-center'>Gross Weight</th>
+					<th class='text-center'>Height</th>
+					<th class='text-center'>Width</th>
+					<th class='text-center'>Length</th>
+				  </tr>
+				</thead>
+				<tbody>
+				  <tr>
+					<td>${parcel_details.from_case_no}</td>
+					<td>${parcel_details.custom_neb_parcel_template}</td>
+					<td class='text-center'>${parcel_details.gross_weight_pkg}</td>
+					<td class='text-center'>${parcel_details.custom_neb_box_height}</td>
+					<td class='text-center'>${parcel_details.custom_neb_box_width}</td>
+					<td class='text-center'>${parcel_details.custom_neb_box_length}</td>
+				  </tr>
+				</tbody>
+			  </table>`;
                 }
                 packed_items += `
-            <table class='table table-bordered packing-slip-detail mt-1'>
-              <tbody class='packing-list-items-list'>
-                ${items.map((props) => `
-                  <tr>
-                    <td>${props.ifw_retailskusuffix}</td>
-                    <td>${props.item_name}</td>
-                    <td>${props.qty}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>`;
+			<table class='table table-bordered packing-slip-detail mt-1'>
+			  <tbody class='packing-list-items-list'>
+				${items.map((props) => `
+				  <tr>
+					<td>${props.ifw_retailskusuffix}</td>
+					<td>${props.item_name}</td>
+					<td>${props.qty}</td>
+				  </tr>`).join('')}
+			  </tbody>
+			</table>`;
             });
 
             dialog.fields_dict.packed_item_detail.$wrapper.html(packed_items);
@@ -201,21 +203,21 @@ export default {
 
             let barcode_found = false;
             this.pending_items.forEach((cur_item) => {
-              if (cur_item.item_barcode.indexOf(barcode) != -1) {
-                if (amount > cur_item.qty) {
-                  frappe.throw(`You can only add a maximum of ${cur_item.qty} items`);
+                if (cur_item.item_barcode.indexOf(barcode) != -1) {
+                    if (amount > cur_item.qty) {
+                        frappe.throw(`You can only add a maximum of ${cur_item.qty} items`);
+                    }
+                    frappe.utils.play_sound("alert");
+
+                    const fields = me.getMeasurementFields(cur_item);
+                    if (fields.length > 0 && me.ask_shipment_info) {
+                        me.showMeasurementDialog(fields, cur_item, barcode, amount);
+                    } else {
+                        me.packItem(cur_item, barcode, amount);
+                    }
+                    barcode_found = true;
+                    throw "Break";
                 }
-                frappe.utils.play_sound("alert");
-            
-                const fields = me.getMeasurementFields(cur_item);
-                if (fields.length > 0 && me.ask_shipment_info) {
-                  me.showMeasurementDialog(fields, cur_item, barcode, amount);
-                } else {
-                  me.packItem(cur_item, barcode, amount);
-                }
-                barcode_found = true;
-                throw "Break";
-              }
             });
 
             if (!barcode_found) {
@@ -277,10 +279,12 @@ export default {
 
         reGenerateCurrentItem(item = null, reverting = false) {
             if (item.qty == 0 && !reverting) {
-              const index = this.pending_items.findIndex((i) => i.dn_detail === item.dn_detail);
-              this.pending_items.splice(index, 1);
+                const index = this.pending_items.findIndex((i) => i.dn_detail === item.dn_detail);
+                this.pending_items.splice(index, 1);
             }
+
             var item = item.qty == 0 ? null : item;
+
             if (this.pending_items.length > 0) {
                 if (item) {
                     this.current_item = this.pending_items.find((row) => row.dn_detail === item.dn_detail);
@@ -297,10 +301,10 @@ export default {
                 title: "Shipment Parcel",
                 fields: [
                     { fieldname: "parcel_template", fieldtype: "Link", options: "Shipment Parcel Template", label: "Parcel Template", onchange: () => this.updateParcelTemplate(dialog) },
-                    { fieldname: "gross_weight_pkg", label: "Box Gross Weight", fieldtype: "Float", reqd: 1 },
-                    { fieldname: "height", label: "Box Height", fieldtype: "Float", reqd: 1 },
-                    { fieldname: "width", label: "Width", fieldtype: "Float", reqd: 1 },
-                    { fieldname: "length", label: "Length", fieldtype: "Float", reqd: 1 },
+                    { fieldname: "gross_weight_pkg", label: "Box Gross Weight (kg)", fieldtype: "Float", reqd: 1 },
+                    { fieldname: "height", label: "Box Height (cm)", fieldtype: "Float", reqd: 1 },
+                    { fieldname: "width", label: "Width (cm)", fieldtype: "Float", reqd: 1 },
+                    { fieldname: "length", label: "Length (cm)", fieldtype: "Float", reqd: 1 },
                 ],
                 primary_action_label: "Pack",
                 primary_action: (values) => this.saveForm(dialog),
