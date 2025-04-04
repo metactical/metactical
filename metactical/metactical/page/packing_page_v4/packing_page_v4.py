@@ -67,16 +67,18 @@ def get_all_packed_items(delivery_note, stock_entry=None):
 	doctype = "STE Packing Slip"
 	field = "stock_entry"
 	value = stock_entry if stock_entry else delivery_note
+	link_field = "ste_detail"
 
 	if delivery_note:
 		doctype = "Packing Slip"
 		field = "delivery_note"
+		link_field = "dn_detail"
 
 	packed_items = frappe.db.sql(f"""
 		SELECT
 			psi.item_code, psi.item_name, psi.stock_uom, psi.qty, 
 			psi.net_weight, psi.parent AS packing_slip,
-			i.ifw_retailskusuffix
+			i.ifw_retailskusuffix, {link_field} as dn_detail
 		FROM
 			`tab{doctype} Item` psi
 			JOIN `tab{doctype}` ON `tab{doctype}`.name = psi.parent
