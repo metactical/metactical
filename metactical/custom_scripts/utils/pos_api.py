@@ -3,7 +3,7 @@ from metactical.custom_scripts.sales_order.sales_order import make_sales_invoice
 from metactical.custom_scripts.utils.metactical_utils import ( 
 	post_to_rocket_chat, queue_action
 )
-from frappe.utils import file_lock, now_datetime, get_url
+from frappe.utils import file_lock, now_datetime, get_url, flt
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
@@ -253,11 +253,22 @@ def create_invoice(sales_order, form_data):
     sales_invoice = make_sales_invoice(sales_order.name)
     sales_invoice.is_pos = 1
     sales_invoice.update_stock = 1
+    sales_invoice.write_off_outstanding_amount_automatically = 0
     sales_invoice.pos_profile = form_data['POSProfile'] + ' Operators'
     frappe.set_user(form_data['SalesPerson'])
     payments = get_payments(form_data)
     sales_invoice.update({'payments': payments})
     sales_invoice.save()
+    
+    # add a write off amount when there is a difference between the total and the payment amount 
+    if sales_invoice.grand_total != form_data['Total']:		
+        write_off_limit = flt(frappe.db.get_value("POS Profile", sales_invoice.pos_profile, "write_off_limit"))
+        difference = sales_invoice.grand_total - form_data['Total']
+        
+        if write_off_limit and difference <= write_off_limit:
+            sales_invoice.write_off_amount = difference
+            sales_invoice.save()
+            frappe.db.commit()
 
     frappe.set_user("Administrator")    
     return sales_invoice
