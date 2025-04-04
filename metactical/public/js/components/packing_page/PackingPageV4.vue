@@ -257,8 +257,17 @@
   
 	  async packItem(cur_item, barcode, amount = 1) {
 		let cur_packed_item = this.packed_items.find((item) => item.dn_detail === cur_item.dn_detail);
+		var packed_qty = 0;
+
+		Object.values(this.all_packed_items).forEach((items) => {
+			items.forEach((item) => {
+				if (item.dn_detail === cur_item.dn_detail) {
+					packed_qty += item.qty;
+				}
+			})
+		});
 		
-		await this.check_stock_availability(cur_item, cur_packed_item, amount).then((r) => {
+		await this.check_stock_availability(cur_item, cur_packed_item, amount, packed_qty).then((r) => {
 			if (r) {
 				cur_item.qty -= amount;
 				if (cur_packed_item) {
@@ -278,16 +287,17 @@
 		})
 	  },
 
-	  async check_stock_availability(cur_item, cur_packed_item, amount) {
+	  async check_stock_availability(cur_item, cur_packed_item, amount, packed_qty) {
 		let in_stock = true;
 		if (cur_item.s_warehouse) {
 			await frappe.db.get_value("Bin", { item_code: cur_item.item_code, warehouse: cur_item.s_warehouse }, ["actual_qty", "reserved_qty"]).then((r) => {
 				var available_qty = r.message.actual_qty - r.message.reserved_qty;
-				var packed_qty = cur_packed_item ? cur_packed_item.qty : 0;
+				var qantity_added_for_packing = cur_packed_item ? cur_packed_item.qty : 0;
+				var total = packed_qty + amount + qantity_added_for_packing
 
-				if (available_qty < (packed_qty + amount)) {
+				if (available_qty < total) {
 					in_stock = false;
-					frappe.throw(`Cannot Transfer Qty ${amount} for Item ${cur_item.item_code}, Available Qty is ${available_qty}`);
+					frappe.throw(`Cannot Transfer Qty ${total} for Item ${cur_item.item_code}, Available Qty is ${available_qty}`);
 				}
 				else{
 					in_stock = true;
