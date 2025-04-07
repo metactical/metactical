@@ -3,14 +3,9 @@ from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 
 
 @frappe.whitelist()
-def copy_specifications_to_items(item_group, overwrite, add_missing_labels, sync_to_websites):
+def copy_specifications_to_items(item_group, add_missing_labels):
     chunk_size = 2500
-    start = 0        
-    webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "enabled": 1, "webhook_docevent": "on_update"})
-    if webhook:
-        webhook = frappe.get_doc("Webhook", webhook)
-    else:
-        webhook = None
+    start = 0
         
     # Get a batch of items
     # Fetch specifications only once per batch
@@ -32,10 +27,6 @@ def copy_specifications_to_items(item_group, overwrite, add_missing_labels, sync
                     process_item_specifications,
                     items=items,
                     web_spec_labels=web_spec_labels,
-                    overwrite=overwrite,
-                    add_missing_labels=add_missing_labels,
-                    webhook=webhook,
-                    sync_to_websites=sync_to_websites,
                     queue='long'
                 )
                 
@@ -45,7 +36,7 @@ def copy_specifications_to_items(item_group, overwrite, add_missing_labels, sync
         frappe.log_error(title="Error in copy_specifications_to_items", message=frappe.get_traceback())
         frappe.msgprint(f"Error: {e}")    
 
-def process_item_specifications(items, web_spec_labels, overwrite, add_missing_labels, webhook, sync_to_websites):
+def process_item_specifications(items, web_spec_labels):
     """
     Process the specifications for a single item.
     """
@@ -59,10 +50,7 @@ def process_item_specifications(items, web_spec_labels, overwrite, add_missing_l
                 fields=['name', 'label']
             )
 
-            if existing_specs and int(overwrite):
-                for spec in existing_specs:
-                    frappe.delete_doc('MT Item Website Specification', spec['name'])
-            elif not int(overwrite) and existing_specs and int(add_missing_labels):
+            if existing_specs:
                 existing_labels = [spec['label'] for spec in existing_specs]
                 new_spec_found = False
                 
@@ -72,12 +60,7 @@ def process_item_specifications(items, web_spec_labels, overwrite, add_missing_l
                         insert_web_specification(item_code, label)
                 
                 update_website_items(item_code)
-                if not new_spec_found and int(sync_to_websites):
-                    trigger_item_update(item_code, webhook)
-                
                 frappe.db.commit()
-                continue
-            elif not int(overwrite) and existing_specs and not int(add_missing_labels):
                 continue
             
             # Insert new specifications
@@ -85,9 +68,6 @@ def process_item_specifications(items, web_spec_labels, overwrite, add_missing_l
                 insert_web_specification(item_code, spec)
             
             update_website_items(item_code)
-            if int(sync_to_websites):
-                trigger_item_update(item_code, webhook)
-                
             frappe.db.commit()
     except Exception as e: 
         frappe.log_error(title="Error in process_item_specifications", message=frappe.get_traceback())
