@@ -1,0 +1,84 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2025-04-07 09:54:17.864408",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": "",
+ "modified": "2025-04-07 09:54:17.864408",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Search by Location",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Item",
+ "report_name": "Search by Location",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Maintenance User"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Item Manager"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "All"
+  },
+  {
+   "role": "10B. WarehouseLv2"
+  },
+  {
+   "role": "12C. StoreLv3"
+  },
+  {
+   "role": "16B. AccountingUserLv2"
+  },
+  {
+   "role": "14B. CustomerServiceLv2"
+  },
+  {
+   "role": "10C. WarehouseLv3"
+  },
+  {
+   "role": "20A. BuyingLv1"
+  },
+  {
+   "role": "12B. StoreLv2"
+  },
+  {
+   "role": "22A. AdvanceUserLv1"
+  },
+  {
+   "role": "20B. BuyingLv2"
+  },
+  {
+   "role": "16A. AccountingUserLv1"
+  },
+  {
+   "role": "12A. StoreLv1"
+  }
+ ]
+}
