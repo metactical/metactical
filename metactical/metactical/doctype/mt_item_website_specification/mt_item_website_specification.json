@@ -34,16 +34,6 @@
    "read_only_depends_on": "eval:parent.doctype == \"Item Group\";"
   },
   {
-   "depends_on": "eval:parent.doctype != \"Item Group\";",
-   "fetch_from": "description_link.description",
-   "fieldname": "description",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Description",
-   "print_width": "300px",
-   "read_only_depends_on": "eval:parent.doctype == \"Item Group\";"
-  },
-  {
    "columns": 2,
    "default": "0",
    "fieldname": "mandatory",
