@@ -80,7 +80,6 @@ def insert_web_specification(item_code, spec):
         'parentfield': 'neb_website_specifications',
         'label': spec.label or '',
         'mandatory': spec.mandatory or 0,
-        'sort_order': spec.sort_order or 0,
         'description': spec.description or ''
     })
     new_spec.insert()
