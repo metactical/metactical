@@ -4,12 +4,13 @@ import json
 
 class CustomWebsiteItem(WebsiteItem):
 	def before_insert(self):
-		website_specs = frappe.db.get_all("MT Item Website Specification", filters={"parent": self.item_code}, fields=["label", "description", "mandatory"])
+		website_specs = frappe.db.get_all("MT Item Website Specification", filters={"parent": self.item_code}, fields=["label", "description", "mandatory", "sb_tag"])
 		for spec in website_specs:
 			website_spec = self.append("neb_website_specifications")
 			website_spec.label = spec.label
 			website_spec.description = spec.description
 			website_spec.mandatory = spec.mandatory
+			website_spec.sb_tag = spec.sb_tag
 
 	def validate(self):
 		super().validate()
