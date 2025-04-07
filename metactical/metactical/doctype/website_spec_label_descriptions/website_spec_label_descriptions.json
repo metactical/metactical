@@ -7,7 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "description",
-  "sort_order"
+  "sort_order",
+  "sb_tag"
  ],
  "fields": [
   {
@@ -21,12 +22,19 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Sort Order"
+  },
+  {
+   "fieldname": "sb_tag",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "SB Tag",
+   "options": "SB Tag"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-02-20 11:06:33.673492",
+ "modified": "2025-04-07 01:46:15.942140",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Spec Label Descriptions",
