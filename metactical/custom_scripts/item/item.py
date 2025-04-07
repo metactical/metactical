@@ -107,6 +107,7 @@ def sync_website_specifications(doc):
                     website_spec.label = spec.label
                     website_spec.description = spec.description
                     website_spec.mandatory = spec.mandatory
+                    website_spec.sb_tag = spec.sb_tag
                     website_spec.parent = website_item.name
                     website_spec.parenttype = website_item.doctype
                     website_spec.parentfield = "neb_website_specifications"
@@ -116,6 +117,7 @@ def sync_website_specifications(doc):
                     main_website_spec.label = spec.label
                     main_website_spec.description = spec.description
                     main_website_spec.parent = website_item.name
+                    main_website_spec.sb_tag = spec.sb_tag
                     main_website_spec.parenttype = website_item.doctype
                     main_website_spec.parentfield = "website_specifications"
                     main_website_spec.save()
@@ -148,3 +150,15 @@ def get_website_label_descriptions(label):
         )
     
     frappe.msgprint(desc)
+    
+@frappe.whitelist()
+def get_sb_tag(label, description):
+    sb_tag = frappe.db.get_all(
+        "Website Spec Label Descriptions",
+        filters={"parent": label, "description": description},
+        fields=["sb_tag"]
+    )
+    if sb_tag:
+        return sb_tag[0].sb_tag
+    else:
+        return None
