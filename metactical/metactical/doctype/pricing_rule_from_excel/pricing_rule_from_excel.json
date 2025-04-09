@@ -7,8 +7,12 @@
  "engine": "InnoDB",
  "field_order": [
   "import_based_on",
+  "pr_naming_series",
+  "download_template",
   "excel_file",
   "section_break_i8qkd",
+  "import_preview",
+  "section_break_wzfbv",
   "error_log",
   "section_queus",
   "ais_queue_failed",
@@ -25,7 +29,7 @@
    "fieldname": "import_based_on",
    "fieldtype": "Select",
    "label": "Import Based On",
-   "options": "ERP SKU\nRetail SKU",
+   "options": "Retail SKU\nERP SKU",
    "reqd": 1
   },
   {
@@ -45,8 +49,10 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.excel_file",
    "fieldname": "section_break_i8qkd",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Preview"
   },
   {
    "fieldname": "error_log",
@@ -110,12 +116,31 @@
    "options": "Pricing Rule From Excel",
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "import_preview",
+   "fieldtype": "HTML"
+  },
+  {
+   "fieldname": "section_break_wzfbv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "download_template",
+   "fieldtype": "Button",
+   "label": "Download Template"
+  },
+  {
+   "fieldname": "pr_naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "PRLE-.####\nPRLE-.#####\nPRLE-.######"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-08 16:11:25.597176",
+ "modified": "2024-11-28 13:53:00.081765",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pricing Rule From Excel",
@@ -135,5 +160,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

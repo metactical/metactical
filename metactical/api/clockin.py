@@ -42,6 +42,7 @@ def get_clockin_status():
 def get_pay_cycle_data(current_date=None):
 	if current_date is None:
 		current_date = datetime.date.today()
+	
 	user = frappe.session.user
 	employee = frappe.db.exists("Employee", {"user_id": user})
 	current_shift = None
@@ -391,13 +392,17 @@ def convert_to_12hr(time_24hr):
 	return time
 
 @frappe.whitelist()
-def send_details_change_request(log_name, checkInTime12, checkInTimeMilitary, checkOutTime12, checkOutTimeMilitary, currentCheckIn12, currentCheckOut12, date):
+def send_details_change_request(log_name, checkInTime12, checkInTimeMilitary, checkOutTime12, checkOutTimeMilitary, currentCheckIn12, currentCheckOut12, date, full_date):
 	user = frappe.session.user
 
 	user_doc = frappe.get_doc("User", user)
 	username = user_doc.username
 	first_name = user_doc.first_name
 	last_name = user_doc.last_name
+
+	# If log_name is not set (no hours clocked for that day), create a log first
+	if log_name is None or log_name == "":
+		log_name = create_zero_log(user, full_date)
 
 	requested_total_hours = time_difference(f'{checkOutTimeMilitary}:00', f'{checkInTimeMilitary}:00')
 	current_total_hours = frappe.get_value("Clockin Log", log_name, "total_hours")
@@ -444,6 +449,46 @@ def send_details_change_request(log_name, checkInTime12, checkInTimeMilitary, ch
 		),
 		header="Checkin Modification Request"
 	)
+
+def create_zero_log(user, date):
+	employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+	shift = frappe.db.get_value("Shift Assignment", {"employee": employee, "status": "Active"}, "shift_type")
+	#date = datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%Y-%m-%d")
+	get_pay_cycle_data(datetime.datetime.strptime(date, "%Y-%m-%d").date())
+	# clockin = frappe.new_doc("Employee Checkin")
+	# clockin.update({
+	# 	"employee": employee,
+	# 	"log_type": "IN",
+	# 	"shift": shift,
+	# 	"time": f'{date} 00:00:00'
+	# })
+	# clockin.insert()
+
+	# clockout = frappe.new_doc("Employee Checkin")
+	# clockout.update({
+	# 	"employee": employee,
+	# 	"log_type": "OUT",
+	# 	"shift": shift,
+	# 	"time": f'{date} 00:00:00'
+	# })
+	# clockout.insert()
+
+	log_doc = frappe.new_doc("Clockin Log")
+	log_doc.update({
+		"user": user,
+		"date": date,
+		"from_time": f'{date} 00:00:00',
+		"total_hours": 0
+	})
+	log_doc.insert()
+	
+	log_doc.update({
+		"to_time": f'{date} 00:00:00',
+		"total_hours": 0,
+		"has_clocked_out": 1,
+	})
+	log_doc.save()
+	return log_doc.name
 
 @frappe.whitelist()
 def decline_details_change_request(request_name):

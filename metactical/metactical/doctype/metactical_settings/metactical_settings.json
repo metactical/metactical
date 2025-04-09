@@ -16,7 +16,9 @@
   "roles_to_adjust_payment",
   "column_break_ax30v",
   "roles_to_make_payment",
-  "roles_to_cancel_payment"
+  "roles_to_cancel_payment",
+  "pos_section",
+  "pos_url"
  ],
  "fields": [
   {
@@ -79,12 +81,22 @@
    "fieldtype": "Table",
    "label": "USAePay Accounts",
    "options": "USAePay Accounts"
+  },
+  {
+   "fieldname": "pos_section",
+   "fieldtype": "Tab Break",
+   "label": "POS"
+  },
+  {
+   "fieldname": "pos_url",
+   "fieldtype": "Data",
+   "label": "POS URL"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-04-09 08:01:43.022513",
+ "modified": "2025-03-19 06:52:44.649311",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",

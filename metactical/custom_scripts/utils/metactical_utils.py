@@ -12,20 +12,14 @@ from openpyxl.utils import get_column_letter
 from frappe.utils.xlsxutils import handle_html, ILLEGAL_CHARACTERS_RE
 from io import BytesIO
 import re, os
+from datetime import datetime
 
 from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
 
 def queue_action(self, action, **kwargs):
-	"""Run an action in background. If the action has an inner function,
-	like _submit for submit, it will call that instead"""
-	# call _submit instead of submit, so you can override submit to call
-	# run_delayed based on some action
-	# See: Stock Reconciliation
+	#Run an action in background
 	from frappe.utils.background_jobs import enqueue
-
-	if hasattr(self, '_' + action):
-		action = '_' + action
 
 	if file_lock.lock_exists(self.get_signature()):
 		frappe.throw(_('This document is currently queued for execution. Please try again'),
@@ -40,7 +34,7 @@ def queue_action(self, action, **kwargs):
 	enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 		action=action, **kwargs)
 		
-def post_to_rocket_chat(doc, msg, failed=False):
+def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
 		if not rocket_chat_settings.rocket_notification:
@@ -53,13 +47,18 @@ def post_to_rocket_chat(doc, msg, failed=False):
 			'X-User-Id': rocket_chat_settings.user_id
 		}
 
-		url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
-		message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
-						administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
-		
-		if failed:
-			message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
-						\n[{0}]({1})'.format(get_url(url), get_url(url))
+		if pos:	
+			message = msg
+		elif rmq:
+			message = msg
+		else:	
+			url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
+			message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
+							administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
+			
+			if failed:
+				message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
+							\n[{0}]({1})'.format(get_url(url), get_url(url))
 
 		payload = {
 			'channel': "#"+channel_name,
@@ -165,7 +164,7 @@ def get_customer_payment_information(customer, payment_entry, reference_no=None)
 			break
 
 	if frappe.db.exists("Customer CC", customer):
-		tokens = frappe.get_list("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
+		tokens = frappe.get_all("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
 
 	usaepay_settings = get_usaepay_account(reference_no, None, lead_source)
 	payment_form_url = usaepay_settings.payment_form_url
@@ -431,48 +430,74 @@ def check_si_payment_status_for_so(sales_order):
 	return all_invoices_paid
 
 def get_customer_email_and_phone(customer):
-    contacts = frappe.db.sql("""select c.email_id, phone, c.mobile_no
+	contacts = frappe.db.sql("""select c.email_id, phone, c.mobile_no
 								from `tabContact` c
 								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
 								INNER Join `tabCustomer` cs on dl.link_name=cs.name
 								where  dl.link_doctype="Customer" and cs.name = "{0}"
-                                ORDER BY c.creation desc
-                                """.format(customer), as_dict=True)
-            
+								ORDER BY c.creation desc
+								""".format(customer), as_dict=True)
+			
 
-    if len(contacts):
-        return contacts
-    else:
-        return None
+	if len(contacts):
+		return contacts
+	else:
+		return None
 
 def search_customer_by_phone_email(phone_number, email):
-    email_filter = ""
-    if email:
-        email_filter = f"AND c.email_id like '%{email}%'"
-    
-    phone_filter = ""
-    if phone_number:
-        phone_filter = f"AND (c.phone like '%{phone_number}%' or c.mobile_no like '%{phone_number}%')"
+	email_filter = ""
+	if email:
+		email_filter = f"AND c.email_id like '%{email}%'"
+	
+	phone_filter = ""
+	if phone_number:
+		phone_filter = f"AND (c.phone like '%{phone_number}%' or c.mobile_no like '%{phone_number}%')"
 
-    customers = frappe.db.sql(f"""select cs.name
-                                from `tabContact` c
-                                INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
-                                INNER Join `tabCustomer` cs on dl.link_name=cs.name
-                                where  dl.link_doctype="Customer" {email_filter} {phone_filter}
-                                """, as_dict=True)
+	customers = frappe.db.sql(f"""select cs.name
+								from `tabContact` c
+								INNER JOIN `tabDynamic Link` dl on dl.parent=c.name
+								INNER Join `tabCustomer` cs on dl.link_name=cs.name
+								where  dl.link_doctype="Customer" {email_filter} {phone_filter}
+								""", as_dict=True)
 
-    if len(customers):
-        return [customer.get('name') for customer in customers]
-    else:
-        return None
+	if len(customers):
+		return [customer.get('name') for customer in customers]
+	else:
+		return None
+	
 def read_file(file_path):
-		extn = os.path.splitext(file_path)[1][1:]
+	extn = os.path.splitext(file_path)[1][1:]
 
-		file_content = None
+	file_content = None
 
-		file_name = frappe.db.get_value("File", {"file_url": file_path})
-		if file_name:
-			file = frappe.get_doc("File", file_name)
-			file_content = file.get_content()
-		
-		return file_content, extn
+	file_name = frappe.db.get_value("File", {"file_url": file_path})
+	if file_name:
+		file = frappe.get_doc("File", file_name)
+		file_content = file.get_content()
+	
+	return file_content, extn
+
+def remove_tz_from_date(date):
+	if not date:
+		return None
+	
+	# Truncate to six digits
+	# '%Y-%m-%dT%H:%M:%S.%fZ'  check if the date has this format
+	# if not, add the missing part
+	date_str_fixed = date
+	if len(date) == 19:
+		date_str_fixed = date + ".000000Z"
+	elif len(date) > 26:
+		date_str_fixed = date[:26] + "Z"
+	elif len(date) > 19 and len(date) < 26:
+		date_str_fixed = date + "0" * (26 - len(date)) + "Z"
+
+	parsed_date = datetime.strptime(date_str_fixed, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+	# Output the formatted datetime (customize the format as needed)
+	formatted_date = parsed_date.strftime("%Y-%m-%d")
+	return formatted_date
+
+def get_state_code(state):
+	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
+	return symbol

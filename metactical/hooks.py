@@ -16,7 +16,7 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["metactical.bundle.js", "/assets/metactical/js/metactical_kanban_custom.js"]
+app_include_js = ["metactical.bundle.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -48,7 +48,10 @@ doctype_js = {
 	"Project": "custom_scripts/project/project.js",
 	"Task": "custom_scripts/task/task.js",
 	"Warehouse": "custom_scripts/warehouse/warehouse.js",
-	"Contact": "custom_scripts/contact/contact.js"
+	"Contact": "custom_scripts/contact/contact.js",
+	"Item": "custom_scripts/item/item.js",
+	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
+	"Item Group": "custom_scripts/item_group/item_group.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -57,6 +60,7 @@ doctype_list_js = {
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
 	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
+	"Pick List": "custom_scripts/pick_list/pick_list_list.js"
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -135,12 +139,18 @@ doc_events = {
 	"Item Price": {
 		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	},
-	"RabbitMQ Config": {
-		"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
-	}, 
+	# "RabbitMQ Config": {
+	# 	"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
+	# }, 
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
 	},
+	"Stock Ledger Entry": {
+		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+	},
+	"Item": {
+		"on_update": "metactical.custom_scripts.item.item.on_update"
+	}
 }
 
 # DocType Class
@@ -163,7 +173,9 @@ override_doctype_class = {
 	"Company": "metactical.custom_scripts.company.company.CustomCompany",
 	"Auto Email Report": "metactical.custom_scripts.auto_email_report.auto_email_report.CustomAutoEmailReport",
 	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
-	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment"
+	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
+	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
+	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 }
 
 # Scheduled Tasks
@@ -173,9 +185,9 @@ scheduler_events = {
 # 	"all": [
 # 		"metactical.tasks.all"
 # 	],
-    "all": [
-        "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-    ],
+#	"all": [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+#	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty"
 	],
@@ -190,7 +202,7 @@ scheduler_events = {
 # 	],
 	"cron": {
 		"15 * * * *": [
-			"metactical.custom_scripts.frappe/document.clear_queues_docs"
+			"metactical.custom_scripts.frappe.document.clear_queued_docs"
 		]
 	}
 }
@@ -213,7 +225,6 @@ override_whitelisted_methods = {
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
-	"erpnext.setup.utils.get_exchange_rate": "metactical.custom_scripts.setup.utils.get_exchange_rate",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
 }
@@ -233,13 +244,6 @@ fixtures = [{
 			'Stock Settings-ais_sales_report_settings'
 		]]]
 	},
-	{
-		"dt": "Kanban Board",
-		"filters": [["name", "in", [
-			"Buying Board",
-			"Projects Status"
-		]]]
-	},
   	{
 		"dt": "Provinces"
 	},
@@ -250,6 +254,12 @@ fixtures = [{
 			"Store Credit - CAD - ICL",
 			"Store Credit - USD - ICL"
 		]]]
+	},
+	{
+		"dt": "Email Template",
+		"filters": [["name", "in", [
+			"POS User Welcome Email"
+		]]]
 	}
 ]
 
@@ -259,15 +269,17 @@ jinja = {
 		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",
-		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.si_mode_of_payment",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_commercial_invoice",
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_totals",
-		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info"
+		"metactical.barcode_generator.get_barcode_for_print_format",
+		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info",
+		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
+		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
 	]
 }
 
 
-app_include_python = [
-    "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
-]
+# app_include_python = [
+#     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
+# ]

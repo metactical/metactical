@@ -21,10 +21,12 @@ frappe.ui.form.on('Manifest', {
 					method: "metactical.metactical.doctype.manifest.manifest.get_shipments",
 					args: {
 						"pickup_date": frm.doc.pickup_date,
-						"warehouse": frm.doc.warehouse
+						"warehouse": frm.doc.warehouse,
+						"service_provider": frm.doc.service_provider
 					},
 					freeze: true,
 					callback: function(ret){
+						console.log("Ret: ", ret);
 						let shipments = ret.message.shipments;
 						if(!frm.doc.pickup_contact_person){
 							frm.set_value("pickup_contact_person", ret.message.pickup_contact_person);
@@ -55,7 +57,8 @@ frappe.ui.form.on('Manifest', {
 					frappe.call({
 						method: "metactical.metactical.doctype.manifest.manifest.create_manifest",
 						args: {
-							"manifest": frm.docname
+							"manifest": frm.docname,
+							"service_provider": frm.doc.service_provider
 						},
 						freeze: true,
 						callback: function(ret){
@@ -75,6 +78,7 @@ frappe.ui.form.on('Manifest', {
 					frappe.call({
 						method: "metactical.metactical.doctype.manifest.manifest.redownload_manifest",
 						args: {
+							"doctype": "Manifest",
 							"docname": frm.docname
 						},
 						freeze: true,

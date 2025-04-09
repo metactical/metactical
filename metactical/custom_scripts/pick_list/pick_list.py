@@ -23,8 +23,23 @@ from frappe import _, msgprint, bold
 from frappe.utils.nestedset import get_descendants_of
 from erpnext.stock.doctype.packed_item.packed_item import is_product_bundle
 import re
+from frappe.model.docstatus import DocStatus
 
 class CustomPickList(PickList):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.locations) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+			
 	def validate(self):
 		super(CustomPickList, self).validate()
 		self.check_for_existing_draft()
@@ -296,21 +311,16 @@ class CustomPickList(PickList):
 		if save:
 			self.save()
 
-	def submit(self):
-		if len(self.locations) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-
 	def validate_stock_qty(self):
 		from erpnext.stock.doctype.batch.batch import get_batch_qty
+		shipping_items = frappe.db.get_all('Pick List Shipping Item', fields=["item"], pluck='item')
+		
 
 		for row in self.get("locations"):
+			# Metactical Customization: Skip shipping items
+			if row.item_code in shipping_items:
+				continue
+
 			# Metactical Customization: If is product budle, validate individual items
 			if is_product_bundle(row.item_code):
 				bundle_items = frappe.get_all('Product Bundle Item', filters={'parent': row.item_code}, fields=['item_code', 'qty'])
@@ -323,9 +333,8 @@ class CustomPickList(PickList):
 					if row.qty > bin_qty:
 						frappe.throw(
 							_(
-								"At Row #{0}: The picked quantity {1} for the product budle item {2} is greater than available stock {3} in the warehouse {5}."
-							).format(row.idx, bundle_item.item_code, bundle_item.qty,  bold(row.warehouse)),
-							title=_("Insufficient Stock"),
+								"At Row #{0}: The picked quantity {1} for the product budle item {2} is greater than available stock {3} in the warehouse {4}."
+							).format(row.idx, row.qty, bold(bundle_item.item_code), bin_qty, bold(row.warehouse)),
 						)
 			else:
 				if row.batch_no and not row.qty:
@@ -495,8 +504,7 @@ def create_pick_list(source_name, target_doc=None):
 
 		target.qty = qty_to_be_picked
 		target.stock_qty = qty_to_be_picked * flt(source.conversion_factor)
-		# Metactical Customization: Default pick qty take delivered qty into consideration
-		target.picked_qty = flt(source.qty) - flt(source.delivered_qty)
+		target.picked_qty = qty_to_be_picked
 
 	def update_packed_item_qty(source, target, source_parent) -> None:
 		qty = flt(source.qty)
@@ -509,9 +517,15 @@ def create_pick_list(source_name, target_doc=None):
 	
 	# Metactical Customization: Add bundled item instead of breaking it down to it's individual items
 	def should_pick_order_item(item) -> bool:
+		is_stock_item = True
+
+		if not is_product_bundle(item.item_code):
+			is_stock_item = frappe.db.get_value("Item", item.item_code, "is_stock_item")
+
 		return (
 			abs(item.delivered_qty) < abs(item.qty)
 			and item.delivered_by_supplier != 1
+			and is_stock_item
 		)
 	
 	# Metactcal Customization: Add warehouse, sales order and source to item map
@@ -591,3 +605,17 @@ def create_delivery_note(source_name, target_doc=None):
 
 	#frappe.msgprint(_("Delivery Note(s) created for the Pick List"))
 	return delivery_note
+
+@frappe.whitelist()
+def submit_pick_list(doc):
+	# Metactical Customization: Submit pick list in background if more than 10 items
+	doc = frappe.get_doc("Pick List", doc)
+	if len(doc.locations) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()

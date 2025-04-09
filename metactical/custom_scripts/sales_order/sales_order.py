@@ -21,14 +21,30 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 )
 
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
+from frappe.model.docstatus import DocStatus
 
 class SalesOrderCustom(SalesOrder):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def validate(self):
 		super(SalesOrderCustom, self).validate()
 		self.pull_reserved_qty()
 		
 		if self.po_no and not self.neb_usaepay_transaction_key:
-			self.get_transaction_key()
+			self.neb_usaepay_transaction_key = get_transaction_key(self.source, self.po_no, self.customer)
 
 	def pull_reserved_qty(self):
 		for row in self.items:
@@ -39,17 +55,6 @@ class SalesOrderCustom(SalesOrder):
 					'warehouse': row.warehouse}, 'reserved_qty')
 				row.update({'sal_reserved_qty': reserved_qty})
 
-	def submit(self):
-		if len(self.items) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
-	
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(SalesOrderCustom, self).set_status(update, status, update_modified)
 
@@ -61,30 +66,40 @@ class SalesOrderCustom(SalesOrder):
 
 		elif self.billing_status != "Fully Billed" and self.neb_payment_completed_at:
 			self.db_set("neb_payment_completed_at", None, notify=True)
-			
-	def get_transaction_key(self):
-		if not self.po_no:
-			return
 
-		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":self.po_no, "lead_source": self.source})
-		if not so_usaepay_transaction:
-			so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": self.po_no, "lead_source": self.source})
-			if not so_usaepay_transaction:
-				return
+	def on_submit(self):
+		super(SalesOrderCustom, self).on_submit()
 
-		usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
-		self.neb_usaepay_transaction_key = usaepay_transaction.transaction_key
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
-		obj = {
-			"object": {
-				"key": usaepay_transaction.transaction_key,
-				"creditcard": {
-					"number": usaepay_transaction.credit_card
-				}
-			}
-		}
-		process_credit_card_tokens(obj, self.customer)
-		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
+	def on_cancel(self):
+		super(SalesOrderCustom, self).on_cancel()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+
+	def on_submit(self):
+		super(SalesOrderCustom, self).on_submit()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+   
+	def on_update_after_submit(self):
+		super().on_update_after_submit()
+
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+
+	def on_cancel(self):
+		super(SalesOrderCustom, self).on_cancel()
+
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
 @frappe.whitelist()
 def save_cancel_reason(**args):
@@ -230,3 +245,43 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		doclist.set_payment_schedule()
 
 	return doclist
+
+@frappe.whitelist()
+def submit_order(doc):
+	# Metactical Customization: Submit order in background if more than 10 items
+	doc = frappe.get_doc("Sales Order", doc)
+	if len(doc.items) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()
+
+@frappe.whitelist()
+def get_transaction_key(source, po_no, customer):
+	if not po_no:
+		return
+
+	so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":po_no, "lead_source": source})
+	if not so_usaepay_transaction:
+		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": po_no, "lead_source": source})
+		if not so_usaepay_transaction:
+			return
+
+	usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
+
+	obj = {
+		"object": {
+			"key": usaepay_transaction.transaction_key,
+			"creditcard": {
+				"number": usaepay_transaction.credit_card
+			}
+		}
+	}
+	process_credit_card_tokens(obj, customer)
+	frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
+	
+	return usaepay_transaction.transaction_key

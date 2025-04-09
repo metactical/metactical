@@ -93,7 +93,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2024-08-19 15:10:15.427702",
+ "modified": "2024-10-10 16:47:05.470560",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
@@ -113,5 +113,6 @@
  "quick_entry": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }

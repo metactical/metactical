@@ -1,7 +1,5 @@
 frappe.ui.form.on('Pick List', {
 	refresh: function(frm){
-		console.log({"socket": frappe.socketio});
-		
 		//Code for custom cancel button that saves cancel reason first
 		if(frm.doc.docstatus == 1){
 			frm.page.clear_secondary_action();

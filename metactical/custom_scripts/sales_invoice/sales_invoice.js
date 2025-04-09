@@ -4,7 +4,6 @@ frappe.ui.form.on('Sales Invoice', {
 			frm.set_value("neb_payment_completed_at", null)
 
 		frm.trigger("update_custom_buttons")
-
 		//frm.add_custom_button(__('Journal Entry'), () => frm.events.create_journal_entry(frm), __("Create"));
 	},
 	validate: function(frm){
@@ -87,6 +86,7 @@ frappe.ui.form.on('Sales Invoice', {
 			},
 			callback: function(r){
 				if(r.message){
+					console.log(r.message, frm.doc.debit_to, r.message != frm.doc.debit_to);
 					if (r.message != frm.doc.debit_to){
 						frm.set_value("debit_to", r.message);
 						frm.trigger("get_advances")

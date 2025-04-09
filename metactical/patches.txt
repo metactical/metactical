@@ -1,3 +1,4 @@
+[pre_model_sync]
 execute:frappe.db.sql("update `tabReport` set prepared_report = 1 where name in ('Accounts Receivable', 'Accounts Receivable Summary', 'Accounts Payable', 'Accounts Payable Summary')")
 execute:frappe.db.sql("update `tabPage` set module = 'Metactical' where name = 'packing-slip'")
 metactical.patches.copy_shipstation_orderids
@@ -12,3 +13,11 @@ metactical.patches.copy_retailsku_item_price
 execute:frappe.db.sql("CREATE INDEX docstatus on `tabPick List` (docstatus)")
 execute:frappe.db.sql("CREATE INDEX warehouse on `tabPick List Item` (warehouse)")
 execute:frappe.db.sql("UPDATE `tabDocField` SET reqd=0 WHERE fieldname='weight' AND parent='Shipment Parcel Template'")
+metactical.patches.update_source_si_so_last
+metactical.patches.set_default_weight_uom
+metactical.patches.remove_whitespace_from_descriptions
+
+[post_model_sync]
+execute:frappe.db.sql("UPDATE `tabPick List` SET status = 'Picked' WHERE status='Open' AND docstatus='1'")
+
+

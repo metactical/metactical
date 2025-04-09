@@ -1,0 +1,12 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Email Template",
+  "modified": "2025-03-19 07:31:48.289427",
+  "name": "POS User Welcome Email",
+  "response": "<div class=\"ql-editor read-mode\"><p>Hello {{full_name}},</p><p><br></p><p>You can get started by clicking the link below:</p><p>\ud83d\udc49 {{pos_url}}?{{ branch_pairing }}</p><p><br></p><p>If you need any assistance, feel free to reach out.</p><p><br></p><p>Best regards,</p><p><br></p></div>",
+  "response_html": null,
+  "subject": "POS User  Link",
+  "use_html": 0
+ }
+]

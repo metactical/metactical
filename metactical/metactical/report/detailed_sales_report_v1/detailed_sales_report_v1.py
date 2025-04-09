@@ -131,6 +131,8 @@ def execute(filters=None):
 		row["sold_in_store"] = 0
 
 		years_ago = today - relativedelta(years=years_to_subtract)
+		last12_month_date = today - relativedelta(years=1)
+		last24_month_date = today - relativedelta(years=2)
 		for d in sales_data:
 			posting_date = getdate(d.get("posting_date"))
 			qty = d.get("qty")
@@ -141,8 +143,6 @@ def execute(filters=None):
 			elif posting_date.year == current_year:
 				row["total"] += qty
 
-			last12_month_date = today - relativedelta(years=1)
-			last24_month_date = today - relativedelta(years=2)
 			if posting_date >= last12_month_date:
 				row["last_twelve_months"] += qty
 			
@@ -167,6 +167,33 @@ def execute(filters=None):
 					row["sold_last_thirty_days"] += qty
 					if posting_date >= sold_last_ten_days:
 						row["sold_last_ten_days"] += qty
+
+		# completed purchase receipts
+		received_purchase_receipts = get_received_purchase_receipts(i.get("item_code"), i.get("supplier"))
+		last_month = getdate(str(datetime(today.year-years_to_subtract, 1,1)))
+		while last_month <= today:
+			month = last_month.strftime("%B").lower()	
+			row[frappe.scrub("received"+month+str(last_month.year))]=0
+			last_month = last_month + relativedelta(months=1)
+
+
+		total_received_12m = 0
+		total_received_24m = 0
+
+		for d in received_purchase_receipts:
+			posting_date = getdate(d.get("posting_date"))
+			qty = d.get("qty")
+
+			total_received_24m += qty
+			if posting_date >= last12_month_date:
+				total_received_12m += qty
+			
+			month = posting_date.strftime("%B")
+			if posting_date >= years_ago:
+				row[frappe.scrub("received"+month+str(posting_date.year))] += qty
+		
+		row["received_last_twelve_months"] = total_received_12m
+		row["received_last_24_months"] = total_received_24m
 
 		#For Quantity to order
 		reference_warehouse = get_reference_warehouse(filters)
@@ -727,6 +754,32 @@ def get_column(filters,conditions):
 			"fieldname": "sales_revenue_last_twelve_months",
 			"fieldtype": "Currency",
 			"width": 140
+		}])
+
+	last_month = getdate(str(datetime(today.year-years_to_subtract, today.month,1)))
+	while last_month <= today:
+		month = last_month.strftime("%B")
+		columns.append({
+				"label": _(str(last_month.year) + "_RCVD" + month),
+				"fieldname": frappe.scrub("received"+month+str(last_month.year)),
+				"fieldtype": "Int",
+				"width": 140,
+		})
+
+		last_month = last_month + relativedelta(months=1)
+
+	columns.extend([
+		{
+			"label": _("TotalReceived12M"),
+			"fieldname": "received_last_twelve_months",
+			"fieldtype": "Int",
+			"width": 140,
+		},
+		{
+			"label": _("TotalReceived24M"),
+			"fieldname": "received_last_24_months",
+			"fieldtype": "Int",
+			"width": 140
 		},
 		{
 			"label": _(f"NoCustL12M"),
@@ -933,7 +986,11 @@ def get_monthly_consumption(item_code, created_at,filters, sales_data):
 		if len(monthly_consumption) == 0:
 			average_monthly_consumption = 0
 		else:
-			average_monthly_consumption = sum(monthly_consumption) / (months_passed if months_passed < total_months else total_months)
+			total_months = months_passed if months_passed < total_months else total_months
+			if total_months == 0:
+				average_monthly_consumption = 0
+			else:
+				average_monthly_consumption = sum(monthly_consumption) / total_months
 
 		average_monthly_consumption = (average_monthly_consumption * 100) / 100
 		if i == 1:
@@ -942,6 +999,26 @@ def get_monthly_consumption(item_code, created_at,filters, sales_data):
 			average_monthly_consumption_24 = average_monthly_consumption
 
 	return average_monthly_consumption_12, average_monthly_consumption_24
+
+def get_received_purchase_receipts(item_code, years_before):
+	# group the qty in months and sum
+
+	data = frappe.db.sql("""
+		select 
+			pr.posting_date, qty
+		from	
+			`tabPurchase Receipt Item` pri
+		join
+			`tabPurchase Receipt` pr on pr.name = pri.parent
+		where
+			pri.item_code = %s and 
+			pr.docstatus = 1 and 
+			pr.posting_date >= %s and
+			pr.status = "Completed" and
+			pri.warehouse not in ('US02-Houston - Active Stock - ICL')
+		""",(item_code, years_before), as_dict=1)
+
+	return data
 
 def get_inventory(item_code, warehouse):
 	today = getdate(nowdate())
@@ -1037,7 +1114,7 @@ def get_order_frequency(item_code, today):
 								pr.docstatus = 1 and 
 								pr.posting_date >= %s and 
 								pr.status = "Completed" and
-								pri.warehouse not in ('US02-Houston - Active Stock - ICL', 'R04-Mon-Active Stock - ICL', 'R06-Reg-Active Stock - ICL')
+								pri.warehouse not in ('US02-Houston - Active Stock - ICL')
 		""",(item_code, two_years_before.strftime("%Y-%m-%d")), as_dict=1)
 
 	order_frequency = {}
@@ -1315,52 +1392,52 @@ def get_open_po_qty(item,supplier, warehouse=None):
 
 @frappe.whitelist()
 def get_item_details(item, list_type="Selling", supplier=None):
-	price_list = frappe.db.get_value("Stock Settings", "Stock Settings", "ais_default_price_list")
+	price_list = None
+	
+	if supplier is not None and supplier != "":
+		price_list = frappe.db.get_value("Supplier", supplier, "default_price_list")
+	
+	if price_list is None or price_list == "":
+		price_list = frappe.db.get_value("Stock Settings", "Stock Settings", "ais_default_price_list")
+
 	if price_list is None or price_list  == "":
 		frappe.throw("Please set a default price list in stock Settings")
+
 	cond = "and price_list = '{}' and selling = 1".format(price_list)
 	if list_type == "Buying": cond= " and buying = 1"
 	rate = 0
 	date = frappe.utils.nowdate()
-	r = frappe.db.sql("select price_list_rate from `tabItem Price` \
-						where '{}' between valid_from and valid_upto and item_code = '{}' \
-						{} limit 1".format(date, item, cond))
+	r = frappe.db.sql(f"""select price_list_rate from `tabItem Price`
+						where '{date}' between valid_from and valid_upto and item_code = '{item}'
+						{cond} limit 1""")
 	if r:
 		if r[0][0]:
 			rate = r[0][0]
 	else:
-		r = frappe.db.sql("select price_list_rate from `tabItem Price` \
-							where (valid_from <= '{}' or valid_upto >= '{}') and item_code = '{}' \
-							{} limit 1".format(date, date, item, cond))
+		r = frappe.db.sql(f"""select price_list_rate from `tabItem Price`
+							where (valid_from <= '{date}' or valid_upto >= '{date}') and item_code = '{item}'
+							{cond} limit 1""")
 		if r:
 			if r[0][0]:
 				rate = r[0][0]
 		else:
-			r = frappe.db.sql("select price_list_rate from `tabItem Price` \
-								where valid_from IS NULL and valid_upto IS NULL and item_code = '{}' \
-								{} limit 1".format(item, cond))
+			r = frappe.db.sql(f"""select price_list_rate from `tabItem Price` 
+								where valid_from IS NULL and valid_upto IS NULL and item_code = '{item}' 
+								{cond} limit 1""")
 			if r:
 				if r[0][0]:
 					rate = r[0][0]
 	return rate
 
-def test():
-	today = getdate(nowdate())
-	last_month = getdate(str(datetime(today.year-1, 1,1)))
-	print(last_month.year)
-	print(today.year)
-	while last_month < today:
-		month = last_month.strftime("%B")
-		print(last_month.month)
-		print(last_month.year)
-		last_month = last_month + relativedelta(months=1)
-
 def get_us_data(filters):
 	item_search_settings = frappe.get_doc("Item Search Settings")
-	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
+	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "" \
+		and item_search_settings.get("api_key") is not None and item_search_settings.get("api_key") != "" \
+			and item_search_settings.get("api_secret") is not None and item_search_settings.get("api_secret") != "":
 		us_request = requests.get(item_search_settings.get("sales_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params=filters)
+
 		if us_request.status_code == 200:
 			return us_request.json().get("message", {})
 	else:

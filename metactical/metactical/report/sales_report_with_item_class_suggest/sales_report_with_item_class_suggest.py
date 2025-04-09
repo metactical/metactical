@@ -1439,7 +1439,7 @@ def get_us_data(filters):
 	item_search_settings = frappe.get_doc("Item Search Settings")
 	if item_search_settings.get("sales_report_url") is not None and item_search_settings.get("sales_report_url") != "":
 		us_request = requests.get(item_search_settings.get("sales_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.api_secret),
+						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
 									params=filters)
 		if us_request.status_code == 200:
 			return us_request.json().get("message", {})

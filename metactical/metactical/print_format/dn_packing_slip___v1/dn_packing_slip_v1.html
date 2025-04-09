@@ -1,0 +1,78 @@
+{% for i, packing_slip in enumerate(packing_slips) %}
+
+    <div class="page {% if i == 0 %} first-div{% endif %}">
+            <div class="print-heading">
+            <div>
+                <img src="data:image/png;base64,{{doc.barcode}}" style="width:300px;" alt="Barcode">
+            </div>
+        </div>
+        <div class="print pb-2">
+            <p class ="text-center pb-1">
+                Date: <b>{{frappe.utils.get_datetime(packing_slip.creation).strftime('%b %d, %Y %H: %M')}}</b>
+            </p>
+
+            <p class ="text-center pb-1">
+                Box number: <b>{{packing_slip.from_case_no}} of {{ packing_slips|length }}</b>
+            </p>
+            <div class ="text-center">
+                <img alt='Barcode Generator TEC-IT'
+                src="data:image/png;base64,{{packing_slip.barcode}}" style="height:50px; padding:0px;"?draggable="false"/>
+            </div>
+        </div>
+        <table class="table table-condensed table-bordered cart no-border" style="font-size:100%;margin-top: 10px;">
+            <colgroup>
+                <col style="width: 10%">
+                <col style="width:60%; height: auto;">
+                <col style="width:10%">
+                <col style="width:10%">
+                <col style="width:10%">
+            </colgroup>
+
+            <tr>
+                <th class ="text-center">Sr.</th>
+                <th class ="text-center">Item Name</th>
+                <th class ="text-center">Qty packed</th>
+                <th class ="text-center">Net Weight</th>
+                <th class ="text-center">Weight UOM</th>
+            </tr>
+
+            {% for i, item in enumerate(packing_slip["items"]) %}
+            <tr>
+                <td class="text-center">{{ i+1 }}</td>
+                <td class ="">
+                    {{ item.item_name }}
+                </td>
+                <td class ="text-center">
+                    {{ item.qty }}
+                </td>
+                <td class ="text-center">
+                    {{ item.net_weight }}
+                </td>
+                <td class ="text-center">
+                    {{ item.weight_uom }}
+                </td>
+            </tr>
+
+
+            {% endfor %}
+        </table>
+
+        <div class="mb-3">
+            <p class ="text-left" style>
+                Net weight: <b>{{ packing_slip.net_weight_pkg }}</b>
+            </p>
+            <p class ="text-left" >
+                Gross weight: <b>{{ packing_slip.gross_weight_pkg }}</b>
+            </p>
+            <p class ="text-left" >
+                Box Size: L <b>{{ packing_slip.custom_neb_box_length }}</b> | W <b>{{ packing_slip.custom_neb_box_width }}</b> | H <b>{{ packing_slip.custom_neb_box_height }}</b> (cm)
+            </p>
+            <p class ="text-left" >
+                Total number of boxes: <b>{{ packing_slips| length }}</b>
+            </p>
+        </div>
+
+        
+    </div>
+
+{% endfor %}

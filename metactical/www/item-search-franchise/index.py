@@ -3,7 +3,10 @@ import requests
 
 def get_context(context):
 	context.no_cache = 1
-	search_text = frappe.request.args["searchtext"]
+	if frappe.request.args:
+		search_text = frappe.request.args["searchtext"]
+	else:
+		search_text = ""
 	context.csrf_token = frappe.sessions.get_csrf_token()
 	context.columns = get_columns()
 	context.data = get_data(search_text)
@@ -52,8 +55,11 @@ def get_columns():
 	return columns
 
 def get_data(search_text):
+	if search_text is None or search_text == "":
+		return []
+	
 	data = []
-	franchises = frappe.db.get_all("Item Search Settings Franchise", fields=["franchise_url", "label", "api_key", "api_secret"])
+	franchises = frappe.get_single("Item Search Settings").franchise_settings
 
 	if not franchises:
 		frappe.throw("No Franchise settings found. Please create a Franchise setting first.")
@@ -70,7 +76,7 @@ def get_data(search_text):
 		url = franchise.franchise_url
 		label = franchise.label
 		api_key = franchise.api_key
-		api_secret = franchise.api_secret
+		api_secret = franchise.get_password("api_secret")
 
 		if not url or not label or not api_key or not api_secret:
 			frappe.throw("Franchise settings are incomplete. Please fill all the fields in the Franchise setting.")

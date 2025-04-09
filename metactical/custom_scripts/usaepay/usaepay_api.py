@@ -316,17 +316,18 @@ def create_log(doc, event_body):
 		
 	if log_type:
 		log = create_usaepay_log(doc.doctype, doc.name, log_type)
+		amount = event_body["object"]["auth_amount"] if "auth_amount" in event_body["object"] else event_body["object"]["amount"]
 
 		frappe.db.set_value("USAePay Log", log.name, "response", format_json_for_html(event_body), update_modified=False)
 		frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
-		frappe.db.set_value("USAePay Log", log.name, "amount", event_body["object"]["auth_amount"], update_modified=False)
+		frappe.db.set_value("USAePay Log", log.name, "amount", amount, update_modified=False)
 		payment_requests = frappe.get_all("Payment Request", 
 												filters={
 													"reference_doctype": doc.doctype, 
 													"reference_name": doc.name, 
 													"docstatus": 1, 
 													"status": "Requested",
-													"grand_total": event_body["object"]["auth_amount"]
+													"grand_total": amount
 												}, fields=["name"])
 
 		if payment_requests:
@@ -336,21 +337,26 @@ def create_log(doc, event_body):
 
 def create_payment_entry(doc, data, log):
 	try: 
+		mode_of_payment = "Visa"
+		if data["object"]["creditcard"]["category_code"] == "AX":
+			mode_of_payment = "Amex"
+		elif data["object"]["creditcard"]["category_code"] == "M":
+			mode_of_payment = "Master Card"
+
 		pe = get_payment_entry(doc.doctype, doc.name)
-		pe.mode_of_payment = "Credit Card"
+		pe.mode_of_payment = mode_of_payment
 		pe.reference_no = data["object"]["key"]
 		pe.reference_date = frappe.utils.now()
-		pe.paid_amount = float(data["object"]["auth_amount"])
 		pe.set_missing_values()
 		
 		if pe.references:
 			outstanding_amount = pe.references[0].outstanding_amount
 			allocated = pe.references[0].allocated_amount if outstanding_amount >= pe.references[0].allocated_amount else outstanding_amount
 			
-			if float(allocated) > float(data["object"]["auth_amount"]):
-				pe.references[0].allocated_amount = int(data["object"]["auth_amount"])
+			amount = data["object"]["auth_amount"] if "auth_amount" in data["object"] else data["object"]["amount"]
+			if float(allocated) > float(amount):
+				pe.references[0].allocated_amount = int(amount)
 
-		pe.insert()
 		pe.submit()
 
 		if log:
@@ -393,7 +399,7 @@ def process_credit_card_tokens(event_body, customer):
 def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body):
 	headers, usaepay_url = get_headers(event_body)
 	token = get_card_token(usaepay_url, transaction_key, headers)
-	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh"]
+	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"]
 
 	frappe.get_doc({
 		"doctype": "Customer CC Tokens",

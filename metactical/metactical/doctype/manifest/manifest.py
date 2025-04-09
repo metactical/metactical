@@ -7,16 +7,25 @@ from frappe import _
 from metactical.utils.shipping.canada_post import CanadaPost
 from datetime import datetime
 from frappe.utils import get_files_path
+from metactical.utils.shipping.purolator import Purolator
 
 
 class Manifest(Document):
 	pass
 						
 @frappe.whitelist()
-def create_manifest(manifest):
+def create_manifest(manifest, service_provider):
 	try:
-		cp = CanadaPost()
-		shipments, po_number = cp.create_manifest(manifest)
+		po_number = None
+		shipments = []
+
+		if service_provider == "Canada Post":
+			cp = CanadaPost()
+			shipments, po_number = cp.create_manifest(manifest)
+		elif service_provider == "Purolator":
+			purolator = Purolator()
+			shipments, po_number = purolator.consolidate_shipments(manifest)
+
 		doc = frappe.get_doc("Manifest", manifest)
 		doc.po_number = po_number
 		
@@ -41,8 +50,17 @@ def create_manifest(manifest):
 			redownload_manifest(manifest)
 
 @frappe.whitelist()		
-def redownload_manifest(docname="MF-10-11-2023-251", doctype="Manifest"):
+def redownload_manifest(docname, doctype):
 	doc = frappe.get_doc(doctype, docname)
+	if doc.service_provider == "Canada Post":
+		shipment_ids, shipments_found = redownload_cp_manifest(doc)
+	
+	return {"shipments": shipment_ids, "found": shipments_found}
+
+def redownload_cp_manifest(doc):
+	shipment_ids = []
+	shipments_found = {}
+
 	ref_shipments = []
 	for row in doc.items:
 		ref_shipments.append(row.shipment_id)
@@ -61,8 +79,6 @@ def redownload_manifest(docname="MF-10-11-2023-251", doctype="Manifest"):
 	
 	shipments = []
 	shipment_infos = []
-	shipments_found = {}
-	shipment_ids = []
 	shipment_manifests = []
 	for manifest_link in manifest_links:
 		if manifest_link is None:
@@ -93,7 +109,7 @@ def redownload_manifest(docname="MF-10-11-2023-251", doctype="Manifest"):
 					res = cp.get_response(
 							link['@href'], None, {'Accept': link['@media-type'], 'Content-Type': link['@media-type']}, True, 'GET')
 					if res.status_code == 200:
-						file_name = f"manifest_{docname}.pdf"
+						file_name = f"manifest_{doc.name}.pdf"
 						file_path = get_files_path(f"{file_name}", is_private=True)
 						with open(file_path, 'wb') as f:
 							f.write(res.content)
@@ -103,8 +119,8 @@ def redownload_manifest(docname="MF-10-11-2023-251", doctype="Manifest"):
 							'file_url': file_path.replace(frappe.get_site_path(), ''),
 							'is_private': 1,
 							'folder': 'Home/Attachments',
-							'attached_to_doctype': doctype,
-							'attached_to_name': docname
+							'attached_to_doctype': "Manifest",
+							'attached_to_name': doc.name
 						})
 						file_doc.insert(ignore_permissions=True)
 						
@@ -123,11 +139,11 @@ def redownload_manifest(docname="MF-10-11-2023-251", doctype="Manifest"):
 				doc.po_number = po_number
 		doc.status = "Completed"
 		doc.save()
-	
-	return {"shipments": shipment_ids, "found": shipments_found}
+	return shipment_ids, shipments_found
+
 
 @frappe.whitelist()
-def get_shipments(pickup_date, warehouse):
+def get_shipments(pickup_date, warehouse, service_provider):
 	pickup_contact_person = None
 	shipments = frappe.db.sql("""
 					SELECT
@@ -138,9 +154,10 @@ def get_shipments(pickup_date, warehouse):
 					LEFT JOIN
 						`tabShipment` AS shipment ON shipment.name = cps.parent
 					WHERE
-						shipment.po_number IS NULL AND shipment.pickup_date = %(pickup_date)s
-						AND warehouse = %(warehouse)s
-				""", {"pickup_date": pickup_date, "warehouse": warehouse}, as_dict=1)
+						(shipment.po_number IS NULL OR shipment.po_number = "") AND shipment.pickup_date <= %(pickup_date)s
+						AND warehouse = %(warehouse)s AND shipment.service_provider = %(service_provider)s
+				""", {"pickup_date": pickup_date, "warehouse": warehouse, 
+		  			"service_provider": service_provider}, as_dict=1)
 	
 	
 	if len(shipments) > 0:

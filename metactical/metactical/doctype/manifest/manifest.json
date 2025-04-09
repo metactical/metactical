@@ -17,6 +17,7 @@
   "pickup_contact_person",
   "pickup_contact_display",
   "column_break_4",
+  "service_provider",
   "drop_to_point",
   "point_zip_code",
   "po_number",
@@ -117,14 +118,22 @@
    "label": "Status",
    "options": "Pending\nError\nCompleted",
    "read_only": 1
+  },
+  {
+   "fieldname": "service_provider",
+   "fieldtype": "Select",
+   "label": "Service Provider",
+   "options": "Canada Post\nPurolator",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-09-16 14:42:47.980377",
+ "modified": "2025-01-22 15:58:26.607494",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -141,5 +150,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

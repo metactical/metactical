@@ -1,6 +1,6 @@
 import frappe
+from frappe import _, msgprint, qb, throw
 import functools
-from frappe import _, msgprint
 import barcode as _barcode
 from io import BytesIO
 from frappe.utils import now
@@ -10,8 +10,23 @@ from erpnext.controllers.stock_controller import StockController
 from erpnext.controllers.accounts_controller import AccountsController
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
 from erpnext.accounts.utils import convert_to_list
+from frappe.model.docstatus import DocStatus
 
 class CustomSalesInvoice(SalesInvoice, SellingController, StockController, AccountsController):
+	def save(self):
+		if self.docstatus == DocStatus.submitted() and len(self.items) > 25 and \
+			self.ais_queue_status and self.ais_queue_status != "Queued":
+			msgprint(
+				_(
+					"The task has been enqueued as a background job. In case there is \
+					any issue on processing in background, the system will add a comment \
+					about the error on this document and revert to the Draft stage"
+				)
+			)
+			queue_action(self, "submit", timeout=2000)
+		else:
+			super().save()
+
 	def on_cancel(self):
 		# Metactical Customization: Relink payment entries to sales orders when sales invoice is cancelled
 		if self.doctype in ["Sales Invoice", "Purchase Invoice"]:
@@ -64,17 +79,6 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 		):
 			self.calculate_commission()
 			self.calculate_contribution()
-
-	def submit(self):
-		if len(self.items) > 25:
-			msgprint(
-				_(
-					"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-				)
-			)
-			queue_action(self, "submit", timeout=2000)
-		else:
-			self._submit()
 
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(CustomSalesInvoice, self).set_status(update, status, update_modified)
@@ -577,6 +581,83 @@ def get_totals(items):
 		"rate": rate,
 		"country_of_origin": country_of_origin
 	}
+
+@frappe.whitelist()
+def get_store_credit_account(currency):
+	field = None
+	if currency == 'CAD':
+		field = "store_credit_account_cad"
+	elif currency == 'USD':
+		field = "store_credit_account_usd"
+
+	if field:
+		account = frappe.db.get_single_value("Metactical Settings", field)
+		return account
+	else:
+		return None
+
+@frappe.whitelist()
+def get_customer_info(doc):
+	if doc.neb_store_credit_beneficiary:
+		customer = frappe.get_doc("Customer", doc.neb_store_credit_beneficiary)
+		address = load_address(customer)
+		contact = load_contact(customer)
+
+		return {
+			"contact": contact[0] if len(contact) > 0 else {},
+			"address": address[0] if len(address) > 0 else {}
+		}
+
+
+def load_address(doc, key=None):
+	"""Loads address list and contact list in `__onload`"""
+	from frappe.contacts.doctype.address.address import get_address_display, get_condensed_address
+
+	filters = [
+		["Dynamic Link", "link_doctype", "=", doc.doctype],
+		["Dynamic Link", "link_name", "=", doc.name],
+		["Dynamic Link", "parenttype", "=", "Address"],
+	]
+	address_list = frappe.get_list("Address", 
+									filters=filters, 
+									fields=["city", "county", "state", "country", "pincode", "creation", "modified", "address_line1"], 
+									order_by="creation desc")
+	address_list = [a.update({"display": get_address_display(a)}) for a in address_list]
+
+	address_list = sorted(
+		address_list,
+		key=functools.cmp_to_key(
+			lambda a, b: (int(a.is_primary_address - b.is_primary_address))
+			or (1 if a.modified - b.modified else 0)
+		),
+		reverse=True,
+	)
+
+	return address_list
+
+def load_contact(doc):
+	contact_list = []
+	filters = [
+		["Dynamic Link", "link_doctype", "=", doc.doctype],
+		["Dynamic Link", "link_name", "=", doc.name],
+		["Dynamic Link", "parenttype", "=", "Contact"],
+	]
+	contact_list = frappe.get_all("Contact", filters=filters, fields=["email_id", "phone", "mobile_no"])
+	return contact_list
+
+@frappe.whitelist()
+def submit_invoice(doc):
+	# Metactical Customization: Submit invoice in background if more than 10 items
+	doc = frappe.get_doc("Sales Invoice", doc)
+	if len(doc.items) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()
 
 @frappe.whitelist()
 def get_store_credit_account(currency):
