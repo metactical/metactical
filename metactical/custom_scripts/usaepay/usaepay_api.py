@@ -145,90 +145,96 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 
 @frappe.whitelist()
 def receive_customer_data():
-	response = frappe.form_dict
+	try:  
+		response = frappe.form_dict
 
-	event_body = response.get("event_body")
-	transaction_key = event_body["object"]["key"]
+		event_body = response.get("event_body")
+		transaction_key = event_body["object"]["key"]
 
-	docs_to_check = ["Sales Order", "Sales Invoice", "Payment Entry"]
-	doctype = ""
+		docs_to_check = ["Sales Order", "Sales Invoice", "Payment Entry"]
+		doctype = ""
 
-	# check if the trnsaction is initiated from a payment Entry in the ERP
-	if "invoice" in event_body["object"]:
-		if event_body["object"]["invoice"]:
-			for doc in docs_to_check:
-				if frappe.db.exists(doc, event_body["object"]["invoice"]):
-					doctype = doc
-					break
+		# check if the trnsaction is initiated from a payment Entry in the ERP
+		if "invoice" in event_body["object"]:
+			if event_body["object"]["invoice"]:
+				for doc in docs_to_check:
+					if frappe.db.exists(doc, event_body["object"]["invoice"]):
+						doctype = doc
+						break
+			else:
+				return
+		# when the payment is created from the website and the SO is not created yet
+		# webhook's response will be added to a temporary doc and then will be processed when the SO is created.
+		# This is to avoid the case where the webhook response comes before the SO is created in the ERP
 		else:
-			return
-	# when the payment is created from the website and the SO is not created yet
-	# webhook's response will be added to a temporary doc and then will be processed when the SO is created.
-	# This is to avoid the case where the webhook response comes before the SO is created in the ERP
-	else:
-		usaepay_account = get_usaepay_account(merchant_id=event_body["merchant"]["merch_key"])
-		if not usaepay_account:
-			return 
+			usaepay_account = get_usaepay_account(merchant_id=event_body["merchant"]["merch_key"])
+			if not usaepay_account:
+				return
+			
+			token_hash = get_token_hash(usaepay_account)
+			headers = {
+				"Content-Type": "application/json",
+				"Authorization": token_hash
+			}
 
-		token_hash = get_token_hash(usaepay_account)
-		headers = {
-			"Content-Type": "application/json",
-			"Authorization": token_hash
-		}
-
-		transaction = event_body["object"]["key"]
-		transaction = get_transaction_from_usaepay(transaction, headers, event_body["merchant"]["merch_key"])
-		if not transaction or "orderid" not in transaction:
-			return
-
-		# check if the SO is created by the SB before usaepay webhook response
-		if frappe.db.exists("Sales Order", {"po_no": transaction["orderid"]}):
-			event_body["object"] = transaction
-			doctype = "Sales Order"
-		else:
-			if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "marchant_id": event_body["merchant"]["merch_key"]}):
-				lead_source = usaepay_account.lead_source
-
-				frappe.get_doc({
-					"doctype": "SO USAePay Transaction", 
-					"order_id": transaction["orderid"],
-					"invoice": transaction["invoice"],
-					"credit_card": transaction["creditcard"]["number"],
-					"transaction_key": transaction["key"],
-					"merchant_id": event_body["merchant"]["merch_key"],
-					"lead_source": lead_source
-				}).insert()
+			transaction = event_body["object"]["key"]
+			transaction = get_transaction_from_usaepay(transaction, headers, event_body["merchant"]["merch_key"])
+			if not transaction or "orderid" not in transaction:
 				return
 
-	# doctype = the doctype referenced in the Payment Entry or the Sales order created by the SB
-	if not doctype:
-		return
+			# check if the SO is created by the SB before usaepay webhook response
+			if frappe.db.exists("Sales Order", {"po_no": transaction["orderid"]}):
+				event_body["object"] = transaction
+				doctype = "Sales Order"
+			else:
+				if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "marchant_id": event_body["merchant"]["merch_key"]}):
+					lead_source = usaepay_account.lead_source
+					frappe.get_doc({
+						"doctype": "SO USAePay Transaction", 
+						"order_id": transaction["orderid"],
+						"invoice": transaction["invoice"],
+						"credit_card": transaction["creditcard"]["number"],
+						"transaction_key": transaction["key"],
+						"merchant_id": event_body["merchant"]["merch_key"],
+						"lead_source": lead_source
+					}).insert()
+					frappe.db.commit()
+					return
+		
+		# doctype = the doctype referenced in the Payment Entry or the Sales order created by the SB
+		if not doctype:
+			return
 
-	if doctype == "Sales Order":
-		process_sales_order(event_body, transaction_key)
-	elif doctype == "Payment Entry":
-		process_payment_entry(event_body, transaction_key)
-	elif doctype == "Sales Invoice":
-		process_sales_invoice(event_body, transaction_key)
-	else:
-		process_credit_card_tokens(event_body, event_body["object"]["customer"])
-	
-	# log the response from USAePay if the transaction is initiated from the ERP and paid from the ERP
-	try:
-		log = frappe.db.get_value("USAePay Log", {"reference_docname": event_body["object"]["invoice"], "action": "New Payment", "reference_doctype": doctype}, ["name", "response", "payment_entry"], as_dict=True)
-		if log:
-			if not log.response:
-				frappe.db.set_value("USAePay Log", log.name, "response", format_json_for_html(event_body), update_modified=False)
-				frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
-			
-			if log.payment_entry:
-				if not frappe.db.get_value("Payment Entry", log.payment_entry, "reference_no"):
-					frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+		if doctype == "Sales Order":
+			process_sales_order(event_body, transaction_key)
+		elif doctype == "Payment Entry":
+			process_payment_entry(event_body, transaction_key)
+		elif doctype == "Sales Invoice":
+			process_sales_invoice(event_body, transaction_key)
+		else:
+			process_credit_card_tokens(event_body, event_body["object"]["customer"])
+   
+		frappe.db.commit()
+		
+		# log the response from USAePay if the transaction is initiated from the ERP and paid from the ERP
+		try:
+			log = frappe.db.get_value("USAePay Log", {"reference_docname": event_body["object"]["invoice"], "action": "New Payment", "reference_doctype": doctype}, ["name", "response", "payment_entry"], as_dict=True)
+			if log:
+				if not log.response:
+					frappe.db.set_value("USAePay Log", log.name, "response", format_json_for_html(event_body), update_modified=False)
+					frappe.db.set_value("USAePay Log", log.name, "transaction_key", event_body["object"]["key"], update_modified=False)
 				
+				if log.payment_entry:
+					if not frappe.db.get_value("Payment Entry", log.payment_entry, "reference_no"):
+						frappe.db.set_value("Payment Entry", log.payment_entry, "reference_no", event_body["object"]["key"], update_modified=False)
+					
 
-				if frappe.db.get_value("Payment Entry", log.payment_entry, "docstatus") == 0:
-					frappe.get_doc("Payment Entry", log.payment_entry).submit()
-				
+					if frappe.db.get_value("Payment Entry", log.payment_entry, "docstatus") == 0:
+						frappe.get_doc("Payment Entry", log.payment_entry).submit()
+		except Exception as e:
+			frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())	
+   
+		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
 
@@ -242,6 +248,7 @@ def process_sales_order(event_body, transaction_key):
 
 	if not sales_order["neb_usaepay_transaction_key"]:
 		frappe.db.set_value("Sales Order", sales_order.name, "neb_usaepay_transaction_key", transaction_key)
+		frappe.db.commit()
 
 	customer = sales_order.customer
 	sales_order.doctype = "Sales Order"
@@ -823,4 +830,4 @@ def add_to_log(log):
 	}).insert()
 
 def get_lead_source(transaction_key):
-	return frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": usaepay_transaction_key}, "source")
+	return frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "source")
