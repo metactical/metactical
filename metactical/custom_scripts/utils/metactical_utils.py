@@ -40,7 +40,7 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
 		if not rocket_chat_settings.rocket_notification:
 			return
 
-		channel_name = rocket_chat_settings.channel_name
+		channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
 		headers = {
 			'Content-type': rocket_chat_settings.content_type or 'application/json',
 			'X-Auth-Token': rocket_chat_settings.auth_token,

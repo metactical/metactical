@@ -167,24 +167,7 @@ def load_si(sales_invoice):
             taxes["TTL Store Credit"] = frappe.format_value(sales_invoice_doc.grand_total, {"fieldtype": "Currency"}) if sales_invoice_doc else ""
             taxes["Total Qty Returned"] = sales_invoice_doc.total_qty if sales_invoice_doc else ""
     
-        if sales_invoice_doc.is_return:
-            credit_notes = items
-            items = []
-        else:
-            credit_notes = frappe.db.sql(""" SELECT
-                                                si.name as si_name, sii.item_code, sii.item_name, sii.qty, sii.rate, 
-                                                sii.discount_amount, sii.amount, si.posting_date, si.customer,
-                                                si.neb_store_credit_beneficiary,
-                                                si.total_taxes_and_charges, si.grand_total, si.discount_amount as si_discount_amount,
-                                                sii.discount_percentage
-                                            FROM
-                                                `tabSales Invoice` si
-                                            JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
-                                            WHERE
-                                                return_against = %(sales_invoice)s and si.docstatus = 1
-                                            ORDER BY
-                                                si.creation DESC, sii.idx ASC
-                                        """, {"sales_invoice": sales_invoice_doc.name}, as_dict=True)
+        credit_notes = get_returns(sales_invoice_doc)
 
         # group credit notes by sales invoice
         for credit_note in credit_notes:
@@ -201,6 +184,138 @@ def load_si(sales_invoice):
     frappe.response["taxes"] = taxes
     frappe.response["customer"] = sales_invoice_doc.customer if sales_invoice_doc else ""
     frappe.response["credit_notes"] = credit_notes_grouped
+    
+    
+@frappe.whitelist(allow_guest=True)
+def load_si_pos(sales_invoice):
+    sales_invoice = frappe.form_dict.sales_invoice
+    invoice = None
+    if frappe.db.exists("Sales Invoice", sales_invoice):
+        invoice = frappe.get_doc("Sales Invoice", sales_invoice)
+        if (invoice.docstatus > 1):
+            frappe.response["invoice_details"] = {}
+            frappe.response["error"] = "Sales Invoice is "+invoice.get("status")
+            return
+        elif invoice.docstatus == 0:
+            frappe.response["invoice_details"] = {}
+            frappe.response["error"] = "Sales Invoice "+sales_invoice+" is a Draft"
+            return
+        elif invoice.status not in ["Paid", "Credit Note Issued"]:
+            frappe.response["invoice_details"] = {}
+            frappe.response["error"] = "Sales Invoice "+sales_invoice+" is "+invoice.get("status")
+            return
+
+    if not invoice:
+        frappe.response["invoice_details"] = {}
+        frappe.response["error"] = "Sales Invoice not found"
+        return
+    
+    items = []
+    taxes = []
+    payments = []
+    customer = { "id": invoice.customer, "Name":invoice.customer_name }
+    invoice_details = {}
+
+    for item in invoice.items:
+        items.append({
+            "ItemCode": item.item_code,
+            "ItemName": item.item_name,
+            "Rate": item.rate,
+            "PriceListRate": item.price_list_rate,
+            "Qty": item.qty,
+            "Amount": frappe.format_value(item.net_amount, {"fieldtype": "Currency"}),
+            "Discount": item.discount_percentage,
+        })
+    for tax in invoice.taxes:
+        tax_name = tax.account_head.split(" - ")[0]
+        taxes.append({
+            "TaxId": tax_name,
+            "Amount": tax.rate
+        })
+
+    for payment in invoice.payments:
+        payments.append({
+            "ModeOfPayment": payment.mode_of_payment,
+            "Amount": payment.amount,
+            "Change": invoice.change_amount if payment.mode_of_payment == "Cash" else 0,
+        })
+
+    pos_profile = ""
+    if invoice.pos_profile:
+        pos_profile = invoice.pos_profile.replace(" Operators", "")
+
+    invoice_details["ApprovalList"] = []
+    invoice_details["SalesPerson"] = "ifwEdmonds@camouflage.ca"
+    invoice_details["Comments"] = []
+    invoice_details["InvoiceId"] = invoice.name
+    invoice_details["Total"] = invoice.grand_total
+    invoice_details["PriceList"] = invoice.selling_price_list
+    invoice_details["PostingDate"] = invoice.posting_date
+    invoice_details["OverallDiscount"] = invoice.additional_discount_percentage
+    invoice_details["TaxesAndChargesTemplate"] = invoice.taxes_and_charges
+    invoice_details["POSProfile"] = pos_profile
+    invoice_details["LeadSource"] = invoice.source
+    invoice_details["total_taxes_and_charges"] = invoice.total_taxes_and_charges
+    invoice_details["Items"] = items
+    invoice_details["Taxes"] = taxes
+    invoice_details["Customer"] = customer
+    invoice_details["Payment"] = payments
+
+    returns = get_returns(invoice)
+    store_credits = group_invoice_data(returns)
+    invoice_details["Returns"] = store_credits
+
+    frappe.response["invoice_details"] = invoice_details
+    frappe.response["error"] = ""
+
+def get_returns(sales_invoice_doc):
+    if sales_invoice_doc.is_return:
+        credit_notes = items
+        items = []
+    else:
+        credit_notes = frappe.db.sql(""" SELECT
+                                            si.name as si_name, sii.item_code, sii.item_name, sii.qty, sii.rate, 
+                                            sii.discount_amount, sii.amount, si.posting_date, si.customer,
+                                            si.neb_store_credit_beneficiary,
+                                            si.total_taxes_and_charges, si.grand_total, si.discount_amount as si_discount_amount,
+                                            sii.discount_percentage
+                                        FROM
+                                            `tabSales Invoice` si
+                                        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+                                        WHERE
+                                            return_against = %(sales_invoice)s and si.docstatus = 1
+                                        ORDER BY
+                                            si.creation DESC, sii.idx ASC
+                                    """, {"sales_invoice": sales_invoice_doc.name}, as_dict=True)
+        
+    return credit_notes
+
+def group_invoice_data(credit_notes):
+    grouped_credit_notes = {}
+    
+    for row in credit_notes:
+        if row.si_name not in grouped_credit_notes:
+            grouped_credit_notes[row.si_name] = {
+                "posting_date": row.posting_date,
+                "customer": row.customer,
+                "store_credit_beneficiary": row.neb_store_credit_beneficiary,
+                "total_taxes_and_charges": row.total_taxes_and_charges,
+                "grand_total": row.grand_total,
+                "si_discount_amount": row.si_discount_amount,
+                "items": []
+            }
+    
+        grouped_credit_notes[row.si_name]["items"].append({
+            "item_code": row.item_code,
+            "item_name": row.item_name,
+            "qty": row.qty,
+            "rate": row.rate,
+            "discount_amount": row.discount_amount,
+            "discount_percentage": row.discount_percentage,
+            "amount": row.amount,
+        })
+    
+    return grouped_credit_notes
 
 @frappe.whitelist()
 def transfer_store_credit(**kwargs):
