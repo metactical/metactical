@@ -10,6 +10,18 @@ import time
 
 class STEPackingSlip(Document):
 	def validate(self):
+		try:
+			checkpoint = "check_stock_entry"+str(int(time.time() * 1000))
+			frappe.db.savepoint(checkpoint)
+			stock_entry = frappe.get_doc("Stock Entry", self.stock_entry)
+			stock_entry.submit()
+			frappe.db.rollback(save_point=checkpoint)
+		except frappe.exceptions.ValidationError as e:
+			frappe.clear_last_message()
+			frappe.throw(f"Unable to pack the item(s) because the Stock Entry has an issue that will prevent submission. Please check the <a href='/app/stock-entry/{self.stock_entry}' target='_blank'>Stock Entry</a> and try again.<br><br> <b>Error</b>: {e}")
+		except Exception as e:
+			frappe.throw(f"Unable to pack the item(s) because the Stock Entry has an issue that will prevent submission. Please check the <a href='/app/stock-entry/{self.stock_entry}' target='_blank'>Stock Entry</a> and try again .<br><br> <b>Error</b>: {e}")
+  
 		self.validate_stock_entry()
 		self.validate_case_nos()
 	
