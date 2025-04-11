@@ -204,7 +204,28 @@ def submit_sales_order(sales_order, form_data):
         return
     
     if sales_invoice:
-        queue_action(sales_invoice, 'submit')
+        try:
+            frappe.db.commit()
+            sales_invoice.submit()
+            frappe.db.commit()
+        except Exception as e:
+            frappe.db.rollback()
+            frappe.set_user("Administrator")
+            frappe.log_error(title='Submit Invoice Error', message=frappe.get_traceback())
+            
+            # add comment to sales order
+            comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}
+            create_comment(comment, form_data['SalesPerson'], sales_invoice.name, "Sales Invoice")
+            
+            # post to rocket chat
+            url = "/app/{0}/{1}".format(sales_invoice.doctype.lower().replace(" ", "-"), sales_invoice.name)
+            message = "Unable to submit Invoice created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+            post_to_rocket_chat(sales_invoice, message, pos=True)
+            
+            # add payment info to sales order
+            add_payment_info_to_sales_order(sales_order, form_data)
+            
+        # queue_action(sales_invoice, 'submit')
         frappe.set_user("Administrator")
 
 def add_payment_info_to_sales_order(sales_order, form_data):
@@ -237,13 +258,13 @@ def create_comments(sales_order, form_data):
     frappe.set_user("Administrator")
     frappe.db.commit()
     
-def create_comment(comment, commentor, sales_order):
+def create_comment(comment, commentor, sales_order, doctype="Sales Order"):
     frappe.get_doc({
         'doctype': 'Comment',
         'comment_email': commentor,
         'comment_by': comment['comment_by'],
         'content': comment['comment'],
-        'reference_doctype': 'Sales Order',
+        'reference_doctype': doctype,
         "comment_type": "Comment",
         'reference_name': sales_order,
     }).save(ignore_permissions=True)
