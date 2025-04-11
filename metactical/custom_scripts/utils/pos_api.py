@@ -3,7 +3,7 @@ from metactical.custom_scripts.sales_order.sales_order import make_sales_invoice
 from metactical.custom_scripts.utils.metactical_utils import ( 
 	post_to_rocket_chat, queue_action
 )
-from frappe.utils import file_lock, now_datetime, get_url
+from frappe.utils import file_lock, now_datetime, get_url, flt
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
@@ -204,7 +204,28 @@ def submit_sales_order(sales_order, form_data):
         return
     
     if sales_invoice:
-        queue_action(sales_invoice, 'submit')
+        try:
+            frappe.db.commit()
+            sales_invoice.submit()
+            frappe.db.commit()
+        except Exception as e:
+            frappe.db.rollback()
+            frappe.set_user("Administrator")
+            frappe.log_error(title='Submit Invoice Error', message=frappe.get_traceback())
+            
+            # add comment to sales order
+            comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}
+            create_comment(comment, form_data['SalesPerson'], sales_invoice.name, "Sales Invoice")
+            
+            # post to rocket chat
+            url = "/app/{0}/{1}".format(sales_invoice.doctype.lower().replace(" ", "-"), sales_invoice.name)
+            message = "Unable to submit Invoice created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+            post_to_rocket_chat(sales_invoice, message, pos=True)
+            
+            # add payment info to sales order
+            add_payment_info_to_sales_order(sales_order, form_data)
+            
+        # queue_action(sales_invoice, 'submit')
         frappe.set_user("Administrator")
 
 def add_payment_info_to_sales_order(sales_order, form_data):
@@ -237,13 +258,13 @@ def create_comments(sales_order, form_data):
     frappe.set_user("Administrator")
     frappe.db.commit()
     
-def create_comment(comment, commentor, sales_order):
+def create_comment(comment, commentor, sales_order, doctype="Sales Order"):
     frappe.get_doc({
         'doctype': 'Comment',
         'comment_email': commentor,
         'comment_by': comment['comment_by'],
         'content': comment['comment'],
-        'reference_doctype': 'Sales Order',
+        'reference_doctype': doctype,
         "comment_type": "Comment",
         'reference_name': sales_order,
     }).save(ignore_permissions=True)
@@ -253,11 +274,22 @@ def create_invoice(sales_order, form_data):
     sales_invoice = make_sales_invoice(sales_order.name)
     sales_invoice.is_pos = 1
     sales_invoice.update_stock = 1
+    sales_invoice.write_off_outstanding_amount_automatically = 0
     sales_invoice.pos_profile = form_data['POSProfile'] + ' Operators'
     frappe.set_user(form_data['SalesPerson'])
     payments = get_payments(form_data)
     sales_invoice.update({'payments': payments})
     sales_invoice.save()
+    
+    # add a write off amount when there is a difference between the total and the payment amount 
+    if sales_invoice.grand_total != form_data['Total']:		
+        write_off_limit = flt(frappe.db.get_value("POS Profile", sales_invoice.pos_profile, "write_off_limit"))
+        difference = sales_invoice.grand_total - form_data['Total']
+        
+        if write_off_limit and difference <= write_off_limit:
+            sales_invoice.write_off_amount = difference
+            sales_invoice.save()
+            frappe.db.commit()
 
     frappe.set_user("Administrator")    
     return sales_invoice
