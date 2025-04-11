@@ -11,7 +11,8 @@
   "content_type",
   "auth_token",
   "user_id",
-  "channel_name"
+  "channel_name",
+  "pos_failed_invoices"
  ],
  "fields": [
   {
@@ -32,7 +33,7 @@
    "fieldname": "channel_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Channel Name",
+   "label": "Default Channel Name",
    "reqd": 1
   },
   {
@@ -52,12 +53,17 @@
    "fieldname": "rocket_notification",
    "fieldtype": "Check",
    "label": "Post Error Notification To Rocket Chat"
+  },
+  {
+   "fieldname": "pos_failed_invoices",
+   "fieldtype": "Data",
+   "label": "POS Failed Invoices Channel"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-05-20 07:14:57.818337",
+ "modified": "2025-04-11 04:17:26.359979",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Rocket Chat Settings",
@@ -75,5 +81,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }
