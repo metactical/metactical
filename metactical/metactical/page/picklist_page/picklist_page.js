@@ -239,8 +239,18 @@ class PicklistPage{
 		}
 	}
 	
-	list_multi_orders(source="All", searched=false, pl_filter="", sort_by="qty_item", sort_order="desc"){
+	list_multi_orders(source="All", searched=false, pl_filter="", sort_by="qty_item", sort_order="desc", is_reload=false){
 		const me = this;
+		// If it's a reload either by clicking refresh or going back, load the
+		// previous sort values
+		if(is_reload){
+			sort_by = metactical.pick_list.order_sort_by;
+			sort_order = metactical.pick_list.order_sort_order;
+		}
+		else{
+			metactical.pick_list.order_sort_by = sort_by;
+			metactical.pick_list.order_sort_order = sort_order;
+		}
 		if(source == ""){
 			source = "All"
 		}
@@ -286,7 +296,7 @@ class PicklistPage{
 		var me = this;
 		me.wrapper.find('.start-picking-btn').hide();
 		me.wrapper.find('.refresh-orders').on('click', function(){
-			me.list_multi_orders();
+			me.list_multi_orders(pl_source, false, pl_filter, sort_by, sort_order, true);
 		});
 		me.wrapper.find('.back-to-tote').on('click', function(){
 			me.list_totes();
@@ -317,6 +327,13 @@ class PicklistPage{
 			},
 			render_input: true
 		});
+
+		let sort_labels = {
+			"qty_item": "QtyItems",
+			"locations": "Locations",
+			"order_date": "Order Date"
+		}
+
 		me.sort_selector = new frappe.ui.SortSelector({
 			parent: $('.pl-multi-filters'),
 			args: {
@@ -334,8 +351,8 @@ class PicklistPage{
 						label: "Order Date"
 					}
 				],
-				sort_by: "qty_item",
-				sort_by_label: "QtyItems",
+				sort_by: sort_by,
+				sort_by_label: sort_labels[sort_by],
 				sort_order: sort_order
 			},
 			sort_by: sort_by,
@@ -344,6 +361,8 @@ class PicklistPage{
 				let barcode = $('input[data-fieldname="pl_multi_barcode"]').val();
 				let sort_order = me.sort_selector.sort_order;
 				let sort_by = me.sort_selector.sort_by;
+				metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
+				metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
 				me.list_multi_orders(pl_source, false, barcode, sort_by, sort_order);
 			}
 		});
