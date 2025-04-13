@@ -192,7 +192,7 @@ def get_returns(sales_invoice_doc):
     else:
         credit_notes = frappe.db.sql(""" SELECT
                                             si.name as si_name, sii.item_code, sii.item_name, sii.qty, sii.rate, 
-                                            sii.discount_amount, sii.amount, si.posting_date, si.customer,
+                                            sii.discount_amount, sii.amount, si.posting_date, si.customer, si.customer_name,
                                             si.neb_store_credit_beneficiary,
                                             si.total_taxes_and_charges, si.grand_total, si.discount_amount as si_discount_amount,
                                             sii.discount_percentage
@@ -216,6 +216,7 @@ def group_invoice_data(credit_notes):
                 "InvoiceId": row.si_name,
                 "posting_date": row.posting_date,
                 "customer": row.customer,
+                "customer_name": row.customer_name,
                 "store_credit_beneficiary": row.neb_store_credit_beneficiary,
                 "total_taxes_and_charges": row.total_taxes_and_charges,
                 "grand_total": row.grand_total,
