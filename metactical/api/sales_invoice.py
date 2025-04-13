@@ -41,6 +41,7 @@ def load_si_pos(sales_invoice):
             "ItemName": item.item_name,
             "Rate": item.rate,
             "PriceListRate": item.price_list_rate,
+            "Image": item.image,
             "Qty": item.qty,
             "Amount": frappe.format_value(item.net_amount, {"fieldtype": "Currency"}),
             "Discount": item.discount_percentage,
