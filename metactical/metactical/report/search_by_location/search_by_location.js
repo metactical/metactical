@@ -5,8 +5,13 @@
 frappe.query_reports["Search by Location"] = {
 	"filters": [
 		{
-			"fieldname": "location",
-			"label": __("Location"),
+			"fieldname": "location_starts_with",
+			"label": __("Location (Starts With)"),
+			"fieldtype": "Data"
+		},
+		{
+			"fieldname": "location_includes",
+			"label": __("Location (Includes)"),
 			"fieldtype": "Data"
 		},
 		{
