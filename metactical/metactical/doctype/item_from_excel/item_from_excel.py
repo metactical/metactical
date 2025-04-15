@@ -128,6 +128,10 @@ class ItemFromExcel(Document):
 				elif not is_template and i >= cost_column_index:
 					prices.append(row[i])
 
+			# add cost to valuation rate
+			if cost_column_index != -1:
+				item.valuation_rate = row[cost_column_index]
+    
 			# Append prices to the price list if there are any valid prices
 			if prices and not all(p is None for p in prices):
 				price_list_rows.append(prices)
