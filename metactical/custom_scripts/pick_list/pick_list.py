@@ -495,7 +495,7 @@ def create_pick_list(source_name, target_doc=None):
 		return (
 			abs(item.delivered_qty) < abs(item.qty)
 			and item.delivered_by_supplier != 1
-			and is_stock_item
+			# and is_stock_item
 		)
 	
 	# Metactcal Customization: Add warehouse, sales order and source to item map
