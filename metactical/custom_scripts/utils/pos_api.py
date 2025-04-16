@@ -283,16 +283,31 @@ def create_invoice(sales_order, form_data):
     
     # add a write off amount when there is a difference between the total and the payment amount 
     if sales_invoice.grand_total != form_data['Total']:		
-        write_off_limit = flt(frappe.db.get_value("POS Profile", sales_invoice.pos_profile, "write_off_limit"))
+        net_paid_amount_form = get_total_paid_with_change(form_data)
+        net_paid_erpnext = sales_invoice.paid_amount - sales_invoice.change_amount
         difference = sales_invoice.grand_total - form_data['Total']
-        
-        if write_off_limit and difference <= write_off_limit:
-            sales_invoice.write_off_amount = difference
-            sales_invoice.save()
-            frappe.db.commit()
 
-    frappe.set_user("Administrator")    
+        if not(net_paid_amount_form != net_paid_erpnext and difference < 0):
+            write_off_limit = flt(frappe.db.get_value("POS Profile", sales_invoice.pos_profile, "write_off_limit"))
+            
+            if write_off_limit and difference <= write_off_limit:
+                sales_invoice.write_off_amount = difference
+                sales_invoice.change_amount = .10
+                sales_invoice.save()
+                frappe.db.commit()
+
+    frappe.set_user("Administrator")
     return sales_invoice
+
+def get_total_paid_with_change(form_data):
+    total_paid = 0.0
+    for payment in form_data['Payment']:
+        if payment['ModeOfPayment'] == "Cash":
+            total_paid += payment['Amount'] - payment['Change']
+        else:
+            total_paid += payment['Amount']
+            
+    return total_paid
     
 def get_taxes(form_data):  
     taxes = []
