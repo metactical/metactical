@@ -438,7 +438,7 @@ def get_comments(form_data):
         
     return comments
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_item_from_barcode(barcode, branch):
     item = frappe.db.sql(f"""
         SELECT 
