@@ -38,13 +38,23 @@ def receive_pos_data(*args, **kwargs):
         
         sales_order = sales_order["sales_order"]
         if sales_order:
-            frappe.enqueue(
-                submit_sales_order,
-                queue="default", # one of short, default, long
-                at_front=True,
-                form_data=form_data,
-                sales_order=sales_order.name
-            )
+            if len(form_data["Payment"]):
+                has_intrac_payment = False
+                for payment in form_data["Payment"]:
+                    if payment["ModeOfPayment"] == "Interac Etransfer":
+                        has_intrac_payment = True
+                        break
+                    
+                if not has_intrac_payment:
+                    frappe.enqueue(
+                        submit_sales_order,
+                        queue="default", # one of short, default, long
+                        at_front=True,
+                        form_data=form_data,
+                        sales_order=sales_order.name
+                    )
+                else:
+                    add_payment_info_to_sales_order(sales_order, form_data)
                                     
             frappe.enqueue(
                 create_comments,
@@ -224,8 +234,11 @@ def add_payment_info_to_sales_order(sales_order, form_data):
     
     message = ""
     for payment in form_data['Payment']:
-        message += "Payment of <b>$ {0}</b> made using <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
-        
+        if payment['ModeOfPayment'] == "Interac Etransfer":
+            message += "Payment of <b>$ {0}</b> will be made via <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
+        else:
+            message += "Payment of <b>$ {0}</b> made using <b>{1}</b> <br>".format(payment['Amount'], payment['ModeOfPayment'])
+		
     if message:
         frappe.get_doc({
             'doctype': 'Comment',
@@ -409,3 +422,98 @@ def get_comments(form_data):
         })
         
     return comments
+
+@frappe.whitelist(allow_guest=True)
+def get_item_from_barcode(barcode, branch):
+    item = frappe.db.sql(f"""
+        SELECT 
+            tabItem.name, item_name, ifw_retailskusuffix,
+            brand, image, is_stock_item
+        FROM `tabItem Barcode` ib Join `tabItem` on ib.parent=tabItem.name
+        WHERE ib.barcode = {frappe.db.escape(barcode)}
+        limit 1
+    """, as_dict=True)    
+
+    pos_profile = branch + ' Operators'    
+    pos_profile = frappe.get_doc('POS Profile', pos_profile)
+    price_list = pos_profile.selling_price_list
+    warehouse = pos_profile.warehouse
+
+    if item:
+        item = item[0]    
+        frappe.response["Sku"] = item.name
+        frappe.response["ItemName"] = item.item_name
+        frappe.response["RetailSku"] = item.ifw_retailskusuffix
+        frappe.response["Categories"] = []
+        frappe.response["Comment"] = ""
+        frappe.response["ImageUrl"] = item.image if item.image else ""
+        frappe.response["Brand"] = item.brand if item.brand else ""
+        frappe.response["NonStocking"] = False if item.is_stock_item else True
+        barcodes = frappe.db.get_all("Item Barcode", {"parent": item.name}, ["barcode"])
+        frappe.response["Barcodes"] = [{"Barcode": barcode.barcode} for barcode in barcodes]
+        frappe.response["Quantity"] = int(get_quantity(item.name, warehouse))
+        
+        item_price = get_item_price(item.name, price_list)
+        frappe.response["Price"] = item_price
+        
+        discount = get_item_discount(item.name, price_list, item_price)
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
+        frappe.response["OnSale"] = discount["on_sale"] if discount else False
+        frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
+        frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
+
+        
+def get_quantity(item, warehouse):
+    bin_qty = frappe.db.get_value('Bin', {'item_code': item, 'warehouse': warehouse}, ['actual_qty', 'reserved_qty'])
+    quantity = 0
+    if bin_qty:
+        quantity = bin_qty[0] - bin_qty[1]
+        
+    return quantity
+        
+def get_item_price(item, price_list):
+    price = frappe.db.get_value('Item Price', {'item_code': item, 'price_list': price_list}, ['price_list_rate'])
+    if not price:
+        return 0.0
+    
+    return price
+
+def get_item_discount(item, price_list, item_price):
+    # select all pricing rules for the item and pick the one with the highest priority for each item
+    print(item, price_list)
+    pricing_rule = frappe.db.sql(f"""
+        SELECT
+            valid_from AS discount_start_date,
+            valid_upto AS discount_expiry_date,
+            disable AS on_sale,
+            discount_percentage, rate, rate_or_discount, discount_amount
+        FROM
+            `tabPricing Rule Item Code`
+        JOIN
+            `tabPricing Rule` ON `tabPricing Rule`.name = `tabPricing Rule Item Code`.parent
+        WHERE
+            `tabPricing Rule Item Code`.item_code = '{item}'
+            AND (`tabPricing Rule`.for_price_list = '{price_list}' or `tabPricing Rule`.for_price_list is NULL)
+            AND `tabPricing Rule`.disable = 0
+            AND `tabPricing Rule`.valid_upto >= CURDATE()
+        ORDER BY
+            CAST(`tabPricing Rule`.priority AS UNSIGNED) DESC
+        LIMIT 1;
+    """, as_dict=1)
+
+    if pricing_rule:
+        if pricing_rule[0].rate_or_discount == "Discount Percentage":
+            discount_price =  item_price - (item_price * pricing_rule[0].discount_percentage / 100)
+        elif pricing_rule[0].rate_or_discount == "Discount Amount":
+            discount_price = item_price - pricing_rule[0].discount_amount
+        else:
+            discount_price = pricing_rule[0].rate
+            
+        return {
+            "discount_start_date": pricing_rule[0].discount_start_date,
+            "discount_expiry_date": pricing_rule[0].discount_expiry_date,
+            "on_sale": not pricing_rule[0].on_sale,
+            "discount_price": discount_price
+        }
+    else:
+        return {}
