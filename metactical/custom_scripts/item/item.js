@@ -97,6 +97,24 @@ frappe.ui.form.on("Item", {
     },
 });
 
+frappe.ui.form.on("MT Item Website Specification", {
+    description: function (frm, cdt, cdn) {
+        var row = locals[cdt][cdn];
+        frappe.call({
+            method: "metactical.custom_scripts.item.item.get_sb_tag",
+            args: {
+                description: row.description,
+                label: row.label,
+            },
+            callback: function (r) {
+                if (r.message) {
+                    frappe.model.set_value(cdt, cdn, "sb_tag", r.message);
+                }
+            },
+        });
+    },
+});
+
 
 function get_descriptions_dict(frm, r) {
     var descriptions = {};
