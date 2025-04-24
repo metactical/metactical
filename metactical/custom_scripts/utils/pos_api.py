@@ -174,7 +174,7 @@ def submit_sales_order(sales_order, form_data):
         create_comment(comment, form_data['SalesPerson'], sales_order.name)
         
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
-        message = "Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+        message = "Branch: *{0}* \nUnable to submit Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
         
         add_payment_info_to_sales_order(sales_order, form_data)
@@ -195,7 +195,7 @@ def submit_sales_order(sales_order, form_data):
         
         # post to rocket chat
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
-        message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+        message = "Branch: *{0}* \nUnable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
         
         # add payment info to sales order
@@ -219,7 +219,7 @@ def submit_sales_order(sales_order, form_data):
             
             # post to rocket chat
             url = "/app/{0}/{1}".format(sales_invoice.doctype.lower().replace(" ", "-"), sales_invoice.name)
-            message = "Unable to submit Invoice created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+            message = "Branch: *{0}* \nUnable to submit Invoice created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
             post_to_rocket_chat(sales_invoice, message, pos=True)
             
             # add payment info to sales order
