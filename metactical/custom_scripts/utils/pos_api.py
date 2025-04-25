@@ -113,6 +113,9 @@ def validate_users(form_data):
         manager_approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name') if approver["ManagerId"] else None
         cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
         
+        if not approver["ManagerId"] and not approver["CashierId"]:
+            return {"error": "ManagerId or CashierId is required to apply discounts", "success": False}
+                    
         discount = 0
         if approver["isOverallDiscount"]:
             discount = form_data['OverallDiscount']
@@ -121,6 +124,9 @@ def validate_users(form_data):
                 if item['ItemCode'] == approver["ItemId"]:
                     discount = item['Discount']
                     break
+                
+            if not discount:
+                return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
         
         if approver["ManagerId"] and not manager_approver:
             return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
