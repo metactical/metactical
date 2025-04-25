@@ -4,6 +4,7 @@ from metactical.custom_scripts.utils.metactical_utils import (
 	post_to_rocket_chat, queue_action
 )
 from frappe.utils import file_lock, now_datetime, get_url, flt
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
@@ -109,15 +110,38 @@ def validate_users(form_data):
         return {"success": True}   
 
     for approver in approvers:
-        approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name')
-        if approver not in users:
-            return {"error": "User {0} is not allowed to approve POS transactions".format(approver), "success": False}
+        manager_approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name') if approver["ManagerId"] else None
+        cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
+        
+        discount = 0
+        if approver["isOverallDiscount"]:
+            discount = form_data['OverallDiscount']
         else:
-            if not users[approver]["ifw_is_main_pos_user"]:
-                return {"error": "User {0} is not allowed to approve Discounts in POS transactions for {1} profile".format(approver, pos_profile), "success": False}
-            if users[approver]["ifw_max_discount_percent"] < form_data['OverallDiscount']:
-                return {"error": "User {0} is not allowed to approve POS transactions with discount greater than {1}%".format(approver, users[approver]["ifw_max_discount_percent"]), "success": False}
-            
+            for item in form_data['Items']:
+                if item['ItemCode'] == approver["ItemId"]:
+                    discount = item['Discount']
+                    break
+        
+        if approver["ManagerId"] and not manager_approver:
+            return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
+        if approver["CashierId"] and not cashier_approver:
+            return {"error": "User {0} does not exist".format(approver["CashierId"]), "success": False}
+        
+        if approver["ManagerId"] and manager_approver not in users:
+            return {"error": "User {0} is not allowed to approve POS transactions".format(manager_approver), "success": False}
+        if approver["CashierId"] and cashier_approver not in users:
+            return {"error": "User {0} is not allowed to approve POS transactions".format(cashier_approver), "success": False}
+        
+        if approver["CashierId"]:
+            if users[cashier_approver]["ifw_max_discount_percent"] < discount and not manager_approver:
+                return {"error": "User {0} is not allowed to give POS discount greater than {1}%".format(cashier_approver, users[cashier_approver]["ifw_max_discount_percent"]), "success": False}
+
+        if manager_approver:
+            if not users[manager_approver]["ifw_is_main_pos_user"]:
+                return {"error": "User {0} is not allowed to approve Discounts in POS transactions for {1} profile".format(manager_approver, pos_profile), "success": False}
+            if users[manager_approver]["ifw_max_discount_percent"] < discount:
+                return {"error": "User {0} is not allowed to approve POS transactions with discount greater than {1}%".format(manager_approver, users[manager_approver]["ifw_max_discount_percent"]), "success": False}
+                
     return {"success": True}
                 
                    
@@ -495,7 +519,6 @@ def get_item_price(item, price_list):
 
 def get_item_discount(item, price_list, item_price):
     # select all pricing rules for the item and pick the one with the highest priority for each item
-    print(item, price_list)
     pricing_rule = frappe.db.sql(f"""
         SELECT
             valid_from AS discount_start_date,
@@ -532,3 +555,105 @@ def get_item_discount(item, price_list, item_price):
         }
     else:
         return {}
+    
+@frappe.whitelist()
+def create_return(*args, **kwargs):
+    form_data = dict(frappe.form_dict)
+    
+    # Check if SalesPerson exists
+    if "SalesPerson" not in form_data:
+        return {"error": "SalesPerson is required", "success": False, "coupon_code": None}
+    else:
+        if not frappe.db.exists('User', form_data['SalesPerson']):
+            return {"error": "User {0} does not exist".format(form_data['SalesPerson']), "success": False, "coupon_code": None}
+    
+    invoiceId = form_data["InvoiceId"]
+    url = "/app/{0}/{1}".format("sales-invoice", invoiceId)
+
+    
+    sales_return = make_sales_return(invoiceId)
+    
+    updated_items = get_items(form_data)
+    items = sales_return.items.copy()
+    filtered_items = []
+
+    for item in items:
+        for updated_item in updated_items:
+            if item.item_code == updated_item["item_code"] and updated_item["qty"] != 0:
+                item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                item.price_list_rate = (-1 * updated_item["price_list_rate"]) if updated_item["qty"] > 0 else updated_item["price_list_rate"]
+                filtered_items.append(item)
+                 
+    sales_return.items = filtered_items
+    sales_return.calculate_taxes_and_totals()
+    
+    frappe.set_user(form_data['SalesPerson'])
+    try:
+        sales_return.save()
+    except Exception as e:  
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        frappe.log_error(title='Create Sales Return Error', message=frappe.get_traceback())
+        
+        # message = "Branch: *{0}* \n Unable to create Sales Return. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
+        # post_to_rocket_chat(sales_return, message, pos=True)
+        
+        # comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}    
+        # create_comment(comment, form_data['SalesPerson'], invoiceId, "Sales Invoice")
+        
+        return {"error": str(e), "success": False, "coupon_code": None}
+    
+    try:
+        sales_return.submit()
+    except Exception as e:
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        frappe.log_error(title='Submit Sales Return Error', message=frappe.get_traceback())
+        
+        return {"error": str(e), "success": False, "coupon_code": None}
+    
+    coupon_code = None
+    try:
+        coupon_code = create_gift_card(sales_return, form_data)
+    except Exception as e:
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
+        return {"error": str(e), "success": False, "coupon_code": None}
+    
+    frappe.db.commit()
+    return {"error": None, "success": True, "coupon_code": coupon_code, "sales_return": sales_return.name, "total": sales_return.grand_total}
+    
+def create_gift_card(sales_return, form_data):
+    # create pricing rule for the gift card
+    frappe.set_user(form_data['SalesPerson'])
+    pricing_rule = frappe.get_doc({
+            "title": "Gift Card for {0}".format(sales_return.customer),
+            "doctype": "Pricing Rule",
+            "coupon_code_based": 1,
+            "apply_on": "Transaction",
+            "price_or_product_discount": "Price",
+            "selling": 1,
+            "valid_from": now_datetime(),
+            "rate_or_discount": "Discount Amount",
+            "discount_amount": -1 * sales_return.grand_total
+        })
+    pricing_rule.insert(ignore_permissions=True)
+    
+    existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": sales_return.customer})
+    # create gift card item
+    gift_card = frappe.get_doc({
+            "doctype": "Coupon Code",
+            "coupon_name": sales_return.name +"-"+str((existing_coupon_codes + 1)),
+            "coupon_type": "Gift Card",
+            "customer": sales_return.customer,
+            "pricing_rule": pricing_rule.name,
+            "valid_from": now_datetime(),
+            "coupon_description": "Gift Card for {0} from {1}".format(sales_return.customer, sales_return.name),
+        })
+    gift_card.insert(ignore_permissions=True)
+    gift_card.save()
+    frappe.set_user("Administrator")
+    
+    return gift_card.coupon_code
+
