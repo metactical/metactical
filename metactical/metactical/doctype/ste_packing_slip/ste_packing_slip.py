@@ -10,18 +10,6 @@ import time
 
 class STEPackingSlip(Document):
 	def validate(self):
-		try:
-			checkpoint = "check_stock_entry"+str(int(time.time() * 1000))
-			frappe.db.savepoint(checkpoint)
-			stock_entry = frappe.get_doc("Stock Entry", self.stock_entry)
-			stock_entry.submit()
-			frappe.db.rollback(save_point=checkpoint)
-		except frappe.exceptions.ValidationError as e:
-			frappe.clear_last_message()
-			frappe.throw(f"Unable to pack the item(s) because the Stock Entry has an issue that will prevent submission. Please check the <a href='/app/stock-entry/{self.stock_entry}' target='_blank'>Stock Entry</a> and try again.<br><br> <b>Error</b>: {e}")
-		except Exception as e:
-			frappe.throw(f"Unable to pack the item(s) because the Stock Entry has an issue that will prevent submission. Please check the <a href='/app/stock-entry/{self.stock_entry}' target='_blank'>Stock Entry</a> and try again .<br><br> <b>Error</b>: {e}")
-  
 		self.validate_stock_entry()
 		self.validate_case_nos()
 	
@@ -88,7 +76,7 @@ class STEPackingSlip(Document):
 
 		# gets item code, qty per item code, latest packed qty per item code and stock uom
 		res = frappe.db.sql(
-			"""select item_code, sum(qty) as qty, name,
+			"""select item_code, sum(qty) as qty, name, s_warehouse, t_warehouse,
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabSTE Packing Slip` ps, `tabSTE Packing Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
@@ -116,15 +104,20 @@ class STEPackingSlip(Document):
 
 		ste_details = self.get_details_for_packing()[0]
 		for item in ste_details:
+			print(item.s_warehouse)
 			if flt(item.qty) > flt(item.packed_qty):
 				ch = self.append("items", {})
 				ch.item_code = item.item_code
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
 				ch.description = item.description
+				ch.s_warehouse = item.s_warehouse
+				ch.t_warehouse = item.t_warehouse
 				ch.ste_detail = item.name
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
+    
+				print(ch.as_dict())
 
 				# copy custom fields
 				for d in custom_fields:
@@ -167,7 +160,7 @@ def item_details(doctype, txt, searchfield, start, page_len, filters):
 
 	return frappe.db.sql(
 		"""select name, item_name, description from `tabItem`
-				where name in ( select item_code FROM `tabDStock Entry Detail`
+				where name in ( select item_code FROM `tabStock Entry Detail`
 	 						where parent= %s)
 	 			and %s like "%s" %s
 	 			limit  %s, %s """
