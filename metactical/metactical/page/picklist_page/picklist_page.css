@@ -253,6 +253,12 @@
 	margin-bottom: 10px;
 }
 
+.partial-tote-list-div {
+	background-color: #FFF; 
+	padding: 5px;
+	margin-bottom: 10px;
+}
+
 .start-picking-btn{
   position: relative;
   display: inline-flex;

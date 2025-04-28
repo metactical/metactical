@@ -229,11 +229,16 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 			update_doc(docname, total_available_qty, data, item_code, voucher_type, round+1)
 
 def is_product_bundle_item(item_code):
-	product_bundle_items = frappe.get_all(
-		'Product Bundle Item',
-		filters={'item_code': item_code},
-		fields=['name', 'parent']
-	)
+	product_bundle_items = frappe.db.sql(f"""
+		SELECT
+			`tabProduct Bundle Item`.name, `tabProduct Bundle Item`.parent
+		FROM
+			`tabProduct Bundle Item`
+		JOIN
+			`tabProduct Bundle` ON `tabProduct Bundle`.name = `tabProduct Bundle Item`.parent
+		WHERE
+			item_code = '{item_code}' and `tabProduct Bundle`.disabled = 0 
+	""", as_dict=True)
 	
 	if not product_bundle_items:
 		return None
