@@ -585,15 +585,20 @@ def create_return(*args, **kwargs):
     log = create_log(form_data, 'Sales Return')
     
     # Check if SalesPerson exists
-    if "SalesPerson" not in form_data:
-        return {"error": "SalesPerson is required", "success": False, "coupon_code": None}
+    if "SalesPerson" not in form_data or not form_data["SalesPerson"]:
+        frappe.response["Message"] = "Sales Person is required"
+        frappe.response["Status"] = 500
+        frappe.response["CouponCode"] = None
+        return
     else:
         if not frappe.db.exists('User', form_data['SalesPerson']):
-            return {"error": "User {0} does not exist".format(form_data['SalesPerson']), "success": False, "coupon_code": None}
-    
+            frappe.response["Message"] = "User {0} does not exist".format(form_data['SalesPerson'])
+            frappe.response["Status"] = 500
+            frappe.response["CouponCode"] = None
+            return
+            
     invoiceId = form_data["InvoiceId"]
     sales_return = make_sales_return(invoiceId)
-    
     formatted_items = get_items(form_data)
     items = sales_return.items.copy()
     filtered_items = []
@@ -609,7 +614,7 @@ def create_return(*args, **kwargs):
                 item.margin_type = ""
                 item.rate = item.price_list_rate - item.discount_amount
                 filtered_items.append(item)
-                                  
+
     sales_return.items = filtered_items
     # sales_return.additional_discount_percentage = form_data['OverallDiscount']
     sales_return.calculate_taxes_and_totals()
@@ -620,6 +625,7 @@ def create_return(*args, **kwargs):
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
     except Exception as e:
+        frappe.db.rollback()
         frappe.clear_last_message()
         frappe.set_user("Administrator")
         
@@ -645,7 +651,6 @@ def create_return(*args, **kwargs):
         frappe.response["Status"] = 500
         frappe.response["Message"] = str(e)
     
-    frappe.db.commit()
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
     frappe.response["CouponCode"] = coupon_code
@@ -656,18 +661,7 @@ def create_return(*args, **kwargs):
 def create_gift_card(sales_return, form_data):
     # create pricing rule for the gift card
     frappe.set_user(form_data['SalesPerson'])
-    pricing_rule = frappe.get_doc({
-            "title": "Gift Card for {0}".format(sales_return.customer),
-            "doctype": "Pricing Rule",
-            "coupon_code_based": 1,
-            "apply_on": "Transaction",
-            "price_or_product_discount": "Price",
-            "selling": 1,
-            "valid_from": now_datetime(),
-            "rate_or_discount": "Discount Amount",
-            "discount_amount": -1 * sales_return.grand_total
-        })
-    pricing_rule.insert(ignore_permissions=True)
+    pricing_rule = get_or_create_pricing_rule(sales_return)
     
     existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": sales_return.customer})
     # create gift card item
@@ -676,7 +670,7 @@ def create_gift_card(sales_return, form_data):
             "coupon_name": sales_return.customer +"-"+str((existing_coupon_codes + 1)),
             "coupon_type": "Gift Card",
             "customer": sales_return.customer,
-            "pricing_rule": pricing_rule.name,
+            "pricing_rule": pricing_rule,
             "valid_from": now_datetime(),
             "coupon_description": "Gift Card for {0} from {1}".format(sales_return.customer, sales_return.name),
         })
@@ -685,6 +679,27 @@ def create_gift_card(sales_return, form_data):
     frappe.set_user("Administrator")
     
     return gift_card.coupon_code
+
+def get_or_create_pricing_rule(sales_return):
+    pricing_rule = frappe.db.exists("Pricing Rule", {"discount_amount": -1 * sales_return.grand_total, "coupon_code_based": 1, "title": "GC-{0}".format(sales_return.customer)})
+    if not pricing_rule:
+        pricing_rule = frappe.get_doc({
+                "title": "GC-{0}".format(sales_return.customer),
+                "doctype": "Pricing Rule",
+                "coupon_code_based": 1,
+                "apply_on": "Transaction",
+                "price_or_product_discount": "Price",
+                "selling": 1,
+                "valid_from": now_datetime(),
+                "rate_or_discount": "Discount Amount",
+                "discount_amount": -1 * sales_return.grand_total
+            })
+        
+        pricing_rule.insert(ignore_permissions=True)
+        frappe.db.commit()
+        return pricing_rule.name
+    
+    return pricing_rule    
 
 def create_log(form_data, request_type):
     try:
