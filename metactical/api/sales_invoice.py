@@ -73,7 +73,18 @@ def load_si_pos(sales_invoice):
     items = []
     taxes = []
     payments = []
+    
     customer = { "id": invoice.customer, "Name":invoice.customer_name }
+    customer_contact = get_customer_detail(invoice.customer)
+    if customer_contact:
+        customer["Email"] = customer.get("Email")
+        customer["Phone"] = customer.get("Phone") or customer.get("Mobile")
+        customer["Note"] = ""
+    else:
+        customer["Email"] = ""
+        customer["Phone"] = ""
+        customer["Note"] = ""
+        
     invoice_details = {}
 
     for item in invoice.items:
@@ -188,9 +199,11 @@ def load_so_pos(sales_order):
     if customer:
         order_details["Customer"]["Email"] = customer.get("Email")
         order_details["Customer"]["Phone"] = customer.get("Phone") or customer.get("Mobile")
+        order_details["Note"] = ""
     else:
         order_details["Customer"]["Email"] = ""
         order_details["Customer"]["Phone"] = ""
+        order_details["Note"] = ""
         
     frappe.response["Invoice"] = order_details
     frappe.response["Status"] = 200
