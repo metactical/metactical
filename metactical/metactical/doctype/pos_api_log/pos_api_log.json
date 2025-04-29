@@ -31,16 +31,14 @@
   },
   {
    "fieldname": "sales_order",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Sales Order",
-   "options": "Sales Order",
    "read_only": 1
   },
   {
    "fieldname": "sales_invoice",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Sales Invoice",
-   "options": "Sales Invoice",
    "read_only": 1
   },
   {
@@ -53,22 +51,20 @@
   },
   {
    "fieldname": "coupon_code",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Coupon Code",
-   "options": "Coupon Code",
    "read_only": 1
   },
   {
    "fieldname": "sales_return",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Sales Return",
-   "options": "Sales Invoice",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-29 04:38:12.720499",
+ "modified": "2025-04-29 05:23:01.102683",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS API Log",
