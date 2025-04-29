@@ -7,17 +7,17 @@ def load_si_from_so_pos(sales_order):
     sales_order = frappe.db.exists("Sales Order", sales_order)
 
     if not sales_order:
-        frappe.response["Status"] = 400
+        frappe.response["Status"] = 404
         frappe.response["Message"] = "Sales Order not found"
         return
     
     sales_order = frappe.get_doc("Sales Order", sales_order)
     if sales_order.docstatus > 1:
-        frappe.response["Status"] = 400
+        frappe.response["Status"] = 404
         frappe.response["Message"] = "Sales Order is cancelled"
         return
     if sales_order.docstatus == 0:
-        frappe.response["Status"] = 400
+        frappe.response["Status"] = 404
         frappe.response["Message"] = "Sales Order is Draft"
         return
     
@@ -73,7 +73,18 @@ def load_si_pos(sales_invoice):
     items = []
     taxes = []
     payments = []
+    
     customer = { "id": invoice.customer, "Name":invoice.customer_name }
+    customer_contact = get_customer_detail(invoice.customer)
+    if customer_contact:
+        customer["Email"] = customer.get("Email")
+        customer["Phone"] = customer.get("Phone") or customer.get("Mobile")
+        customer["Note"] = ""
+    else:
+        customer["Email"] = ""
+        customer["Phone"] = ""
+        customer["Note"] = ""
+        
     invoice_details = {}
 
     for item in invoice.items:
@@ -106,7 +117,7 @@ def load_si_pos(sales_invoice):
         pos_profile = invoice.pos_profile.replace(" Operators", "")
 
     invoice_details["ApprovalList"] = []
-    invoice_details["SalesPerson"] = "ifwEdmonds@camouflage.ca"
+    invoice_details["SalesPerson"] = invoice.owner
     invoice_details["Comments"] = []
     invoice_details["InvoiceId"] = invoice.name
     invoice_details["Total"] = invoice.grand_total
@@ -121,6 +132,7 @@ def load_si_pos(sales_invoice):
     invoice_details["Taxes"] = taxes
     invoice_details["Customer"] = customer
     invoice_details["Payment"] = payments
+    invoice_details["Status"] = invoice.status
 
     returns = get_returns(invoice)
     store_credits = group_invoice_data(returns)
@@ -128,3 +140,94 @@ def load_si_pos(sales_invoice):
     frappe.response["Returns"] = store_credits
     frappe.response["Status"] = status
     frappe.response["Message"] = "Success"
+
+@frappe.whitelist()
+def load_so_pos(sales_order):
+    sales_order = frappe.db.exists("Sales Order", sales_order)
+
+    if not sales_order:
+        frappe.response["Status"] = 404
+        frappe.response["Message"] = "Sales Order not found"
+        return
+    
+    sales_order = frappe.get_doc("Sales Order", sales_order)
+    if sales_order.docstatus > 1:
+        frappe.response["Status"] = 404
+        frappe.response["Message"] = "Sales Order is cancelled"
+        return
+    
+    order_details = {}
+    
+    order_details["ApprovalList"] = []
+    order_details["SalesPerson"] = sales_order.owner
+    order_details["Comments"] = []
+    order_details["InvoiceId"] = sales_order.name
+    order_details["Total"] = sales_order.grand_total
+    order_details["PriceList"] = sales_order.selling_price_list
+    order_details["PostingDate"] = sales_order.transaction_date
+    order_details["OverallDiscount"] = sales_order.additional_discount_percentage
+    order_details["TaxesAndChargesTemplate"] = sales_order.taxes_and_charges
+    order_details["POSProfile"] = None
+    order_details["LeadSource"] = sales_order.source
+    order_details["total_taxes_and_charges"] = sales_order.total_taxes_and_charges
+    order_details["Items"] = []
+    order_details["Taxes"] = []
+    order_details["Payment"] = []
+    order_details["Customer"] = {"id": sales_order.customer, "Name": sales_order.customer_name}
+    order_details["Status"] = sales_order.status
+    
+    for item in sales_order.items:
+        order_details["Items"].append({
+            "ItemCode": item.item_code,
+            "ItemName": item.item_name,
+            "Rate": item.rate,
+            "PriceListRate": item.price_list_rate,
+            "Image": item.image,
+            "Qty": item.qty,
+            "Amount": frappe.format_value(item.net_amount, {"fieldtype": "Currency"}),
+            "Discount": item.discount_percentage,
+        })
+        
+    for tax in sales_order.taxes:
+        tax_name = tax.account_head.split(" - ")[0]
+        order_details["Taxes"].append({
+            "TaxId": tax_name,
+            "Amount": tax.rate
+        })
+        
+    customer = get_customer_detail(sales_order.customer)
+    if customer:
+        order_details["Customer"]["Email"] = customer.get("Email")
+        order_details["Customer"]["Phone"] = customer.get("Phone") or customer.get("Mobile")
+        order_details["Note"] = ""
+    else:
+        order_details["Customer"]["Email"] = ""
+        order_details["Customer"]["Phone"] = ""
+        order_details["Note"] = ""
+        
+    frappe.response["Invoice"] = order_details
+    frappe.response["Status"] = 200
+    frappe.response["Message"] = "Success"
+    
+    
+def get_customer_detail(customer):
+    customer = frappe.db.exists("Customer", customer)
+    if not customer:
+        return {}
+    
+    contact_info = frappe.db.sql("""
+        SELECT email_id, phone, mobile_no FROM `tabContact` 
+        JOIN `tabDynamic Link` ON `tabDynamic Link`.parent = `tabContact`.name
+        WHERE link_name = %s AND link_doctype = 'Customer'
+        """, (customer), as_dict=True)
+    
+    contact_details = {}
+    if contact_info:
+        contact_info = contact_info[0]
+        contact_details = {
+            "Email": contact_info.email_id,
+            "Phone": contact_info.phone,
+            "Mobile": contact_info.mobile_no
+        }
+        
+    return contact_details
