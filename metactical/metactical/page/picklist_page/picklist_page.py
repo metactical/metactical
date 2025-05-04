@@ -160,7 +160,7 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 		# 		items.remove(item)
 		# 		items.extend(bundled_items)
 		
-			
+		partially_picked = []
 		for item in items:
 			barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
 							WHERE parent=%(item_code)s""", {"item_code": item.item_code}, as_dict=1)
@@ -172,9 +172,32 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 				"locations": [location.strip() for location in locations],
 				"tote": tote
 			})
+
+			# Load partially picked items
+			picked = frappe.db.exists("Picklist Tote Item", 
+							{"pick_list": item.pick_list, "pick_list_item": item.name, "item": item.item_code})
+			if picked:
+				picked_qty, picked_tote = frappe.db.get_value("Picklist Tote Item", picked, ["qty", "parent"])
+				partial_item = copy.deepcopy(item)
+				partial_item.update({
+					"picked_qty": picked_qty,
+					"tote": picked_tote
+				})
+				
+				item.update({
+					"qty": item.qty - picked_qty,
+					"tote": picked_tote
+				})
+				partially_picked.append(partial_item)
+
 		pl_text = frappe.db.get_value("Pick List", pick_list, "pl_text")
 		frappe.db.set_value('Pick List', pick_list, 'ais_picked_by', user)
-		doc = {"name": items[0].pick_list, "pl_text": pl_text, "items": items}
+		doc = {
+			"name": items[0].pick_list, 
+			"pl_text": pl_text, 
+			"items": items,
+			"partially_picked": partially_picked
+		}
 		return doc
 	else:
 		return 'Already Picked'
