@@ -569,6 +569,7 @@ class PicklistPage{
 			},
 			"freeze": true,
 			"callback": function(ret){
+				console.log("Returned: ", ret.message);
 				let selected_source = 'Source';
 				if(metactical.pick_list.selected_source != "All"){
 					selected_source = metactical.pick_list.selected_source;
@@ -680,11 +681,22 @@ class PicklistPage{
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_totes",
 			"freeze": true, 
-			"args": {"warehouse": metactical.pick_list.selected_warehouse},
+			"args": {
+				"warehouse": metactical.pick_list.selected_warehouse,
+				"pick_lists": [metactical.pick_list.current_pick]
+			},
 			"callback": function(ret){
-				metactical.pick_list.available_totes = ret.message;
+				let available_totes = []
+
+				if(ret.message.partial_totes && ret.message.partial_totes.length > 0){
+					available_totes = [ret.message.partial_totes[0].tote_name];
+				}
+				else{
+					available_totes = ret.message.totes;
+				}
+				metactical.pick_list.available_totes = available_totes;
 				me.wrapper.html(frappe.render_template('totes_single_list', 
-					{"totes": ret.message}));
+					{"totes": available_totes}));
 				me.tote_barcode = frappe.ui.form.make_control({
 					parent: $('.tote-barcode'),
 					df: {
@@ -757,6 +769,9 @@ class PicklistPage{
 				}
 				else{
 					metactical.pick_list.items_to_pick = ret.message.items;
+					if(ret.message.partially_picked){
+						metactical.pick_list.picked_items = ret.message.partially_picked;
+					}
 					me.wrapper.html(frappe.render_template('items_list',
 						{"pick_list_name": metactical.pick_list.current_pick, "pl_text": ret.message.pl_text}));
 					me.item_barcode = frappe.ui.form.make_control({
