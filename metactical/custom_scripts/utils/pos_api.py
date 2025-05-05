@@ -237,22 +237,28 @@ def update_sales_order(sales_order, form_data):
         # add sales order id
         i = 0
         for item in items:
+            found = False
             for sales_item in sales_order.items:
                 if (item['item_code'] == 2 and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != 2):
                     item["name"] = sales_item.name
                     item["docname"] = sales_item.name
                     item["idx"] = i + 1
+                    found = True
+                    
+            if not found:
+                item["__islocal"] = True
+                item["idx"] = i + 1
+                item["name"] = "Row-{0}".format(i + 1)
                 
             i += 1
-        
         parent_doctype = sales_order.doctype
         parent_doctype_name = sales_order.name
         child_docname = "items"
             
-        from erpnext.controllers.accounts_controller import update_child_qty_rate
-        import json
+        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
         
         trans_items = json.dumps(items)
+        
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
         frappe.db.commit()
         return {"success": True, "message": ""}
@@ -450,7 +456,7 @@ def get_items(form_data):
             'rate': rate - (item['Rate'] * (item['Discount'] / 100)),
             'qty': qty,
             'discount_percentage': item['Discount'],
-            'warehouse': warehouse if warehouse else 'W01-WHS-Active Stock - ICL'
+            'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
         }
 
         if item_code == "2":
