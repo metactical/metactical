@@ -10,7 +10,8 @@ import json
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
-    log = create_log(form_data, 'New Order')
+    order_type = "New Order" if not form_data["InvoiceId"] else "Manual Order"
+    log = create_log(form_data, order_type)
 
     user_validation = validate_users(form_data)
     if not user_validation["success"]:
@@ -23,7 +24,6 @@ def receive_pos_data(*args, **kwargs):
         return
         
     try:        
-        # Do something with the data
         customer = get_customer(form_data)
         if not customer:
             frappe.response["Status"] = "500"
@@ -34,16 +34,50 @@ def receive_pos_data(*args, **kwargs):
             frappe.db.commit()
             return
             
-        sales_order = create_sales_order(form_data, customer)
-        if not sales_order["success"]:
-            frappe.response["Status"] = "500"
-            frappe.response["Message"] = [sales_order["error"]]
-            frappe.response["InvoiceId"] = None
-            frappe.response["Total"] = 0.0
-            frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
-            frappe.db.commit()
-            return
-        
+        if form_data["InvoiceId"]:
+            sales_order = frappe.get_doc('Sales Order', form_data["InvoiceId"])
+            if sales_order.docstatus != 1:
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = ["Sales Order {0} is not submitted".format(form_data["InvoiceId"])]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', "Sales Order {0} is not submitted".format(form_data["InvoiceId"]))
+                frappe.db.commit()
+                return
+            
+            if sales_order.status != "To Deliver and Bill":
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = ["Unable to update Sales Order {0}. The status is {1}".format(form_data["InvoiceId"], sales_order.status)]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', "Unable to update Sales Order {0}. The status is {1}".format(form_data["InvoiceId"], sales_order.status))
+                frappe.db.commit()
+                return
+            
+            # update the sales order with the new data
+            update_details = update_sales_order(sales_order, form_data)
+            if not update_details["success"]:
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = [update_details["error"]]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', update_details["error"], update_modified=False)
+                frappe.db.commit()
+                return
+            
+            sales_order = frappe.get_doc('Sales Order', form_data["InvoiceId"])
+            sales_order = {"sales_order": sales_order}
+        else:
+            sales_order = create_sales_order(form_data, customer)
+            if not sales_order["success"]:
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = [sales_order["error"]]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
+                frappe.db.commit()
+                return
+                
         sales_order = sales_order["sales_order"]
         if sales_order:
             if len(form_data["Payment"]):
@@ -196,13 +230,43 @@ def create_sales_order(form_data, customer):
             
     return {"success": True, "sales_order": sales_order}
 
+def update_sales_order(sales_order, form_data):
+    items = get_items(form_data)
+        
+    try:
+        # add sales order id
+        i = 0
+        for item in items:
+            for sales_item in sales_order.items:
+                if (item['item_code'] == 2 and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != 2):
+                    item["name"] = sales_item.name
+                    item["docname"] = sales_item.name
+                    item["idx"] = i + 1
+                
+            i += 1
+        
+        parent_doctype = sales_order.doctype
+        parent_doctype_name = sales_order.name
+        child_docname = "items"
+            
+        from erpnext.controllers.accounts_controller import update_child_qty_rate
+        import json
+        
+        trans_items = json.dumps(items)
+        update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
+        frappe.db.commit()
+        return {"success": True, "message": ""}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 def submit_sales_order(sales_order, form_data, log):
     frappe.set_user(form_data["SalesPerson"])
     try:
         frappe.db.set_value('POS API Log', log, 'sales_order', sales_order, update_modified=False)
         sales_order = frappe.get_doc('Sales Order', sales_order)
-        sales_order.submit()    
-        frappe.db.commit()    
+        if sales_order.docstatus == 0:
+            sales_order.submit()    
+            frappe.db.commit()    
     except Exception as e:
         frappe.set_user("Administrator")
         frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
@@ -383,6 +447,7 @@ def get_items(form_data):
         item_info = {
             'item_code': item_code,
             'price_list_rate': rate,
+            'rate': rate - (item['Rate'] * (item['Discount'] / 100)),
             'qty': qty,
             'discount_percentage': item['Discount'],
             'warehouse': warehouse if warehouse else 'W01-WHS-Active Stock - ICL'

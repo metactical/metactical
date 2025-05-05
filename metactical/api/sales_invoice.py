@@ -79,11 +79,11 @@ def load_si_pos(sales_invoice):
     if customer_contact:
         customer["Email"] = customer.get("Email")
         customer["Phone"] = customer.get("Phone") or customer.get("Mobile")
-        customer["Note"] = ""
+        customer["Customer"]["Note"] = ""
     else:
         customer["Email"] = ""
         customer["Phone"] = ""
-        customer["Note"] = ""
+        customer["Customer"]["Note"] = ""
         
     invoice_details = {}
 
@@ -175,6 +175,7 @@ def load_so_pos(sales_order):
     order_details["Payment"] = []
     order_details["Customer"] = {"id": sales_order.customer, "Name": sales_order.customer_name}
     order_details["Status"] = sales_order.status
+    order_details["HasInvoice"] = so_has_invoice(sales_order.name)
     
     for item in sales_order.items:
         order_details["Items"].append({
@@ -199,16 +200,28 @@ def load_so_pos(sales_order):
     if customer:
         order_details["Customer"]["Email"] = customer.get("Email")
         order_details["Customer"]["Phone"] = customer.get("Phone") or customer.get("Mobile")
-        order_details["Note"] = ""
+        order_details["Customer"]["Note"] = ""
     else:
         order_details["Customer"]["Email"] = ""
         order_details["Customer"]["Phone"] = ""
-        order_details["Note"] = ""
+        order_details["Customer"]["Note"] = ""
         
     frappe.response["Invoice"] = order_details
     frappe.response["Status"] = 200
     frappe.response["Message"] = "Success"
     
+def so_has_invoice(sales_order):
+    sales_invoices = frappe.db.sql("""
+        SELECT `tabSales Invoice Item`.parent, si.status, si.docstatus FROM `tabSales Invoice Item`
+        JOIN `tabSales Invoice` si ON si.name = `tabSales Invoice Item`.parent
+        Where
+        `tabSales Invoice Item`.sales_order = %s 
+        and is_return = 0 
+        and si.docstatus <> 2
+        order by si.posting_date asc
+        """, (sales_order), as_dict=True)
+        
+    return True if sales_invoices else False
     
 def get_customer_detail(customer):
     customer = frappe.db.exists("Customer", customer)
