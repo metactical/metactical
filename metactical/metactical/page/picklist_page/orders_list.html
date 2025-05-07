@@ -21,6 +21,7 @@
 					<b><span class="pick-list-name">{{pl.name}}</span></b>
 					{% if pl.status == "Partially Picked" %} 
 						<span style="color:#333c44; font-size: small; font-weight: 500;"> ({{pl.status}})</span>
+						<span style="color:#333c44; font-size: small; font-weight: 500;"> ({{pl.tote}})</span>
 					{% endif %}
 					<br>
 					<span class="pick-order-no"><b>{{pl.sales_order}}</b><br></span>
