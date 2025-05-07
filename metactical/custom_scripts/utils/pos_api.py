@@ -4,11 +4,14 @@ from metactical.custom_scripts.utils.metactical_utils import (
 	post_to_rocket_chat, queue_action
 )
 from frappe.utils import file_lock, now_datetime, get_url, flt
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
+import json
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
-    frappe.log_error("POS Data", form_data)
+    order_type = "New Order" if not form_data["InvoiceId"] else "Manual Order"
+    log = create_log(form_data, order_type)
 
     user_validation = validate_users(form_data)
     if not user_validation["success"]:
@@ -16,26 +19,65 @@ def receive_pos_data(*args, **kwargs):
         frappe.response["Message"] = [user_validation["error"]]
         frappe.response["InvoiceId"] = None
         frappe.response["Total"] = 0.0
+        frappe.db.set_value('POS API Log', log, 'error', user_validation["error"])
+        frappe.db.commit()
         return
         
     try:        
-        # Do something with the data
         customer = get_customer(form_data)
         if not customer:
             frappe.response["Status"] = "500"
             frappe.response["Message"] = ["Unable to create/find Customer"]
             frappe.response["InvoiceId"] = None
             frappe.response["Total"] = 0.0
+            frappe.db.set_value('POS API Log', log, 'error', "Unable to create/find Customer")
+            frappe.db.commit()
             return
             
-        sales_order = create_sales_order(form_data, customer)
-        if not sales_order["success"]:
-            frappe.response["Status"] = "500"
-            frappe.response["Message"] = [sales_order["error"]]
-            frappe.response["InvoiceId"] = None
-            frappe.response["Total"] = 0.0
-            return
-        
+        if form_data["InvoiceId"]:
+            sales_order = frappe.get_doc('Sales Order', form_data["InvoiceId"])
+            if sales_order.docstatus != 1:
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = ["Sales Order {0} is not submitted".format(form_data["InvoiceId"])]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', "Sales Order {0} is not submitted".format(form_data["InvoiceId"]))
+                frappe.db.commit()
+                return
+            
+            if sales_order.status != "To Deliver and Bill":
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = ["Unable to update Sales Order {0}. The status is {1}".format(form_data["InvoiceId"], sales_order.status)]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', "Unable to update Sales Order {0}. The status is {1}".format(form_data["InvoiceId"], sales_order.status))
+                frappe.db.commit()
+                return
+            
+            # update the sales order with the new data
+            update_details = update_sales_order(sales_order, form_data)
+            if not update_details["success"]:
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = [update_details["error"]]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', update_details["error"], update_modified=False)
+                frappe.db.commit()
+                return
+            
+            sales_order = frappe.get_doc('Sales Order', form_data["InvoiceId"])
+            sales_order = {"sales_order": sales_order}
+        else:
+            sales_order = create_sales_order(form_data, customer)
+            if not sales_order["success"]:
+                frappe.response["Status"] = "500"
+                frappe.response["Message"] = [sales_order["error"]]
+                frappe.response["InvoiceId"] = None
+                frappe.response["Total"] = 0.0
+                frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
+                frappe.db.commit()
+                return
+                
         sales_order = sales_order["sales_order"]
         if sales_order:
             if len(form_data["Payment"]):
@@ -51,7 +93,8 @@ def receive_pos_data(*args, **kwargs):
                         queue="default", # one of short, default, long
                         at_front=True,
                         form_data=form_data,
-                        sales_order=sales_order.name
+                        sales_order=sales_order.name,
+                        log=log
                     )
                 else:
                     add_payment_info_to_sales_order(sales_order, form_data)
@@ -71,6 +114,8 @@ def receive_pos_data(*args, **kwargs):
     except Exception as e:
         frappe.log_error(title="pos_data", message=form_data)
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
         frappe.clear_last_message()
         frappe.response["Status"] = "500"
         frappe.response["Message"] = [str(e)]
@@ -106,18 +151,48 @@ def validate_users(form_data):
         
     # Check if approvers list is availble in the incoming api request
     if "ApprovalList" not in form_data:
-        return {"success": True}   
+        return {"success": True}  
+    
 
     for approver in approvers:
-        approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name')
-        if approver not in users:
-            return {"error": "User {0} is not allowed to approve POS transactions".format(approver), "success": False}
+        manager_approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name') if approver["ManagerId"] else None
+        # cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
+        
+        # if not approver["ManagerId"] and not approver["CashierId"]:
+        #     return {"error": "ManagerId or CashierId is required to apply discounts", "success": False}
+                    
+        discount = 0
+        if approver["isOverallDiscount"]:
+            discount = form_data['OverallDiscount']
         else:
-            if not users[approver]["ifw_is_main_pos_user"]:
-                return {"error": "User {0} is not allowed to approve Discounts in POS transactions for {1} profile".format(approver, pos_profile), "success": False}
-            if users[approver]["ifw_max_discount_percent"] < form_data['OverallDiscount']:
-                return {"error": "User {0} is not allowed to approve POS transactions with discount greater than {1}%".format(approver, users[approver]["ifw_max_discount_percent"]), "success": False}
-            
+            for item in form_data['Items']:
+                if item['ItemCode'] == approver["ItemId"]:
+                    discount = item['Discount']
+                    break
+                
+            if not discount:
+                return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
+        
+        if approver["ManagerId"] and not manager_approver:
+            return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
+        # if approver["CashierId"] and not cashier_approver:
+        #     return {"error": "User {0} does not exist".format(approver["CashierId"]), "success": False}
+        
+        if approver["ManagerId"] and manager_approver not in users:
+            return {"error": "User {0} is not allowed to approve POS transactions".format(manager_approver), "success": False}
+        # if approver["CashierId"] and cashier_approver not in users:
+        #     return {"error": "User {0} is not allowed to approve POS transactions".format(cashier_approver), "success": False}
+        
+        # if approver["CashierId"]:
+        #     if users[cashier_approver]["ifw_max_discount_percent"] < discount and not manager_approver:
+        #         return {"error": "User {0} is not allowed to give POS discount greater than {1}%".format(cashier_approver, users[cashier_approver]["ifw_max_discount_percent"]), "success": False}
+
+        if manager_approver:
+            if not users[manager_approver]["ifw_is_main_pos_user"]:
+                return {"error": "User {0} is not allowed to approve Discounts in POS transactions for {1} profile".format(manager_approver, pos_profile), "success": False}
+            if users[manager_approver]["ifw_max_discount_percent"] < discount:
+                return {"error": "User {0} is not allowed to approve POS transactions with discount greater than {1}%".format(manager_approver, users[manager_approver]["ifw_max_discount_percent"]), "success": False}
+                
     return {"success": True}
                 
                    
@@ -156,15 +231,53 @@ def create_sales_order(form_data, customer):
             
     return {"success": True, "sales_order": sales_order}
 
-def submit_sales_order(sales_order, form_data):
+def update_sales_order(sales_order, form_data):
+    items = get_items(form_data)
+        
+    try:
+        # add sales order id
+        i = 0
+        for item in items:
+            found = False
+            for sales_item in sales_order.items:
+                if (item['item_code'] == 2 and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != 2):
+                    item["name"] = sales_item.name
+                    item["docname"] = sales_item.name
+                    item["idx"] = i + 1
+                    found = True
+                    
+            if not found:
+                item["__islocal"] = True
+                item["idx"] = i + 1
+                item["name"] = "Row-{0}".format(i + 1)
+                
+            i += 1
+        parent_doctype = sales_order.doctype
+        parent_doctype_name = sales_order.name
+        child_docname = "items"
+            
+        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
+        
+        trans_items = json.dumps(items)
+        
+        update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
+        frappe.db.commit()
+        return {"success": True, "message": ""}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def submit_sales_order(sales_order, form_data, log):
     frappe.set_user(form_data["SalesPerson"])
     try:
+        frappe.db.set_value('POS API Log', log, 'sales_order', sales_order, update_modified=False)
         sales_order = frappe.get_doc('Sales Order', sales_order)
-        sales_order.submit()    
-        frappe.db.commit()    
+        if sales_order.docstatus == 0:
+            sales_order.submit()    
+            frappe.db.commit()    
     except Exception as e:
         frappe.set_user("Administrator")
         frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
         
         if type(sales_order) == str:
             sales_order = frappe.get_doc('Sales Order', sales_order)
@@ -184,10 +297,12 @@ def submit_sales_order(sales_order, form_data):
     sales_invoice = None
     try:
         sales_invoice = create_invoice(sales_order, form_data)
+        frappe.db.set_value('POS API Log', log, 'sales_invoice', sales_invoice.name)
         frappe.db.commit()
     except Exception as e:
         frappe.set_user("Administrator")
         frappe.log_error(title='Create Invoice Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
         
         # add comment to sales order
         comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}
@@ -212,6 +327,7 @@ def submit_sales_order(sales_order, form_data):
             frappe.db.rollback()
             frappe.set_user("Administrator")
             frappe.log_error(title='Submit Invoice Error', message=frappe.get_traceback())
+            frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
             
             # add comment to sales order
             comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}
@@ -336,9 +452,10 @@ def get_items(form_data):
         item_info = {
             'item_code': item_code,
             'price_list_rate': rate,
+            'rate': rate - (item['Rate'] * (item['Discount'] / 100)),
             'qty': qty,
             'discount_percentage': item['Discount'],
-            'warehouse': warehouse if warehouse else 'W01-WHS-Active Stock - ICL'
+            'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
         }
 
         if item_code == "2":
@@ -495,7 +612,6 @@ def get_item_price(item, price_list):
 
 def get_item_discount(item, price_list, item_price):
     # select all pricing rules for the item and pick the one with the highest priority for each item
-    print(item, price_list)
     pricing_rule = frappe.db.sql(f"""
         SELECT
             valid_from AS discount_start_date,
@@ -532,3 +648,138 @@ def get_item_discount(item, price_list, item_price):
         }
     else:
         return {}
+    
+@frappe.whitelist()
+def create_return(*args, **kwargs):
+    form_data = dict(frappe.form_dict)
+    log = create_log(form_data, 'Sales Return')
+    
+    # Check if SalesPerson exists
+    if "SalesPerson" not in form_data or not form_data["SalesPerson"]:
+        frappe.response["Message"] = "Sales Person is required"
+        frappe.response["Status"] = 500
+        frappe.response["CouponCode"] = None
+        return
+    else:
+        if not frappe.db.exists('User', form_data['SalesPerson']):
+            frappe.response["Message"] = "User {0} does not exist".format(form_data['SalesPerson'])
+            frappe.response["Status"] = 500
+            frappe.response["CouponCode"] = None
+            return
+            
+    invoiceId = form_data["InvoiceId"]
+    sales_return = make_sales_return(invoiceId)
+    formatted_items = get_items(form_data)
+    items = sales_return.items.copy()
+    filtered_items = []
+
+    for item in items:
+        for updated_item in formatted_items:
+            if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
+                (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
+                item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
+                item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
+                item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                item.margin_type = ""
+                item.rate = item.price_list_rate - item.discount_amount
+                filtered_items.append(item)
+
+    sales_return.items = filtered_items
+    # sales_return.additional_discount_percentage = form_data['OverallDiscount']
+    sales_return.calculate_taxes_and_totals()
+    
+    frappe.set_user(form_data['SalesPerson'])
+    try:
+        sales_return.save()
+        sales_return.submit()
+        frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        
+        frappe.log_error(title='Submit Sales Return Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = str(e)
+        frappe.response["CouponCode"] = None
+        return
+    
+    coupon_code = None
+    try:
+        coupon_code = create_gift_card(sales_return, form_data)
+        frappe.db.set_value('POS API Log', log, 'coupon_code', coupon_code, update_modified=False)
+    except Exception as e:
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        
+        frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = str(e)
+    
+    frappe.response["Status"] = 200
+    frappe.response["Message"] = ""
+    frappe.response["CouponCode"] = coupon_code
+    frappe.response["SalesReturn"] = sales_return.name
+    frappe.response["Total"] = sales_return.grand_total
+    frappe.db.commit()
+    
+def create_gift_card(sales_return, form_data):
+    # create pricing rule for the gift card
+    frappe.set_user(form_data['SalesPerson'])
+    pricing_rule = get_or_create_pricing_rule(sales_return)
+    
+    existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": sales_return.customer})
+    # create gift card item
+    gift_card = frappe.get_doc({
+            "doctype": "Coupon Code",
+            "coupon_name": sales_return.customer +"-"+str((existing_coupon_codes + 1)),
+            "coupon_type": "Gift Card",
+            "customer": sales_return.customer,
+            "pricing_rule": pricing_rule,
+            "valid_from": now_datetime(),
+            "coupon_description": "Gift Card for {0} from {1}".format(sales_return.customer, sales_return.name),
+        })
+    gift_card.insert(ignore_permissions=True)
+    gift_card.save()
+    frappe.set_user("Administrator")
+    
+    return gift_card.coupon_code
+
+def get_or_create_pricing_rule(sales_return):
+    pricing_rule = frappe.db.exists("Pricing Rule", {"discount_amount": -1 * sales_return.grand_total, "coupon_code_based": 1, "title": "GC-{0}".format(sales_return.customer)})
+    if not pricing_rule:
+        pricing_rule = frappe.get_doc({
+                "title": "GC-{0}".format(sales_return.customer),
+                "doctype": "Pricing Rule",
+                "coupon_code_based": 1,
+                "apply_on": "Transaction",
+                "price_or_product_discount": "Price",
+                "selling": 1,
+                "valid_from": now_datetime(),
+                "rate_or_discount": "Discount Amount",
+                "discount_amount": -1 * sales_return.grand_total
+            })
+        
+        pricing_rule.insert(ignore_permissions=True)
+        frappe.db.commit()
+        return pricing_rule.name
+    
+    return pricing_rule    
+
+def create_log(form_data, request_type):
+    try:
+        log = frappe.get_doc({
+            'doctype': 'POS API Log',
+            'request_type': request_type,
+            'payload': json.dumps(form_data),
+        })
+        log.insert(ignore_permissions=True)
+        frappe.db.commit()
+        return log.name
+    except Exception as e:
+        frappe.log_error(title='POS API Log Error', message=frappe.get_traceback())
