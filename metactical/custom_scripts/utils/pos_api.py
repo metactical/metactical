@@ -151,14 +151,15 @@ def validate_users(form_data):
         
     # Check if approvers list is availble in the incoming api request
     if "ApprovalList" not in form_data:
-        return {"success": True}   
+        return {"success": True}  
+    
 
     for approver in approvers:
         manager_approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name') if approver["ManagerId"] else None
-        cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
+        # cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
         
-        if not approver["ManagerId"] and not approver["CashierId"]:
-            return {"error": "ManagerId or CashierId is required to apply discounts", "success": False}
+        # if not approver["ManagerId"] and not approver["CashierId"]:
+        #     return {"error": "ManagerId or CashierId is required to apply discounts", "success": False}
                     
         discount = 0
         if approver["isOverallDiscount"]:
@@ -174,17 +175,17 @@ def validate_users(form_data):
         
         if approver["ManagerId"] and not manager_approver:
             return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
-        if approver["CashierId"] and not cashier_approver:
-            return {"error": "User {0} does not exist".format(approver["CashierId"]), "success": False}
+        # if approver["CashierId"] and not cashier_approver:
+        #     return {"error": "User {0} does not exist".format(approver["CashierId"]), "success": False}
         
         if approver["ManagerId"] and manager_approver not in users:
             return {"error": "User {0} is not allowed to approve POS transactions".format(manager_approver), "success": False}
-        if approver["CashierId"] and cashier_approver not in users:
-            return {"error": "User {0} is not allowed to approve POS transactions".format(cashier_approver), "success": False}
+        # if approver["CashierId"] and cashier_approver not in users:
+        #     return {"error": "User {0} is not allowed to approve POS transactions".format(cashier_approver), "success": False}
         
-        if approver["CashierId"]:
-            if users[cashier_approver]["ifw_max_discount_percent"] < discount and not manager_approver:
-                return {"error": "User {0} is not allowed to give POS discount greater than {1}%".format(cashier_approver, users[cashier_approver]["ifw_max_discount_percent"]), "success": False}
+        # if approver["CashierId"]:
+        #     if users[cashier_approver]["ifw_max_discount_percent"] < discount and not manager_approver:
+        #         return {"error": "User {0} is not allowed to give POS discount greater than {1}%".format(cashier_approver, users[cashier_approver]["ifw_max_discount_percent"]), "success": False}
 
         if manager_approver:
             if not users[manager_approver]["ifw_is_main_pos_user"]:
