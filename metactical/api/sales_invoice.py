@@ -79,11 +79,11 @@ def load_si_pos(sales_invoice):
     if customer_contact:
         customer["Email"] = customer.get("Email")
         customer["Phone"] = customer.get("Phone") or customer.get("Mobile")
-        customer["Customer"]["Note"] = ""
+        customer["Note"] = ""
     else:
         customer["Email"] = ""
         customer["Phone"] = ""
-        customer["Customer"]["Note"] = ""
+        customer["Note"] = ""
         
     invoice_details = {}
 
