@@ -105,6 +105,12 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 										{sort_by} {sort_order},
 										pl.date DESC""", 
 								as_dict=1)
+
+	# Add totes for partially picked items
+	for pick_list in pick_lists:
+		if pick_list["status"] == "Partially Picked":
+			tote = frappe.db.get_value("Picklist Tote Item", {"pick_list": pick_list["name"]}, "parent")
+			pick_list["tote"] = tote if tote else ""
 	return pick_lists
 
 @frappe.whitelist()
@@ -140,25 +146,6 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 										AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
 									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
-		# for item in items:
-		# 	if item.is_product_bundle == 1:
-		# 		bundled_items = frappe.db.sql("""
-		# 						SELECT
-		# 						  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
-		# 						  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
-		# 						  	bin.actual_qty, 1 AS is_product_bundle_item
-		# 						FROM
-		# 							`tabProduct Bundle Item` AS bundle_item
-		# 						LEFT JOIN
-		# 						  	`tabItem` AS item ON item.name = bundle_item.item_code
-		# 						LEFT JOIN
-		# 							`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
-		# 						WHERE
-		# 							bundle_item.parent = %(bundle)s
-		# 						ORDER BY item.ifw_location
-		# 						""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
-		# 		items.remove(item)
-		# 		items.extend(bundled_items)
 		
 		partially_picked = []
 		for item in items:

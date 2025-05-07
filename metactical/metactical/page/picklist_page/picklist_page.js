@@ -174,7 +174,9 @@ class PicklistPage{
 
 				me.wrapper.html(frappe.render_template('totes_list', {"totes": totes, 
 					"partial_totes": partial_totes}));
+				
 				me.wrapper.find('.start-picking-btn').hide(); //Hide start picking button
+				
 				me.wrapper.find('.back-to-home').on('click', function(){
 					//me.load_home();
 					me.list_multi_orders();
@@ -217,6 +219,14 @@ class PicklistPage{
 					me.list_tote_items();
 					//me.list_multi_orders(metactical.pick_list.selected_source);
 				});
+
+				setTimeout(function(){
+					if(metactical.pick_list.selected_pick_lists.length == 
+						metactical.pick_list.selected_totes.length
+					){
+						me.wrapper.find('.start-picking-btn').show();
+					}
+				}, 200);
 			}
 		});
 	}
