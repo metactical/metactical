@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import frappe
 from frappe.model.document import Document
 
-class CycleCount(Document):
+class CycleCountV3(Document):
 	def on_submit(self):
 		doc = frappe.new_doc("Stock Reconciliation");
 		doc.update({
@@ -25,10 +25,14 @@ class CycleCount(Document):
 		
 		if hasattr(doc, "items"):
 			doc.submit()
+   
+	def before_submit(self):
+		if not self.reason_for_adjustment:
+			frappe.throw("Please add the reason for adjustment")
 
 	def validate(self):
-		if len(self.items) > 99:
-			frappe.throw("You can't add more than 99 items in a Cycle Count")
+		# if len(self.items) > 99:
+		# 	frappe.throw("You can't add more than 99 items in a Cycle Count")
 
 		for row in self.items:
 			if row.get("expected_qty") is None:
@@ -67,3 +71,16 @@ def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
+
+@frappe.whitelist()
+def get_items_from_template_sku(template_sku):
+    return frappe.db.get_all("Item", filters={"variant_of": template_sku}, fields=["name", "ifw_retailskusuffix", "ifw_location"])
+
+@frappe.whitelist()
+def get_items_from_retail_sku(retail_sku):
+	return frappe.db.get_all("Item", 
+		filters={	
+			"ifw_retailskusuffix": ["like", f"{retail_sku}%"]
+		},
+		fields=["name", "ifw_retailskusuffix", "ifw_location"]
+	)
