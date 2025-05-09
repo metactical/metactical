@@ -783,3 +783,50 @@ def create_log(form_data, request_type):
         return log.name
     except Exception as e:
         frappe.log_error(title='POS API Log Error', message=frappe.get_traceback())
+        
+@frappe.whitelist()
+def verify_coupon_code(coupon_code):
+    if not coupon_code:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Coupon Code is required"
+        frappe.response["Amount"] = 0.0
+        return
+    
+    coupon_code = frappe.db.exists("Coupon Code", {"coupon_code": coupon_code, "used": 0})
+    if not coupon_code:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Coupon Code is not valid"
+        frappe.response["Amount"] = 0.0
+        return
+    
+    sql = f"""
+        SELECT
+            coupon_code, coupon_name, cc.customer, coupon_type,
+            cc.valid_from, cc.valid_upto, discount_amount
+        FROM
+            `tabCoupon Code` cc
+        JOIN
+            `tabPricing Rule` pr ON cc.pricing_rule = pr.name
+        WHERE
+            cc.name = '{coupon_code}'
+            AND used = 0
+            AND (cc.valid_upto >= CURDATE() or cc.valid_upto is NULL)
+            AND cc.valid_from <= CURDATE()
+    """
+    
+    coupon_code = frappe.db.sql(sql, as_dict=True)
+
+    if not coupon_code:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Coupon Code is not valid"
+        frappe.response["Amount"] = 0.0
+        return
+    
+    coupon_code = coupon_code[0]
+    frappe.response["Status"] = 200
+    frappe.response["Message"] = ""
+    frappe.response["CouponCode"] = coupon_code.coupon_code
+    frappe.response["Amount"] = coupon_code.discount_amount
+    frappe.response["Customer"] = coupon_code.customer
+    
+    
