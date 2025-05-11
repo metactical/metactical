@@ -260,6 +260,9 @@ def process_sales_order(event_body, transaction_key):
 
 def process_payment_entry(event_body, transaction_key):
 	frappe.db.set_value("Payment Entry", event_body["object"]["invoice"], "reference_no", transaction_key)
+	if frappe.db.get_value("Payment Entry", event_body["object"]["invoice"], "docstatus") == 0:
+		frappe.get_doc("Payment Entry", event_body["object"]["invoice"]).submit()
+  
 	customer = frappe.db.get_value("Payment Entry", event_body["object"]["invoice"], "party")
 	
 	# update the sales order with the transaction key
