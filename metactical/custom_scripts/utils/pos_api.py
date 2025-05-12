@@ -653,45 +653,46 @@ def get_item_discount(item, price_list, item_price):
 @frappe.whitelist()
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
-    log = create_log(form_data, 'Sales Return')
-    
-    # Check if SalesPerson exists
-    if "SalesPerson" not in form_data or not form_data["SalesPerson"]:
-        frappe.response["Message"] = "Sales Person is required"
-        frappe.response["Status"] = 500
-        frappe.response["CouponCode"] = None
-        return
-    else:
-        if not frappe.db.exists('User', form_data['SalesPerson']):
-            frappe.response["Message"] = "User {0} does not exist".format(form_data['SalesPerson'])
+    try:
+        frappe.set_user(form_data['SalesPerson'])
+        log = create_log(form_data, 'Sales Return')
+        
+        # Check if SalesPerson exists
+        if "SalesPerson" not in form_data or not form_data["SalesPerson"]:
+            frappe.response["Message"] = "Sales Person is required"
             frappe.response["Status"] = 500
             frappe.response["CouponCode"] = None
             return
-            
-    invoiceId = form_data["InvoiceId"]
-    sales_return = make_sales_return(invoiceId)
-    formatted_items = get_items(form_data)
-    items = sales_return.items.copy()
-    filtered_items = []
+        else:
+            if not frappe.db.exists('User', form_data['SalesPerson']):
+                frappe.response["Message"] = "User {0} does not exist".format(form_data['SalesPerson'])
+                frappe.response["Status"] = 500
+                frappe.response["CouponCode"] = None
+                return
+                
+        invoiceId = form_data["InvoiceId"]
+        sales_return = make_sales_return(invoiceId)
+        formatted_items = get_items(form_data)
+        items = sales_return.items.copy()
+        filtered_items = []
 
-    for item in items:
-        for updated_item in formatted_items:
-            if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
-                (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
-                item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
-                item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
-                item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
-                item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
-                item.margin_type = ""
-                item.rate = item.price_list_rate - item.discount_amount
-                filtered_items.append(item)
+        for item in items:
+            for updated_item in formatted_items:
+                if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
+                    (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
+                    item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                    item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
+                    item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
+                    item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                    item.margin_type = ""
+                    item.rate = item.price_list_rate - item.discount_amount
+                    filtered_items.append(item)
 
-    sales_return.items = filtered_items
-    # sales_return.additional_discount_percentage = form_data['OverallDiscount']
-    sales_return.calculate_taxes_and_totals()
-    
-    frappe.set_user(form_data['SalesPerson'])
-    try:
+        sales_return.items = filtered_items
+        # sales_return.additional_discount_percentage = form_data['OverallDiscount']
+        sales_return.calculate_taxes_and_totals()
+        
+
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
