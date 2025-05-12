@@ -336,7 +336,55 @@ def create_log(doc, event_body):
 		if payment_requests:
 			frappe.db.set_value("USAePay Log", log.name, "request", "<a href='/app/payment-request/{0}'>Payment Request</a>".format(payment_requests[0].name), update_modified=False)
 
+		create_comment(log.name)
 	return log
+
+def create_comment(log):
+    if not frappe.db.exists("USAePay Log", log):
+        log = frappe.get_doc("USAePay Log", log)
+
+        comment = get_comment_message(log)
+        doctypes = {}
+        
+        if log.reference_doctype == "Payment Entry":
+            doctypes["Payment Entry"] = log.reference_docname
+
+            references = frappe.get_doc("Payment Entry", log.reference_docname).references
+            if references:
+                doctypes[references[0].reference_doctype] = references[0].reference_name
+        
+        if log.sales_return:
+            doctypes["Sales Invoice"] = log.sales_return
+        
+        for dt in doctypes:
+            frappe.get_doc({
+				'doctype': 'Comment',
+				'content': comment,
+				'reference_doctype': dt,
+				"comment_type": "Comment",
+				'reference_name': doctypes[dt],
+			}).save(ignore_permissions=True)
+			
+        frappe.db.commit()    
+        
+    
+def get_comment_message(log):
+    comment = "*USAePay Log*\n"    
+    comment += f"Action: {log.action}\n"
+    
+    if log.transaction_key:
+        comment += f"Transaction Key: {log.transaction_key}\n"
+    
+    if log.payment_entry:
+        comment += f"Payment Entry: {log.payment_entry}\n"
+    
+    if log.sales_return:
+        comment += f"Sales Return: {log.sales_return}\n"
+        comment += f"Refund Transaction Key: {log.refund_transaction_key}\n"
+        
+    comment += f"Amount: {log.amount}\n"
+	
+    return comment
 
 def create_payment_entry(doc, data, log):
 	try: 
