@@ -452,7 +452,6 @@ def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, 
 	token = get_card_token(usaepay_url, transaction_key, headers)
 	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"]
 
-	print("Token: ", token, headers, customer_cc)
 	frappe.get_doc({
 		"doctype": "Customer CC Tokens",
 		"parent": customer_cc,
@@ -762,7 +761,6 @@ def adjust_payment(docname, advance_paid=None):
 
 			return adjust_response, log.name
 		else:
-			print("Transaction not found in USAePay")
 			log.log = f"Transaction {usaepay_transaction_key} not found in USAePay"
 			log.save()
 
@@ -770,7 +768,6 @@ def adjust_payment(docname, advance_paid=None):
 			frappe.response["message"] = "Transaction not found in USAePay"
 	
 	except Exception as e:
-		print("error", e)
 		frappe.db.set_value("USAePay Log", log.name, "log", frappe.get_traceback(), update_modified=False)
 
 		# frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
