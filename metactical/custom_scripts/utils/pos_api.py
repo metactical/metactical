@@ -219,7 +219,7 @@ def create_sales_order(form_data, customer):
     items = get_items(form_data)
     so_data.update({'items': items})
     
-    taxes = get_taxes(form_data)
+    taxes = get_taxes(form_data, company.company)
     so_data.update({'taxes': taxes})
         
     frappe.set_user(form_data['SalesPerson'])
@@ -427,15 +427,15 @@ def get_total_paid_with_change(form_data):
             
     return total_paid
     
-def get_taxes(form_data):  
+def get_taxes(form_data, company):  
     taxes = []
-    company = frappe.db.get_single_value('Global Defaults', 'default_company')
+    # company = frappe.db.get_single_value('Global Defaults', 'default_company')
     company_abr = frappe.db.get_value('Company', company, 'abbr')
     
     for tax in form_data['Taxes']:
         taxes.append({
             'charge_type': 'On Net Total',
-            'account_head': tax['TaxId'] + ' - ' + company_abr,
+            'account_head': tax['TaxId'].split(" ")[0] + " - " + company_abr,
             'description': tax['TaxId'],
             'rate': tax['Amount'],
         })
@@ -564,7 +564,10 @@ def get_item_from_barcode(barcode, branch):
             tabItem.name, item_name, ifw_retailskusuffix,
             brand, image, is_stock_item
         FROM `tabItem Barcode` ib Join `tabItem` on ib.parent=tabItem.name
-        WHERE ib.barcode = {frappe.db.escape(barcode)}
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.is_sales_item = 1
+            and ib.barcode = {frappe.db.escape(barcode)}
         limit 1
     """, as_dict=True)    
 
@@ -841,7 +844,11 @@ def get_item_by_retail_sku(retail_sku, branch):
             brand, image, is_stock_item
         From
             `tabItem`
-        WHERE ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.is_sales_item = 1
+            and `tabItem`.has_variants = 0
+            and ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
     """, as_dict=True)    
 
     pos_profile = branch + ' Operators'    
