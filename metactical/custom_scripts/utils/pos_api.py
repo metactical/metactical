@@ -564,7 +564,10 @@ def get_item_from_barcode(barcode, branch):
             tabItem.name, item_name, ifw_retailskusuffix,
             brand, image, is_stock_item
         FROM `tabItem Barcode` ib Join `tabItem` on ib.parent=tabItem.name
-        WHERE ib.barcode = {frappe.db.escape(barcode)}
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.is_sales_item = 1
+            and ib.barcode = {frappe.db.escape(barcode)}
         limit 1
     """, as_dict=True)    
 
@@ -841,7 +844,11 @@ def get_item_by_retail_sku(retail_sku, branch):
             brand, image, is_stock_item
         From
             `tabItem`
-        WHERE ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.is_sales_item = 1
+            and `tabItem`.has_variants = 0
+            and ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
     """, as_dict=True)    
 
     pos_profile = branch + ' Operators'    
