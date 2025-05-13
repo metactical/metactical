@@ -12,6 +12,7 @@ def execute(filters=None):
 
 def get_data(filters):
 	pos_profile = filters.get("pos_profile")	
+	company = filters.get("company")
 	pos_profile = frappe.db.get_value("POS Profile", pos_profile, ["ifw_default_lead_source", "selling_price_list", "name", "warehouse"], as_dict=True)
 	price_list = pos_profile.selling_price_list
 	warehouse = pos_profile.warehouse
@@ -39,7 +40,10 @@ def get_data(filters):
 	""", as_dict=1)
 
 	data = []
-	for item in items:        
+	for item in items:  
+		if item.is_stock_item and (item.quantity is None or item.quantity <= 0):
+			continue
+
 		# select all pricing rules for the item and pick the one with the highest priority for each item
 		pricing_rule = frappe.db.sql(f"""
 			SELECT
@@ -56,6 +60,7 @@ def get_data(filters):
 				AND (`tabPricing Rule`.for_price_list = '{price_list}' or `tabPricing Rule`.for_price_list is NULL)
 				AND `tabPricing Rule`.disable = 0
 				AND `tabPricing Rule`.valid_upto >= CURDATE()
+				AND `tabPricing Rule`.company = '{company}'
 			ORDER BY
 				CAST(`tabPricing Rule`.priority AS UNSIGNED) DESC
 			LIMIT 1;
