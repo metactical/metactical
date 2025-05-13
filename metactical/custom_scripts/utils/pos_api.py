@@ -198,8 +198,8 @@ def validate_users(form_data):
 def create_sales_order(form_data, customer):
     items = form_data['Items']
     taxes = form_data['Taxes']
-    company_address = frappe.db.get_value("POS Profile", form_data['POSProfile'] + ' Operators', 'company_address')
-    if not company_address:
+    company = frappe.db.get_value("POS Profile", form_data['POSProfile'] + ' Operators', ['company_address', "company"], as_dict=True)
+    if not company:
         return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators')}
     
     so_data = {
@@ -207,7 +207,8 @@ def create_sales_order(form_data, customer):
         'customer': customer,
         'taxes_and_charges': form_data['TaxesAndChargesTemplate'],
         'delivery_date': frappe.utils.today(),
-        'company_address': company_address,
+        "company": company.company,
+        'company_address': company.company_address,
         'source': form_data['LeadSource'],
         'ignore_pricing_rule': 1,
         'contact_person': frappe.db.get_value('Customer', customer, 'customer_primary_contact'),
@@ -569,6 +570,7 @@ def get_item_from_barcode(barcode, branch):
 
     pos_profile = branch + ' Operators'    
     pos_profile = frappe.get_doc('POS Profile', pos_profile)
+    company = pos_profile.company
     price_list = pos_profile.selling_price_list
     warehouse = pos_profile.warehouse
 
@@ -589,7 +591,7 @@ def get_item_from_barcode(barcode, branch):
         item_price = get_item_price(item.name, price_list)
         frappe.response["Price"] = item_price
         
-        discount = get_item_discount(item.name, price_list, item_price)
+        discount = get_item_discount(item.name, price_list, item_price, company)
         frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
@@ -610,7 +612,7 @@ def get_item_price(item, price_list):
     
     return price
 
-def get_item_discount(item, price_list, item_price):
+def get_item_discount(item, price_list, item_price, company):
     # select all pricing rules for the item and pick the one with the highest priority for each item
     pricing_rule = frappe.db.sql(f"""
         SELECT
@@ -627,6 +629,7 @@ def get_item_discount(item, price_list, item_price):
             AND (`tabPricing Rule`.for_price_list = '{price_list}' or `tabPricing Rule`.for_price_list is NULL)
             AND `tabPricing Rule`.disable = 0
             AND `tabPricing Rule`.valid_upto >= CURDATE()
+            AND `tabPricing Rule`.company = '{company}'
         ORDER BY
             CAST(`tabPricing Rule`.priority AS UNSIGNED) DESC
         LIMIT 1;
@@ -843,6 +846,7 @@ def get_item_by_retail_sku(retail_sku, branch):
 
     pos_profile = branch + ' Operators'    
     pos_profile = frappe.get_doc('POS Profile', pos_profile)
+    company = pos_profile.company
     price_list = pos_profile.selling_price_list
     warehouse = pos_profile.warehouse
     item_details = []
@@ -865,7 +869,7 @@ def get_item_by_retail_sku(retail_sku, branch):
         item_price = get_item_price(item.name, price_list)
         item_detail["Price"] = item_price
         
-        discount = get_item_discount(item.name, price_list, item_price)
+        discount = get_item_discount(item.name, price_list, item_price, company)
         item_detail["DiscountPrice"] = discount["discount_price"] if discount else 0.0
         item_detail["OnSale"] = discount["on_sale"] if discount else False
         item_detail["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
