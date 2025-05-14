@@ -836,30 +836,74 @@ def verify_coupon_code(coupon_code):
     frappe.response["Customer"] = coupon_code.customer
     
 @frappe.whitelist()
-def get_item_by_retail_sku(retail_sku, branch):
+def get_item_by_retail_sku(retail_sku, branch):    
     items = frappe.db.sql(f"""
         SELECT 
-            tabItem.name, item_name, ifw_retailskusuffix,
-            brand, image, is_stock_item
+            tabItem.name as item_code, tabItem.item_name, tabItem.ifw_retailskusuffix, price_list_rate, price_list, pp.company,
+            tabItem.brand, tabItem.is_stock_item, pp.warehouse, actual_qty-reserved_qty as qty, pp.name as pos_profile,
+            (SELECT GROUP_CONCAT(barcode SEPARATOR ', ') AS barcodes
+                FROM `tabItem Barcode` ib 
+                WHERE ib.parent=tabItem.name) as barcodes         
         From
             `tabItem`
+        Left Join `tabBin` on `tabItem`.name=`tabBin`.item_code
+        Left Join `tabPOS Profile` pp on pp.warehouse=tabBin.warehouse
+        Left Join `tabItem Price` ip on ip.price_list=pp.selling_price_list and ip.item_code=tabItem.name
         WHERE 
-            `tabItem`.disabled = 0
+            pp.name is not null 
+            and pp.disabled = 0
+            and `tabItem`.disabled = 0
             and `tabItem`.is_sales_item = 1
             and `tabItem`.has_variants = 0
-            and ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
-    """, as_dict=True)    
-
-    pos_profile = branch + ' Operators'    
-    pos_profile = frappe.get_doc('POS Profile', pos_profile)
-    company = pos_profile.company
-    price_list = pos_profile.selling_price_list
-    warehouse = pos_profile.warehouse
-    item_details = []
+            and tabItem.ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
+    """, as_dict=True)
     
+    pos_profiles = frappe.get_all("POS Profile", fields=["company", "selling_price_list", "warehouse", "name"], filters={"disabled": 0})
+    pos_profiles = [profile.name.split(' ')[0] for profile in pos_profiles]
+        
+    # group items by item_code
+    item_groups = {}
+    for item in items:
+        if item.item_code not in item_groups:
+            item_groups[item.item_code] = item
+            
+            
+        if "branches" not in item_groups[item.item_code]:
+            item_groups[item.item_code]["branches"] = {}
+            
+        pos_profile = item.pos_profile.split(" ")[0]
+        if pos_profile == branch:
+            item["company"] = item.company
+            item["price_list"] = item.price_list
+            item["price_list_rate"] = item.price_list_rate
+            item["qty"] = item.qty
+            
+        item_groups[item.item_code]["branches"][pos_profile] = {
+            "Branch": pos_profile,
+            "Qty": int(item.qty),
+            "Price": item.price_list_rate if item.price_list_rate else 0.0,
+            "PriceList": item.price_list if item.price_list else "",
+            "Warehouse": item.warehouse,
+        }
+        
+    # add the remaining branches
+    for item_code, detail in item_groups.items():
+        for pos_profile in pos_profiles:
+            if pos_profile not in detail["branches"]:
+                detail["branches"][pos_profile] = {
+                    "Branch": pos_profile,
+                    "Qty": 0,
+                    "Price": 0.0,
+                    "PriceList": "",
+                    "Warehouse": "",
+                }
+        
+    items = item_groups.values()
+        
+    item_details = []
     for item in items:
         item_detail = {}
-        item_detail["Sku"] = item.name
+        item_detail["Sku"] = item.item_code
         item_detail["ItemName"] = item.item_name
         item_detail["RetailSku"] = item.ifw_retailskusuffix
         item_detail["Categories"] = []
@@ -868,18 +912,20 @@ def get_item_by_retail_sku(retail_sku, branch):
         item_detail["Brand"] = item.brand if item.brand else ""
         item_detail["NonStocking"] = False if item.is_stock_item else True
         
-        barcodes = frappe.db.get_all("Item Barcode", {"parent": item.name}, ["barcode"])
-        item_detail["Barcodes"] = [{"Barcode": barcode.barcode} for barcode in barcodes]
-        item_detail["Quantity"] = int(get_quantity(item.name, warehouse))
+        item_detail["Barcodes"] = [{"Barcode": barcode} for barcode in item.barcodes.split(", ")] if item.barcodes else []
+        item_detail["Quantity"] = int(item.qty) if item.qty else 0
+        item_detail["Price"] = item.price_list_rate if item.price_list_rate else 0.0
+        discount = 0   
         
-        item_price = get_item_price(item.name, price_list)
-        item_detail["Price"] = item_price
-        
-        discount = get_item_discount(item.name, price_list, item_price, company)
+        if item.price_list_rate and item.price_list and item.company:
+            discount = get_item_discount(item.item_code, item.price_list, item.price_list_rate, item.company)
+            
         item_detail["DiscountPrice"] = discount["discount_price"] if discount else 0.0
         item_detail["OnSale"] = discount["on_sale"] if discount else False
         item_detail["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         item_detail["DiscountStartDate"] = discount["discount_start_date"] if discount else None
+        item_detail["Branches"] = item.branches.values()
+        
         item_details.append(item_detail)
         
     if not item_details:
