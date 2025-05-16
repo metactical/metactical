@@ -1,7 +1,7 @@
 {
- "add_total_row": 1,
+ "add_total_row": 0,
  "columns": [],
- "creation": "2024-06-27 05:28:10.962159",
+ "creation": "2024-07-10 00:29:04.997681",
  "disable_prepared_report": 0,
  "disabled": 1,
  "docstatus": 0,
@@ -10,18 +10,14 @@
  "idx": 0,
  "is_standard": "Yes",
  "letter_head": "International Camouflage LTD 888 Granville Street Vancouver, British Columbia Canada - V6Z 1K3",
- "modified": "2025-05-15 10:06:53.162427",
+ "modified": "2025-05-15 10:06:53.476907",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "Sales Report with Item Class Suggest",
+ "name": "Store Credits",
  "owner": "Administrator",
  "prepared_report": 1,
- "ref_doctype": "Sales Invoice",
- "report_name": "Sales Report with Item Class Suggest",
+ "ref_doctype": "Customer",
+ "report_name": "Store Credits",
  "report_type": "Script Report",
- "roles": [
-  {
-   "role": "99.  Abdul"
-  }
- ]
+ "roles": []
 }
