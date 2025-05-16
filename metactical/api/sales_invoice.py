@@ -88,9 +88,11 @@ def load_si_pos(sales_invoice):
     invoice_details = {}
 
     for item in invoice.items:
+        retail_sku = item.ifw_retailskusuffix if item.ifw_retailskusuffix else frappe.get_value("Item", item.item_code, "ifw_retailskusuffix")
         items.append({
             "ItemCode": item.item_code,
             "ItemName": item.item_name,
+            "RetailSku": retail_sku,
             "Rate": item.rate,
             "PriceListRate": item.price_list_rate,
             "Image": item.image,
@@ -178,9 +180,11 @@ def load_so_pos(sales_order):
     order_details["HasInvoice"] = so_has_invoice(sales_order.name)
     
     for item in sales_order.items:
+        reatil_sku = item.ifw_retailskusuffix if item.ifw_retailskusuffix else frappe.get_value("Item", item.item_code, "ifw_retailskusuffix")
         order_details["Items"].append({
             "ItemCode": item.item_code,
             "ItemName": item.item_name,
+            "RetailSku": reatil_sku,
             "Rate": item.rate,
             "PriceListRate": item.price_list_rate,
             "Image": item.image,
