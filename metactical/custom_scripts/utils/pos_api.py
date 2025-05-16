@@ -795,8 +795,9 @@ def create_gift_card(doc, form_data, coupon_code=None):
             "valid_from": now_datetime(),
             "custom_sales_invoice": doc.name,
             "description": description,
-            "used": 0 if not coupon_code else 1
+            "used": 1 if form_data["InvoiceId"] else 0
         })
+        
         gift_card.insert(ignore_permissions=True)
         gift_card.save()
         frappe.db.commit()

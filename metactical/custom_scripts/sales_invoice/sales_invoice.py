@@ -41,6 +41,12 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 
 				if self.doctype == "Sales Order":
 					self.unlink_ref_doc_from_po()
+
+		# Metactical Customization: prevent cancellation of sales invoice if there are any linked coupon codes
+		coupon_codes = frappe.db.get_all("Coupon Code", filters={"custom_sales_invoice": self.name}, fields=["name"])
+		if len(coupon_codes) > 0:
+			frappe.throw(_("Cannot cancel this invoice as it has linked coupon codes."))
+  
 		super(CustomSalesInvoice, self).on_cancel()
 		
 	def before_save(self):
