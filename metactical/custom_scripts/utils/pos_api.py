@@ -794,7 +794,7 @@ def create_gift_card(doc, form_data, coupon_code=None):
             "valid_from": now_datetime(),
             "custom_sales_invoice": doc.name,
             "description": description,
-            "used": 1 if form_data["InvoiceId"] else 0
+            "used": 1 if form_data["InvoiceId"] and form_data["InvoiceId"].startswith("SAL-ORD") else 0
         })
         
         gift_card.insert(ignore_permissions=True)
