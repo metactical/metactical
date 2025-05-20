@@ -150,7 +150,10 @@ doc_events = {
 	},
 	"Item": {
 		"on_update": "metactical.custom_scripts.item.item.on_update"
-	}
+	}, 
+	"Payment Entry": {
+		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
+	},
 }
 
 # DocType Class

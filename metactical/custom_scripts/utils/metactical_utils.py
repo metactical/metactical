@@ -17,8 +17,15 @@ from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
 
 def queue_action(self, action, **kwargs):
-	#Run an action in background
+	"""Run an action in background. If the action has an inner function,
+	like _submit for submit, it will call that instead"""
+	# call _submit instead of submit, so you can override submit to call
+	# run_delayed based on some action
+	# See: Stock Reconciliation
 	from frappe.utils.background_jobs import enqueue
+
+	if hasattr(self, '_' + action):
+		action = '_' + action
 
 	if file_lock.lock_exists(self.get_signature()):
 		frappe.throw(_('This document is currently queued for execution. Please try again'),
@@ -74,6 +81,161 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
 			frappe.log_error(title='Rocket Chat Error', message=response.json())
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
+
+def format_json_for_html(data, indent_size=2):
+	try:
+		# Function to recursively format JSON
+		def format_json(data, indent_level):
+			lines = []
+			for key, value in data.items():
+				if isinstance(value, dict):
+					# Recursively format nested objects
+					lines.append(f'{" " * indent_level * indent_size}"{key}": {{ <br>')
+					lines.extend(format_json(value, indent_level + 1))
+					lines.append(f'{" " * indent_level * indent_size}}}, <br>')
+				elif isinstance(value, list):
+					# Handle lists of objects
+					lines.append(f'{" " * indent_level * indent_size}"{key}": [ <br>')
+					for item in value:
+						lines.extend(format_json(item, indent_level + 1))
+					lines.append(f'{" " * indent_level * indent_size}] <br>')
+				else:
+					# Format primitive types (string, number, etc.)
+					lines.append(f'{" " * indent_level * indent_size}"{key}": "{value}", <br>')
+			return lines
+		
+		# Start formatting from the top-level object
+		formatted_lines = format_json(data, indent_level=1)
+		
+		# Join all lines with newline characters
+		formatted_json = '\n'.join(formatted_lines)
+		
+		return formatted_json
+	
+	except json.JSONDecodeError as e:
+		return f"Error decoding JSON: {str(e)}"
+	except Exception as e:
+		return f"Error: {str(e)}"
+
+def create_usaepay_log(doctype, docname, action):
+	# Create USAePay Log
+	log = frappe.get_doc({
+		"doctype": "USAePay Log",
+		"date": frappe.utils.now(),
+		"reference_docname": docname,
+		"action": action,
+		"reference_doctype": doctype
+	}).insert()
+
+	return log
+
+@frappe.whitelist()
+def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None):
+	usaepay_account = None
+	if lead_source:
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source})
+	elif merchant_id:
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id})
+	elif transaction_key:
+		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "name")
+		if source:
+			usaepay_account = frappe.db.exists("USAePay Accounts", {"source": source})
+
+	if usaepay_account:
+		return frappe.get_doc("USAePay Accounts", usaepay_account)
+
+	return get_default_usaepay_account()
+
+@frappe.whitelist()
+def get_default_usaepay_account():
+	account = frappe.db.get_value("USAePay Accounts", {"is_default": 1}, "name")
+	if not account:
+		frappe.throw(_("No default USAePay account found. Please add a default account"))
+	else:
+		account = frappe.get_doc("USAePay Accounts", account)
+
+	return account
+
+@frappe.whitelist()
+def get_customer_payment_information(customer, payment_entry, reference_no=None):
+	from metactical.custom_scripts.usaepay.usaepay_api import get_token_hash
+
+	# get existing credit card tokens
+	tokens = []
+	lead_source = ""
+	references = frappe.get_doc("Payment Entry", payment_entry).references
+	for ref in references:
+		if ref.reference_doctype in ["Sales Order", "Sales Invoice"] and ref.reference_name:
+			lead_source = frappe.db.get_value(ref.reference_doctype, ref.reference_name, "source")
+			break
+
+	if frappe.db.exists("Customer CC", customer):
+		tokens = frappe.get_all("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
+
+	usaepay_settings = get_usaepay_account(reference_no, None, lead_source)
+	payment_form_url = usaepay_settings.payment_form_url
+	billing_address = get_customer_address(customer)
+
+	form_hash = get_token_hash(usaepay_settings, "1234")
+	# form_hash = form_hash[6:] if form_hash else None
+	
+	if not form_hash:
+		frappe.log_error(title="Metactical Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
+		frappe.throw(_("Failed to generate form hash. Please check the MetaTactical settings"))
+
+	frappe.response["tokens"] = tokens
+	frappe.response["payment_form_url"] = payment_form_url
+	frappe.response["address"] = billing_address
+	frappe.response["hash"] = form_hash
+
+def get_customer_address(customer):
+	addresses = frappe.db.sql("""SELECT
+			address_line1, address_line2, city, state, 
+			country, phone, company, pincode, 
+			phone, address_type, 
+			is_shipping_address, is_primary_address
+		FROM
+			`tabAddress`
+		JOIN
+			`tabDynamic Link` ON `tabDynamic Link`.parent = `tabAddress`.name
+		WHERE
+			`tabDynamic Link`.link_doctype = 'Customer' AND
+			`tabDynamic Link`.link_name = %(customer)s 
+		""", {"customer": customer}, as_dict=1)
+
+	grouped_address = {}
+	billing_address = None
+	shipping_address = None
+	for address in addresses:
+		if billing_address and shipping_address:
+			break
+
+		if address.get("is_primary_address"):
+			billing_address = address
+		elif address.get("is_shipping_address"):
+			shipping_address = address
+
+		if address.address_type not in grouped_address:
+			grouped_address[address.address_type] = []
+
+		grouped_address[address.address_type].append(address)
+		
+	if not billing_address:
+		billing_address = grouped_address["Billing"][0] if "Billing" in grouped_address else None
+
+	if not shipping_address:
+		shipping_address = grouped_address["Shipping"][0] if "Shipping" in grouped_address else None
+	
+	# add customer personal information to the address
+	customer_info = frappe.db.get_value("Customer", customer, ["ais_company", "first_name", "last_name"], as_dict=1)
+	if customer_info:
+		billing_address.update(customer_info) if billing_address else None
+		shipping_address.update(customer_info) if shipping_address else None
+
+	return {
+		"billing": billing_address,
+		"shipping": shipping_address
+	}
 
 @frappe.whitelist()
 def export_query(data, sub_headers=[]):
