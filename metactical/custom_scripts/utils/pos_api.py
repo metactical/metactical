@@ -236,6 +236,9 @@ def create_sales_order(form_data, customer):
 
 def check_coupon_code(sales_order, form_data):
     for payment in form_data['Payment']:
+        if payment['ModeOfPayment'] == "Gift Card" and not payment['CouponCode']:
+            frappe.throw("Coupon Code is required for Gift Card payment")
+            
         if payment['ModeOfPayment'] == "Gift Card" and payment['CouponCode']:
             coupon_code = frappe.db.exists("Coupon Code", {"coupon_code": payment['CouponCode'], "used": 0})
             sql = get_coupon_code_sql(coupon_code)
