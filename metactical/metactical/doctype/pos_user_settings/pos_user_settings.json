@@ -10,7 +10,7 @@
  "field_order": [
   "user",
   "section_break_leysh",
-  "pin",
+  "password",
   "can_disable_auto_logout"
  ],
  "fields": [
@@ -27,17 +27,17 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "pin",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "PIN",
-   "reqd": 1
-  },
-  {
    "default": "0",
    "fieldname": "can_disable_auto_logout",
    "fieldtype": "Check",
    "label": "Can Disable Auto Logout"
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "PIN",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -47,7 +47,7 @@
    "link_fieldname": "user"
   }
  ],
- "modified": "2025-05-20 06:15:08.062477",
+ "modified": "2025-05-20 10:30:02.790139",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS User Settings",

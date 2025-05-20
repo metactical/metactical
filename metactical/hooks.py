@@ -276,6 +276,7 @@ jinja = {
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info",
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
+ 		"metactical.custom_scripts.utils.metactical_utils.get_password"
 	]
 }
 
