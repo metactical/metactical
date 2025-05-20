@@ -6,6 +6,7 @@ from frappe.model.document import Document
 from frappe import _
 from frappe.model import no_value_fields
 from frappe.utils import cint, flt
+import time
 
 class STEPackingSlip(Document):
 	def validate(self):
@@ -75,7 +76,7 @@ class STEPackingSlip(Document):
 
 		# gets item code, qty per item code, latest packed qty per item code and stock uom
 		res = frappe.db.sql(
-			"""select item_code, sum(qty) as qty, name,
+			"""select item_code, sum(qty) as qty, name, s_warehouse, t_warehouse,
 			(select sum(psi.qty * (abs(ps.to_case_no - ps.from_case_no) + 1))
 				from `tabSTE Packing Slip` ps, `tabSTE Packing Slip Item` psi
 				where ps.name = psi.parent and ps.docstatus = 1
@@ -103,15 +104,20 @@ class STEPackingSlip(Document):
 
 		ste_details = self.get_details_for_packing()[0]
 		for item in ste_details:
+			print(item.s_warehouse)
 			if flt(item.qty) > flt(item.packed_qty):
 				ch = self.append("items", {})
 				ch.item_code = item.item_code
 				ch.item_name = item.item_name
 				ch.stock_uom = item.stock_uom
 				ch.description = item.description
+				ch.s_warehouse = item.s_warehouse
+				ch.t_warehouse = item.t_warehouse
 				ch.ste_detail = item.name
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
+    
+				print(ch.as_dict())
 
 				# copy custom fields
 				for d in custom_fields:
@@ -154,10 +160,53 @@ def item_details(doctype, txt, searchfield, start, page_len, filters):
 
 	return frappe.db.sql(
 		"""select name, item_name, description from `tabItem`
-				where name in ( select item_code FROM `tabDStock Entry Detail`
+				where name in ( select item_code FROM `tabStock Entry Detail`
 	 						where parent= %s)
 	 			and %s like "%s" %s
 	 			limit  %s, %s """
 		% ("%s", searchfield, "%s", get_match_cond(doctype), "%s", "%s"),
 		((filters or {}).get("stock_entry"), "%%%s%%" % txt, start, page_len),
 	)
+ 
+ 
+def get_item_details_for_print(items):
+	"""
+	Returns item details for print format
+	"""
+	item_details = []
+	item_codes = {}
+	for d in items:
+		if d.item_code not in item_codes:
+			item_codes[d.item_code] = d.as_dict()
+		else:
+			item_codes[d.item_code].qty += d.qty
+ 
+	item_codes_list = list(item_codes.keys())
+	item_codes_tuple = tuple(item_codes_list) if len(item_codes) > 1 else "('{}')".format(item_codes_list[0])
+	selling_price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+ 
+	res = frappe.db.sql(f"""
+		SELECT ifw_retailskusuffix, item_name, ifw_location, item_code,
+		(SELECT barcode FROM `tabItem Barcode` WHERE parent = item_code ORDER BY idx LIMIT 1) AS barcode,
+		(Select price_list_rate from `tabItem Price` where item_code = item_code and price_list = '{selling_price_list}' order by creation desc limit 1) as item_price
+		FROM `tabItem` 
+		WHERE item_code IN {item_codes_tuple}
+	""", as_dict=True)
+	
+	for d in res:
+		item = item_codes[d.item_code]
+		item_details.append({
+			"item_code": d.item_code,
+			"item_name": d.item_name,
+			"barcode": d.barcode,
+			"qty": item.qty,
+			"item_price": d.item_price,
+			"ifw_retailskusuffix": d.ifw_retailskusuffix,
+			"ifw_location": d.ifw_location
+		})
+ 
+	return item_details
+                     
+                      
+  
+  

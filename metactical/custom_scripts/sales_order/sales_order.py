@@ -80,6 +80,13 @@ class SalesOrderCustom(SalesOrder):
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
+	def on_update_after_submit(self):
+		super().on_update_after_submit()
+
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+
+			
 @frappe.whitelist()
 def save_cancel_reason(**args):
 	args = frappe._dict(args)
