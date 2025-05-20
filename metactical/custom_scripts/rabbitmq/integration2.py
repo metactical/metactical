@@ -61,7 +61,7 @@ def start_consumer(rounds=0):
 
         # Change the current working directory to the site directory
         os.chdir(result)
-        frappe.init(site='deverp.metactical.com')
+        frappe.init(site='erp.metactical.com')
         frappe.connect()
 
         # RabbitMQ connection parameters
