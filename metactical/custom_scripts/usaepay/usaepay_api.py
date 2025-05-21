@@ -407,8 +407,10 @@ def create_payment_entry(doc, data, log):
 			amount = data["object"]["auth_amount"] if "auth_amount" in data["object"] else data["object"]["amount"]
 			if float(allocated) > float(amount):
 				pe.references[0].allocated_amount = int(amount)
-
-		pe.submit()
+		
+		if pe.paid_amount > 0:
+			pe.save()
+			pe.submit()
 
 		if log:
 			frappe.db.set_value("USAePay Log", log.name, "payment_entry", pe.name, update_modified=False)
@@ -772,6 +774,7 @@ def adjust_payment(docname, advance_paid=None):
 
 		# frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to adjust payment: {0}".format(e), title="Error")
+		return None, None
 
 def void_payment_in_usaepay(doc):
 	doctype = doc.doctype
