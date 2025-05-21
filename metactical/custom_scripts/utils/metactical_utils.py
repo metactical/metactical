@@ -502,3 +502,7 @@ def group_invoice_data(credit_notes):
         })
 
     return list(grouped_credit_notes.values())
+
+def get_password(doc):
+	doc = frappe.get_doc(doc.doctype, doc.name)	
+	return doc.get_password(raise_exception=False)
