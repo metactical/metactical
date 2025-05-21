@@ -199,8 +199,8 @@ def validate_users(form_data):
 def create_sales_order(form_data, customer):
     items = form_data['Items']
     taxes = form_data['Taxes']
-    company_address = frappe.db.get_value("POS Profile", form_data['POSProfile'] + ' Operators', 'company_address')
-    if not company_address:
+    company = frappe.db.get_value("POS Profile", form_data['POSProfile'] + ' Operators', ['company_address', "company"], as_dict=True)
+    if not company:
         return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators')}
     
     so_data = {
@@ -208,7 +208,8 @@ def create_sales_order(form_data, customer):
         'customer': customer,
         'taxes_and_charges': form_data['TaxesAndChargesTemplate'],
         'delivery_date': frappe.utils.today(),
-        'company_address': company_address,
+        "company": company.company,
+        'company_address': company.company_address,
         'source': form_data['LeadSource'],
         'ignore_pricing_rule': 1,
         'contact_person': frappe.db.get_value('Customer', customer, 'customer_primary_contact'),
@@ -219,11 +220,13 @@ def create_sales_order(form_data, customer):
     items = get_items(form_data)
     so_data.update({'items': items})
     
-    taxes = get_taxes(form_data)
+    taxes = get_taxes(form_data, company.company)
     so_data.update({'taxes': taxes})
         
     frappe.set_user(form_data['SalesPerson'])
     sales_order = frappe.get_doc(so_data)
+    
+    check_coupon_code(sales_order, form_data)
 
     sales_order.insert(ignore_permissions=True)
     frappe.set_user("Administrator")
@@ -231,6 +234,44 @@ def create_sales_order(form_data, customer):
             
     return {"success": True, "sales_order": sales_order}
 
+def check_coupon_code(sales_order, form_data):
+    for payment in form_data['Payment']:
+        if payment['ModeOfPayment'] == "Gift Card" and not payment['CouponCode']:
+            frappe.throw("Coupon Code is required for Gift Card payment")
+            
+        if payment['ModeOfPayment'] == "Gift Card" and payment['CouponCode']:
+            coupon_code = frappe.db.exists("Coupon Code", {"coupon_code": payment['CouponCode'], "used": 0})
+            sql = get_coupon_code_sql(coupon_code)
+            gift_card = frappe.db.sql(sql, as_dict=True)
+                        
+            if gift_card:
+                coupon_code = gift_card[0]
+                if coupon_code["discount_amount"] == payment['Amount']:
+                    sales_order.coupon_code = coupon_code["coupon_name"]
+                    continue
+                else:
+                    if coupon_code["discount_amount"] > payment['Amount']:
+                        doc = frappe._dict({
+                            "name": coupon_code["custom_sales_invoice"],
+                            "grand_total": -1*payment['Amount'],
+                            "customer": sales_order.customer
+                        })
+                            
+                        new_gift_card = create_gift_card(doc, form_data, coupon_code["coupon_name"])
+                        remaining_amount = coupon_code["discount_amount"] - payment['Amount']
+                        
+                        frappe.db.set_value('Pricing Rule', coupon_code.pricing_rule, 'discount_amount', remaining_amount)
+                        frappe.db.commit()
+                        
+                        if form_data["InvoiceId"]:
+                            frappe.db.set_value('Sales Order', sales_order.name, 'coupon_code', new_gift_card.name)
+                        else:
+                            sales_order.coupon_code = new_gift_card.name
+                    else:
+                        frappe.throw("Coupon Code {0} has a discount amount of {1} which is less than the payment amount of {2}".format(coupon_code.coupon_code, coupon_code.discount_amount, payment['Amount']))
+            else:
+                frappe.throw("Coupon Code {0} is not valid".format(payment['CouponCode']))
+                        
 def update_sales_order(sales_order, form_data):
     items = get_items(form_data)
         
@@ -261,6 +302,7 @@ def update_sales_order(sales_order, form_data):
         trans_items = json.dumps(items)
         
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
+        check_coupon_code(sales_order, form_data)
         frappe.db.commit()
         return {"success": True, "message": ""}
     except Exception as e:
@@ -375,16 +417,17 @@ def create_comments(sales_order, form_data):
     frappe.db.commit()
     
 def create_comment(comment, commentor, sales_order, doctype="Sales Order"):
-    frappe.get_doc({
-        'doctype': 'Comment',
-        'comment_email': commentor,
-        'comment_by': comment['comment_by'],
-        'content': comment['comment'],
-        'reference_doctype': doctype,
-        "comment_type": "Comment",
-        'reference_name': sales_order,
-    }).save(ignore_permissions=True)
-    frappe.db.commit()
+    if comment:
+        frappe.get_doc({
+            'doctype': 'Comment',
+            'comment_email': commentor,
+            'comment_by': comment['comment_by'],
+            'content': comment['comment'],
+            'reference_doctype': doctype,
+            "comment_type": "Comment",
+            'reference_name': sales_order,
+        }).save(ignore_permissions=True)
+        frappe.db.commit()
     
 def create_invoice(sales_order, form_data):
     sales_invoice = make_sales_invoice(sales_order.name)
@@ -425,15 +468,15 @@ def get_total_paid_with_change(form_data):
             
     return total_paid
     
-def get_taxes(form_data):  
+def get_taxes(form_data, company):  
     taxes = []
-    company = frappe.db.get_single_value('Global Defaults', 'default_company')
+    # company = frappe.db.get_single_value('Global Defaults', 'default_company')
     company_abr = frappe.db.get_value('Company', company, 'abbr')
     
     for tax in form_data['Taxes']:
         taxes.append({
             'charge_type': 'On Net Total',
-            'account_head': tax['TaxId'] + ' - ' + company_abr,
+            'account_head': tax['TaxId'].split(" ")[0] + " - " + company_abr,
             'description': tax['TaxId'],
             'rate': tax['Amount'],
         })
@@ -562,12 +605,16 @@ def get_item_from_barcode(barcode, branch):
             tabItem.name, item_name, ifw_retailskusuffix,
             brand, image, is_stock_item
         FROM `tabItem Barcode` ib Join `tabItem` on ib.parent=tabItem.name
-        WHERE ib.barcode = {frappe.db.escape(barcode)}
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.is_sales_item = 1
+            and ib.barcode = {frappe.db.escape(barcode)}
         limit 1
     """, as_dict=True)    
 
     pos_profile = branch + ' Operators'    
     pos_profile = frappe.get_doc('POS Profile', pos_profile)
+    company = pos_profile.company
     price_list = pos_profile.selling_price_list
     warehouse = pos_profile.warehouse
 
@@ -588,13 +635,12 @@ def get_item_from_barcode(barcode, branch):
         item_price = get_item_price(item.name, price_list)
         frappe.response["Price"] = item_price
         
-        discount = get_item_discount(item.name, price_list, item_price)
+        discount = get_item_discount(item.name, price_list, item_price, company)
         frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
 
-        
 def get_quantity(item, warehouse):
     bin_qty = frappe.db.get_value('Bin', {'item_code': item, 'warehouse': warehouse}, ['actual_qty', 'reserved_qty'])
     quantity = 0
@@ -610,7 +656,7 @@ def get_item_price(item, price_list):
     
     return price
 
-def get_item_discount(item, price_list, item_price):
+def get_item_discount(item, price_list, item_price, company):
     # select all pricing rules for the item and pick the one with the highest priority for each item
     pricing_rule = frappe.db.sql(f"""
         SELECT
@@ -627,6 +673,7 @@ def get_item_discount(item, price_list, item_price):
             AND (`tabPricing Rule`.for_price_list = '{price_list}' or `tabPricing Rule`.for_price_list is NULL)
             AND `tabPricing Rule`.disable = 0
             AND `tabPricing Rule`.valid_upto >= CURDATE()
+            AND `tabPricing Rule`.company = '{company}'
         ORDER BY
             CAST(`tabPricing Rule`.priority AS UNSIGNED) DESC
         LIMIT 1;
@@ -652,45 +699,46 @@ def get_item_discount(item, price_list, item_price):
 @frappe.whitelist()
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
-    log = create_log(form_data, 'Sales Return')
-    
-    # Check if SalesPerson exists
-    if "SalesPerson" not in form_data or not form_data["SalesPerson"]:
-        frappe.response["Message"] = "Sales Person is required"
-        frappe.response["Status"] = 500
-        frappe.response["CouponCode"] = None
-        return
-    else:
-        if not frappe.db.exists('User', form_data['SalesPerson']):
-            frappe.response["Message"] = "User {0} does not exist".format(form_data['SalesPerson'])
+    try:
+        frappe.set_user(form_data['SalesPerson'])
+        log = create_log(form_data, 'Sales Return')
+        
+        # Check if SalesPerson exists
+        if "SalesPerson" not in form_data or not form_data["SalesPerson"]:
+            frappe.response["Message"] = "Sales Person is required"
             frappe.response["Status"] = 500
             frappe.response["CouponCode"] = None
             return
-            
-    invoiceId = form_data["InvoiceId"]
-    sales_return = make_sales_return(invoiceId)
-    formatted_items = get_items(form_data)
-    items = sales_return.items.copy()
-    filtered_items = []
+        else:
+            if not frappe.db.exists('User', form_data['SalesPerson']):
+                frappe.response["Message"] = "User {0} does not exist".format(form_data['SalesPerson'])
+                frappe.response["Status"] = 500
+                frappe.response["CouponCode"] = None
+                return
+                
+        invoiceId = form_data["InvoiceId"]
+        sales_return = make_sales_return(invoiceId)
+        formatted_items = get_items(form_data)
+        items = sales_return.items.copy()
+        filtered_items = []
 
-    for item in items:
-        for updated_item in formatted_items:
-            if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
-                (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
-                item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
-                item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
-                item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
-                item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
-                item.margin_type = ""
-                item.rate = item.price_list_rate - item.discount_amount
-                filtered_items.append(item)
+        for item in items:
+            for updated_item in formatted_items:
+                if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
+                    (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
+                    item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                    item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
+                    item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
+                    item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                    item.margin_type = ""
+                    item.rate = item.price_list_rate - item.discount_amount
+                    filtered_items.append(item)
 
-    sales_return.items = filtered_items
-    # sales_return.additional_discount_percentage = form_data['OverallDiscount']
-    sales_return.calculate_taxes_and_totals()
-    
-    frappe.set_user(form_data['SalesPerson'])
-    try:
+        sales_return.items = filtered_items
+        # sales_return.additional_discount_percentage = form_data['OverallDiscount']
+        sales_return.calculate_taxes_and_totals()
+        
+
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
@@ -707,10 +755,10 @@ def create_return(*args, **kwargs):
         frappe.response["CouponCode"] = None
         return
     
-    coupon_code = None
+    gift_card = None
     try:
-        coupon_code = create_gift_card(sales_return, form_data)
-        frappe.db.set_value('POS API Log', log, 'coupon_code', coupon_code, update_modified=False)
+        gift_card = create_gift_card(sales_return, form_data)
+        frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
     except Exception as e:
         frappe.clear_last_message()
         frappe.set_user("Administrator")
@@ -723,51 +771,60 @@ def create_return(*args, **kwargs):
     
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
-    frappe.response["CouponCode"] = coupon_code
+    frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = sales_return.grand_total
     frappe.db.commit()
     
-def create_gift_card(sales_return, form_data):
+def create_gift_card(doc, form_data, coupon_code=None):
     # create pricing rule for the gift card
-    frappe.set_user(form_data['SalesPerson'])
-    pricing_rule = get_or_create_pricing_rule(sales_return)
-    
-    existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": sales_return.customer})
-    # create gift card item
-    gift_card = frappe.get_doc({
+    try:
+        frappe.set_user(form_data['SalesPerson'])
+        pricing_rule = get_or_create_pricing_rule(doc)
+        
+        existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": doc.customer})
+        description = ""
+        if coupon_code:
+            description = "Gift Card from Coupon code <a href='/app/coupon-code/{0}'>{1}</a> for {2} from {3}".format(coupon_code, coupon_code, doc.customer, doc.name)
+        
+        # create gift card item
+        gift_card = frappe.get_doc({
             "doctype": "Coupon Code",
-            "coupon_name": sales_return.customer +"-"+str((existing_coupon_codes + 1)),
+            "coupon_name": doc.customer +"-"+str((existing_coupon_codes + 1)),
             "coupon_type": "Gift Card",
-            "customer": sales_return.customer,
+            "customer": doc.customer,
             "pricing_rule": pricing_rule,
             "valid_from": now_datetime(),
-            "coupon_description": "Gift Card for {0} from {1}".format(sales_return.customer, sales_return.name),
+            "custom_sales_invoice": doc.name,
+            "description": description,
+            "used": 1 if form_data["InvoiceId"] and form_data["InvoiceId"].startswith("SAL-ORD") else 0
         })
-    gift_card.insert(ignore_permissions=True)
-    gift_card.save()
-    frappe.set_user("Administrator")
-    
-    return gift_card.coupon_code
-
-def get_or_create_pricing_rule(sales_return):
-    pricing_rule = frappe.db.exists("Pricing Rule", {"discount_amount": -1 * sales_return.grand_total, "coupon_code_based": 1, "title": "GC-{0}".format(sales_return.customer)})
-    if not pricing_rule:
-        pricing_rule = frappe.get_doc({
-                "title": "GC-{0}".format(sales_return.customer),
-                "doctype": "Pricing Rule",
-                "coupon_code_based": 1,
-                "apply_on": "Transaction",
-                "price_or_product_discount": "Price",
-                "selling": 1,
-                "valid_from": now_datetime(),
-                "rate_or_discount": "Discount Amount",
-                "discount_amount": -1 * sales_return.grand_total
-            })
         
-        pricing_rule.insert(ignore_permissions=True)
+        gift_card.insert(ignore_permissions=True)
+        gift_card.save()
         frappe.db.commit()
-        return pricing_rule.name
+        frappe.set_user("Administrator")
+        
+        return gift_card
+    except Exception as e:
+        frappe.throw("Unable to create Gift Card: {0}".format(str(e)))
+
+def get_or_create_pricing_rule(doc):
+    pricing_rule = frappe.get_doc({
+            "title": "GC-{0}".format(doc.customer),
+            "doctype": "Pricing Rule",
+            "coupon_code_based": 1,
+            "apply_on": "Transaction",
+            "price_or_product_discount": "Price",
+            "selling": 1,
+            "valid_from": now_datetime(),
+            "rate_or_discount": "Discount Amount",
+            "discount_amount": -1 * doc.grand_total
+        })
+    
+    pricing_rule.insert(ignore_permissions=True)
+    frappe.db.commit()
+    return pricing_rule.name
     
     return pricing_rule    
 
@@ -783,3 +840,158 @@ def create_log(form_data, request_type):
         return log.name
     except Exception as e:
         frappe.log_error(title='POS API Log Error', message=frappe.get_traceback())
+        
+@frappe.whitelist()
+def verify_coupon_code(coupon_code):
+    if not coupon_code:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Coupon Code is required"
+        frappe.response["Amount"] = 0.0
+        return
+    
+    coupon_code = frappe.db.exists("Coupon Code", {"coupon_code": coupon_code, "used": 0})
+    if not coupon_code:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Coupon Code is not valid"
+        frappe.response["Amount"] = 0.0
+        return
+    
+    sql = get_coupon_code_sql(coupon_code)
+    coupon_code = frappe.db.sql(sql, as_dict=True)
+
+    if not coupon_code:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Coupon Code is not valid"
+        frappe.response["Amount"] = 0.0
+        return
+    
+    coupon_code = coupon_code[0]
+    frappe.response["Status"] = 200
+    frappe.response["Message"] = ""
+    frappe.response["CouponCode"] = coupon_code.coupon_code
+    frappe.response["Amount"] = coupon_code.discount_amount
+    frappe.response["Customer"] = coupon_code.customer
+    
+def get_coupon_code_sql(coupon_code):
+    return f"""
+        SELECT
+            coupon_code, coupon_name, cc.customer, coupon_type, custom_sales_invoice,
+            cc.valid_from, cc.valid_upto, pr.discount_amount, pricing_rule
+        FROM
+            `tabCoupon Code` cc
+        JOIN
+            `tabPricing Rule` pr ON cc.pricing_rule = pr.name
+        JOIN 
+            `tabSales Invoice` si ON cc.custom_sales_invoice = si.name
+        WHERE
+            cc.name = {frappe.db.escape(coupon_code)}
+            AND used = 0
+            AND (cc.valid_upto >= CURDATE() or cc.valid_upto is NULL)
+            AND cc.valid_from <= CURDATE()
+            AND pr.disable = 0
+            AND si.docstatus = 1
+    """
+    
+@frappe.whitelist()
+def get_item_by_retail_sku(retail_sku, branch):    
+    items = frappe.db.sql(f"""
+        SELECT 
+            tabItem.name as item_code, tabItem.item_name, tabItem.ifw_retailskusuffix, price_list_rate, price_list, pp.company,
+            tabItem.brand, tabItem.is_stock_item, pp.warehouse, actual_qty-reserved_qty as qty, pp.name as pos_profile,
+            (SELECT GROUP_CONCAT(barcode SEPARATOR ', ') AS barcodes
+                FROM `tabItem Barcode` ib 
+                WHERE ib.parent=tabItem.name) as barcodes         
+        From
+            `tabItem`
+        Left Join `tabBin` on `tabItem`.name=`tabBin`.item_code
+        Left Join `tabPOS Profile` pp on pp.warehouse=tabBin.warehouse
+        Left Join `tabItem Price` ip on ip.price_list=pp.selling_price_list and ip.item_code=tabItem.name
+        WHERE 
+            pp.name is not null 
+            and pp.disabled = 0
+            and `tabItem`.disabled = 0
+            and `tabItem`.is_sales_item = 1
+            and `tabItem`.has_variants = 0
+            and tabItem.ifw_retailskusuffix like {frappe.db.escape(f"{retail_sku}%")}
+    """, as_dict=True)
+    
+    pos_profiles = frappe.get_all("POS Profile", fields=["company", "selling_price_list", "warehouse", "name"], filters={"disabled": 0})
+    pos_profiles = [profile.name.split(' ')[0] for profile in pos_profiles]
+        
+    # group items by item_code
+    item_groups = {}
+    for item in items:
+        if item.item_code not in item_groups:
+            item_groups[item.item_code] = item
+            
+            
+        if "branches" not in item_groups[item.item_code]:
+            item_groups[item.item_code]["branches"] = {}
+            
+        pos_profile = item.pos_profile.split(" ")[0]
+        if pos_profile == branch:
+            item["company"] = item.company
+            item["price_list"] = item.price_list
+            item["price_list_rate"] = item.price_list_rate
+            item["qty"] = item.qty
+            
+        item_groups[item.item_code]["branches"][pos_profile] = {
+            "Branch": pos_profile,
+            "Qty": int(item.qty),
+            "Price": item.price_list_rate if item.price_list_rate else 0.0,
+            "PriceList": item.price_list if item.price_list else "",
+            "Warehouse": item.warehouse,
+        }
+        
+    # add the remaining branches
+    for item_code, detail in item_groups.items():
+        for pos_profile in pos_profiles:
+            if pos_profile not in detail["branches"]:
+                detail["branches"][pos_profile] = {
+                    "Branch": pos_profile,
+                    "Qty": 0,
+                    "Price": 0.0,
+                    "PriceList": "",
+                    "Warehouse": "",
+                }
+        
+    items = item_groups.values()
+        
+    item_details = []
+    for item in items:
+        item_detail = {}
+        item_detail["Sku"] = item.item_code
+        item_detail["ItemName"] = item.item_name
+        item_detail["RetailSku"] = item.ifw_retailskusuffix
+        item_detail["Categories"] = []
+        item_detail["Comment"] = ""
+        item_detail["ImageUrl"] = item.image if item.image else ""
+        item_detail["Brand"] = item.brand if item.brand else ""
+        item_detail["NonStocking"] = False if item.is_stock_item else True
+        
+        item_detail["Barcodes"] = [{"Barcode": barcode} for barcode in item.barcodes.split(", ")] if item.barcodes else []
+        item_detail["Quantity"] = int(item.qty) if item.qty else 0
+        item_detail["Price"] = item.price_list_rate if item.price_list_rate else 0.0
+        discount = 0   
+        
+        if item.price_list_rate and item.price_list and item.company:
+            discount = get_item_discount(item.item_code, item.price_list, item.price_list_rate, item.company)
+            
+        item_detail["DiscountPrice"] = discount["discount_price"] if discount else 0.0
+        item_detail["OnSale"] = discount["on_sale"] if discount else False
+        item_detail["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
+        item_detail["DiscountStartDate"] = discount["discount_start_date"] if discount else None
+        item_detail["Branches"] = item.branches.values()
+        
+        item_details.append(item_detail)
+        
+    if not item_details:
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = "Item not found"
+        frappe.response["Items"] = []
+        return
+    
+    frappe.response["Status"] = 200
+    frappe.response["Message"] = ""
+    frappe.response["Items"] = item_details
+    

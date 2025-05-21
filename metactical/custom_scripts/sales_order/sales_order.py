@@ -13,9 +13,15 @@ from frappe.model.utils import get_fetch_values
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
-from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 from frappe.model.docstatus import DocStatus
+from metactical.custom_scripts.utils.metactical_utils import ( 
+	queue_action, 
+	check_si_payment_status_for_so
+)
+from metactical.custom_scripts.usaepay.usaepay_api import (
+	process_credit_card_tokens
+)
 
 class SalesOrderCustom(SalesOrder):
 	def save(self):
@@ -35,7 +41,10 @@ class SalesOrderCustom(SalesOrder):
 	def validate(self):
 		super(SalesOrderCustom, self).validate()
 		self.pull_reserved_qty()
-			
+		
+		if self.po_no and not self.neb_usaepay_transaction_key:
+			self.neb_usaepay_transaction_key = get_transaction_key(self.source, self.po_no, self.customer)
+
 	def pull_reserved_qty(self):
 		for row in self.items:
 			#Check if bin exists
@@ -84,7 +93,6 @@ def save_cancel_reason(**args):
 	doc = frappe.get_doc("Sales Order", args.docname)
 	doc.db_set("cancel_reason", args.cancel_reason, notify=True)
 	return 'Success'
-
 
 @frappe.whitelist()
 def get_open_count(**args):
@@ -221,19 +229,33 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	)
 	if automatically_fetch_payment_terms:
 		doclist.set_payment_schedule()
-
+  
+	doclist.set_onload("ignore_price_list", True)
+ 
 	return doclist
 
 @frappe.whitelist()
-def submit_order(doc):
-	# Metactical Customization: Submit order in background if more than 10 items
-	doc = frappe.get_doc("Sales Order", doc)
-	if len(doc.items) > 25:
-		msgprint(
-			_(
-				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
-			)
-		)
-		queue_action(doc, "submit", timeout=2000)
-	else:
-		doc._submit()
+def get_transaction_key(source, po_no, customer):
+	if not po_no:
+		return
+
+	so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":po_no, "lead_source": source})
+	if not so_usaepay_transaction:
+		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": po_no, "lead_source": source})
+		if not so_usaepay_transaction:
+			return
+
+	usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
+
+	obj = {
+		"object": {
+			"key": usaepay_transaction.transaction_key,
+			"creditcard": {
+				"number": usaepay_transaction.credit_card
+			}
+		}
+	}
+	process_credit_card_tokens(obj, customer)
+	frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
+	
+	return usaepay_transaction.transaction_key
