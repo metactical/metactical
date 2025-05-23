@@ -553,6 +553,10 @@ def group_invoice_data(credit_notes):
 
     return list(grouped_credit_notes.values())
 
+@frappe.whitelist()
 def get_password(doc):
+	if type(doc) == str:
+		doc = frappe._dict(json.loads(doc))
+  
 	doc = frappe.get_doc(doc.doctype, doc.name)	
 	return doc.get_password(raise_exception=False)
