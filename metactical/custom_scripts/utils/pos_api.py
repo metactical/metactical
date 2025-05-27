@@ -920,7 +920,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
     if not items:
         frappe.response.update({
-            "Status": 500,
+            "Status": 404,
             "Message": "Item not found",
             "Items": []
         })
