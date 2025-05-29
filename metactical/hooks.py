@@ -301,7 +301,6 @@ fixtures = [{
 			'POS Profile-_ifw_email_group',
 			'POS Profile-ifw_discount_alert_percent',
 			'POS Profile User-ifw_max_discount_percent',
-			'Customer-ifw_email',
 			'Pick List-date',
 			'Pick List-order_type',
 			'Pick List-po_no',
