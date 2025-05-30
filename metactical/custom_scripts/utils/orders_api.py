@@ -499,3 +499,22 @@ def process_items(items, shipping_item, order_detail):
 		items_list.append(new_shipping_item)
 
 	return items_list
+
+def update_signify_detail(parsedContent):    
+	try:
+		sales_order = frappe.db.get_value("Sales Order", {"ifw_signifyd_sid": parsedContent['Sid']}, "name")
+		if sales_order:
+			frappe.db.set_value("Sales Order", sales_order, {
+				"ifw_signifyd_caseid": parsedContent['CaseId'] if parsedContent.get('CaseId') else None,
+				"ifw_signifyd_casestatus": parsedContent['CaseStatus'] if parsedContent.get('CaseStatus') else None,
+				"ifw_signifyd_score": parsedContent['Score'] if parsedContent.get('Score') else None,
+				"ifw_signifyd_approved": parsedContent['IsApproved'] if parsedContent.get('IsApproved') else False,
+				"ifw_signifyd_guaranteedisposition": parsedContent['GuarenteedDisposition'] if parsedContent.get('GuarenteedDisposition') else None,
+				"ifw_signifyd_fulfilled": parsedContent['Fullfilled'] if parsedContent.get('Fullfilled') else None,
+			}, update_modified=False)
+			frappe.db.commit()
+		else:
+			frappe.log_error(title='SignifyD Update Error', message=f"Sales Order not found for SignifyD SID: {parsedContent['Sid']}")
+	except Exception as e:
+		frappe.log_error(title='SignifyD Update Error', message=frappe.get_traceback())
+		post_to_rocket_chat([], f"Unable to update SignifyD details: {str(e)}", rmq=True)
