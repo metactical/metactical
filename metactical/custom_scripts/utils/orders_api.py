@@ -12,10 +12,12 @@ def receive_rmq_data(parsedContent):
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
 		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
 		country = parsedContent['shippingCountry']['name'] if parsedContent.get("shippingCountry") else "Canada"
+		frappe.form_dict["account"] = ""
 
 		# Retrieve the default company name from the Global Defaults doctype in Frappe.
-		company = frappe.db.get_single_value("Lead Source", parsedContent["publisher_site"], "neb_company") or frappe.db.get_single_value("Global Defaults", "default_company")
-
+		
+		company = frappe.db.get_value("Lead Source", parsedContent["publisher_site"], "neb_company") or frappe.db.get_single_value("Global Defaults", "default_company")  
+  
 		# Initialize the shipping item as None. If a shipping description exists,
 		# use it to fetch the corresponding shipping item and cost.
 		shipping_item = None
@@ -127,7 +129,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, i
 		"total_shipping_amount": parsedContent['totalShippingAmount'],
 		"total_discount_amount": parsedContent['TotalDiscountAmount']["Amount"],
 		"source": parsedContent['publisher_site'],
-		"taxes_and_charges": get_taxes_and_charges(province, country),
+		"taxes_and_charges": get_taxes_and_charges(province, country, company),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
@@ -181,7 +183,7 @@ def get_shipping_address_detail(parsedContent, is_cp_verified):
 # 
 def get_shipping_item(shipping_quote, total):
 	shipping_item = ""
-	if shipping_quote == "Flat Rate Shipping - Standard Shipping":
+	if shipping_quote == "Flat Rate Shipping - Standard Shipping" or shipping_quote == "Flat Rate Shipping - Standard":
 		shipping_item = "Shipping"
 	elif shipping_quote == "Flat Rate Shipping - Express Shipping":
 		shipping_item = "Express Shipping"
@@ -390,20 +392,23 @@ def create_contact(contact_detail, customer):
 # If a shipping item is provided, it also creates a Sales Order Item for the shipping charges.
 # Finally, it returns a list of all the created Sales Order Item documents.
 def create_payment(payment_detail, order, company):
-	card_type = get_card_type(payment_detail)
+	try:
+		card_type = get_card_type(payment_detail)
 
-	new_payment = get_payment_entry(order.doctype, order.name)
-	new_payment.mode_of_payment = card_type
+		new_payment = get_payment_entry(order.doctype, order.name)
+		new_payment.mode_of_payment = card_type
 
-	account = get_bank_cash_account(company=company, mode_of_payment=card_type)
-	new_payment.paid_to = account["account"]
-	new_payment.reference_no = order.neb_usaepay_transaction_key
-	new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
+		account = get_bank_cash_account(company=company, mode_of_payment=card_type)
+		new_payment.paid_to = account["account"]
+		new_payment.reference_no = order.neb_usaepay_transaction_key
+		new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
+		new_payment.submit()
+		frappe.db.commit()
 
-	new_payment.submit()
-	frappe.db.commit()
+		return new_payment
+	except Exception as e:
+		frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
 
-	return new_payment
 
 def get_card_type(payment_detail):
 	card_type = "Visa"
@@ -438,9 +443,10 @@ def calculate_delivery_date(order_date):
 
 	return frappe.utils.add_to_date(order_date, days=1)
 
-def get_taxes_and_charges(province, country):
-	if country == "United States":
-		return "Export - ICL"
+def get_taxes_and_charges(province, country, company=None):
+	company_code = frappe.db.get_value("Company", company, "abbr")
+	if province == "Texas":
+		return f"Texas - {company_code}"
 	elif province == "Alberta":
 		return "Alberta - ICL"
 	elif province == "British Columbia":
@@ -467,11 +473,15 @@ def get_taxes_and_charges(province, country):
 		return "Nunavut - ICL"
 	elif province == "Yukon":
 		return "Yukon - ICL"
+	elif country == "United States":
+		return "United States - " + company_code
 	else:
-		return "Alberta - ICL"
+		return province + " - " + company_code if company_code else province + " - ICL"
 		
 def process_items(items, shipping_item, order_detail):
 	items_list = []
+	warehouse = frappe.db.get_value("Lead Source", order_detail['source'], "neb_default_warehouse") or "W01-WHS-Active Stock - ICL"
+	
 	for item in items:
 		item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item['retailSku']}, "name")
 		if not item_code:
@@ -482,7 +492,7 @@ def process_items(items, shipping_item, order_detail):
 			"item_code": item_code,
 			"qty": item['quantity'],
 			"rate": item['unitPrice'],
-			"warehouse": "W01-WHS-Active Stock - ICL"
+			"warehouse": warehouse
 		})
 
 		items_list.append(new_item)
@@ -493,7 +503,7 @@ def process_items(items, shipping_item, order_detail):
 			"item_code": shipping_item['item_code'],
 			"qty": shipping_item['qty'],
 			"rate": shipping_item['rate'],
-			"warehouse": "W01-WHS-Active Stock - ICL"
+			"warehouse": warehouse
 		})
 
 		items_list.append(new_shipping_item)
