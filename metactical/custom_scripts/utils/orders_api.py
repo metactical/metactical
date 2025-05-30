@@ -14,7 +14,7 @@ def receive_rmq_data(parsedContent):
 		country = parsedContent['shippingCountry']['name'] if parsedContent.get("shippingCountry") else "Canada"
 
 		# Retrieve the default company name from the Global Defaults doctype in Frappe.
-		company = frappe.db.get_single_value("Global Defaults", "default_company")
+		company = frappe.db.get_single_value("Lead Source", parsedContent["publisher_site"], "neb_company") or frappe.db.get_single_value("Global Defaults", "default_company")
 
 		# Initialize the shipping item as None. If a shipping description exists,
 		# use it to fetch the corresponding shipping item and cost.
