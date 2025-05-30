@@ -40,7 +40,7 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
 		if not rocket_chat_settings.rocket_notification:
 			return
 
-		channel_name = rocket_chat_settings.channel_name
+		channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
 		headers = {
 			'Content-type': rocket_chat_settings.content_type or 'application/json',
 			'X-Auth-Token': rocket_chat_settings.auth_token,
@@ -502,3 +502,62 @@ def remove_tz_from_date(date):
 def get_state_code(state):
 	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
 	return symbol
+
+def get_returns(sales_invoice_doc):
+    if sales_invoice_doc.is_return:
+        credit_notes = items
+        items = []
+    else:
+        credit_notes = frappe.db.sql(""" SELECT
+                                            si.name as si_name, sii.item_code, sii.item_name, sii.qty, sii.rate, 
+                                            sii.discount_amount, sii.amount, si.posting_date, si.customer, si.customer_name,
+                                            si.neb_store_credit_beneficiary, sii.price_list_rate, sii.image,
+                                            si.total_taxes_and_charges, si.grand_total, si.discount_amount as si_discount_amount,
+                                            sii.discount_percentage
+                                        FROM
+                                            `tabSales Invoice` si
+                                        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+                                        WHERE
+                                            return_against = %(sales_invoice)s and si.docstatus = 1
+                                        ORDER BY
+                                            si.creation DESC, sii.idx ASC
+                                    """, {"sales_invoice": sales_invoice_doc.name}, as_dict=True)
+        
+    return credit_notes
+
+def group_invoice_data(credit_notes):
+    grouped_credit_notes = {}
+
+    for row in credit_notes:
+        if row.si_name not in grouped_credit_notes:
+            grouped_credit_notes[row.si_name] = {
+                "InvoiceId": row.si_name,
+                "posting_date": row.posting_date,
+                "customer": row.customer,
+                "customer_name": row.customer_name,
+                "store_credit_beneficiary": row.neb_store_credit_beneficiary,
+                "total_taxes_and_charges": row.total_taxes_and_charges,
+                "grand_total": row.grand_total,
+                "si_discount_amount": row.si_discount_amount,
+                "items": []
+            }
+
+        grouped_credit_notes[row.si_name]["items"].append({
+            "ItemCode": row.item_code,
+            "ItemName": row.item_name,
+            "Image": row.image,
+            "PriceListRate": row.price_list_rate,
+            "Qty": row.qty,
+            "Rate": row.rate,
+            "Discount": row.discount_percentage,
+        })
+
+    return list(grouped_credit_notes.values())
+
+@frappe.whitelist()
+def get_password(doc):
+	if type(doc) == str:
+		doc = frappe._dict(json.loads(doc))
+  
+	doc = frappe.get_doc(doc.doctype, doc.name)	
+	return doc.get_password(raise_exception=False)

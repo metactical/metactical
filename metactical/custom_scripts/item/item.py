@@ -6,6 +6,7 @@ def on_update(doc, method):
     # check website specification values
     validate_website_specifications(doc)
     sync_website_specifications(doc)
+    validate_item_group(doc)
 
     # Trigger update for item inventory output if deduct_qty has been updated
     # Retrieve the document state before the update
@@ -122,6 +123,12 @@ def sync_website_specifications(doc):
                     main_website_spec.parentfield = "website_specifications"
                     main_website_spec.save()
 
+def validate_item_group(doc):
+    if doc.item_group:
+        is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
+        if is_item_group:
+            frappe.throw("Item Group <b>{0}</b> is a group. Please select a non-group item group.".format(doc.item_group))
+        
 @frappe.whitelist()
 def get_website_specification_description_options(labels):
     labels = json.loads(labels)

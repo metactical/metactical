@@ -291,6 +291,11 @@
 		let in_stock = true;
 		if (cur_item.s_warehouse) {
 			await frappe.db.get_value("Bin", { item_code: cur_item.item_code, warehouse: cur_item.s_warehouse }, ["actual_qty", "reserved_qty"]).then((r) => {
+
+				if (Object.keys(r.message).length === 0) {
+					frappe.throw(`Item ${cur_item.item_code} not found in warehouse ${cur_item.s_warehouse}`);
+				}
+
 				var available_qty = r.message.actual_qty - r.message.reserved_qty;
 				var qantity_added_for_packing = cur_packed_item ? cur_packed_item.qty : 0;
 				var total = packed_qty + amount + qantity_added_for_packing
@@ -467,6 +472,8 @@
 		  frappe.confirm(message, () => {
 			frappe.call({
 			  method: "metactical.metactical.page.packing_page_v4.packing_page_v4.remove_remaining_items",
+			 freeze: true,
+			 freeze_message: "Removing remaining items ...", 
 			  args: { "packing_slips": Object.keys(this.all_packed_items), "stock_entry": this.filters.stock_entry, "has_pending_items": pending_items },
 			  callback: (r) => {
 				if (r.success) {
