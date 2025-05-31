@@ -1347,7 +1347,8 @@ fixtures = [{
 			"Stock Ledger Entry-autoname",
 			"Sales Taxes and Charges-autoname",
 			"Bin-autoname",
-			"Custom Field-label-width"
+			"Custom Field-label-width",
+			"Shipment Parcel-weight-precision"
 		]]]
 	},
   	{
