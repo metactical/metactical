@@ -6,8 +6,8 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_det
 
 def receive_rmq_data(parsedContent):
 	try:
-		# from metactical.custom_scripts.utils.loggedinuser import parsedContent
-		
+		# from metactical.custom_scripts.utils.test import parsedContent
+		frappe.log_error(title='RabbitMQ Data Received', message=str(parsedContent))
 		# Assign the shipping province and country based on the parsed content.
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
 		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
@@ -81,7 +81,6 @@ def receive_rmq_data(parsedContent):
 		except Exception as e:
 			frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
 			post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
-   
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
