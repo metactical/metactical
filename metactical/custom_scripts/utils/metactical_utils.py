@@ -12,6 +12,7 @@ from openpyxl.utils import get_column_letter
 from frappe.utils.xlsxutils import handle_html, ILLEGAL_CHARACTERS_RE
 from io import BytesIO
 import re, os
+from datetime import datetime
 
 from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
@@ -448,6 +449,27 @@ def read_file(file_path):
 	
 	return file_content, extn
 
+def remove_tz_from_date(date):
+	if not date:
+		return None
+	
+	# Truncate to six digits
+	# '%Y-%m-%dT%H:%M:%S.%fZ'  check if the date has this format
+	# if not, add the missing part
+	date_str_fixed = date
+	if len(date) == 19:
+		date_str_fixed = date + ".000000Z"
+	elif len(date) > 26:
+		date_str_fixed = date[:26] + "Z"
+	elif len(date) > 19 and len(date) < 26:
+		date_str_fixed = date + "0" * (26 - len(date)) + "Z"
+
+	parsed_date = datetime.strptime(date_str_fixed, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+	# Output the formatted datetime (customize the format as needed)
+	formatted_date = parsed_date.strftime("%Y-%m-%d")
+	return formatted_date
+
 def get_state_code(state):
 	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
 	return symbol
@@ -510,3 +532,7 @@ def get_password(doc):
   
 	doc = frappe.get_doc(doc.doctype, doc.name)	
 	return doc.get_password(raise_exception=False)
+
+def get_state_code(state):
+	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
+	return symbol
