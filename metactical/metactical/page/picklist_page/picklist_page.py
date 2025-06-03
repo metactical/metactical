@@ -318,9 +318,21 @@ def mark_as_picked(items, user):
 	for pick_list in pick_lists:
 		doc = frappe.get_doc('Pick List', pick_list)
 		status = "Picked"
-		if len(picklist_items[pick_list]) != len(doc.locations):
+		non_shipment_items = []
+		shipping_items = []
+
+		pl_settings = frappe.get_doc("Pick List Settings", "Pick List Settings")
+		for row in pl_settings.shipping_items:
+			shipping_items.append(row.item)
+
+		for row in doc.locations:
+			if row.item_code not in shipping_items:
+				non_shipment_items.append(row)
+
+
+		if len(picklist_items[pick_list]) != len(non_shipment_items):
 			status = "Partially Picked"
-		elif len(picklist_items[pick_list]) == len(doc.locations):
+		elif len(picklist_items[pick_list]) == len(non_shipment_items):
 			for item in picklist_items[pick_list]:
 				if item["qty"] > item["picked_qty"]:
 					status = "Partially Picked"
