@@ -813,7 +813,8 @@ fixtures = [{
 			'Address-custom_ais_address_verified',
 			'Sales Order-custom_ais_address_verified',
 			'POS Profile User-neb_send_welcome_email',
-			'Coupon Code-custom_sales_invoice'
+			'Coupon Code-custom_sales_invoice',
+			'Contact-custom_ais_contactnotes'
 		]]]
 	},
 	{
