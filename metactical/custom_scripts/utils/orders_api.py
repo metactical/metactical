@@ -68,16 +68,20 @@ def receive_rmq_data(parsedContent):
 		order = create_order(order_detail, customer, parsedContent["PaymentGateway"], shipping_address_doc, billing_address_doc)
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
-		if parsedContent["PaymentGateway"] != "interacetransfer":
-			if order.neb_usaepay_transaction_key:
-				payment = create_payment(payment_detail, order, company)
-			else:
-				from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
-				transaction_key = get_transaction_key(order.source, order.po_no, order.customer)
-				if transaction_key:
-					frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
+		try:
+			if parsedContent["PaymentGateway"] != "interacetransfer":
+				if order.neb_usaepay_transaction_key:
 					payment = create_payment(payment_detail, order, company)
-
+				else:
+					from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
+					transaction_key = get_transaction_key(order.source, order.po_no, order.customer)
+					if transaction_key:
+						frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
+						payment = create_payment(payment_detail, order, company)
+		except Exception as e:
+			frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
+			post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
+   
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
