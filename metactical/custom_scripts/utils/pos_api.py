@@ -680,7 +680,7 @@ def get_so_comment(sales_order, form_data, error=None):
         
     comment += "<br><br><b>Branch</b>: {0}".format(form_data['POSProfile'])
     # add customer info to the comment
-    if form_data['Customer']:
+    if form_data['Customer'] and form_data['Customer']['Name']:
         comment += "<br><b>Customer:</b> {0} ({1}) - {2}".format(form_data['Customer']['Name'], form_data['Customer']['Phone'], form_data['Customer']['Email'])
     else:
         comment += "<br>*No Customer*"
@@ -833,7 +833,13 @@ def create_return(*args, **kwargs):
         # sales_return.additional_discount_percentage = form_data['OverallDiscount']
         sales_return.calculate_taxes_and_totals()
         
-
+        total_payment = sum(payment.amount for payment in sales_return.payments)
+        invoice_total = sales_return.rounded_total or sales_return.grand_total
+        
+        if float(total_payment) + float(sales_return.write_off_amount) != float(invoice_total) and sales_return.payments:
+            difference = round(float(invoice_total) - float(total_payment) + float(sales_return.write_off_amount), 2)
+            sales_return.payments[0].amount = total_payment + difference
+    
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
