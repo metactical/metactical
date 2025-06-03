@@ -532,7 +532,3 @@ def get_password(doc):
   
 	doc = frappe.get_doc(doc.doctype, doc.name)	
 	return doc.get_password(raise_exception=False)
-
-def get_state_code(state):
-	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
-	return symbol
