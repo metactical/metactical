@@ -80,16 +80,21 @@ def receive_pos_data(*args, **kwargs):
                         
             if not sales_order["success"]:
                 url = "/app/{0}/{1}".format(sales_order["sales_order"].doctype.lower().replace(" ", "-"), sales_order["sales_order"].name)
-                message = "Branch: *{0}* \n Sales Order created by POS has an error: {1}. \nPlease update the document and resubmit. [{2}]({3})".format(
+                message = "Branch: *{0}* \n Sales Order created by POS has an error: `{1}`. \nPlease update the document and resubmit. [{2}]({3})".format(
                     form_data['POSProfile'], sales_order["error"], get_url(url), get_url(url))
-                post_to_rocket_chat(sales_order["sales_order"], message, pos=True)
+                
+                frappe.enqueue(
+                    post_to_rocket_chat,
+                    queue="default", # one of short, default, long
+                    doc=sales_order["sales_order"],
+                    msg=message,
+                    pos=True
+                )
                 
                 comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
-                
                 comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
                 create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
                 
-                    
         has_no_error = sales_order["success"]        
         sales_order = sales_order["sales_order"]
         
