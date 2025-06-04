@@ -639,7 +639,7 @@ def get_item_from_barcode(barcode, branch):
         frappe.response["Price"] = item_price
         
         discount = get_item_discount(item.name, price_list, item_price, company)
-        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else item_price
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
@@ -1012,7 +1012,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
-            "DiscountPrice": round(discount.get("discount_price", 0.0), 2),
+            "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
@@ -1024,3 +1024,48 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
         "Message": "",
         "Items": item_details
     })
+
+
+@frappe.whitelist()
+def get_item_by_retail_sku_single(retail_sku, branch):
+    item = frappe.db.sql(f"""
+        SELECT 
+            tabItem.name, item_name, ifw_retailskusuffix,
+            brand, image, is_stock_item
+        FROM `tabItem`
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.has_variants = 0
+            and `tabItem`.is_sales_item = 1
+            and ifw_retailskusuffix = {frappe.db.escape(retail_sku)}
+        limit 1
+    """, as_dict=True)    
+
+    pos_profile = branch + ' Operators'    
+    pos_profile = frappe.get_doc('POS Profile', pos_profile)
+    company = pos_profile.company
+    price_list = pos_profile.selling_price_list
+    warehouse = pos_profile.warehouse
+
+    if item:
+        item = item[0]    
+        frappe.response["Sku"] = item.name
+        frappe.response["ItemName"] = item.item_name
+        frappe.response["RetailSku"] = item.ifw_retailskusuffix
+        frappe.response["Categories"] = []
+        frappe.response["Comment"] = ""
+        frappe.response["ImageUrl"] = item.image if item.image else ""
+        frappe.response["Brand"] = item.brand if item.brand else ""
+        frappe.response["NonStocking"] = False if item.is_stock_item else True
+        barcodes = frappe.db.get_all("Item Barcode", {"parent": item.name}, ["barcode"])
+        frappe.response["Barcodes"] = [{"Barcode": barcode.barcode} for barcode in barcodes]
+        frappe.response["Quantity"] = int(get_quantity(item.name, warehouse))
+        
+        item_price = get_item_price(item.name, price_list)
+        frappe.response["Price"] = item_price
+        
+        discount = get_item_discount(item.name, price_list, item_price, company)
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else item_price
+        frappe.response["OnSale"] = discount["on_sale"] if discount else False
+        frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
+        frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
