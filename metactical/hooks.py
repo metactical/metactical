@@ -803,7 +803,6 @@ fixtures = [{
 			'Pick List-ais_picked_by',
 			'POS Profile User-column_break_vcps1',
 			'POS Profile User-neb_pin',
-			'POS Profile-neb_taxes_and_charges',
 			'Item-custom_ais_related_sku',
 			'Shipment-custom_ais_require_signature',
 			'Shipment-custom_ais_do_not_safe_drop',
@@ -814,7 +813,9 @@ fixtures = [{
 			'Sales Order-custom_ais_address_verified',
 			'POS Profile User-neb_send_welcome_email',
 			'Coupon Code-custom_sales_invoice',
-			'Contact-custom_ais_contactnotes'
+			'Contact-custom_ais_contactnotes',
+			'Lead Source-neb_default_warehouse',
+			'Lead Source-neb_company'
 		]]]
 	},
 	{
