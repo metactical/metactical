@@ -549,7 +549,11 @@ def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
 	}
 	
 	# Send the data to ShipStation
-	settings = get_settings()
+	source = None
+	if sales_order.source:
+		source = sales_order.source
+
+	settings = get_settings(source=source)
 	
 	if len(settings) == 0:
 		frappe.throw("No shiptation settings found.")
