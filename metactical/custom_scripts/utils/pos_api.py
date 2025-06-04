@@ -69,7 +69,7 @@ def receive_pos_data(*args, **kwargs):
             sales_order = {"sales_order": sales_order}
         else:
             sales_order = create_sales_order(form_data, customer)
-            if not sales_order["success"]:
+            if not sales_order["success"] and not sales_order["sales_order"]:
                 frappe.response["Status"] = "500"
                 frappe.response["Message"] = [sales_order["error"]]
                 frappe.response["InvoiceId"] = None
@@ -77,9 +77,28 @@ def receive_pos_data(*args, **kwargs):
                 frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
                 frappe.db.commit()
                 return
+                        
+            if not sales_order["success"]:
+                url = "/app/{0}/{1}".format(sales_order["sales_order"].doctype.lower().replace(" ", "-"), sales_order["sales_order"].name)
+                message = "Branch: *{0}* \n Sales Order created by POS has an error: `{1}`. \nPlease update the document and resubmit. [{2}]({3})".format(
+                    form_data['POSProfile'], sales_order["error"], get_url(url), get_url(url))
                 
+                frappe.enqueue(
+                    post_to_rocket_chat,
+                    queue="default", # one of short, default, long
+                    doc=sales_order["sales_order"],
+                    msg=message,
+                    pos=True
+                )
+                
+                comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
+                comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
+                create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
+                
+        has_no_error = sales_order["success"]        
         sales_order = sales_order["sales_order"]
-        if sales_order:
+        
+        if sales_order and has_no_error:
             if len(form_data["Payment"]):
                 has_intrac_payment = False
                 for payment in form_data["Payment"]:
@@ -112,7 +131,6 @@ def receive_pos_data(*args, **kwargs):
         frappe.response["Total"] = float(sales_order.grand_total)
             
     except Exception as e:
-        frappe.log_error(title="pos_data", message=form_data)
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
         frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
         
@@ -227,11 +245,34 @@ def create_sales_order(form_data, customer):
     
     check_coupon_code(sales_order, form_data)
 
-    sales_order.insert(ignore_permissions=True)
-    frappe.set_user("Administrator")
-    frappe.db.commit()
+    try:
+        sales_order.insert(ignore_permissions=True)
+    except Exception as e:
+        frappe.clear_last_message()
+        
+        so_data['items'] = [{
+            'item_code': 2,
+            'qty': 1,
+            'rate': form_data['Total'], 
+        }]
+        
+        so_data['taxes'] = []
+        so_data["coupon_code"] = sales_order.coupon_code if hasattr(sales_order, 'coupon_code') else None
+        sales_order = frappe.get_doc(so_data)
+        
+        sales_order.insert(ignore_permissions=True)
+        frappe.set_user("Administrator")
+        frappe.db.commit()
+        
+        if sales_order.items:
+            item = sales_order.items[0].name
+            frappe.delete_doc('Sales Order Item', item)
             
-    return {"success": True, "sales_order": sales_order}
+        return {"success": False, "error": str(e), "sales_order": sales_order}
+
+    frappe.set_user("Administrator")
+    frappe.db.commit()    
+    return {"success": True, "sales_order": sales_order, "error": ""}
 
 def check_coupon_code(sales_order, form_data):
     for payment in form_data['Payment']:
@@ -599,6 +640,59 @@ def get_comments(form_data):
         
     return comments
 
+def get_so_comment(sales_order, form_data, error=None):   
+    comment = "<b>Error</b>: <span class='text-danger'>{0}</span><br><br>".format(error) if error else ""
+    # add items to the comment
+    if form_data['Items']:
+        comment += "<table class='table'><thead><th>Item Code</th><th>Item Name</th><th>Qty</th><th>Rate</th><th>Discount</th></thead><tbody>"
+        for item in form_data['Items']:
+            comment += "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}%</td></tr>".format(
+                item['ItemCode'], item['ItemName'], item['Qty'], item['Rate'], item['Discount'])
+        comment += "</tbody></table>"
+    else:
+        comment += "<br>*No Items*"
+        
+    # add payment info to the comment
+    if form_data['Payment']:
+        coupon_code = ""
+        comment += "<br><b>Payments:</b> "
+        for payment in form_data['Payment']:
+            comment += "<br>{0} - $ {1}".format(payment['ModeOfPayment'], payment['Amount'])
+            if payment['ModeOfPayment'] == "Gift Card" and payment['CouponCode']:
+                coupon_code = payment['CouponCode']
+                comment += " (Coupon Code: {0})".format(coupon_code)
+    else:
+        comment += "<br>*No Payments*"
+        
+    # add taxes to the comment
+    if form_data['Taxes']:
+        comment += "<br><br><b>Taxes</b>"
+        for tax in form_data['Taxes']:
+            comment += "<br>{0} - {1}%".format(tax['TaxId'], tax['Amount'])
+    else:
+        comment += "<br>*No Taxes*"
+        
+    # add total to the comment
+    if form_data['Total']:
+        comment += "<br><br><b>Total:</b> $ {0}".format(form_data['Total'])
+    else:
+        comment += "<br>*No Total*"
+        
+    comment += "<br><br><b>Branch</b>: {0}".format(form_data['POSProfile'])
+    # add customer info to the comment
+    if form_data['Customer'] and form_data['Customer']['Name']:
+        comment += "<br><b>Customer:</b> {0} ({1}) - {2}".format(form_data['Customer']['Name'], form_data['Customer']['Phone'], form_data['Customer']['Email'])
+    else:
+        comment += "<br>*No Customer*"
+        
+        # add overall discount to the comment
+    if form_data['OverallDiscount']:
+        comment += "<br><br><b>Overall Discount:</b> {0}%".format(form_data['OverallDiscount'])
+    else:
+        comment += "<br>*No Overall Discount*"
+        
+    return comment    
+
 @frappe.whitelist()
 def get_item_from_barcode(barcode, branch):
     item = frappe.db.sql(f"""
@@ -739,7 +833,13 @@ def create_return(*args, **kwargs):
         # sales_return.additional_discount_percentage = form_data['OverallDiscount']
         sales_return.calculate_taxes_and_totals()
         
-
+        total_payment = sum(payment.amount for payment in sales_return.payments)
+        invoice_total = sales_return.rounded_total or sales_return.grand_total
+        
+        if float(total_payment) + float(sales_return.write_off_amount) != float(invoice_total) and sales_return.payments:
+            difference = round(float(invoice_total) - float(total_payment) + float(sales_return.write_off_amount), 2)
+            sales_return.payments[0].amount = total_payment + difference
+    
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
