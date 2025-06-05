@@ -952,7 +952,7 @@ def get_master(conditions="", filters={}):
 				`tabItem Supplier` s 
 			inner join 
 				`tabItem` i on i.name = s.parent
-			where 1 = 1 %s
+			where 1 = 1 and i.has_variants=0 %s
 		"""%(conditions), filters, as_dict=1)
 
 	return data
