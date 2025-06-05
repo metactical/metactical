@@ -95,8 +95,8 @@ def receive_pos_data(*args, **kwargs):
                 comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
                 create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
                 
-        has_no_error = sales_order["success"]        
-        sales_order = sales_order["sales_order"]
+        has_no_error = sales_order["success"] if 'success' in sales_order else True   
+        sales_order = sales_order["sales_order"] 
         
         if sales_order and has_no_error:
             if len(form_data["Payment"]):
@@ -731,7 +731,7 @@ def get_item_from_barcode(barcode, branch):
         frappe.response["Price"] = item_price
         
         discount = get_item_discount(item.name, price_list, item_price, company)
-        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else item_price
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
@@ -1112,7 +1112,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
-            "DiscountPrice": round(discount.get("discount_price", 0.0), 2),
+            "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
@@ -1165,7 +1165,7 @@ def get_item_by_retail_sku_single(retail_sku, branch):
         frappe.response["Price"] = item_price
         
         discount = get_item_discount(item.name, price_list, item_price, company)
-        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else item_price
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
