@@ -95,8 +95,8 @@ def receive_pos_data(*args, **kwargs):
                 comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
                 create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
                 
-        has_no_error = sales_order["success"]        
-        sales_order = sales_order["sales_order"]
+        has_no_error = sales_order["success"] if 'success' in sales_order else True   
+        sales_order = sales_order["sales_order"] 
         
         if sales_order and has_no_error:
             if len(form_data["Payment"]):
