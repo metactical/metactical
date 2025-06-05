@@ -141,7 +141,7 @@ class CanadaPost():
 				})
 		return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
 
-	def create_shipping(self, name, carrier_service, service_name):
+	def create_shipping(self, name, carrier_service, service_name, shipment_amount):
 		if carrier_service is None:
 			frappe.throw(_("Service Code Required. please select service"))
 
@@ -158,6 +158,14 @@ class CanadaPost():
 		pickup_date = datetime.strftime(doc.pickup_date, "%Y%m%d")
 		context.pickup_date = pickup_date
 		context.group_id = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{pickup_date}'
+		context.options = []
+
+		if doc.custom_ais_require_signature:
+			context.options.append('SO')
+
+		if doc.custom_ais_do_not_safe_drop:
+			context.options.append('DNS')
+
 		for parcel in context.doc.shipment_parcel:
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
@@ -197,10 +205,25 @@ class CanadaPost():
 		doc.ais_shipment_status = "Shipped"
 		doc.save()
 		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
+		frappe.db.set_value("Shipment", name, "shipment_amount", shipment_amount)
+		self.update_delivery_note(doc, response['shipment-info']['tracking-pin'])
 		# Merger PDFs.
 		if files:
 			files = [self.pdf_merge(files, doc).file_url]
 		return files
+	
+	def update_delivery_note(self, doc, tracking_no):
+		delivery_notes = []
+		for row in doc.shipment_delivery_note:
+			if row.delivery_note not in delivery_notes:
+				delivery_notes.append(row.delivery_note)
+
+		canada_post_supplier = frappe.db.get_single_value("Canada Post", "canada_post_supplier")
+		if canada_post_supplier:
+			for delivery_note in delivery_notes:
+				frappe.db.set_value("Delivery Note", delivery_note, "transporter", canada_post_supplier)
+				frappe.db.set_value("Delivery Note", delivery_note, "lr_no", tracking_no)
+				frappe.db.set_value("Delivery Note", delivery_note, "lr_date", frappe.utils.nowdate())
 
 	def set_price(self, row, link):
 		res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
