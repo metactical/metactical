@@ -1355,14 +1355,6 @@ fixtures = [{
 		"dt": "Provinces"
 	},
 	{
-		"dt": "Account",
-		"filters": [["name", "in", [
-			"Store Credits - ICL",
-			"Store Credit - CAD - ICL",
-			"Store Credit - USD - ICL"
-		]]]
-	},
-	{
 		"dt": "Email Template",
 		"filters": [["name", "in", [
 			"POS User Welcome Email"
