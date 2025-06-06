@@ -20,7 +20,11 @@
   "stock_uom",
   "weight_uom",
   "page_break",
-  "ste_detail"
+  "ste_detail",
+  "section_break_5oygf",
+  "s_warehouse",
+  "column_break_u70u1",
+  "t_warehouse"
  ],
  "fields": [
   {
@@ -122,17 +126,40 @@
    "hidden": 1,
    "in_list_view": 1,
    "label": "STE Detail"
+  },
+  {
+   "fieldname": "section_break_5oygf",
+   "fieldtype": "Section Break",
+   "label": "Warehouse"
+  },
+  {
+   "fieldname": "column_break_u70u1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "s_warehouse",
+   "fieldtype": "Data",
+   "label": "Source Warhouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "t_warehouse",
+   "fieldtype": "Data",
+   "label": "Target Warehouse",
+   "read_only": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2023-03-22 09:37:19.874275",
+ "modified": "2025-04-02 07:12:47.442542",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "STE Packing Slip Item",
+ "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }

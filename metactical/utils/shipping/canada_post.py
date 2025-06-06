@@ -141,7 +141,7 @@ class CanadaPost():
 				})
 		return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()], "supports_multiple": True}
 
-	def create_shipping(self, name, carrier_service, service_name):
+	def create_shipping(self, name, carrier_service, service_name, shipment_amount):
 		if carrier_service is None:
 			frappe.throw(_("Service Code Required. please select service"))
 
@@ -158,6 +158,14 @@ class CanadaPost():
 		pickup_date = datetime.strftime(doc.pickup_date, "%Y%m%d")
 		context.pickup_date = pickup_date
 		context.group_id = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{pickup_date}'
+		context.options = []
+
+		if doc.custom_ais_require_signature:
+			context.options.append('SO')
+
+		if doc.custom_ais_do_not_safe_drop:
+			context.options.append('DNS')
+
 		for parcel in context.doc.shipment_parcel:
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
@@ -197,10 +205,25 @@ class CanadaPost():
 		doc.ais_shipment_status = "Shipped"
 		doc.save()
 		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
+		frappe.db.set_value("Shipment", name, "shipment_amount", shipment_amount)
+		self.update_delivery_note(doc, response['shipment-info']['tracking-pin'])
 		# Merger PDFs.
 		if files:
 			files = [self.pdf_merge(files, doc).file_url]
 		return files
+	
+	def update_delivery_note(self, doc, tracking_no):
+		delivery_notes = []
+		for row in doc.shipment_delivery_note:
+			if row.delivery_note not in delivery_notes:
+				delivery_notes.append(row.delivery_note)
+
+		canada_post_supplier = frappe.db.get_single_value("Canada Post", "canada_post_supplier")
+		if canada_post_supplier:
+			for delivery_note in delivery_notes:
+				frappe.db.set_value("Delivery Note", delivery_note, "transporter", canada_post_supplier)
+				frappe.db.set_value("Delivery Note", delivery_note, "lr_no", tracking_no)
+				frappe.db.set_value("Delivery Note", delivery_note, "lr_date", frappe.utils.nowdate())
 
 	def set_price(self, row, link):
 		res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
@@ -236,11 +259,15 @@ class CanadaPost():
 		context.manifest_doc = doc
 		context.pickup_address_doc = frappe.get_doc("Address", doc.pickup_address)
 		context.pickup_contact_person_doc = frappe.get_doc("User", doc.pickup_contact_person)
-		context.group = f'{doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(doc.pickup_date, "%Y%m%d")}'
+		context.groups = self.get_shipments_groups(doc)
+		if not context.groups or len(context.groups) == 0:
+			frappe.throw("Error: There are no shipments that have not been transmitted.")
+
 		context.warehouse_doc = frappe.get_doc('Warehouse', doc.warehouse)
 		context.warehouse_doc.state = get_state_code(context.warehouse_doc.state)
 		body = frappe.render_template(
 			"metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
+		
 		response = self.get_response(
 				f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
 		
@@ -259,7 +286,7 @@ class CanadaPost():
 							manifest_file = self.get_response(
 									mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
 							if manifest_file.status_code == 200:
-								file_name = f"{manifest}.pdf"
+								file_name = f"manifest_{manifest}.pdf"
 								file_path = get_files_path(f"{file_name}", is_private=True)
 								with open(file_path, 'wb') as f:
 									f.write(manifest_file.content)
@@ -284,8 +311,33 @@ class CanadaPost():
 								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 		return shipment_ids, po_number
 							
-	
-	def get_shipment_manifest(shipment="SHIPMENT-00009"):
+	def get_shipments_groups(self, manifest_doc):
+		groups = []
+		pickup_dates = []
+		for row in manifest_doc.items:
+			pickup_date = frappe.db.get_value("Shipment", row.shipment, "pickup_date")
+			if pickup_date not in pickup_dates:
+				if isinstance(pickup_date, str):
+					pickup_date = datetime.strptime(pickup_date, "%Y-%m-%d")
+				groups.append(f'{manifest_doc.warehouse.split("-")[0].replace(" ", "")}-{datetime.strftime(pickup_date, "%Y%m%d")}')
+
+		# Get available shipment groups and remove any that aren't available
+		available_groups = self.get_available_groups()
+		groups = [group for group in groups if group in available_groups]
+		return groups
+
+	def get_available_groups(self):
+		available_groups = []
+		response = self.get_response(
+			f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/group", None, 
+			headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
+		
+		for group in response["groups"]["group"]:
+			available_groups.append(group["group-id"])
+		
+		return available_groups
+
+	def get_shipment_manifest(self, shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
 		start_date = datetime.strftime(doc.creation, "%Y%m%d")
 		shipment_id = doc.shipments[0].shipment_id
@@ -477,3 +529,7 @@ class CanadaPost():
 			else:
 				frappe.throw(
 					res, title=f"Error from Provider Server, Code: {r.status_code}")
+
+def test():
+	cp = CanadaPost()
+	cp.create_manifest(manifest="MF-02-17-2025-235937")

@@ -79,8 +79,19 @@ def get_ca_data(filters):
 	total_cash_sales = total_data[5]
 
 	# sort the data based on the array given
-	order = [ "Store - Camo - Downtown", "Store - Camo - Edmonds", "Store - Camo - Victoria","Store - Camo - Queen", "Store - Gorilla - Vancouver"]
-	stores_data = sorted(stores_data, key=lambda x: order.index(x.get("name")))
+	order = [ "Store - Camo - Downtown", 
+          		"Store - Camo - Edmonds", 
+            	"Store - Camo - Victoria",
+             	"Store - Camo - Queen", 
+              	"Store - Gorilla - Vancouver", 
+				"Store - Texas",
+				"Store - Zakia Enterprise - Bermondsey",
+				"Store - Zakia Enterprise - Oshawa",
+               "Store - Style Superbe Inc - Hubert"
+            ]
+	order_index = {name: i for i, name in enumerate(order)}
+
+	stores_data = sorted(stores_data, key=lambda x:  order_index.get(x.get("name"), len(order)))
 	data.extend(stores_data)
 
 	data.append({"Location": "Online"})
@@ -92,8 +103,8 @@ def get_ca_data(filters):
 	web_total_mtd = total_data[3]
 	web_total_pmtd = total_data[4]
 
-	order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD"]
-	web_data = sorted(web_data, key=lambda x: order.index(x.get("name")))
+	order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD", "Website - RASUSA", "Website - CamoUSA"]
+	web_data = sorted(web_data, key=lambda x:  order_index.get(x.get("name"), len(order)))
 	data.extend(web_data)
 	
 	#Add an empty row followed with totals rows
@@ -137,7 +148,7 @@ def get_website_stores_data(filters, location):
 	sources = frappe.db.get_list("Lead Source", 
 									['name', 'ais_report_label'], 
 									{
-										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Website - RASUSA", "Store - Camo - Montreal"]]
+										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Store - Camo - Montreal"]]
 									})
 	for source in sources:
 		matches = False
@@ -344,5 +355,3 @@ def export_to_excel(date):
 
 	sub_headers = ["Stores", "Online", "USA", "QC1", "Rameen"]
 	export_query(data, sub_headers)
-
-	

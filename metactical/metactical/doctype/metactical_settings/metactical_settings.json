@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-06-18 09:39:18.849903",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "store_credit_section",
+  "store_credit_account_cad",
+  "store_credit_account_usd",
+  "usaepay_settings_section",
+  "usaepay_accounts",
+  "section_break_03fwb",
+  "roles_to_refund",
+  "roles_to_adjust_payment",
+  "column_break_ax30v",
+  "roles_to_make_payment",
+  "roles_to_cancel_payment",
+  "pos_section",
+  "pos_url"
+ ],
+ "fields": [
+  {
+   "fieldname": "store_credit_account_cad",
+   "fieldtype": "Link",
+   "label": "CAD Account for Store Credits",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_account_usd",
+   "fieldtype": "Link",
+   "label": "USD Account for Store Credit",
+   "options": "Account"
+  },
+  {
+   "fieldname": "store_credit_section",
+   "fieldtype": "Tab Break",
+   "label": "Store Credit"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "usaepay_settings_section",
+   "fieldtype": "Tab Break",
+   "label": "USAepay Settings"
+  },
+  {
+   "fieldname": "roles_to_refund",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Process Refund",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "roles_to_adjust_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Adjust Payment",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "roles_to_make_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Make Payment",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "roles_to_cancel_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Cancel Payment",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "section_break_03fwb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ax30v",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "usaepay_accounts",
+   "fieldtype": "Table",
+   "label": "USAePay Accounts",
+   "options": "USAePay Accounts"
+  },
+  {
+   "fieldname": "pos_section",
+   "fieldtype": "Tab Break",
+   "label": "POS"
+  },
+  {
+   "fieldname": "pos_url",
+   "fieldtype": "Data",
+   "label": "POS URL"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-04-09 08:01:43.022513",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Metactical Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -60,6 +60,9 @@ class ItemFromExcel(Document):
 					frappe.throw(f"Value missing for field {headers[i]} at row {data.index(d) + 1}")
 
 	def create_item(self, data, item_field_map, linked_dcts, is_template):
+		self.attributes = ""
+		self.attribute_values = ""
+    
 		# Helper function to initialize data structures for a new item
 		def initialize_item_data():
 			return frappe.new_doc("Item"), "", {ld: [] for ld in linked_dcts}, {ld: {} for ld in linked_dcts}, [price_list_headers]
@@ -75,13 +78,27 @@ class ItemFromExcel(Document):
 				parent_label = get_parent_label(linked_dcts, doctype)
 
 				for i, field in enumerate(fields):
-					if field and field.endswith(f"({parent_label})") and row[i] is not None:
-						child_table = get_key_from_value(linked_dcts, doctype)
-						child_table_field = updated_linked_doctypes_to_map[doctype][field]
-						temp_child_table_values[child_table][child_table_field] = row[i]
+					if field == "Attribute (Variant Attributes)" and row[i]:
+						self.attributes = row[i]
+					elif field == "Attribute Value (Variant Attributes)" and row[i]:
+						self.attribute_values = row[i]
+					else:
+						if field and field.endswith(f"({parent_label})") and row[i] is not None:
+							child_table = get_key_from_value(linked_dcts, doctype)
+							child_table_field = updated_linked_doctypes_to_map[doctype][field]
+							temp_child_table_values[child_table][child_table_field] = row[i]
+       
+			# check if the number of attributes and attribute values match
+			if self.attributes and self.attribute_values and not is_template:
+				attributes = self.attributes.split(', ') if "," in self.attributes else [self.attributes]
+				attribute_values = self.attribute_values.split(', ') if not type(self.attribute_values) == int else [self.attribute_values]
 
+				if len(attributes) != len(attribute_values):
+					frappe.throw(f"Number of attributes and attribute values do not match for row {data.index(row) + 1}")
+		  
 		# Extract field names and price list headers from the first row
 		fields = data[0]
+		price_list_index = fields.index("Price List") if "Price List" in fields else -1
 		price_list_headers, cost_column_index, item_name_column = self.get_price_list_headers(fields, is_template)
 		linked_doctypes_to_map, updated_linked_doctypes_to_map = get_linked_doctypes(linked_dcts, fields)
 
@@ -95,11 +112,10 @@ class ItemFromExcel(Document):
 
 			# If starting a new item, save the current one and reinitialize variables
 			if index > 0 and row_to_check and item_code != row_to_check:
-				self.save_item(item, child_table_values, is_template, price_list_rows)
+				self.save_item(item, child_table_values, is_template, price_list_rows, self.attributes, self.attribute_values, data[index][price_list_index])
 				item, item_code, child_table_values, temp_child_table_values, price_list_rows = initialize_item_data()
 
 			prices = []
-
 			# Iterate over each field in the current row
 			for i, field in enumerate(fields):
 				# Process item fields before the cost column index
@@ -107,6 +123,7 @@ class ItemFromExcel(Document):
 					if index == 0:
 						item_code = row_to_check
 					update_item_field(item, field, row[i])
+	
 				# Process price fields for non-template items
 				elif not is_template and i >= cost_column_index:
 					prices.append(row[i])
@@ -124,13 +141,13 @@ class ItemFromExcel(Document):
 					child_table_values[child_table].append(temp_values.copy())
 					temp_child_table_values[child_table] = {}
 
-		# Save the last item after the loop
 		if item:
-			self.save_item(item, child_table_values, is_template, price_list_rows)
+			self.save_item(item, child_table_values, is_template, price_list_rows, self.attributes, self.attribute_values, data[-1][price_list_index])
 
-	def save_item(self, item, child_table_values, is_template, price_list_rows):
+	def save_item(self, item, child_table_values, is_template, price_list_rows, attributes, attribute_values, price_list):
+     
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
-		item = add_child_table_values_to_item(item, child_table_values, is_template)
+		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
 
 		# generate the item code if it is a variant
 		# if not (item.item_code and is_template):
@@ -144,15 +161,29 @@ class ItemFromExcel(Document):
 		# set the retail sku suffix from the item code
 		# item.ifw_retailskusuffix = item.item_code
 		item.insert()
+		supplier = item.supplier_items[0].supplier if item.supplier_items else None
+		if supplier:
+			self.create_item_defaults(item, supplier)
 		
 		# add the item_code, retail sku, and supplier to the price list rows
-		price_list_rows = self.add_item_details_to_price_list(price_list_rows, item)
+		price_list_rows = self.add_item_details_to_price_list(price_list_rows, item, price_list)
 		
 		if not is_template:
 			self.create_item_price(price_list_rows)
+   
+	def create_item_defaults(self, item, supplier):
+		frappe.get_doc({
+			"doctype": "Item Default",
+			"parent": item.name,
+			"parenttype": "Item",
+			"parentfield": "item_defaults",
+			"default_supplier": supplier
+		}).insert()
 
-	def add_item_details_to_price_list(self, price_list_rows, item):
-		for plr in price_list_rows[1:]:
+	def add_item_details_to_price_list(self, price_list_rows, item, price_list):
+  
+		for i, plr in enumerate(price_list_rows[1:]):
+			plr.insert(0, price_list)
 			if item.supplier_items:
 				plr.insert(0, item.supplier_items[0].supplier)
 			else:
@@ -165,7 +196,7 @@ class ItemFromExcel(Document):
 		return price_list_rows
 
 	def get_price_list_headers(self, headers, is_template):
-		price_list_headers = ["Item Code", "ERPSKU", "Retail Sku", "Supplier"]
+		price_list_headers = ["Item Code", "ERPSKU", "Retail Sku", "Supplier", "Price List"]
 		cost_column_index = -1
 		item_name_column = -1
 
@@ -191,22 +222,17 @@ class ItemFromExcel(Document):
 		headers = data[0]
 		price_lists = []
 		price_list_headers_index = []
-		suppliers_header_index = None
-
-
+  
+		data, headers = self.update_data_with_supplier_price_lists(data, headers)
 		for i, header in enumerate(headers):
-			if header not in ["Item Code", "Item Name", "Item Group", "TemplateSKU", "ERPSKU", "Supplier"]:
+			if header not in ["Item Code", "Item Name", "Item Group", "TemplateSKU", "ERPSKU", "Supplier", "Price List"]:
 				price_list = frappe.db.exists("Price List", {"name": header})
 
 				if price_list:
 					price_lists.append(header)
 					price_list_headers_index.append(i)
-			elif header == "Supplier":
-				suppliers_header_index = i
 
 		# get all the default price lists for the suppliers
-		if suppliers_header_index:
-			data, headers = self.update_data_with_supplier_price_lists(data, suppliers_header_index, headers)
 
 		# get price lists if all the cells in the column are empty
 		columns_to_remove = []
@@ -227,48 +253,38 @@ class ItemFromExcel(Document):
 		updated_data = []
 		for row in data:
 			updated_data.append([row[i] for i in range(len(row)) if i not in columns_to_remove])
-	
+
 		ItemPriceFromExcel.create_price_entries(self, updated_data, True)
 
 	# get supplier's price list and append it at the end of the headers and update the data with the cost
-	def update_data_with_supplier_price_lists(self, data, suppliers_header_index, headers):
+	def update_data_with_supplier_price_lists(self, data, headers):
 		headers = headers.copy()
-		supplier_with_price_list = {}
+		price_list_index = headers.index("Price List")
 		cost_column_index = headers.index("Cost")
-
+  
 		# get all the suppliers from the excel (Price List sheet)
-		suppliers = [row[suppliers_header_index] for row in data[1:] if row[suppliers_header_index] is not None]
-		suppliers = list(set(suppliers))
-
-		# get all the default price lists for the suppliers
-		for supplier in suppliers:
-			price_list = frappe.db.get_value("Supplier", {"name": supplier}, "default_price_list")
-			if price_list:
-				supplier_with_price_list[supplier] = price_list
+		price_lists = [row[price_list_index] for row in data[1:] if row[price_list_index] is not None]
+		price_lists = list(set(price_lists))
 		
 		# if there are suppliers with price lists, update the data with the price list and the cost
-		if len(supplier_with_price_list) > 0:
-			supplier_costs = list(set(supplier_with_price_list.values()))
-
+		if len(price_lists) > 0:
 			for i, d in enumerate(data):
 				# add empty values to all the rows to match the price list columns because the suppier price lists are added in the header
-				if supplier_costs and i != 0:
-					d += [None] * len(supplier_costs)
+				if price_lists and i != 0:
+					d += [None] * len(price_lists)
 
 				if i == 0:
-					for sc in supplier_costs:
-						if sc not in headers:
-							headers.append(sc)
+					for pl in price_lists:
+						if pl not in headers:
+							headers.append(pl)
 
 				else:
 					cost = d[cost_column_index]
-					supplier = d[suppliers_header_index]
-					price_list = supplier_with_price_list[supplier]
-					suplier_price_list_index = headers.index(price_list)
-					d[suplier_price_list_index] = cost
+					index = headers.index(d[price_list_index])
+					d[index] = cost
 
 			data[0] = headers
-
+   
 		return data, headers
 
 	def on_submit(self):
@@ -282,6 +298,7 @@ class ItemFromExcel(Document):
 			frappe.db.commit()
 		except Exception as e:
 			frappe.db.rollback()
+			frappe.clear_last_message()
 			frappe.log_error(title="Error creating items", message=frappe.get_traceback())
 			frappe.throw(f"Error creating items: {e}")
 			self.db_set("ais_queueu_comment", e)
@@ -365,9 +382,12 @@ def get_linked_doctypes(linked_dcts, fields):
 
 	return linked_doctypes_to_map, updated_linked_doctypes_to_map
 
-def add_child_table_values_to_item(item, child_table_values, is_template):
+def add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values):
 	from frappe.client import validate_link
-
+	child_table_values['attributes'] = []
+ 	
+	add_attributes_to_child_table(item, child_table_values, attributes, attribute_values, is_template)
+	
 	for child in child_table_values:
 		if child == "attributes" and is_template:
 			for attr in child_table_values[child]:
@@ -384,6 +404,28 @@ def add_child_table_values_to_item(item, child_table_values, is_template):
 			child_table_values[child] = []
 
 	return item
+
+def add_attributes_to_child_table(item, child_table_values, attributes, attribute_values, is_template=False):
+	attr_list = attributes.split(', ') if "," in attributes else [attributes]
+	attr_values_list = attribute_values.split(', ') if not type(attribute_values) == int else [attribute_values]
+
+	if is_template:
+		for attr in attr_list:
+			is_numeric = frappe.db.get_value("Item Attribute", {"name": attr.strip()}, "numeric_values")
+			child_table_values['attributes'].append({
+				"attribute": attr.strip(),
+				"attribute_value": None,
+				"numeric_values": is_numeric
+			})
+	else:
+		for i, attr in enumerate(attr_list):
+			is_numeric = frappe.db.get_value("Item Attribute", {"name": attr.strip()}, "numeric_values")
+			child_table_values['attributes'].append({
+				"variant_of": item.variant_of,
+				"attribute": attr.strip(),
+				"attribute_value": attr_values_list[i].strip() if type(attr_values_list[i]) == str else attr_values_list[i],
+				"numeric_values": is_numeric
+			})
 
 def get_doctype_information():
 	item_doctype_meta = frappe.get_meta("Item")
@@ -437,7 +479,7 @@ def get_parent_label(linked_doctypes, doctype):
 
 # Function to remove rows with all None values
 def remove_all_none_rows(data):
-    return [[row for row in table if not all(value is None for value in row)] for table in data]
+	return [[row for row in table if not all(value is None for value in row)] for table in data]
 
 def remove_duplicate_child_table_values(data):
 	return {key: [dict(t) for t in {tuple(d.items()) for d in data[key]}] for key in data}

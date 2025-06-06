@@ -12,13 +12,21 @@ from openpyxl.utils import get_column_letter
 from frappe.utils.xlsxutils import handle_html, ILLEGAL_CHARACTERS_RE
 from io import BytesIO
 import re, os
+from datetime import datetime
 
 from openpyxl.styles.borders import Border, Side
 from openpyxl import Workbook
 
 def queue_action(self, action, **kwargs):
-	#Run an action in background
+	"""Run an action in background. If the action has an inner function,
+	like _submit for submit, it will call that instead"""
+	# call _submit instead of submit, so you can override submit to call
+	# run_delayed based on some action
+	# See: Stock Reconciliation
 	from frappe.utils.background_jobs import enqueue
+
+	if hasattr(self, '_' + action):
+		action = '_' + action
 
 	if file_lock.lock_exists(self.get_signature()):
 		frappe.throw(_('This document is currently queued for execution. Please try again'),
@@ -33,26 +41,31 @@ def queue_action(self, action, **kwargs):
 	enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 		action=action, **kwargs)
 		
-def post_to_rocket_chat(doc, msg, failed=False):
+def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
 		if not rocket_chat_settings.rocket_notification:
 			return
 
-		channel_name = rocket_chat_settings.channel_name
+		channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
 		headers = {
 			'Content-type': rocket_chat_settings.content_type or 'application/json',
 			'X-Auth-Token': rocket_chat_settings.auth_token,
 			'X-User-Id': rocket_chat_settings.user_id
 		}
 
-		url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
-		message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
-						administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
-		
-		if failed:
-			message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
-						\n[{0}]({1})'.format(get_url(url), get_url(url))
+		if pos:	
+			message = msg
+		elif rmq:
+			message = msg
+		else:	
+			url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
+			message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
+							administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
+			
+			if failed:
+				message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
+							\n[{0}]({1})'.format(get_url(url), get_url(url))
 
 		payload = {
 			'channel': "#"+channel_name,
@@ -69,6 +82,165 @@ def post_to_rocket_chat(doc, msg, failed=False):
 			frappe.log_error(title='Rocket Chat Error', message=response.json())
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
+
+def format_json_for_html(data, indent_size=2):
+	try:
+		# Function to recursively format JSON
+		def format_json(data, indent_level):
+			lines = []
+			for key, value in data.items():
+				if isinstance(value, dict):
+					# Recursively format nested objects
+					lines.append(f'{" " * indent_level * indent_size}"{key}": {{ <br>')
+					lines.extend(format_json(value, indent_level + 1))
+					lines.append(f'{" " * indent_level * indent_size}}}, <br>')
+				elif isinstance(value, list):
+					# Handle lists of objects
+					lines.append(f'{" " * indent_level * indent_size}"{key}": [ <br>')
+					for item in value:
+						lines.extend(format_json(item, indent_level + 1))
+					lines.append(f'{" " * indent_level * indent_size}] <br>')
+				else:
+					# Format primitive types (string, number, etc.)
+					lines.append(f'{" " * indent_level * indent_size}"{key}": "{value}", <br>')
+			return lines
+		
+		# Start formatting from the top-level object
+		formatted_lines = format_json(data, indent_level=1)
+		
+		# Join all lines with newline characters
+		formatted_json = '\n'.join(formatted_lines)
+		
+		return formatted_json
+	
+	except json.JSONDecodeError as e:
+		return f"Error decoding JSON: {str(e)}"
+	except Exception as e:
+		return f"Error: {str(e)}"
+
+def create_usaepay_log(doctype, docname, action):
+	# Create USAePay Log
+	log = frappe.get_doc({
+		"doctype": "USAePay Log",
+		"date": frappe.utils.now(),
+		"reference_docname": docname,
+		"action": action,
+		"reference_doctype": doctype
+	}).insert()
+
+	return log
+
+@frappe.whitelist()
+def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None):
+	usaepay_account = None
+	if lead_source:
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source})
+	elif merchant_id:
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id})
+	elif transaction_key:
+		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "source")
+
+		if not source:
+			source = frappe.db.get_value("SO USAePay Transaction", {"transaction_key": transaction_key}, "lead_source")
+
+		if source:
+			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source})
+
+	if usaepay_account:
+		return frappe.get_doc("USAePay Accounts", usaepay_account)
+
+	return get_default_usaepay_account()
+
+@frappe.whitelist()
+def get_default_usaepay_account():
+	account = frappe.db.get_value("USAePay Accounts", {"is_default": 1}, "name")
+	if not account:
+		frappe.throw(_("No default USAePay account found. Please add a default account"))
+	else:
+		account = frappe.get_doc("USAePay Accounts", account)
+
+	return account
+
+@frappe.whitelist()
+def get_customer_payment_information(customer, payment_entry, reference_no=None):
+	from metactical.custom_scripts.usaepay.usaepay_api import get_token_hash
+
+	# get existing credit card tokens
+	tokens = []
+	lead_source = ""
+	references = frappe.get_doc("Payment Entry", payment_entry).references
+	for ref in references:
+		if ref.reference_doctype in ["Sales Order", "Sales Invoice"] and ref.reference_name:
+			lead_source = frappe.db.get_value(ref.reference_doctype, ref.reference_name, "source")
+			break
+
+	if frappe.db.exists("Customer CC", customer):
+		tokens = frappe.get_all("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
+
+	usaepay_settings = get_usaepay_account(reference_no, None, lead_source)
+	payment_form_url = usaepay_settings.payment_form_url
+	billing_address = get_customer_address(customer)
+
+	form_hash = get_token_hash(usaepay_settings, "1234")
+	# form_hash = form_hash[6:] if form_hash else None
+	
+	if not form_hash:
+		frappe.log_error(title="Metactical Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
+		frappe.throw(_("Failed to generate form hash. Please check the MetaTactical settings"))
+
+	frappe.response["tokens"] = tokens
+	frappe.response["payment_form_url"] = payment_form_url
+	frappe.response["address"] = billing_address
+	frappe.response["hash"] = form_hash
+
+def get_customer_address(customer):
+	addresses = frappe.db.sql("""SELECT
+			address_line1, address_line2, city, state, 
+			country, phone, company, pincode, 
+			phone, address_type, 
+			is_shipping_address, is_primary_address
+		FROM
+			`tabAddress`
+		JOIN
+			`tabDynamic Link` ON `tabDynamic Link`.parent = `tabAddress`.name
+		WHERE
+			`tabDynamic Link`.link_doctype = 'Customer' AND
+			`tabDynamic Link`.link_name = %(customer)s 
+		""", {"customer": customer}, as_dict=1)
+
+	grouped_address = {}
+	billing_address = None
+	shipping_address = None
+	for address in addresses:
+		if billing_address and shipping_address:
+			break
+
+		if address.get("is_primary_address"):
+			billing_address = address
+		elif address.get("is_shipping_address"):
+			shipping_address = address
+
+		if address.address_type not in grouped_address:
+			grouped_address[address.address_type] = []
+
+		grouped_address[address.address_type].append(address)
+		
+	if not billing_address:
+		billing_address = grouped_address["Billing"][0] if "Billing" in grouped_address else None
+
+	if not shipping_address:
+		shipping_address = grouped_address["Shipping"][0] if "Shipping" in grouped_address else None
+	
+	# add customer personal information to the address
+	customer_info = frappe.db.get_value("Customer", customer, ["ais_company", "first_name", "last_name"], as_dict=1)
+	if customer_info:
+		billing_address.update(customer_info) if billing_address else None
+		shipping_address.update(customer_info) if shipping_address else None
+
+	return {
+		"billing": billing_address,
+		"shipping": shipping_address
+	}
 
 @frappe.whitelist()
 def export_query(data, sub_headers=[]):
@@ -280,7 +452,86 @@ def read_file(file_path):
 	
 	return file_content, extn
 
+def remove_tz_from_date(date):
+	if not date:
+		return None
+	
+	# Truncate to six digits
+	# '%Y-%m-%dT%H:%M:%S.%fZ'  check if the date has this format
+	# if not, add the missing part
+	date_str_fixed = date
+	if len(date) == 19:
+		date_str_fixed = date + ".000000Z"
+	elif len(date) > 26:
+		date_str_fixed = date[:26] + "Z"
+	elif len(date) > 19 and len(date) < 26:
+		date_str_fixed = date + "0" * (26 - len(date)) + "Z"
+
+	parsed_date = datetime.strptime(date_str_fixed, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+	# Output the formatted datetime (customize the format as needed)
+	formatted_date = parsed_date.strftime("%Y-%m-%d")
+	return formatted_date
+
 def get_state_code(state):
 	symbol = frappe.db.get_value('City Symbol', {"city": state}, "symbol")
 	return symbol
 
+def get_returns(sales_invoice_doc):
+    if sales_invoice_doc.is_return:
+        credit_notes = items
+        items = []
+    else:
+        credit_notes = frappe.db.sql(""" SELECT
+                                            si.name as si_name, sii.item_code, sii.item_name, sii.qty, sii.rate, 
+                                            sii.discount_amount, sii.amount, si.posting_date, si.customer, si.customer_name,
+                                            si.neb_store_credit_beneficiary, sii.price_list_rate, sii.image,
+                                            si.total_taxes_and_charges, si.grand_total, si.discount_amount as si_discount_amount,
+                                            sii.discount_percentage
+                                        FROM
+                                            `tabSales Invoice` si
+                                        JOIN `tabSales Invoice Item` sii ON si.name = sii.parent
+                                        WHERE
+                                            return_against = %(sales_invoice)s and si.docstatus = 1
+                                        ORDER BY
+                                            si.creation DESC, sii.idx ASC
+                                    """, {"sales_invoice": sales_invoice_doc.name}, as_dict=True)
+        
+    return credit_notes
+
+def group_invoice_data(credit_notes):
+    grouped_credit_notes = {}
+
+    for row in credit_notes:
+        if row.si_name not in grouped_credit_notes:
+            grouped_credit_notes[row.si_name] = {
+                "InvoiceId": row.si_name,
+                "posting_date": row.posting_date,
+                "customer": row.customer,
+                "customer_name": row.customer_name,
+                "store_credit_beneficiary": row.neb_store_credit_beneficiary,
+                "total_taxes_and_charges": row.total_taxes_and_charges,
+                "grand_total": row.grand_total,
+                "si_discount_amount": row.si_discount_amount,
+                "items": []
+            }
+
+        grouped_credit_notes[row.si_name]["items"].append({
+            "ItemCode": row.item_code,
+            "ItemName": row.item_name,
+            "Image": row.image,
+            "PriceListRate": row.price_list_rate,
+            "Qty": row.qty,
+            "Rate": row.rate,
+            "Discount": row.discount_percentage,
+        })
+
+    return list(grouped_credit_notes.values())
+
+@frappe.whitelist()
+def get_password(doc):
+	if type(doc) == str:
+		doc = frappe._dict(json.loads(doc))
+  
+	doc = frappe.get_doc(doc.doctype, doc.name)	
+	return doc.get_password(raise_exception=False)
