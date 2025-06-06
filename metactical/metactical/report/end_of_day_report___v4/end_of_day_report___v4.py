@@ -148,7 +148,7 @@ def get_website_stores_data(filters, location):
 	sources = frappe.db.get_list("Lead Source", 
 									['name', 'ais_report_label'], 
 									{
-										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Website - RASUSA", "Store - Camo - Montreal"]]
+										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Store - Camo - Montreal"]]
 									})
 	for source in sources:
 		matches = False
