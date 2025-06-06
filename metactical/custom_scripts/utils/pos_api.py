@@ -187,8 +187,8 @@ def validate_users(form_data):
                     discount = item['Discount']
                     break
                 
-            if not discount:
-                return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
+            # if not discount and approver["ItemId"] != None:
+            #     return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
         
         if approver["ManagerId"] and not manager_approver:
             return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
@@ -249,14 +249,14 @@ def create_sales_order(form_data, customer):
         sales_order.insert(ignore_permissions=True)
     except Exception as e:
         frappe.clear_last_message()
-        
         so_data['items'] = [{
             'item_code': 2,
             'qty': 1,
-            'rate': form_data['Total'], 
+            'rate': form_data['Total'],
         }]
         
         so_data['taxes'] = []
+        so_data["additional_discount_percentage"] = 0.0
         so_data["coupon_code"] = sales_order.coupon_code if hasattr(sales_order, 'coupon_code') else None
         sales_order = frappe.get_doc(so_data)
         
@@ -830,7 +830,7 @@ def create_return(*args, **kwargs):
                     filtered_items.append(item)
 
         sales_return.items = filtered_items
-        # sales_return.additional_discount_percentage = form_data['OverallDiscount']
+        sales_return.update_outstanding_for_self = 0
         sales_return.calculate_taxes_and_totals()
         
         total_payment = sum(payment.amount for payment in sales_return.payments)
