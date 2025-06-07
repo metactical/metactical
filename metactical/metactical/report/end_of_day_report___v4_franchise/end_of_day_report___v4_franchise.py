@@ -33,8 +33,8 @@ def execute(filters=None):
 				else:
 					data.append(row)
 	
-	# add totals to the end of the data
-	data.append({})
+			# add totals to the end of the data
+			data.append({})
 
 	if len(totals) > 0:
 		location = totals[0]["location"]
