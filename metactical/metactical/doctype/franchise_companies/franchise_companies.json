@@ -13,6 +13,7 @@
   {
    "fieldname": "company",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Company",
    "options": "Company"
   }
@@ -20,7 +21,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-06-06 23:05:56.759567",
+ "modified": "2025-06-07 00:01:13.735285",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Franchise Companies",
