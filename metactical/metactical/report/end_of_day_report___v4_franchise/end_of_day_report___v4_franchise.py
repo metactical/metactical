@@ -5,6 +5,7 @@ import frappe
 import requests
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from metactical.api.end_of_day_report import get_franchise_report_data
 
 def execute(filters=None):
 	columns, data = [], []
@@ -17,12 +18,14 @@ def execute(filters=None):
 	location = ""
 
 	# get all the frachise companies and their settings
-	item_search_settings = get_all_franchises()
+	# item_search_settings = get_all_franchises()
+	franchise_companies = frappe.get_all("Franchise Companies", fields=["company"])
+	franchise_companies = [company.get("company") for company in franchise_companies]
 
 	# get end of day report data for each franchise
 	totals = []
-	for i, key in enumerate(item_search_settings):
-		franchise_data = get_data(item_search_settings[key], filters)
+	for company in franchise_companies:
+		franchise_data = get_franchise_report_data(filters.get("date"), company=company)
 		if len(franchise_data) > 0:
 			for row in franchise_data:
 				if row.get("location") == "Stores Total":
@@ -30,8 +33,8 @@ def execute(filters=None):
 				else:
 					data.append(row)
 	
-	# add totals to the end of the data
-	data.append({})
+			# add totals to the end of the data
+			data.append({})
 
 	if len(totals) > 0:
 		location = totals[0]["location"]

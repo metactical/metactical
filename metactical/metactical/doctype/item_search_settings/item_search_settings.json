@@ -18,7 +18,8 @@
   "section_price_list",
   "print_price_list",
   "section_franchise_settings",
-  "franchise_settings"
+  "franchise_settings",
+  "franchise_companies"
  ],
  "fields": [
   {
@@ -89,11 +90,17 @@
   {
    "fieldname": "section_break_svddt",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "franchise_companies",
+   "fieldtype": "Table MultiSelect",
+   "label": "Franchise Companies",
+   "options": "Franchise Companies"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2024-08-19 15:10:15.427702",
+ "modified": "2025-06-06 23:06:19.205306",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Search Settings",
