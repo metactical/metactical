@@ -4,7 +4,6 @@ from dateutil.relativedelta import relativedelta
 
 @frappe.whitelist()
 def get_us_report_data(date):
-	#date = "2023-02-16"
 	data = []
 	total_stores_with_tax = 0
 	total_stores_without_tax = 0
@@ -14,9 +13,17 @@ def get_us_report_data(date):
 	total_stores_pmtd = 0
 	total_web_mtd = 0
 	total_web_pmtd = 0
+ 
+	us_companies = frappe.db.get_list("Company",
+		filters={"country": "United States", "is_group": 0},
+		fields=["name"]
+	)
+	if not us_companies:
+		return []
 
-	sources = frappe.db.get_all("Lead Source", ['name', 'ais_report_label'])	
-	total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data, cash_sales = get_stores_report_data(date, sources)
+	companies = [company.name for company in us_companies]
+	sources = frappe.db.get_all("Lead Source", {"neb_company": ["in", companies]}, ['name', 'ais_report_label'])
+	total_stores_with_tax, total_stores_without_tax, total_stores_md, total_stores_pmtd, data, cash_sales = get_stores_report_data(date, sources)
 			
 	# Get website data
 	for source in sources:
@@ -118,8 +125,12 @@ def get_us_report_data(date):
 
 
 @frappe.whitelist()
-def get_franchise_report_data(date):
-	source = frappe.db.get_all("Lead Source", ['name', 'ais_report_label'])
+def get_franchise_report_data(date, company=None):
+	filters = {}
+	if company:
+		filters = {"neb_company": company}
+		
+	source = frappe.db.get_all("Lead Source", filters=filters, fields=['name', 'ais_report_label'])
 	total_stores_with_tax, total_stores_without_tax, total_stores_mtd, total_stores_pmtd, data, total_cash = get_stores_report_data(date, source)
 	
 	# totals row
