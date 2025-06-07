@@ -5,6 +5,7 @@ import frappe
 import requests
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from metactical.api.end_of_day_report import get_us_report_data
 
 def execute(filters=None):
 	columns, data = [], []
@@ -17,7 +18,7 @@ def execute(filters=None):
 	data = get_ca_data(filters)
 
 	# Get USA data
-	us_data = get_us_data(item_search_settings, filters)
+	us_data = get_us_report_data(filters.get("date"))
 	if len(us_data) > 0:
 		data.append({"Location": "USA"})
 		data.extend(us_data)
@@ -83,11 +84,7 @@ def get_ca_data(filters):
           		"Store - Camo - Edmonds", 
             	"Store - Camo - Victoria",
              	"Store - Camo - Queen", 
-              	"Store - Gorilla - Vancouver", 
-				"Store - Texas",
-				"Store - Zakia Enterprise - Bermondsey",
-				"Store - Zakia Enterprise - Oshawa",
-               "Store - Style Superbe Inc - Hubert"
+              	"Store - Gorilla - Vancouver"
             ]
 	order_index = {name: i for i, name in enumerate(order)}
 
@@ -103,7 +100,7 @@ def get_ca_data(filters):
 	web_total_mtd = total_data[3]
 	web_total_pmtd = total_data[4]
 
-	order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD", "Website - RASUSA", "Website - CamoUSA"]
+	order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD"]
 	web_data = sorted(web_data, key=lambda x:  order_index.get(x.get("name"), len(order)))
 	data.extend(web_data)
 	
@@ -145,10 +142,12 @@ def get_website_stores_data(filters, location):
 	total_cash_sales = 0
 	
 	date = filters.get("date")
+	default_company = frappe.db.get_single_value("Global Defaults", "default_company")
 	sources = frappe.db.get_list("Lead Source", 
 									['name', 'ais_report_label'], 
 									{
-										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Store - Camo - Montreal"]]
+										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Store - Camo - Montreal"]],
+										"neb_company": default_company,
 									})
 	for source in sources:
 		matches = False
@@ -341,7 +340,6 @@ def get_qc1_data(item_search_settings, filters):
 @frappe.whitelist()
 def export_to_excel(date):
 	from metactical.custom_scripts.utils.metactical_utils import export_query
-
 	dates = {
 		"date": date,
 		"end_date": (datetime.strptime(date, "%Y-%m-%d") + relativedelta(days=1)).strftime("%Y-%m-%d")
