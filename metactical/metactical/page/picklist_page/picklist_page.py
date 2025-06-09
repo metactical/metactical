@@ -300,13 +300,23 @@ def submit_pick_list(items):
 	return "Pick List Submitted"
 
 @frappe.whitelist()
-def mark_as_picked(items, user):
-	items = json.loads(items)
+def mark_as_picked(picked_items, user, all_items):
+	picked_items = json.loads(picked_items)
+	all_items = json.loads(all_items)
 	pick_lists = []
 	totes = []
 	delivery_notes = {}
 	picklist_items = {}
-	for item in items:
+	all_pick_lists = []
+	associated_totes = {}
+
+	for item in all_items:
+		item = frappe._dict(item)
+		if item.pick_list not in pick_lists:
+			all_pick_lists.append(item.pick_list)
+			associated_totes[item.pick_list] = item.get("tote")
+
+	for item in picked_items:
 		item = frappe._dict(item)
 		if item.pick_list not in pick_lists:
 			pick_lists.append(item.pick_list)
@@ -350,7 +360,7 @@ def mark_as_picked(items, user):
 	for tote in totes:
 		doc = frappe.get_doc('Picklist Tote', tote)
 		doc.tote_items = []
-		for item in items:
+		for item in picked_items:
 			item = frappe._dict(item)
 			if item.tote == tote:
 				doc.append('tote_items', {
@@ -360,7 +370,22 @@ def mark_as_picked(items, user):
 					"qty": item.picked_qty
 				})
 		doc.update({"current_delivery_note": delivery_notes[doc.tote_items[0].pick_list]})
-		doc.save()			
+		doc.save()		
+
+	# Clear pick lists that have not been picked
+	for pick_list in all_pick_lists:
+		if pick_list not in pick_lists:
+			frappe.db.set_value("Pick List", pick_list, "ais_picked_by", "")
+
+			# Clear totes
+			if associated_totes.get(pick_list):
+				tote = frappe.get_doc("Picklist Tote", associated_totes.get(pick_list))
+				tote.update({
+					"current_delivery_note": "",
+					"tote_items": [],
+					"used_by": ""
+				})
+				tote.save()
 	return "Pick List Picked"
 	
 @frappe.whitelist()
