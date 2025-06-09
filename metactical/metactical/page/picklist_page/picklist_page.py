@@ -75,6 +75,9 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	elif sort_by == "order_date":
 		sort_by = "transaction_date"
 
+	# Get the number after which a Pick List is considered wholesale
+	no_for_manual = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
+
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
 										COUNT(pli.name) AS qty_item,
@@ -100,6 +103,7 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 										AND pl.ais_source <> 'Website - GPD'
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
+									HAVING COUNT(pli.name) < {no_for_manual}
 									ORDER BY 
 										is_rush DESC,
 										{sort_by} {sort_order},
