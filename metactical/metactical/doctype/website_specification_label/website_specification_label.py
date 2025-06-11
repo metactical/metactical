@@ -5,4 +5,6 @@
 from frappe.model.document import Document
 
 class WebsiteSpecificationLabel(Document):
-	pass
+	def validate(self):
+		for row in self.descriptions:
+			row.description = row.description.strip()
