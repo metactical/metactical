@@ -147,9 +147,6 @@ doc_events = {
 	},
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
-	},
-	"Item": {
-		"on_update": "metactical.custom_scripts.item.item.on_update"
 	}
 }
 
@@ -176,6 +173,7 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
+ 	"Item": "metactical.custom_scripts.item.item.CustomItem",
 }
 
 # Scheduled Tasks
