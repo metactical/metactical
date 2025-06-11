@@ -1000,6 +1000,16 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
     limit = int(page_size or 10)
     offset = (page - 1) * limit
 
+    # search by retail_sku the filter is less than 12 characters. otherwise, it is a barcode
+    filter = f'tabItem.ifw_retailskusuffix LIKE {frappe.db.escape(f"{retail_sku}%")}'
+    if (len(retail_sku) == 12 or len(retail_sku) == 13) and retail_sku.isdigit():
+        filter = f"""
+                 EXISTS (
+            SELECT 1 FROM `tabItem Barcode`
+            WHERE parent = tabItem.name AND barcode LIKE {frappe.db.escape(f"{retail_sku}%")}
+        )
+        """
+        
     # Fetch matching items
     items = frappe.db.sql(f"""
         SELECT
@@ -1015,7 +1025,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             tabItem.disabled = 0
             AND tabItem.is_sales_item = 1
             AND tabItem.has_variants = 0
-            AND tabItem.ifw_retailskusuffix LIKE {frappe.db.escape(f"{retail_sku}%")}
+            AND {filter}
         LIMIT {limit} OFFSET {offset}
     """, as_dict=True)
 
@@ -1061,7 +1071,12 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
                     "PriceList": "",
                     "Qty": 0,
                     "Branch": operator,
-                    "Warehouse": bin.warehouse
+                    "Warehouse": bin.warehouse,
+                    "DisplayName": warehouses_display_name_mapping().get(bin.warehouse, bin.warehouse),
+                    "LastReconciliation": frappe.db.get_value("Stock Reconciliation Item", {
+                        "item_code": item.item_code,
+                        "warehouse": bin.warehouse
+                    }, "creation", order_by="creation desc")
                 })
                 item.branches[operator]["Qty"] = int(bin.actual_qty - bin.reserved_qty)
 
@@ -1073,15 +1088,18 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
         for price in prices:
             for operator in price_list_map.get(price.price_list, []):
-                branch_info = item.branches.setdefault(operator, {
-                    "Qty": 0,
-                    "Price": 0.0,
-                    "Branch": operator,
-                    "Warehouse": profile_map.get(operator, {}).get("warehouse", ""),
-                    "PriceList": price.price_list
-                })
-                branch_info["Price"] = price.price_list_rate or 0.0
-                branch_info["PriceList"] = price.price_list or ""
+                warehouse = profile_map.get(operator, {}).get("warehouse", "")
+                if operator not in item.branches:
+                    item.branches.setdefault(operator, {
+                        "Qty": 0,
+                        "Price": 0.0,
+                        "Branch": operator,
+                        "Warehouse": profile_map.get(operator, {}).get("warehouse", ""),
+                        "PriceList": price.price_list,
+                        "DisplayName": warehouses_display_name_mapping().get(warehouse, warehouse)
+                    })
+                item.branches[operator]["Price"] = price.price_list_rate or 0.0
+                item.branches[operator]["PriceList"] = price.price_list or ""
 
         operator_key = f"{branch} Operators"
         item.qty = item.branches.get(operator_key, {}).get("Qty", 0)
@@ -1098,6 +1116,13 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
         if item.price and item.price_list and item.company:
             discount = get_item_discount(item.item_code, item.price_list, item.price, item.company) or {}
+            
+            
+        # sort item branches by display name
+        sorted_order = ["DTN", "GOR", "EDM", "VIC", "WHS", "QEN", "MTL", "BER", "OSH", "TEX"]
+        sort_orders_index = {name: index for index, name in enumerate(sorted_order)}
+        branches = item.branches.values()
+        item.branches = sorted(branches, key=lambda x:  sort_orders_index.get(x.get("DisplayName"), len(sorted_order)))
 
         item_details.append({
             "Sku": item.item_code,
@@ -1115,7 +1140,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
-            "Branches": list(item.branches.values())
+            "Branches": item.branches
         })
 
     frappe.response.update({
@@ -1168,3 +1193,17 @@ def get_item_by_retail_sku_single(retail_sku, branch):
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
+
+def warehouses_display_name_mapping():
+    return {
+        "R05-DTN-Active Stock - ICL": "DTN",
+        "R01-Gor-Active Stock - ICL": "GOR",
+        "R02-Edm-Active Stock - ICL": "EDM",
+        "R03-Vic-Active Stock - ICL": "VIC",
+        "W01-WHS-Active Stock - ICL": "WHS",
+        "R07-Queen-Active Stock - ICL": "QEN",
+        "R04-Mon-Active Stock - ICL": "MTL",
+        "RM01-Bermondsey-Active - ZE": "BER",
+        "RM02-Oshawa-Active - ZE": "OSH",
+        "US01-Houston-Active - AOI": "TEX",
+    }
