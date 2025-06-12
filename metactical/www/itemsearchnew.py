@@ -4,7 +4,7 @@ import frappe.sessions
 from frappe.utils import cint, sanitize_html, strip_html
 from datetime import datetime
 import requests
-from metactical.api.stock_balance import get_items as get_items_from_stock_balance
+
 
 def get_context(context):		
 	'''if (frappe.session.user == "Guest" or
@@ -169,18 +169,12 @@ def get_items(search_value="", offset=0):
 		item_search_settings = frappe.get_doc("Item Search Settings")
 		#Get US data
 		us_data = {}
-
-		us_stock_balance = get_items_from_stock_balance(search_value)
-		if us_stock_balance:
-			for item in us_stock_balance:
-				us_data[item.item_code] = item.actual_qty
-
-		# if item_search_settings.get("us_url") is not None and item_search_settings.get("us_url") != "":
-		# 	us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
-		# 								params={"search_value": search_value})
-		# 	if us_request.status_code == 200:
-		# 		for item in us_request.json().get("message", {}):
-		# 			us_data.update({item["item_code"]: item["actual_qty"]})
+		if item_search_settings.get("us_url") is not None and item_search_settings.get("us_url") != "":
+			us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
+										params={"search_value": search_value})
+			if us_request.status_code == 200:
+				for item in us_request.json().get("message", {}):
+					us_data.update({item["item_code"]: item["actual_qty"]})
 		
 		table_columns = ["RetailSKU", "Item Name", "Price", "GPrice", "SQOH"]
 		table_data = []

@@ -1,6 +1,6 @@
 import frappe
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_items(search_value=""):
 	query = """
 		SELECT
@@ -12,7 +12,7 @@ def get_items(search_value=""):
 		LEFT JOIN
 			`tabItem Barcode` AS barcode ON barcode.parent = item.name 
 		WHERE
-			bin.warehouse = 'US01-Houston-Active - AOI' AND (barcode.barcode = "{search_text}" or 
+			bin.warehouse = '01A-ActiveStock - CUS' AND (barcode.barcode = "{search_text}" or 
 			item.ifw_retailskusuffix like "{search_text}%") AND item.disabled = 0
 			AND item.has_variants = 0 AND item.is_sales_item = 1
 		GROUP BY
