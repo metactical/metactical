@@ -11,7 +11,7 @@ class CycleCountV3(Document):
 		doc = frappe.new_doc("Stock Reconciliation");
 		doc.update({
 			"purpose": "Stock Reconciliation",
-			"ais_cycle_count": self.name,
+			"neb_cycle_count_v3": self.name,
 			"ais_reason_for_adjustment": self.reason_for_adjustment
 		})
 		for row in self.items:
