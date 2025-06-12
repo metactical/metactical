@@ -124,7 +124,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Cycle Count",
+   "options": "Cycle Count V3",
    "print_hide": 1,
    "read_only": 1
   },
@@ -133,7 +133,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Cycle Count",
+   "options": "Cycle Count V3",
    "print_hide": 1,
    "read_only": 1
   }
@@ -145,7 +145,7 @@
    "link_fieldname": "neb_cycle_count_v3"
   }
  ],
- "modified": "2025-06-12 04:39:14.631029",
+ "modified": "2025-06-12 04:43:52.764230",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Cycle Count V3",
