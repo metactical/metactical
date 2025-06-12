@@ -153,7 +153,7 @@ doc_events = {
 	}, 
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert",
-	},
+	}
 }
 
 # DocType Class

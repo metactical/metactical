@@ -23,7 +23,6 @@
   "section_break_4",
   "reason_for_adjustment",
   "column_break_6",
-  "amended_from",
   "amended_from"
  ],
  "fields": [
@@ -125,24 +124,19 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Cycle Count",
-   "print_hide": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
    "options": "Cycle Count V3",
    "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
+   "read_only": 1
   }
  ],
  "is_submittable": 1,
- "links": [],
- "modified": "2025-05-09 02:05:03.397514",
+ "links": [
+  {
+   "link_doctype": "Stock Reconciliation",
+   "link_fieldname": "neb_cycle_count_v3"
+  }
+ ],
+ "modified": "2025-06-12 04:43:52.764230",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Cycle Count V3",
