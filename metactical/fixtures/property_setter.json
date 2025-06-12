@@ -8439,7 +8439,7 @@
   "doctype_or_field": "DocField",
   "field_name": "naming_series",
   "is_system_generated": 0,
-  "modified": "2025-05-29 01:59:31.898277",
+  "modified": "2025-05-29 02:26:34.934911",
   "module": null,
   "name": "Purchase Order-naming_series-options",
   "property": "options",
@@ -8455,12 +8455,28 @@
   "doctype_or_field": "DocField",
   "field_name": "naming_series",
   "is_system_generated": 0,
-  "modified": "2025-05-29 01:59:31.918217",
+  "modified": "2025-05-29 02:26:34.956182",
   "module": null,
   "name": "Customer-naming_series-options",
   "property": "options",
   "property_type": null,
   "row_name": null,
   "value": "CS-.YY.-"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Shipment Parcel",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "weight",
+  "is_system_generated": 0,
+  "modified": "2025-05-30 10:42:56.165251",
+  "module": null,
+  "name": "Shipment Parcel-weight-precision",
+  "property": "precision",
+  "property_type": "Select",
+  "row_name": null,
+  "value": "2"
  }
 ]

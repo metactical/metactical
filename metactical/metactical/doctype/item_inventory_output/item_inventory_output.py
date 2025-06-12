@@ -216,7 +216,9 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 		frappe.db.commit()
 	except Exception as e:
 		if round > 2:
+			frappe.set_user('Administrator')
 			frappe.delete_doc('Item Inventory Output', docname)
+			frappe.set_user(frappe.session.user)
 			item_inventory_output = frappe.new_doc('Item Inventory Output')
 			item_inventory_output.item_code = item_code
 			item_inventory_output.qoh = total_available_qty

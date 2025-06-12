@@ -108,26 +108,27 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 					frappe.msgprint(__("Please select min one."))
 					return
 				}
-				frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
-					name: this.frm.docname,
-					provider: this.frm.doc.service_provider,
-					carrier_service: carrier_service,
-					service_name: service_name
-				}).then(r => {
-					this.rateDialog.enable_primary_action()
-					this.rateDialog.hide()
-					this.frm.reload_doc()
-					let html = ''
-					r.forEach(file => {
-						html += `<embed src="${file}" type="application/pdf" frameBorder="0" scrolling="auto"
-						height="100%"
-						width="100%"
-					></embed>`
-					})
-					let newWindow = window.open('', '_new')
-					newWindow.document.write(html)
-					newWindow.document.close()
-				})
+				console.log("Carrier service: ", carrier_service);
+				// frappe.xcall("metactical.utils.shipping.shipping.create_shipping", {
+				// 	name: this.frm.docname,
+				// 	provider: this.frm.doc.service_provider,
+				// 	carrier_service: carrier_service,
+				// 	service_name: service_name
+				// }).then(r => {
+				// 	this.rateDialog.enable_primary_action()
+				// 	this.rateDialog.hide()
+				// 	this.frm.reload_doc()
+				// 	let html = ''
+				// 	r.forEach(file => {
+				// 		html += `<embed src="${file}" type="application/pdf" frameBorder="0" scrolling="auto"
+				// 		height="100%"
+				// 		width="100%"
+				// 	></embed>`
+				// 	})
+				// 	let newWindow = window.open('', '_new')
+				// 	newWindow.document.write(html)
+				// 	newWindow.document.close()
+				// })
 			},
 			primary_action_label: __(`Create Shipment<small>(s)</small>`)
 		})

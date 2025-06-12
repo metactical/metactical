@@ -69,7 +69,7 @@ def receive_pos_data(*args, **kwargs):
             sales_order = {"sales_order": sales_order}
         else:
             sales_order = create_sales_order(form_data, customer)
-            if not sales_order["success"]:
+            if not sales_order["success"] and not sales_order["sales_order"]:
                 frappe.response["Status"] = "500"
                 frappe.response["Message"] = [sales_order["error"]]
                 frappe.response["InvoiceId"] = None
@@ -77,9 +77,28 @@ def receive_pos_data(*args, **kwargs):
                 frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
                 frappe.db.commit()
                 return
+                        
+            if not sales_order["success"]:
+                url = "/app/{0}/{1}".format(sales_order["sales_order"].doctype.lower().replace(" ", "-"), sales_order["sales_order"].name)
+                message = "Branch: *{0}* \n Sales Order created by POS has an error: `{1}`. \nPlease update the document and resubmit. [{2}]({3})".format(
+                    form_data['POSProfile'], sales_order["error"], get_url(url), get_url(url))
                 
-        sales_order = sales_order["sales_order"]
-        if sales_order:
+                frappe.enqueue(
+                    post_to_rocket_chat,
+                    queue="default", # one of short, default, long
+                    doc=sales_order["sales_order"],
+                    msg=message,
+                    pos=True
+                )
+                
+                comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
+                comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
+                create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
+                
+        has_no_error = sales_order["success"] if 'success' in sales_order else True   
+        sales_order = sales_order["sales_order"] 
+        
+        if sales_order and has_no_error:
             if len(form_data["Payment"]):
                 has_intrac_payment = False
                 for payment in form_data["Payment"]:
@@ -112,7 +131,6 @@ def receive_pos_data(*args, **kwargs):
         frappe.response["Total"] = float(sales_order.grand_total)
             
     except Exception as e:
-        frappe.log_error(title="pos_data", message=form_data)
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
         frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
         
@@ -169,8 +187,8 @@ def validate_users(form_data):
                     discount = item['Discount']
                     break
                 
-            if not discount:
-                return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
+            # if not discount and approver["ItemId"] != None:
+            #     return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
         
         if approver["ManagerId"] and not manager_approver:
             return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
@@ -227,11 +245,34 @@ def create_sales_order(form_data, customer):
     
     check_coupon_code(sales_order, form_data)
 
-    sales_order.insert(ignore_permissions=True)
-    frappe.set_user("Administrator")
-    frappe.db.commit()
+    try:
+        sales_order.insert(ignore_permissions=True)
+    except Exception as e:
+        frappe.clear_last_message()
+        so_data['items'] = [{
+            'item_code': 2,
+            'qty': 1,
+            'rate': form_data['Total'],
+        }]
+        
+        so_data['taxes'] = []
+        so_data["additional_discount_percentage"] = 0.0
+        so_data["coupon_code"] = sales_order.coupon_code if hasattr(sales_order, 'coupon_code') else None
+        sales_order = frappe.get_doc(so_data)
+        
+        sales_order.insert(ignore_permissions=True)
+        frappe.set_user("Administrator")
+        frappe.db.commit()
+        
+        if sales_order.items:
+            item = sales_order.items[0].name
+            frappe.delete_doc('Sales Order Item', item)
             
-    return {"success": True, "sales_order": sales_order}
+        return {"success": False, "error": str(e), "sales_order": sales_order}
+
+    frappe.set_user("Administrator")
+    frappe.db.commit()    
+    return {"success": True, "sales_order": sales_order, "error": ""}
 
 def check_coupon_code(sales_order, form_data):
     for payment in form_data['Payment']:
@@ -599,6 +640,59 @@ def get_comments(form_data):
         
     return comments
 
+def get_so_comment(sales_order, form_data, error=None):   
+    comment = "<b>Error</b>: <span class='text-danger'>{0}</span><br><br>".format(error) if error else ""
+    # add items to the comment
+    if form_data['Items']:
+        comment += "<table class='table'><thead><th>Item Code</th><th>Item Name</th><th>Qty</th><th>Rate</th><th>Discount</th></thead><tbody>"
+        for item in form_data['Items']:
+            comment += "<tr><td>{0}</td><td>{1}</td><td>{2}</td><td>{3}</td><td>{4}%</td></tr>".format(
+                item['ItemCode'], item['ItemName'], item['Qty'], item['Rate'], item['Discount'])
+        comment += "</tbody></table>"
+    else:
+        comment += "<br>*No Items*"
+        
+    # add payment info to the comment
+    if form_data['Payment']:
+        coupon_code = ""
+        comment += "<br><b>Payments:</b> "
+        for payment in form_data['Payment']:
+            comment += "<br>{0} - $ {1}".format(payment['ModeOfPayment'], payment['Amount'])
+            if payment['ModeOfPayment'] == "Gift Card" and payment['CouponCode']:
+                coupon_code = payment['CouponCode']
+                comment += " (Coupon Code: {0})".format(coupon_code)
+    else:
+        comment += "<br>*No Payments*"
+        
+    # add taxes to the comment
+    if form_data['Taxes']:
+        comment += "<br><br><b>Taxes</b>"
+        for tax in form_data['Taxes']:
+            comment += "<br>{0} - {1}%".format(tax['TaxId'], tax['Amount'])
+    else:
+        comment += "<br>*No Taxes*"
+        
+    # add total to the comment
+    if form_data['Total']:
+        comment += "<br><br><b>Total:</b> $ {0}".format(form_data['Total'])
+    else:
+        comment += "<br>*No Total*"
+        
+    comment += "<br><br><b>Branch</b>: {0}".format(form_data['POSProfile'])
+    # add customer info to the comment
+    if form_data['Customer'] and form_data['Customer']['Name']:
+        comment += "<br><b>Customer:</b> {0} ({1}) - {2}".format(form_data['Customer']['Name'], form_data['Customer']['Phone'], form_data['Customer']['Email'])
+    else:
+        comment += "<br>*No Customer*"
+        
+        # add overall discount to the comment
+    if form_data['OverallDiscount']:
+        comment += "<br><br><b>Overall Discount:</b> {0}%".format(form_data['OverallDiscount'])
+    else:
+        comment += "<br>*No Overall Discount*"
+        
+    return comment    
+
 @frappe.whitelist()
 def get_item_from_barcode(barcode, branch):
     item = frappe.db.sql(f"""
@@ -637,7 +731,7 @@ def get_item_from_barcode(barcode, branch):
         frappe.response["Price"] = item_price
         
         discount = get_item_discount(item.name, price_list, item_price, company)
-        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else 0.0
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else item_price
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
@@ -736,10 +830,16 @@ def create_return(*args, **kwargs):
                     filtered_items.append(item)
 
         sales_return.items = filtered_items
-        # sales_return.additional_discount_percentage = form_data['OverallDiscount']
+        sales_return.update_outstanding_for_self = 0
         sales_return.calculate_taxes_and_totals()
         
-
+        total_payment = sum(payment.amount for payment in sales_return.payments)
+        invoice_total = sales_return.rounded_total or sales_return.grand_total
+        
+        if float(total_payment) + float(sales_return.write_off_amount) != float(invoice_total) and sales_return.payments:
+            difference = round(float(invoice_total) - float(total_payment) + float(sales_return.write_off_amount), 2)
+            sales_return.payments[0].amount = total_payment + difference
+    
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
@@ -899,6 +999,16 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
     limit = int(page_size or 10)
     offset = (page - 1) * limit
 
+    # search by retail_sku the filter is less than 12 characters. otherwise, it is a barcode
+    filter = f'tabItem.ifw_retailskusuffix LIKE {frappe.db.escape(f"{retail_sku}%")}'
+    if (len(retail_sku) == 12 or len(retail_sku) == 13) and retail_sku.isdigit():
+        filter = f"""
+                 EXISTS (
+            SELECT 1 FROM `tabItem Barcode`
+            WHERE parent = tabItem.name AND barcode LIKE {frappe.db.escape(f"{retail_sku}%")}
+        )
+        """
+        
     # Fetch matching items
     items = frappe.db.sql(f"""
         SELECT
@@ -915,7 +1025,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             tabItem.disabled = 0
             AND tabItem.is_sales_item = 1
             AND tabItem.has_variants = 0
-            AND tabItem.ifw_retailskusuffix LIKE {frappe.db.escape(f"{retail_sku}%")}
+            AND {filter}
         LIMIT {limit} OFFSET {offset}
     """, as_dict=True)
 
@@ -961,7 +1071,12 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
                     "PriceList": "",
                     "Qty": 0,
                     "Branch": operator,
-                    "Warehouse": bin.warehouse
+                    "Warehouse": bin.warehouse,
+                    "DisplayName": warehouses_display_name_mapping().get(bin.warehouse, bin.warehouse),
+                    "LastReconciliation": frappe.db.get_value("Stock Reconciliation Item", {
+                        "item_code": item.item_code,
+                        "warehouse": bin.warehouse
+                    }, "creation", order_by="creation desc")
                 })
                 item.branches[operator]["Qty"] = int(bin.actual_qty - bin.reserved_qty)
 
@@ -973,15 +1088,18 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
         for price in prices:
             for operator in price_list_map.get(price.price_list, []):
-                branch_info = item.branches.setdefault(operator, {
-                    "Qty": 0,
-                    "Price": 0.0,
-                    "Branch": operator,
-                    "Warehouse": profile_map.get(operator, {}).get("warehouse", ""),
-                    "PriceList": price.price_list
-                })
-                branch_info["Price"] = price.price_list_rate or 0.0
-                branch_info["PriceList"] = price.price_list or ""
+                warehouse = profile_map.get(operator, {}).get("warehouse", "")
+                if operator not in item.branches:
+                    item.branches.setdefault(operator, {
+                        "Qty": 0,
+                        "Price": 0.0,
+                        "Branch": operator,
+                        "Warehouse": profile_map.get(operator, {}).get("warehouse", ""),
+                        "PriceList": price.price_list,
+                        "DisplayName": warehouses_display_name_mapping().get(warehouse, warehouse)
+                    })
+                item.branches[operator]["Price"] = price.price_list_rate or 0.0
+                item.branches[operator]["PriceList"] = price.price_list or ""
 
         operator_key = f"{branch} Operators"
         item.qty = item.branches.get(operator_key, {}).get("Qty", 0)
@@ -998,6 +1116,13 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
         if item.price and item.price_list and item.company:
             discount = get_item_discount(item.item_code, item.price_list, item.price, item.company) or {}
+            
+            
+        # sort item branches by display name
+        sorted_order = ["DTN", "GOR", "EDM", "VIC", "WHS", "QEN", "MTL", "BER", "OSH", "TEX"]
+        sort_orders_index = {name: index for index, name in enumerate(sorted_order)}
+        branches = item.branches.values()
+        item.branches = sorted(branches, key=lambda x:  sort_orders_index.get(x.get("DisplayName"), len(sorted_order)))
 
         item_details.append({
             "Sku": item.item_code,
@@ -1012,11 +1137,11 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
-            "DiscountPrice": round(discount.get("discount_price", 0.0), 2),
+            "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
-            "Branches": list(item.branches.values())
+            "Branches": item.branches
         })
 
     frappe.response.update({
@@ -1026,4 +1151,60 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
     })
 
 
-# dummy commit
+@frappe.whitelist()
+def get_item_by_retail_sku_single(retail_sku, branch):
+    item = frappe.db.sql(f"""
+        SELECT 
+            tabItem.name, item_name, ifw_retailskusuffix,
+            brand, image, is_stock_item
+        FROM `tabItem`
+        WHERE 
+            `tabItem`.disabled = 0
+            and `tabItem`.has_variants = 0
+            and `tabItem`.is_sales_item = 1
+            and ifw_retailskusuffix = {frappe.db.escape(retail_sku)}
+        limit 1
+    """, as_dict=True)    
+
+    pos_profile = branch + ' Operators'    
+    pos_profile = frappe.get_doc('POS Profile', pos_profile)
+    company = pos_profile.company
+    price_list = pos_profile.selling_price_list
+    warehouse = pos_profile.warehouse
+
+    if item:
+        item = item[0]    
+        frappe.response["Sku"] = item.name
+        frappe.response["ItemName"] = item.item_name
+        frappe.response["RetailSku"] = item.ifw_retailskusuffix
+        frappe.response["Categories"] = []
+        frappe.response["Comment"] = ""
+        frappe.response["ImageUrl"] = item.image if item.image else ""
+        frappe.response["Brand"] = item.brand if item.brand else ""
+        frappe.response["NonStocking"] = False if item.is_stock_item else True
+        barcodes = frappe.db.get_all("Item Barcode", {"parent": item.name}, ["barcode"])
+        frappe.response["Barcodes"] = [{"Barcode": barcode.barcode} for barcode in barcodes]
+        frappe.response["Quantity"] = int(get_quantity(item.name, warehouse))
+        
+        item_price = get_item_price(item.name, price_list)
+        frappe.response["Price"] = item_price
+        
+        discount = get_item_discount(item.name, price_list, item_price, company)
+        frappe.response["DiscountPrice"] = discount["discount_price"] if discount else item_price
+        frappe.response["OnSale"] = discount["on_sale"] if discount else False
+        frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
+        frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
+
+def warehouses_display_name_mapping():
+    return {
+        "R05-DTN-Active Stock - ICL": "DTN",
+        "R01-Gor-Active Stock - ICL": "GOR",
+        "R02-Edm-Active Stock - ICL": "EDM",
+        "R03-Vic-Active Stock - ICL": "VIC",
+        "W01-WHS-Active Stock - ICL": "WHS",
+        "R07-Queen-Active Stock - ICL": "QEN",
+        "R04-Mon-Active Stock - ICL": "MTL",
+        "RM01-Bermondsey-Active - ZE": "BER",
+        "RM02-Oshawa-Active - ZE": "OSH",
+        "US01-Houston-Active - AOI": "TEX",
+    }

@@ -147,9 +147,6 @@ doc_events = {
 	},
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
-	},
-	"Item": {
-		"on_update": "metactical.custom_scripts.item.item.on_update"
 	}
 }
 
@@ -176,6 +173,7 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
+ 	"Item": "metactical.custom_scripts.item.item.CustomItem",
 }
 
 # Scheduled Tasks
@@ -812,7 +810,8 @@ fixtures = [{
 			'Address-custom_ais_address_verified',
 			'Sales Order-custom_ais_address_verified',
 			'POS Profile User-neb_send_welcome_email',
-			'Coupon Code-custom_sales_invoice'
+			'Coupon Code-custom_sales_invoice',
+			'Contact-custom_ais_contactnotes'
 		]]]
 	},
 	{
@@ -1346,19 +1345,12 @@ fixtures = [{
 			"Stock Ledger Entry-autoname",
 			"Sales Taxes and Charges-autoname",
 			"Bin-autoname",
-			"Custom Field-label-width"
+			"Custom Field-label-width",
+			"Shipment Parcel-weight-precision"
 		]]]
 	},
   	{
 		"dt": "Provinces"
-	},
-	{
-		"dt": "Account",
-		"filters": [["name", "in", [
-			"Store Credits - ICL",
-			"Store Credit - CAD - ICL",
-			"Store Credit - USD - ICL"
-		]]]
 	},
 	{
 		"dt": "Email Template",

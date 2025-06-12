@@ -179,7 +179,7 @@ class PicklistPage{
 				
 				me.wrapper.find('.back-to-home').on('click', function(){
 					//me.load_home();
-					me.list_multi_orders();
+					me.list_multi_orders(metactical.pick_list.selected_source, undefined, undefined, undefined, undefined, true);
 				});
 				me.wrapper.find('.refresh-totes').on('click', function(){
 					me.list_totes();
@@ -579,7 +579,6 @@ class PicklistPage{
 			},
 			"freeze": true,
 			"callback": function(ret){
-				console.log("Returned: ", ret.message);
 				let selected_source = 'Source';
 				if(metactical.pick_list.selected_source != "All"){
 					selected_source = metactical.pick_list.selected_source;
@@ -1053,8 +1052,9 @@ class PicklistPage{
 			"method": "metactical.metactical.page.picklist_page.picklist_page.mark_as_picked",
 			"freeze": true,
 			"args": {
-				"items": metactical.pick_list.picked_items,
-				"user": frappe.session.user
+				"picked_items": metactical.pick_list.picked_items,
+				"user": frappe.session.user,
+				"all_items": metactical.pick_list.items_to_pick
 			},
 			"callback": function(ret){
 				frappe.show_alert({
@@ -1064,7 +1064,12 @@ class PicklistPage{
 				metactical.pick_list.picked_items = [];
 				metactical.pick_list.to_pick = [];
 				metactical.pick_list.current_pick = '';
-				me.list_orders(undefined, undefined, undefined, true);
+				if(metactical.pick_list.selection_type == "Multi"){
+					me.list_multi_orders(metactical.pick_list.selected_source, undefined, undefined, undefined, undefined, true);
+				}
+				else{
+					me.list_orders(undefined, undefined, undefined, true);
+				}
 			}
 		});
 	}

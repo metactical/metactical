@@ -74,7 +74,8 @@ export default {
 			selectedServiceName: "",
 			selectedProvider: "",
 			selectKey: 0,
-			selectedServices: {}
+			selectedServices: {},
+			selectedRate: ""
 		}
 	},
 	props: {
@@ -173,7 +174,8 @@ export default {
 									"piece_name": row.name,
 									"selectedProvider": me.minimumProvider[row.count],
 									"selectedCarrier": me.minimumCarrier[row.count],
-									"selectedServicename": me.minimumService[row.count]
+									"selectedServicename": me.minimumService[row.count],
+									"selectedRate": me.minimumRate[row.count]
 								}
 							});
 						});
@@ -199,21 +201,25 @@ export default {
 				let carrier_service = {}
 				let service_name = {}
 				let provider = '';
+				let shipment_amount = 0;
 				
 				for (const row in this.selectedServices) {
 					let piece = this.selectedServices[row];
+					console.log("Piece: ", piece);
 					provider = piece.selectedProvider;
 					carrier_service[piece.piece_name] = piece.selectedCarrier;
-					service_name[piece.piece_name] = piece.selectedServiceName
+					service_name[piece.piece_name] = piece.selectedServiceName;
+					shipment_amount = shipment_amount + piece.selectedRate;
 				}
-
+				console.log("Carrier service: ", carrier_service, " Amount: ", shipment_amount);
 				frappe.call({
 					method: "metactical.utils.shipping.shipping.create_shipping",
 					args: {
 						name: me.doc.frm.docname,
 						provider: provider,
 						carrier_service: carrier_service,
-						service_name: service_name
+						service_name: service_name,
+						shipment_amount: shipment_amount
 					},
 					freeze: true,
 					callback: function(ret){
@@ -239,11 +245,13 @@ export default {
 			}
 		},
 		updateSelectedService({count, piece_name, item}) {
+			console.log("Item: ", item);
 			this.$set(this.selectedServices, count, {
 				piece_name: piece_name,
 				selectedProvider: item.provider,
 				selectedCarrier: item.carrier_service,
-				selectedServiceName: item.service_name
+				selectedServiceName: item.service_name,
+				selectedRate: item.shipment_amount
 			});
 		}
 	}
