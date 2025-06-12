@@ -406,7 +406,7 @@ def create_payment_entry(doc, data, log):
 			
 			amount = data["object"]["auth_amount"] if "auth_amount" in data["object"] else data["object"]["amount"]
 			if float(allocated) > float(amount):
-				pe.references[0].allocated_amount = int(amount)
+				pe.references[0].allocated_amount = float(amount)
 		
 		if pe.paid_amount > 0:
 			pe.save()
