@@ -1205,5 +1205,6 @@ def warehouses_display_name_mapping():
         "R04-Mon-Active Stock - ICL": "MTL",
         "RM01-Bermondsey-Active - ZE": "BER",
         "RM02-Oshawa-Active - ZE": "OSH",
+        "SS01-Hubert-Active - SS": "HUB",
         "US01-Houston-Active - AOI": "TEX",
     }
