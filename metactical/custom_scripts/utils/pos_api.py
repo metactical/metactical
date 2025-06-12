@@ -794,6 +794,13 @@ def get_item_discount(item, price_list, item_price, company):
 @frappe.whitelist()
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
+    form_data["ModeOfReturn"] = form_data.get("ModeOfReturn", "Cash")
+    if "ModeOfReturn" not in form_data:
+        frappe.response["Message"] = "Mode of Return is required"
+        frappe.response["Status"] = 500
+        frappe.response["CouponCode"] = None
+        return
+    
     try:
         frappe.set_user(form_data['SalesPerson'])
         log = create_log(form_data, 'Sales Return')
@@ -828,18 +835,34 @@ def create_return(*args, **kwargs):
                     item.margin_type = ""
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
+        
 
         sales_return.items = filtered_items
-        # sales_return.additional_discount_percentage = form_data['OverallDiscount']
         sales_return.calculate_taxes_and_totals()
-        
-        total_payment = sum(payment.amount for payment in sales_return.payments)
+
+        sales_return.payments = []
         invoice_total = sales_return.rounded_total or sales_return.grand_total
+        difference = 0.0
+        if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
+            print("invoice_total:", invoice_total, "form_data Total:", form_data["Total"], "write_off_amount:", sales_return.write_off_amount)
+            difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)
         
-        if float(total_payment) + float(sales_return.write_off_amount) != float(invoice_total) and sales_return.payments:
-            difference = round(float(invoice_total) - float(total_payment) + float(sales_return.write_off_amount), 2)
-            sales_return.payments[0].amount = total_payment + difference
-    
+        
+        write_off_limit = frappe.db.get_value("POS Profile", sales_return.pos_profile, "write_off_limit")
+        if write_off_limit and abs(difference) > write_off_limit:
+            frappe.response["Status"] = 500
+            frappe.response["Message"] = "Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit)
+            frappe.response["CouponCode"] = None
+            return
+        
+        sales_return.update({"payments":[{
+            "mode_of_payment": form_data["ModeOfReturn"],
+            "amount": -1 * form_data["Total"] + difference
+        }]})
+        
+        
+        print("payments:", sales_return.payments[0].as_dict())
+        
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
@@ -857,18 +880,19 @@ def create_return(*args, **kwargs):
         return
     
     gift_card = None
-    try:
-        gift_card = create_gift_card(sales_return, form_data)
-        frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
-    except Exception as e:
-        frappe.clear_last_message()
-        frappe.set_user("Administrator")
-        
-        frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
-        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
-        
-        frappe.response["Status"] = 500
-        frappe.response["Message"] = str(e)
+    if "ModeOfReturn" in form_data and form_data["ModeOfReturn"] == "Gift Card":
+        try:
+            gift_card = create_gift_card(sales_return, form_data)
+            frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
+        except Exception as e:
+            frappe.clear_last_message()
+            frappe.set_user("Administrator")
+            
+            frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
+            frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+            
+            frappe.response["Status"] = 500
+            frappe.response["Message"] = str(e)
     
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
@@ -881,7 +905,7 @@ def create_gift_card(doc, form_data, coupon_code=None):
     # create pricing rule for the gift card
     try:
         frappe.set_user(form_data['SalesPerson'])
-        pricing_rule = get_or_create_pricing_rule(doc)
+        pricing_rule = get_or_create_pricing_rule(doc, form_data)
         
         existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": doc.customer})
         description = ""
@@ -910,7 +934,7 @@ def create_gift_card(doc, form_data, coupon_code=None):
     except Exception as e:
         frappe.throw("Unable to create Gift Card: {0}".format(str(e)))
 
-def get_or_create_pricing_rule(doc):
+def get_or_create_pricing_rule(doc, form_data):
     pricing_rule = frappe.get_doc({
             "title": "GC-{0}".format(doc.customer),
             "doctype": "Pricing Rule",
@@ -920,7 +944,7 @@ def get_or_create_pricing_rule(doc):
             "selling": 1,
             "valid_from": now_datetime(),
             "rate_or_discount": "Discount Amount",
-            "discount_amount": -1 * doc.grand_total
+            "discount_amount": -1 * float(form_data['Total']),
         })
     
     pricing_rule.insert(ignore_permissions=True)
