@@ -239,9 +239,9 @@ def receive_customer_data():
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
 
 def process_sales_order(event_body, transaction_key):
-	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company"], as_dict=1)
+	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
 	if not sales_order:
-		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company"], as_dict=1)
+		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
 	
 		if not sales_order:
 			return
@@ -252,7 +252,7 @@ def process_sales_order(event_body, transaction_key):
 
 	customer = sales_order.customer
 	sales_order.doctype = "Sales Order"
-	process_credit_card_tokens(event_body, customer)
+	process_credit_card_tokens(event_body, customer, sales_order.source)
 	
 	# create USAePay log
 	log = create_log(sales_order, event_body)
@@ -290,7 +290,7 @@ def process_sales_invoice(event_body, transaction_key):
 	sales_invoice.doctype = "Sales Invoice"
 	
 	# process credit card tokens
-	process_credit_card_tokens(event_body, sales_invoice.customer)
+	process_credit_card_tokens(event_body, sales_invoice.customer, sales_invoice.source)
 
 	log = create_log(sales_invoice, event_body)
 	create_payment_entry(sales_invoice, event_body, log)
@@ -418,7 +418,7 @@ def create_payment_entry(doc, data, log):
 	except:
 		frappe.log_error(title="PE Creation from USAePay Error", message=frappe.get_traceback())
 
-def process_credit_card_tokens(event_body, customer):
+def process_credit_card_tokens(event_body, customer, lead_source=None):
 	transaction_key = event_body["object"]["key"]
 
 	if "creditcard" in event_body["object"]:
@@ -437,7 +437,6 @@ def process_credit_card_tokens(event_body, customer):
 
 		credit_card_used_in_transaction = event_body["object"]["creditcard"]
 		is_cc_new = True
-
 		if tokens:
 			for token in tokens:
 				if token.cc_number == credit_card_used_in_transaction["number"]:
@@ -446,23 +445,26 @@ def process_credit_card_tokens(event_body, customer):
 
 		# if the credit card is new, add it to the customer's credit card tokens
 		if is_cc_new:
-			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body)
+			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source)
 		frappe.db.commit()
 
-def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body):
-	headers, usaepay_url = get_headers(event_body)
+def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source=None):
+	headers, usaepay_url = get_headers(event_body, lead_source)
 	token = get_card_token(usaepay_url, transaction_key, headers)
 	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"]
 
-	frappe.get_doc({
-		"doctype": "Customer CC Tokens",
-		"parent": customer_cc,
-		"parentfield": "cc_tokens",
-		"parenttype": "Customer CC",
-		"label": labels[len(tokens)],
-		"token": token,
-		"cc_number": credit_card_used_in_transaction["number"],
-	}).insert()
+	try:
+		frappe.get_doc({
+			"doctype": "Customer CC Tokens",
+			"parent": customer_cc,
+			"parentfield": "cc_tokens",
+			"parenttype": "Customer CC",
+			"label": labels[len(tokens)],
+			"token": token,
+			"cc_number": credit_card_used_in_transaction["number"],
+		}).insert()
+	except Exception as e:
+		frappe.log_error(title="Customer Token Insertion Error", message=frappe.get_traceback())
 
 def get_headers(transaction=None, lead_source=None):
 	if lead_source:
