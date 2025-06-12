@@ -51,8 +51,14 @@ def receive_rmq_data(parsedContent):
 
 		# Build payment details using transaction data and billing country if transactions exist. Default to None otherwise.
 		if parsedContent.get("transactions"):
+			succesfull_transaction = None
+			for transaction in parsedContent['transactions']:
+				if transaction.get("orderTransactionState") == 3:
+					# If the transaction state is 3, it indicates a successful transaction.
+					succesfull_transaction = transaction
+     
 			payment_detail = {
-				"transactions": parsedContent['transactions'][0],
+				"transactions": succesfull_transaction,
 				"billingCountry": parsedContent['billingCountry']
 			}
 		else:
@@ -276,6 +282,7 @@ def create_order(order_detail, customer, gateway, shipping_address_doc, billing_
 		"currency": order_detail['currency'],
 		"transaction_date": remove_tz_from_date(order_detail['order_date']),
 		"company": order_detail['company'],
+		"company_address": frappe.db.get_value("Lead Source", order_detail['source'], "neb_company_address"),
 		"mena_is_cp_verified": order_detail["is_cp_verified"],
 		"shipping_address_name": shipping_address_doc.name,
 		"billing_address_name": billing_address_doc.name,
@@ -291,10 +298,8 @@ def create_order(order_detail, customer, gateway, shipping_address_doc, billing_
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
 	new_order.set_missing_values()
-	if gateway == "interacetransfer":
-		new_order.save()
-	else:
-		new_order.submit()
+	new_order.save()
+	new_order.submit()
 
 	frappe.db.commit()
 	return new_order
