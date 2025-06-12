@@ -815,7 +815,8 @@ fixtures = [{
 			'Coupon Code-custom_sales_invoice',
 			'Contact-custom_ais_contactnotes',
 			'Lead Source-neb_default_warehouse',
-			'Lead Source-neb_company'
+			'Lead Source-neb_company',
+			'Lead Source-neb_company_address'
 		]]]
 	},
 	{
