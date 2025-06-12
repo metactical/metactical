@@ -12,17 +12,21 @@ class CycleCount(Document):
 		doc.update({
 			"purpose": "Stock Reconciliation",
 			"ais_cycle_count": self.name,
-			"ais_reason_for_adjustment": self.reason_for_adjustment
+			"ais_reason_for_adjustment": self.reason_for_adjustment,
+			"company": frappe.db.get_value("Warehouse", self.warehouse, "company")
 		})
 		for row in self.items:
-			if row.qty != row.expected_qty:
-				doc.append("items", {
-					"item_code": row.item_code,
-					"warehouse": self.warehouse,
-					"qty": row.qty,
-					"valuation_rate": row.valuation_rate
-				})
-		
+			valuation_rate = row.valuation_rate if row.valuation_rate else 0.01
+			if row.qty == row.expected_qty:
+				valuation_rate += 0.01
+	
+			doc.append("items", {
+				"item_code": row.item_code,
+				"warehouse": self.warehouse,
+				"qty": row.qty,
+				"valuation_rate": valuation_rate
+			})
+	
 		if hasattr(doc, "items"):
 			doc.submit()
 
