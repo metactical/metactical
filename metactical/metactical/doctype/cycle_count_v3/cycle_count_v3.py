@@ -12,7 +12,8 @@ class CycleCountV3(Document):
 		doc.update({
 			"purpose": "Stock Reconciliation",
 			"neb_cycle_count_v3": self.name,
-			"ais_reason_for_adjustment": self.reason_for_adjustment
+			"ais_reason_for_adjustment": self.reason_for_adjustment,
+			"company": frappe.db.get_value("Warehouse", self.warehouse, "company"),
 		})
 		for row in self.items:
 			if row.qty != row.expected_qty:
