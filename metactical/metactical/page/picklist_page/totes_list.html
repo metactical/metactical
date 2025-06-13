@@ -14,11 +14,27 @@
 	</div>
 	<div class="tote-barcode col-md-12"></div>
 	<div class="col-md-12 totes-container">
+		{% for tote in partial_totes %}
+			<div class="partial-tote-list-div picklist-box">
+				<p>
+					<input class="tote-check" checked type="checkbox" id="check-{{tote.tote_name}}" value="{{tote.tote_name}}" data-tote-list="{{tote.tote_name}}" />
+					<b>
+						<span class="pick-list-name">{{tote.tote_name}}</span> 
+						<span class="pick-list-name" style="color:#333c44; font-size: small; font-weight: 500;""> ({{tote.pick_list}})</span>
+					</b>
+					<br>
+				</p>
+			</div>
+		{% endfor %}
 		{% for tote in totes %}
 			<div class="tote-list-div picklist-box" data-tote-list="{{tote}}">
 				<p>
 					<input class="tote-check" type="checkbox" id="check-{{tote}}" value="{{tote}}" data-tote-list="{{tote}}" />
-					<b><span class="pick-list-name">{{tote}}</span></b><br>
+					<b><span class="pick-list-name">{{tote}}</span></b>
+					<span class="pick-list-name assigned-pick-list"  id="picklist-{{tote}}"
+						style="color:#333c44; font-size: small; font-weight: 500;"
+						data-assigned-pick-list=""></span>
+					<br>
 				</p>
 			</div>
 		{% endfor %}

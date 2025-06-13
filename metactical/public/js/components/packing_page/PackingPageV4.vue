@@ -255,22 +255,65 @@
 		dialog.show();
 	  },
   
-	  packItem(cur_item, barcode, amount = 1) {
-		cur_item.qty -= amount;
+	  async packItem(cur_item, barcode, amount = 1) {
 		let cur_packed_item = this.packed_items.find((item) => item.dn_detail === cur_item.dn_detail);
-		if (cur_packed_item) {
-		  cur_packed_item.qty += amount;
-		} else {
-		  cur_packed_item = { ...cur_item, qty: amount, item_barcode: barcode };
-		  this.packed_items.push(cur_packed_item);
+		var packed_qty = 0;
+
+		Object.values(this.all_packed_items).forEach((items) => {
+			items.forEach((item) => {
+				if (item.dn_detail === cur_item.dn_detail) {
+					packed_qty += item.qty;
+				}
+			})
+		});
+		
+		await this.check_stock_availability(cur_item, cur_packed_item, amount, packed_qty).then((r) => {
+			if (r) {
+				cur_item.qty -= amount;
+				if (cur_packed_item) {
+					cur_packed_item.qty += amount;
+				} else {
+					cur_packed_item = { ...cur_item, qty: amount, item_barcode: barcode };
+					this.packed_items.push(cur_packed_item);
+				}
+
+				if (cur_item.qty === 0) {
+					this.reGenerateCurrentItem(cur_item);
+				} else {
+					this.reGenerateCurrentItem(cur_item);
+				}
+				$(".pack-items-btn").removeClass("d-none");
+			}
+		})
+	  },
+
+	  async check_stock_availability(cur_item, cur_packed_item, amount, packed_qty) {
+		let in_stock = true;
+		if (cur_item.s_warehouse) {
+			await frappe.db.get_value("Bin", { item_code: cur_item.item_code, warehouse: cur_item.s_warehouse }, ["actual_qty", "reserved_qty"]).then((r) => {
+
+				if (Object.keys(r.message).length === 0) {
+					frappe.throw(`Item ${cur_item.item_code} not found in warehouse ${cur_item.s_warehouse}`);
+				}
+
+				var available_qty = r.message.actual_qty - r.message.reserved_qty;
+				var qantity_added_for_packing = cur_packed_item ? cur_packed_item.qty : 0;
+				var total = packed_qty + amount + qantity_added_for_packing
+
+				if (available_qty < total) {
+					in_stock = false;
+					frappe.throw(`Cannot Transfer Qty ${total} for Item ${cur_item.item_code}, Available Qty is ${available_qty}`);
+				}
+				else{
+					in_stock = true;
+				}
+			});
 		}
-  
-		if (cur_item.qty === 0) {
-		  this.reGenerateCurrentItem(cur_item);
-		} else {
-		  this.reGenerateCurrentItem(cur_item);
+		else{
+			in_stock = true;
 		}
-		$(".pack-items-btn").removeClass("d-none");
+
+		return in_stock;
 	  },
   
 	  reGenerateCurrentItem(item = null, reverting = false) {
@@ -429,6 +472,8 @@
 		  frappe.confirm(message, () => {
 			frappe.call({
 			  method: "metactical.metactical.page.packing_page_v4.packing_page_v4.remove_remaining_items",
+			 freeze: true,
+			 freeze_message: "Removing remaining items ...", 
 			  args: { "packing_slips": Object.keys(this.all_packed_items), "stock_entry": this.filters.stock_entry, "has_pending_items": pending_items },
 			  callback: (r) => {
 				if (r.success) {

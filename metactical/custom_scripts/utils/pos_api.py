@@ -187,8 +187,8 @@ def validate_users(form_data):
                     discount = item['Discount']
                     break
                 
-            if not discount:
-                return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
+            # if not discount and approver["ItemId"] != None:
+            #     return {"error": "Discount applied for an item {0} that is not in the order".format(approver["ItemId"]), "success": False}
         
         if approver["ManagerId"] and not manager_approver:
             return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
