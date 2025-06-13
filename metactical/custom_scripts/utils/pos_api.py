@@ -219,7 +219,7 @@ def create_sales_order(form_data, customer):
     taxes = form_data['Taxes']
     company = frappe.db.get_value("POS Profile", form_data['POSProfile'] + ' Operators', ['company_address', "company"], as_dict=True)
     if not company:
-        return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators')}
+        return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators'), "status": 500}
     
     so_data = {
         'doctype': 'Sales Order',
@@ -795,7 +795,6 @@ def get_item_discount(item, price_list, item_price, company):
 @frappe.whitelist()
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
-    form_data["ModeOfReturn"] = form_data.get("ModeOfReturn", "Cash")
     if "ModeOfReturn" not in form_data:
         frappe.response["Message"] = "Mode of Return is required"
         frappe.response["Status"] = 500
@@ -845,9 +844,7 @@ def create_return(*args, **kwargs):
         invoice_total = sales_return.rounded_total or sales_return.grand_total
         difference = 0.0
         if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
-            print("invoice_total:", invoice_total, "form_data Total:", form_data["Total"], "write_off_amount:", sales_return.write_off_amount)
             difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)
-        
         
         write_off_limit = frappe.db.get_value("POS Profile", sales_return.pos_profile, "write_off_limit")
         if write_off_limit and abs(difference) > write_off_limit:
@@ -860,10 +857,7 @@ def create_return(*args, **kwargs):
             "mode_of_payment": form_data["ModeOfReturn"],
             "amount": -1 * form_data["Total"] + difference
         }]})
-        
-        
-        print("payments:", sales_return.payments[0].as_dict())
-        
+                
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
