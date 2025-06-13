@@ -15,11 +15,7 @@ def on_sle_update(doc, method):
 	all_bins = get_all_bins(doc.item_code)
 	net_available_bins = {}
 	for bin in all_bins:
-		if bin.warehouse == doc.warehouse and doc.voucher_type != 'Stock Reconciliation':
-			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty + doc.actual_qty
-		elif bin.warehouse == doc.warehouse and doc.voucher_type == 'Stock Reconciliation':
-			net_available_bins[bin.warehouse] = doc.qty_after_transaction - bin.reserved_qty
-		else:
+		if doc.voucher_type != 'Stock Reconciliation':
 			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
 	
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
@@ -33,7 +29,7 @@ def get_all_bins(item_code):
 
 	other_active_warehouse_bins = frappe.get_all(
 		'Bin', 
-		filters={'item_code': item_code, "warehouse":["like", "%activestock%"]}, 
+		filters={'item_code': item_code, "warehouse":["like", "%-active%"]}, 
 		fields=["warehouse", "actual_qty", "reserved_qty"]
 	)
 
