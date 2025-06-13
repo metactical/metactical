@@ -4,6 +4,7 @@ from frappe import _, msgprint, is_whitelisted
 from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import StockReconciliation
 from frappe.model.docstatus import DocStatus
 from metactical.custom_scripts.utils.metactical_utils import queue_action
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 
 class CustomStockReconciliation(StockReconciliation):
 	def save(self):
@@ -19,3 +20,10 @@ class CustomStockReconciliation(StockReconciliation):
 			queue_action(self, "submit", timeout=2000)
 		else:
 			super().save()
+   
+	def on_submit(self):
+		super(CustomStockReconciliation, self).on_submit()
+		
+		# Metactical Customization: Added
+		for item in self.items:
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
