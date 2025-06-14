@@ -57,7 +57,7 @@ export default {
 	data() {
 		return {
 			ratesLoaded: false,
-			//canadaPostRates: {},
+			canadaPostRates: {},
 			selectedService: '',
 			creatingShipments: false,
 			loadingMessage: '',
@@ -69,7 +69,7 @@ export default {
 			minimumCarrier: {},
 			noOfProviders: 0,
 			tabsData: [],
-			//rateOptions: [],
+			rateOptions: [],
 			selectedCarrier: "",
 			selectedServiceName: "",
 			selectedProvider: "",
@@ -121,146 +121,19 @@ export default {
 						"provider": provider
 					},
 					callback: function(ret){
-						// me.rates[provider_key] = {
-						// 	"label": provider,
-						// 	"rates": ret.message,
-						// 	"supports_multiple": ret.message.supports_multiple,
-						// 	"no_of_parcels": ret.message.data.length
-						// }
-
-						// If the service provider allows multiple shipping services to be
-						// selected for shipments with multiple parcels, then show mutiple tables
-						// depending on the no of parcels. Otherwise the 
-						
-						// The format for tabs Data 
-						// tabsData = [
-						// 	{
-						// 		no_of_parcels: Int16Array,
-						// 		rates: [],
-						// 		supports_multiple: Boolean,
-						// 		title: "sample Title"
-						// 	}
-						// ]
-
-						// rates = [
-						// 	{
-						// 		"count": 1,
-						// 		"parcel_name": ['name'],
-						// 		"services": []
-						// 	}
-						// ]
-
-						// services = [
-						// 	{
-						// 		base: "37.76",
-						// 		carrier_service: "DOM.EP",
-						// 		expected_delivery_date: "2025-02-06",
-						// 		expected_transit_time: "4",
-						// 		guaranteed_delivery: "true",
-						// 		provider: "Canada Post",
-						// 		service_name: "Expedited Parcel",
-						// 		shipment_amount: "53.77",
-						//		
-						// 	}
-						// ]
-
-						let rates = []
-						if(ret.message.supports_multiple){
-							ret.message.data.forEach(data => {
-								let services = []
-								data.items.forEach(option => {
-									services.push({
-										base: option.base,
-										carrier_service: option.carrier_service,
-										expected_delivery_date: option.expected_delivery_date,
-										expected_transit_time: option.expected_transit_time,
-										guaranteed_delivery: option.guaranteed_delivery,
-										provider: provider,
-										service_name: option.service_name,
-										shipment_amount: option.shipment_amount,
-									});
-								});
-								rates.push({
-									"count": data.count,
-									"parcel_name": [data.name],
-									"services": services
-								});
-							});
+						me.rates[provider_key] = {
+							"label": provider,
+							"rates": ret.message,
+							"supports_multiple": ret.message.supports_multiple,
+							"no_of_parcels": ret.message.data.length
 						}
-						else{
-							let temp_services = {}
-							let services = []
-							let parcel_names = []
-							ret.message.data.forEach(data => {
-								data.items.forEach(option => {
-									if (temp_services[option.service_name]) {
-										temp_services[option.service_name].base = temp_services[option.service_name].base + option.base;
-										temp_services[option.service_name].shipment_amount = temp_services[option.service_name].shipment_amount + option.shipment_amount;
-									} else {
-										temp_services[option.service_name] = { 
-											base: option.base,
-											carrier_service: option.carrier_service,
-											expected_delivery_date: option.expected_delivery_date,
-											expected_transit_time: option.expected_transit_time,
-											guaranteed_delivery: option.guaranteed_delivery,
-											provider: provider,
-											service_name: option.service_name,
-											shipment_amount: option.shipment_amount,
-
-										};
-									}
-								});
-								parcel_names.push(data.name);
-							});
-							
-							for (let service in temp_services) {
-								services.push({
-									base: temp_services[service].base,
-									carrier_service: temp_services[service].carrier_service,
-									expected_delivery_date: temp_services[service].expected_delivery_date,
-									expected_transit_time: temp_services[service].expected_transit_time,
-									guaranteed_delivery: temp_services[service].guaranteed_delivery,
-									provider: temp_services[service].provider,
-									service_name: temp_services[service].service_name,
-									shipment_amount: temp_services[service].shipment_amount
-								});
-							}
-							// temp_services.forEach(service => {
-							// 	services.push({
-							// 		base: service.base,
-							// 		carrier_service: service.carrier_service,
-							// 		expected_delivery_date: service.expected_delivery_date,
-							// 		expected_transit_time: service.expected_transit_time,
-							// 		guaranteed_delivery: service.guaranteed_delivery,
-							// 		provider: service.provider,
-							// 		service_name: service.service_name,
-							// 		shipment_amount: service.shipment_amount
-							// 	})
-							// });
-
-							rates.push({
-								count: 1,
-								parcel_name: parcel_names,
-								services: services
-							});
-						}
-
-						console.log("Rates: ", rates);
-						
-						// me.tabsData.push({
-						// 	"title": provider,
-						// 	"rates": ret.message,
-						// 	"supports_multiple": ret.message.supports_multiple,
-						// 	"no_of_parcels": ret.message.data.length
-						// })
 
 						me.tabsData.push({
 							"title": provider,
-							"rates": rates,
+							"rates": ret.message,
 							"supports_multiple": ret.message.supports_multiple,
 							"no_of_parcels": ret.message.data.length
-						});
-
+						})
 						console.log("TabsData: ", me.tabsData);
 						
 						ret.message.options.forEach(option => {
@@ -274,17 +147,17 @@ export default {
 						me.canadaPostRates = ret.message;
 						me.selectKey = me.rateOptions.length;
 						
-						//Select the least expensive service by default
+						// Select the least expensive service by default
 						let min_value = 0;
 						let last_id;
 						me.tabsData.forEach(provider_data => {
-							provider_data.rates.forEach(row => {
+							provider_data.rates.data.forEach(row => {
 								//Initialize the minimum rate fot the piece
 								if(!me.minimumRate[row.count]){
 									me.minimumRate[row.count] = 0
 								}
 
-								row.forEach((item, idx) => {
+								row.items.forEach((item, idx) => {
 									item["provider"] = provider_data.title;
 									if (flt(item.shipment_amount) < me.minimumRate[row.count] 
 										|| me.minimumRate[row.count] == 0) {
