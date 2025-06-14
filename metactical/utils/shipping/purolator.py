@@ -187,6 +187,7 @@ class Purolator:
 
 		request = {
 			'Shipment': {
+				'ShipmentDate': shipment.pickup_date,
 				'SenderInformation': {
 					'Address': {
 						'Name': shipment.pickup_company,
@@ -245,6 +246,26 @@ class Purolator:
 								'DimensionUnit': 'cm'
 							}
 						} for piece in shipment.shipment_parcel]
+					},
+					'DangerousGoodsDeclarationDocumentIndicator': True if shipment.custom_dangerous_goods else False,
+					'OptionsInformation': {
+						'Options': {
+							'OptionIDValuePair':
+							[
+								{
+									'ID': 'DangerousGoods',
+									'Value': True if shipment.custom_dangerous_goods else False
+								},
+								{
+									'ID': 'DangerousGoodsClass',
+									'Value': shipment.custom_dangerous_goods_class
+								},
+								{
+									'ID': 'DangerousGoodsMode',
+									'Value': shipment.custom_dangerous_goods_mode
+								}
+							]
+						}
 					}
 				},
 				'PaymentInformation': {

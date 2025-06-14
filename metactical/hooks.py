@@ -811,7 +811,12 @@ fixtures = [{
 			'Sales Order-custom_ais_address_verified',
 			'POS Profile User-neb_send_welcome_email',
 			'Coupon Code-custom_sales_invoice',
-			'Contact-custom_ais_contactnotes'
+			'Contact-custom_ais_contactnotes',
+			'Lead Source-neb_default_warehouse',
+			'Lead Source-neb_company',
+			'Shipment-custom_dangerous_goods',
+			'Shipment-custom_dangerous_goods_class',
+			'Shipment-custom_dangerous_goods_mode'
 		]]]
 	},
 	{
