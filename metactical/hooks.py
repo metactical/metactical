@@ -816,7 +816,8 @@ fixtures = [{
 			'Lead Source-neb_company',
 			'Shipment-custom_dangerous_goods',
 			'Shipment-custom_dangerous_goods_class',
-			'Shipment-custom_dangerous_goods_mode'
+			'Shipment-custom_dangerous_goods_mode',
+			"Lead Source-neb_company_address"
 		]]]
 	},
 	{
