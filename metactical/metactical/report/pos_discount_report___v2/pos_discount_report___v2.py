@@ -21,17 +21,18 @@ def execute(filters=None):
 			if d.get('price_list_rate') > 0:
 				price_list_rate = frappe.db.get_value("Item Price", 
 					{"price_list": d.get('selling_price_list'), "selling": 1, "item_code": d.get('item_code')}, "price_list_rate")
-				#rate_discount = (d.get('price_list_rate') - d.get('rate'))/d.get('price_list_rate')
 				if price_list_rate is not None:
 					rate_discount = (price_list_rate - d.get('rate'))/d.get('price_list_rate')
 					if rate_discount >= 0.15:
 						row = {}
+						comment, approver = get_comment_and_approver(d.item_code, d.name)
+
 						row['si_date'] = d.posting_date
 						row['warehouse'] = get_branch_name_mapping().get(d.warehouse, d.warehouse)
 						row['si_name'] = d.name
 						row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
 						row['item_code'] = d.item_code
-						row['item_name'] = d.item_name
+						row['item_name'] = d.item_name if len(d.item_name) < 100 else d.item_name[:100]
 						row['qty'] = d.qty
 						row['rate'] = d.rate
 						row['price_list_rate'] = price_list_rate
@@ -39,12 +40,42 @@ def execute(filters=None):
 						row['uom'] = d.uom
 						row['ifw_location'] = d.ifw_location
 						row['cashier'] = frappe.db.get_value("User", d.owner, "first_name") or d.owner
+						row['approver'] = approver
+						row['comment'] = comment if len(comment) < 100 else comment[:100]
 
 						data.append(row)
 
 	return columns, data
 
+def get_comment_and_approver(item_code, si_name):
+	comment = ""
+	approver = ""
 
+	log_entries = frappe.db.get_list(
+		"POS API Log",
+		filters={"sales_invoice": si_name},
+		fields=["payload"]
+	)
+
+	if log_entries:
+		payload_raw = log_entries[0].payload
+		if payload_raw:
+			payload = frappe.parse_json(payload_raw)
+
+			approvals = payload.get("ApprovalList", [])
+			for approval in approvals:
+				if approval.get("ItemId") == item_code:
+					approver = approval.get("ManagerId")
+					break
+
+			comments = payload.get("Comments", [])
+			for comment_item in comments:
+				if comment_item.get("UserId") == approver:
+					comment = comment_item.get("Text")
+					break
+
+	return comment, approver
+ 
 def get_column():
 	return [
 		{
@@ -95,6 +126,18 @@ def get_column():
 			"label": "Cashier",
 			"fieldtype": "Text",
 			'width': 150
+		},
+		{
+			"fieldname": "approver",
+			"label": "Approver",
+			"fieldtype": "Text",
+			'width': 150
+		},
+		{
+			"fieldname": "comment",
+			"label": "Comment",
+			"fieldtype": "Text",
+			'width': 200
 		}
 	]
 
