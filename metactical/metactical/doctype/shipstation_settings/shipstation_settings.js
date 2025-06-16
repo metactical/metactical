@@ -26,23 +26,15 @@ frappe.ui.form.on('Shipstation Settings', {
 	},
 
 	show_stores_dialog: function(frm) {
-		// Display a loading message
-		frappe.msgprint({
-			title: __('Fetching Stores'),
-			indicator: 'blue',
-			message: __('Please wait while we fetch your Shipstation stores...')
-		});
-		
-		// Call the backend function
 		frappe.call({
 			method: 'metactical.api.shipstation.get_shipstation_stores',
 			args: {
 				settingid: frm.doc.name
 			},
+			freeze: true,
+			freeze_message: "Please wait while we fetch your Shipstation stores...",
 			callback: function(r) {
 				console.log("Ret: ", r);
-				// Close the loading message
-				frappe.msgprint.hide();
 				
 				if (r.exc) {
 					// Show error message if there's an exception
