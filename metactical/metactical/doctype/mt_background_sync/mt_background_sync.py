@@ -16,7 +16,7 @@ def start_sync(name, filters):
 	Start the web sync process for the given document name and filters.
 	"""
 	try:
-		sync_doc = frappe.get_single("MT Web Sync")	
+		sync_doc = frappe.get_single("MT Background Sync")	
 		items = frappe.db.get_list(
 			"Item",
 			filters=filters,
@@ -38,7 +38,7 @@ def start_sync(name, filters):
 	
 		frappe.response["message"] = f"Background Sync started for {len(items)} items."
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "MT Web Sync Error")
+		frappe.log_error(frappe.get_traceback(), "Background Sync Error")
 		frappe.response["message"] = f"Error starting sync: {str(e)}"
   
 def sync_items(items_list, sync_doc):
