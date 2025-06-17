@@ -1,6 +1,8 @@
 import frappe
 import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
+from erpnext.stock.doctype.item.item import Item
+from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 
 def validate(doc, method):
     load_tags(doc)
@@ -39,9 +41,6 @@ def on_update(doc, method):
                 elif source.lead_source not in original_deduct_dict.keys():
                     deduct_qty_updated = True
                     break
-
-    if len(doc.custom_neb_website_deduct_qty) and not current_lead_sources:
-        current_lead_sources = [source.lead_source for source in doc.custom_neb_website_deduct_qty]
 
     # Trigger update if deduct_qty was changed
     if deduct_qty_updated or removed_lead_sources:

@@ -177,6 +177,7 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
+ 	"Item": "metactical.custom_scripts.item.item.CustomItem",
 }
 
 # Scheduled Tasks
@@ -815,7 +816,13 @@ fixtures = [{
 			'POS Profile User-neb_send_welcome_email',
 			'Coupon Code-custom_sales_invoice',
 			'Contact-custom_ais_contactnotes',
-			'Item-sb_tags'
+			'Item-sb_tags',
+			'Lead Source-neb_default_warehouse',
+			'Lead Source-neb_company',
+			'Shipment-custom_dangerous_goods',
+			'Shipment-custom_dangerous_goods_class',
+			'Shipment-custom_dangerous_goods_mode',
+			"Lead Source-neb_company_address"
 		]]]
 	},
 	{
