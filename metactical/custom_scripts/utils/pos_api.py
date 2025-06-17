@@ -939,7 +939,7 @@ def get_or_create_pricing_rule(doc, form_data):
             "selling": 1,
             "valid_from": now_datetime(),
             "rate_or_discount": "Discount Amount",
-            "discount_amount": -1 * float(form_data['Total']),
+            "discount_amount": float(form_data['Total']),
         })
     
     pricing_rule.insert(ignore_permissions=True)
