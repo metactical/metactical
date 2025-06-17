@@ -6,7 +6,7 @@ frappe.ui.form.on('MT Background Sync', {
 	refresh: function(frm) {
 		frm.add_custom_button(__('Start Sync'), function() {
 			frappe.call({
-				method: "metactical.metactical.doctype.mt_web_sync.mt_web_sync.start_sync",
+				method: "metactical.metactical.doctype.mt_background_sync.mt_background_sync.start_sync",
 				args: {
 					name: frm.doc.name,
 					filters: frm.events.get_filters(filter_group)
