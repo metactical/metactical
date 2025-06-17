@@ -818,8 +818,11 @@ fixtures = [{
 			'Contact-custom_ais_contactnotes',
 			'Lead Source-neb_default_warehouse',
 			'Lead Source-neb_company',
-			'Lead Source-neb_company_address',
-			'Item-sb_tag'
+			'Shipment-custom_dangerous_goods',
+			'Shipment-custom_dangerous_goods_class',
+			'Shipment-custom_dangerous_goods_mode',
+			"Lead Source-neb_company_address",
+   			'Item-sb_tag'
 		]]]
 	},
 	{
