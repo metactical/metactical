@@ -108,7 +108,7 @@ frappe.ui.form.on("MT Item Website Specification", {
             },
             callback: function (r) {
                 if (r.message) {
-                    frappe.model.set_value(cdt, cdn, "sb_tag", r.message);
+                    
                 }
             },
         });
