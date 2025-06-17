@@ -149,7 +149,8 @@ doc_events = {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
 	},
 	"Item": {
-		"on_update": "metactical.custom_scripts.item.item.on_update"
+		"on_update": "metactical.custom_scripts.item.item.on_update",
+		"validate": "metactical.custom_scripts.item.item.validate",
 	}
 }
 
@@ -813,7 +814,8 @@ fixtures = [{
 			'Sales Order-custom_ais_address_verified',
 			'POS Profile User-neb_send_welcome_email',
 			'Coupon Code-custom_sales_invoice',
-			'Contact-custom_ais_contactnotes'
+			'Contact-custom_ais_contactnotes',
+			'Item-sb_tags'
 		]]]
 	},
 	{
