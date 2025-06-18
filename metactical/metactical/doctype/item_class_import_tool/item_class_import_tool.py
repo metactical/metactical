@@ -73,7 +73,7 @@ class ItemClassImportTool(Document):
 
 			if exists:
 				try:
-					frappe.db.set_value("Item", exists, "asi_item_class", row[2])
+					frappe.db.set_value("Item", exists, "asi_item_class", row[1])
 					frappe.db.commit()
 				except Exception as e:
 					self.log_error(item_code, frappe.get_traceback())
