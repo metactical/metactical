@@ -169,14 +169,15 @@ def validate_users(form_data):
         
     # Check if approvers list is availble in the incoming api request
     if "ApprovalList" not in form_data:
-        return {"success": True}   
+        return {"success": True}  
+    
 
     for approver in approvers:
         manager_approver = frappe.db.get_value('User', {'full_name': approver["ManagerId"]}, 'name') if approver["ManagerId"] else None
-        cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
+        # cashier_approver = frappe.db.get_value('User', {'full_name': approver["CashierId"]}, 'name') if approver["CashierId"] else None
         
-        if not approver["ManagerId"] and not approver["CashierId"]:
-            return {"error": "ManagerId or CashierId is required to apply discounts", "success": False}
+        # if not approver["ManagerId"] and not approver["CashierId"]:
+        #     return {"error": "ManagerId or CashierId is required to apply discounts", "success": False}
                     
         discount = 0
         if approver["isOverallDiscount"]:
@@ -192,17 +193,17 @@ def validate_users(form_data):
         
         if approver["ManagerId"] and not manager_approver:
             return {"error": "User {0} does not exist".format(approver["ManagerId"]), "success": False}
-        if approver["CashierId"] and not cashier_approver:
-            return {"error": "User {0} does not exist".format(approver["CashierId"]), "success": False}
+        # if approver["CashierId"] and not cashier_approver:
+        #     return {"error": "User {0} does not exist".format(approver["CashierId"]), "success": False}
         
         if approver["ManagerId"] and manager_approver not in users:
             return {"error": "User {0} is not allowed to approve POS transactions".format(manager_approver), "success": False}
-        if approver["CashierId"] and cashier_approver not in users:
-            return {"error": "User {0} is not allowed to approve POS transactions".format(cashier_approver), "success": False}
+        # if approver["CashierId"] and cashier_approver not in users:
+        #     return {"error": "User {0} is not allowed to approve POS transactions".format(cashier_approver), "success": False}
         
-        if approver["CashierId"]:
-            if users[cashier_approver]["ifw_max_discount_percent"] < discount and not manager_approver:
-                return {"error": "User {0} is not allowed to give POS discount greater than {1}%".format(cashier_approver, users[cashier_approver]["ifw_max_discount_percent"]), "success": False}
+        # if approver["CashierId"]:
+        #     if users[cashier_approver]["ifw_max_discount_percent"] < discount and not manager_approver:
+        #         return {"error": "User {0} is not allowed to give POS discount greater than {1}%".format(cashier_approver, users[cashier_approver]["ifw_max_discount_percent"]), "success": False}
 
         if manager_approver:
             if not users[manager_approver]["ifw_is_main_pos_user"]:
@@ -226,6 +227,8 @@ def create_sales_order(form_data, customer):
         'taxes_and_charges': form_data['TaxesAndChargesTemplate'],
         'delivery_date': frappe.utils.today(),
         "company": company.company,
+        "currency": frappe.db.get_value("Company", company.company, "default_currency"),
+        "selling_price_list": form_data['PriceList'] if "PriceList" in form_data else "",
         'company_address': company.company_address,
         'source': form_data['LeadSource'],
         'ignore_pricing_rule': 1,
@@ -249,14 +252,14 @@ def create_sales_order(form_data, customer):
         sales_order.insert(ignore_permissions=True)
     except Exception as e:
         frappe.clear_last_message()
-        
         so_data['items'] = [{
             'item_code': 2,
             'qty': 1,
-            'rate': form_data['Total'], 
+            'rate': form_data['Total'],
         }]
         
         so_data['taxes'] = []
+        so_data["additional_discount_percentage"] = 0.0
         so_data["coupon_code"] = sales_order.coupon_code if hasattr(sales_order, 'coupon_code') else None
         sales_order = frappe.get_doc(so_data)
         
@@ -369,7 +372,7 @@ def submit_sales_order(sales_order, form_data, log):
         create_comment(comment, form_data['SalesPerson'], sales_order.name)
         
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
-        message = "Branch: *{0}* \n Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
+        message = "Branch: *{0}* \nUnable to submit Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
         
         add_payment_info_to_sales_order(sales_order, form_data)
@@ -392,8 +395,7 @@ def submit_sales_order(sales_order, form_data, log):
         
         # post to rocket chat
         url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
-        message = "Branch: *{0}* \n Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
-        # message = "Unable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
+        message = "Branch: *{0}* \nUnable to create Invoice for Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
         post_to_rocket_chat(sales_order, message, pos=True)
         
         # add payment info to sales order
@@ -418,8 +420,7 @@ def submit_sales_order(sales_order, form_data, log):
             
             # post to rocket chat
             url = "/app/{0}/{1}".format(sales_invoice.doctype.lower().replace(" ", "-"), sales_invoice.name)
-            # message = "Unable to submit Invoice created by POS. Please check the document and resubmit. \n[{0}]({1})".format(get_url(url), get_url(url))
-            message = "Branch: *{0}* \n Unable to submit Invoice created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
+            message = "Branch: *{0}* \nUnable to submit Invoice created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
             post_to_rocket_chat(sales_invoice, message, pos=True)
             
             # add payment info to sales order
