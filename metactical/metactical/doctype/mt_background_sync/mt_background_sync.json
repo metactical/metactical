@@ -9,9 +9,17 @@
  "field_order": [
   "filter_area",
   "column_break_hoqxp",
+  "last_filters_used",
   "section_break_snehf",
   "filters_detail",
   "section_break_kavoo",
+  "delay_time",
+  "batch_size",
+  "last_offset",
+  "last_sync_time",
+  "pid",
+  "column_break_hq6sk",
+  "sync_item_detail",
   "sync_item_with_price_lists",
   "sync_item_with_discounts",
   "sync_item_with_inventory"
@@ -55,12 +63,56 @@
   {
    "fieldname": "section_break_kavoo",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_hq6sk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "fieldname": "delay_time",
+   "fieldtype": "Int",
+   "label": "Delay Time (in seconds)"
+  },
+  {
+   "default": "10",
+   "fieldname": "batch_size",
+   "fieldtype": "Int",
+   "label": "Batch Size"
+  },
+  {
+   "fieldname": "last_offset",
+   "fieldtype": "Int",
+   "label": "Last Offset"
+  },
+  {
+   "fieldname": "last_sync_time",
+   "fieldtype": "Datetime",
+   "label": "Last Sync Time"
+  },
+  {
+   "default": "1",
+   "fieldname": "sync_item_detail",
+   "fieldtype": "Check",
+   "label": "Sync Item Detail"
+  },
+  {
+   "fieldname": "last_filters_used",
+   "fieldtype": "Text",
+   "label": "Last Filters Used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pid",
+   "fieldtype": "Data",
+   "label": "PID (background process ID)",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-16 06:58:57.330836",
+ "modified": "2025-06-18 06:23:43.019659",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "MT Background Sync",
