@@ -818,7 +818,7 @@ fixtures = [{
 			'Lead Source-neb_default_warehouse',
 			'Lead Source-neb_company',
 			'Lead Source-neb_company_address',
-			'Item-sb_tags'
+			'Item-sb_tag'
 		]]]
 	},
 	{
