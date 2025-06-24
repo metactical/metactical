@@ -15,7 +15,9 @@
   "column_break_4",
   "is_sandbox",
   "customer_number",
-  "contract_number"
+  "contract_number",
+  "disabled_services_section",
+  "disabled_services"
  ],
  "fields": [
   {
@@ -75,12 +77,22 @@
    "label": "Canada Post Supplier",
    "options": "Supplier",
    "reqd": 1
+  },
+  {
+   "fieldname": "disabled_services_section",
+   "fieldtype": "Section Break",
+   "label": "Disabled Services"
+  },
+  {
+   "fieldname": "disabled_services",
+   "fieldtype": "Table",
+   "options": "Canada Post Disabled Service"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-05-31 02:49:41.786634",
+ "modified": "2025-06-24 15:22:35.073386",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Canada Post",
