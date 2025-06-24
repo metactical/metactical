@@ -96,5 +96,8 @@
 			{% endfor %}
 		</options>
 		{% endif %}
+		<references>
+			<customer-ref-1>{{ doc.name }}</customer-ref-1>
+		</references>
     </delivery-spec>
 </shipment>
