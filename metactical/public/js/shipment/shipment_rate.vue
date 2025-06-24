@@ -153,29 +153,29 @@ export default {
 						me.tabsData.forEach(provider_data => {
 							provider_data.rates.data.forEach(row => {
 								//Initialize the minimum rate fot the piece
-								if(!me.minimumRate[row.count]){
-									me.minimumRate[row.count] = 0
+								if(!me.minimumRate[row.idx]){
+									me.minimumRate[row.idx] = 0
 								}
 
 								row.items.forEach((item, idx) => {
 									item["provider"] = provider_data.title;
-									if (flt(item.shipment_amount) < me.minimumRate[row.count] 
-										|| me.minimumRate[row.count] == 0) {
+									if (flt(item.shipment_amount) < me.minimumRate[row.idx] 
+										|| me.minimumRate[row.idx] == 0) {
 
-										me.minimumRate[row.count] = flt(item.shipment_amount)
-										me.minimumProvider[row.count] = provider_data.title;
-										me.minimumCarrier[row.count] = item.carrier_service;
-										me.minimumService[row.count] = item.service_name
+										me.minimumRate[row.idx] = flt(item.shipment_amount)
+										me.minimumProvider[row.idx] = provider_data.title;
+										me.minimumCarrier[row.idx] = item.carrier_service;
+										me.minimumService[row.idx] = item.service_name
 									}
 								})
 
 								// Add minimum rate as default selected service
-								me.selectedServices[row.count] = {
+								me.selectedServices[row.idx] = {
 									"piece_name": row.name,
-									"selectedProvider": me.minimumProvider[row.count],
-									"selectedCarrier": me.minimumCarrier[row.count],
-									"selectedServicename": me.minimumService[row.count],
-									"selectedRate": me.minimumRate[row.count]
+									"selectedProvider": me.minimumProvider[row.idx],
+									"selectedCarrier": me.minimumCarrier[row.idx],
+									"selectedServicename": me.minimumService[row.idx],
+									"selectedRate": me.minimumRate[row.idx]
 								}
 							});
 						});
@@ -244,9 +244,9 @@ export default {
 				
 			}
 		},
-		updateSelectedService({count, piece_name, item}) {
+		updateSelectedService({idx, piece_name, item}) {
 			console.log("Item: ", item);
-			this.$set(this.selectedServices, count, {
+			this.$set(this.selectedServices, idx, {
 				piece_name: piece_name,
 				selectedProvider: item.provider,
 				selectedCarrier: item.carrier_service,
