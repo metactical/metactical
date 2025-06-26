@@ -121,25 +121,6 @@ class CanadaPost():
 			"Tracked Packet – International": "INT.TP"
 		}
 
-		# all_services = {
-		# 	"DOM.RP": "Regular Parcel",
-		# 	"DOM.EP": "Expedited Parcel",
-		# 	"DOM.XP": "Xpresspost",	
-		# 	"DOM.PC": "Priority",
-		# 	"DOM.LIB": "Library Books",	
-		# 	"USA.EP": "Expedited Parcel USA",
-		# 	"USA.SP.AIR": "Small Packet USA Air",
-		# 	"USA.TP": "Tracked Packet – USA",
-		# 	"USA.TP.LVM": "Tracked Packet – USA (LVM)",
-		# 	"USA.XP": "Xpresspost USA",	
-		# 	"INT.XP": "Xpresspost International",	
-		# 	"INT.IP.AIR": "International Parcel Air",	
-		# 	"INT.IP.SURF": "International Parcel Surface",
-		# 	"INT.SP.AIR": "Small Packet International Air",
-		# 	"INT.SP.SURF": "Small Packet International Surface",
-		# 	"INT.TP": "Tracked Packet – International"
-		# }
-
 		disabled_services = frappe.db.get_all("Canada Post Disabled Service", fields=["service"], pluck="service")
 		_disabled_services = []
 		for ds in disabled_services:

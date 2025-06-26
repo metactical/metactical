@@ -106,83 +106,118 @@ export default {
 			});
 		},
 
-		get_rates(){
+		get_rates() {
 			let me = this;
 			me.rates = {};
 			me.tabsData = [];
-			for (let provider of me.enabledProviders) {
-				me.loadingMessage = `Loading rates...`;
-				let provider_key = provider.toLowerCase().replace(/\s+/g, '_');
-				// Add any additional logic needed for each provider here
-				frappe.call({
-					method: "metactical.utils.shipping.shipping.get_rate",
-					args: {
-						"name": me.doc.frm.docname,
-						"provider": provider
-					},
-					callback: function(ret){
-						me.rates[provider_key] = {
-							"label": provider,
-							"rates": ret.message,
-							"supports_multiple": ret.message.supports_multiple,
-							"no_of_parcels": ret.message.data.length
-						}
+			
+			// First fetch the default settings
+			frappe.call({
+				method: "metactical.metactical.doctype.shipment_settings.shipment_settings.get_default_services",
+				callback: function(settings_response) {
+					const settings = settings_response.message || {};
+					const defaultProvider = settings.default_shipping_service;
+					const defaultCarrierService = settings.default_carrier_service;
 
-						me.tabsData.push({
-							"title": provider,
-							"rates": ret.message,
-							"supports_multiple": ret.message.supports_multiple,
-							"no_of_parcels": ret.message.data.length
-						})
-						console.log("TabsData: ", me.tabsData);
+					me.loadingMessage = `Loading rates with preferred carrier: ${defaultProvider || 'None'}`;
+				
+					// Then fetch rates from all providers
+					for (let provider of me.enabledProviders) {
+						me.loadingMessage = `Loading ${provider} rates...`;
+						let provider_key = provider.toLowerCase().replace(/\s+/g, '_');
 						
-						ret.message.options.forEach(option => {
+						frappe.call({
+						method: "metactical.utils.shipping.shipping.get_rate",
+						args: {
+							"name": me.doc.frm.docname,
+							"provider": provider
+						},
+						callback: function(ret) {
+							me.rates[provider_key] = {
+								"label": provider,
+								"rates": ret.message,
+								"supports_multiple": ret.message.supports_multiple,
+								"no_of_parcels": ret.message.data.length
+							}
+
+							me.tabsData.push({
+								"title": provider,
+								"rates": ret.message,
+								"supports_multiple": ret.message.supports_multiple,
+								"no_of_parcels": ret.message.data.length
+							})
+							console.log("TabsData: ", me.tabsData);
+							
+							ret.message.options.forEach(option => {
 							me.rateOptions.push({
 								"carrier_service": option.key,
 								"service_name": option.val,
 								"provider": provider,
 								"label": `${provider} - ${option.val}`
 							});
-						});
-						me.canadaPostRates = ret.message;
-						me.selectKey = me.rateOptions.length;
-						
-						// Select the least expensive service by default
-						let min_value = 0;
-						let last_id;
-						me.tabsData.forEach(provider_data => {
-							provider_data.rates.data.forEach(row => {
-								//Initialize the minimum rate fot the piece
-								if(!me.minimumRate[row.idx]){
-									me.minimumRate[row.idx] = 0
-								}
+							});
+							me.canadaPostRates = ret.message;
+							me.selectKey = me.rateOptions.length;
+							
+							// Process rates and select default or minimum rates
+							let min_value = 0;
+							let last_id;
+							me.tabsData.forEach(provider_data => {
+								provider_data.rates.data.forEach(row => {
+									// Initialize the minimum rate for the piece
+									if (!me.minimumRate[row.idx]) {
+									me.minimumRate[row.idx] = 0;
+									}
 
-								row.items.forEach((item, idx) => {
-									item["provider"] = provider_data.title;
-									if (flt(item.shipment_amount) < me.minimumRate[row.idx] 
-										|| me.minimumRate[row.idx] == 0) {
-
-										me.minimumRate[row.idx] = flt(item.shipment_amount)
+									let foundDefault = false;
+									
+									// First pass: check for default provider and service
+									if (defaultProvider && defaultCarrierService) {
+									row.items.forEach((item, idx) => {
+										item["provider"] = provider_data.title;
+										
+										// If this matches our default provider and service, select it
+										if (provider_data.title === defaultProvider && 
+											item.carrier_service === defaultCarrierService) {
+										me.minimumRate[row.idx] = flt(item.shipment_amount);
 										me.minimumProvider[row.idx] = provider_data.title;
 										me.minimumCarrier[row.idx] = item.carrier_service;
-										me.minimumService[row.idx] = item.service_name
+										me.minimumService[row.idx] = item.service_name;
+										foundDefault = true;
+										}
+									});
 									}
-								})
+									
+									// Second pass: if no default was found, fall back to cheapest rate
+									if (!foundDefault) {
+									row.items.forEach((item, idx) => {
+										item["provider"] = provider_data.title;
+										if (flt(item.shipment_amount) < me.minimumRate[row.idx] 
+											|| me.minimumRate[row.idx] === 0) {
+										me.minimumRate[row.idx] = flt(item.shipment_amount);
+										me.minimumProvider[row.idx] = provider_data.title;
+										me.minimumCarrier[row.idx] = item.carrier_service;
+										me.minimumService[row.idx] = item.service_name;
+										}
+									});
+									}
 
-								// Add minimum rate as default selected service
-								me.selectedServices[row.idx] = {
+									// Add selected service (either default or minimum rate)
+									me.selectedServices[row.idx] = {
 									"piece_name": row.name,
 									"selectedProvider": me.minimumProvider[row.idx],
 									"selectedCarrier": me.minimumCarrier[row.idx],
-									"selectedServicename": me.minimumService[row.idx],
+									"selectedServiceName": me.minimumService[row.idx],
 									"selectedRate": me.minimumRate[row.idx]
-								}
-							});
+									}
+								});
+								});
+								me.ratesLoaded = true;
+							}
 						});
-						me.ratesLoaded = true;
 					}
-				});
-			}
+				}
+			});
 		},
 
 		select_service(){
@@ -211,7 +246,7 @@ export default {
 					service_name[piece.piece_name] = piece.selectedServiceName;
 					shipment_amount = shipment_amount + piece.selectedRate;
 				}
-				console.log("Carrier service: ", carrier_service, " Amount: ", shipment_amount);
+				console.log("Carrier service: ", carrier_service, " Amount: ", shipment_amount, " Service: ", service_name);
 				frappe.call({
 					method: "metactical.utils.shipping.shipping.create_shipping",
 					args: {
@@ -245,7 +280,6 @@ export default {
 			}
 		},
 		updateSelectedService({idx, piece_name, item}) {
-			console.log("Item: ", item);
 			this.$set(this.selectedServices, idx, {
 				piece_name: piece_name,
 				selectedProvider: item.provider,

@@ -88,148 +88,185 @@
 	  </div>
 	</div>
 </template>
-  
+
 <script>
-  export default {
-	  name: "Tabs",
-	  props: {
-		  tabs: {
-			  type: Array,
-			  required: true,
-		  },
-		  selectedServices: {
-			  type: Object, 
-			  required: false
-		  }
-	  },
-	  data() {
-		  return {
-			  activeTab: 0, // Index of the active tab
-		  };
-	  },
-	  watch: {
-		  selectedServices(newVal) {
-			  console.log("Prop updated:", newVal);
-		  },
-	  },
-	  methods: {
-		setActiveTab(index) {
-			console.log("Tabs: ", this.tabs);
-			this.activeTab = index;
-		},
+export default {
+  name: "Tabs",
+  props: {
+    tabs: {
+      type: Array,
+      required: true,
+    },
+    selectedServices: {
+      type: Object, 
+      required: false
+    }
+  },
+  data() {
+    return {
+      activeTab: 0, // Index of the active tab
+    };
+  },
+  watch: {
+    selectedServices: {
+      handler(newVal) {
+        this.setTabWithSelectedService();
+      },
+      deep: true
+    },
+    tabs: {
+      handler() {
+        this.setTabWithSelectedService();
+      },
+      deep: true
+    }
+  },
+  mounted() {
+    // When the component is mounted, set the active tab to the one with the selected service
+    this.$nextTick(() => {
+      this.setTabWithSelectedService();
+    });
+  },
+  methods: {
+    setActiveTab(index) {
+      console.log("Tabs: ", this.tabs);
+      this.activeTab = index;
+    },
 
-		isSelectedService(idx, item) {
-			let selectedProvider = this.selectedServices[idx]["selectedProvider"]
-			let selectedCarrier = this.selectedServices[idx]["selectedCarrier"]
-			let selectedServiceName = this.selectedServices[idx]["selectedServicename"]
-			if(selectedProvider == item.provider && selectedCarrier == item.carrier_service 
-				&& selectedServiceName == item.service_name) {
-				return true;
-			}
-			else{
-				return false;
-			}
-		},
+    // New method to find and set the tab containing the selected service
+    setTabWithSelectedService() {
+      if (!this.tabs || this.tabs.length === 0 || !this.selectedServices) {
+        return;
+      }
 
-		selectService(idx, piece_name, item){
-			this.$emit('update-selected-service', { idx, piece_name, item });
-		},
+      // Get the first selected service (we'll use this as our reference)
+      const firstSelectedIdx = Object.keys(this.selectedServices)[0];
+      if (!firstSelectedIdx) return;
 
-		getSummarizedRates(data) {
-			if (!data || !data.length) return [];
-			
-			// Create a map to aggregate services across parcels
-			const serviceMap = new Map();
-			
-			data.forEach(row => {
-			row.items.forEach(item => {
-				const key = `${item.provider}_${item.carrier_service}_${item.service_name}`;
-				
-				if (!serviceMap.has(key)) {
-				// Initialize with first occurrence
-				serviceMap.set(key, {
-					...item,
-					total_base: parseFloat(item.base) || 0,
-					total_amount: parseFloat(item.shipment_amount) || 0,
-					parcels: [row.idx],
-					idx: "All"  // Indicating this is for all parcels
-				});
-				} else {
-				// Update existing entry
-				const existing = serviceMap.get(key);
-				existing.total_base += parseFloat(item.base) || 0;
-				existing.total_amount += parseFloat(item.shipment_amount) || 0;
-				existing.parcels.push(row.idx);
-				
-				// Keep the latest delivery date
-				if (item.expected_delivery_date) {
-					const currentDate = new Date(existing.expected_delivery_date);
-					const newDate = new Date(item.expected_delivery_date);
-					if (newDate > currentDate) {
-					existing.expected_delivery_date = item.expected_delivery_date;
-					existing.expected_transit_time = item.expected_transit_time;
-					}
-				}
-				}
-			});
-			});
-			
-			// Convert map back to array
-			return Array.from(serviceMap.values());
-		},
-		
-		isSelectedSummaryService(item) {
-			// Check if all parcels have selected this service
-			if (!item.parcels || !item.parcels.length) return false;
-			
-			return item.parcels.every(parcelCount => {
-			const selected = this.selectedServices[parcelCount];
-			return selected && 
-					selected.selectedProvider === item.provider && 
-					selected.selectedCarrier === item.carrier_service && 
-					selected.selectedServicename === item.service_name;
-			});
-		},
-		
-		selectSummaryService(item) {
-			// Update all parcels with this service
-			if (!item.parcels || !item.parcels.length) return;
-			
-			// For each parcel, find the corresponding service and select it
-			item.parcels.forEach(idx => {
-				const data = this.tabs[this.activeTab].rates.data;
-				const row = data.find(r => r.idx === idx);
-				
-				if (row) {
-					const matchingItem = row.items.find(i => 
-						i.provider === item.provider && 
-						i.carrier_service === item.carrier_service &&
-						i.service_name === item.service_name
-					);
-					
-					if (matchingItem) {
-						this.$emit('update-selected-service', { 
-							idx, 
-							piece_name: row.name, 
-							item: matchingItem 
-						});
-					}
-				}
-			});
-		},
-		
-		formatCurrency(value) {
-			// Format number with 2 decimal places
-			if (typeof value !== 'number') {
-			value = parseFloat(value) || 0;
-			}
-			return value.toFixed(2);
-		}
-	  },
-  };
-  </script>
+      const selectedProvider = this.selectedServices[firstSelectedIdx].selectedProvider;
+      
+      // Find the tab index that matches the selected provider
+      const tabIndex = this.tabs.findIndex(tab => tab.title === selectedProvider);
+      
+      // If we found a matching tab, set it as active
+      if (tabIndex !== -1) {
+        this.activeTab = tabIndex;
+      }
+    },
+
+    isSelectedService(idx, item) {
+      if (!this.selectedServices || !this.selectedServices[idx]) return false;
+      
+      let selectedProvider = this.selectedServices[idx].selectedProvider;
+      let selectedCarrier = this.selectedServices[idx].selectedCarrier;
+      let selectedServiceName = this.selectedServices[idx].selectedServiceName;
+      
+      return (
+        selectedProvider === item.provider && 
+        selectedCarrier === item.carrier_service && 
+        selectedServiceName === item.service_name
+      );
+    },
+
+    selectService(idx, piece_name, item) {
+      this.$emit('update-selected-service', { idx, piece_name, item });
+    },
+
+    getSummarizedRates(data) {
+      if (!data || !data.length) return [];
+      
+      // Create a map to aggregate services across parcels
+      const serviceMap = new Map();
+      
+      data.forEach(row => {
+        row.items.forEach(item => {
+          const key = `${item.provider}_${item.carrier_service}_${item.service_name}`;
+          
+          if (!serviceMap.has(key)) {
+            // Initialize with first occurrence
+            serviceMap.set(key, {
+              ...item,
+              total_base: parseFloat(item.base) || 0,
+              total_amount: parseFloat(item.shipment_amount) || 0,
+              parcels: [row.idx],
+              idx: "All"  // Indicating this is for all parcels
+            });
+          } else {
+            // Update existing entry
+            const existing = serviceMap.get(key);
+            existing.total_base += parseFloat(item.base) || 0;
+            existing.total_amount += parseFloat(item.shipment_amount) || 0;
+            existing.parcels.push(row.idx);
+            
+            // Keep the latest delivery date
+            if (item.expected_delivery_date) {
+              const currentDate = new Date(existing.expected_delivery_date);
+              const newDate = new Date(item.expected_delivery_date);
+              if (newDate > currentDate) {
+                existing.expected_delivery_date = item.expected_delivery_date;
+                existing.expected_transit_time = item.expected_transit_time;
+              }
+            }
+          }
+        });
+      });
+      
+      // Convert map back to array
+      return Array.from(serviceMap.values());
+    },
+    
+    isSelectedSummaryService(item) {
+      // Check if all parcels have selected this service
+      if (!item.parcels || !item.parcels.length) return false;
+      
+      return item.parcels.every(parcelIdx => {
+        const selected = this.selectedServices[parcelIdx];
+        return selected && 
+              selected.selectedProvider === item.provider && 
+              selected.selectedCarrier === item.carrier_service && 
+              selected.selectedServiceName === item.service_name;
+      });
+    },
+    
+    selectSummaryService(item) {
+      // Update all parcels with this service
+      if (!item.parcels || !item.parcels.length) return;
+      
+      // For each parcel, find the corresponding service and select it
+      item.parcels.forEach(idx => {
+        const data = this.tabs[this.activeTab].rates.data;
+        const row = data.find(r => r.idx === idx);
+        
+        if (row) {
+          const matchingItem = row.items.find(i => 
+            i.provider === item.provider && 
+            i.carrier_service === item.carrier_service &&
+            i.service_name === item.service_name
+          );
+          
+          if (matchingItem) {
+            this.$emit('update-selected-service', { 
+              idx, 
+              piece_name: row.name, 
+              item: matchingItem 
+            });
+          }
+        }
+      });
+    },
+    
+    formatCurrency(value) {
+      // Format number with 2 decimal places
+      if (typeof value !== 'number') {
+        value = parseFloat(value) || 0;
+      }
+      return value.toFixed(2);
+    }
+  },
+};
+</script>
   
-  <style scoped>
+<style scoped>
   .tabs {
 	border: 1px solid #ddd;
 	border-radius: 5px;
