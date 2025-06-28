@@ -150,7 +150,7 @@ erpnext.utils.update_child_items = function(opts) {
 			// Add already picked items in Sales orders
 			if(frm.doc.doctype == 'Sales Order'){
 				frm.doc[opts.child_docname].forEach(d => {
-					if(d.picked_qty == d.qty){
+					if(d.picked_qty == d.qty || d.delivered_qty == d.qty){
 						this.fields_dict.trans_items.df.data.push({
 							"docname": d.name,
 							"name": d.name,
@@ -171,11 +171,15 @@ erpnext.utils.update_child_items = function(opts) {
 			const trans_items = this.get_values()["trans_items"].filter((item) => !!item.item_code);
 			// Metactical Customization: Add picked qty validation in Item Update
 			// pop up so we don't reduce amount by amount already picked
-			// Validate picked_qty < qty
+			// Validate picked_qty < qty and delivered_qty < qty
 			if(frm.doc.doctype == 'Sales Order'){
 				trans_items.forEach(row => {
 					if(row.picked_qty > row.qty){
 						frappe.throw("Quantity can not be greater than the already picked qty for item " + row.item_code);
+					}
+
+					if(row.qty < row.delivered_qty){
+						frappe.throw("Quantity can not be less than delivered quantity for item " + row.item_code)
 					}
 				});
 			}
@@ -203,7 +207,7 @@ erpnext.utils.update_child_items = function(opts) {
 	frm.doc[opts.child_docname].forEach(d => {
 		// Metactical Customization: Add picked qty validation in Item Update
 		// pop up so we don't reduce amount by amount already picked
-		if(frm.doc.doctype == 'Sales Order' && d.picked_qty < d.qty){
+		if(frm.doc.doctype == 'Sales Order' && d.picked_qty < d.qty && d.delivered_qty < d.qty){
 			dialog.fields_dict.trans_items.df.data.push({
 				"docname": d.name,
 				"name": d.name,
@@ -215,7 +219,8 @@ erpnext.utils.update_child_items = function(opts) {
 				"rate": d.rate,
 				"uom": d.uom,
 				"picked_qty": d.picked_qty,
-				"warehouse": d.warehouse
+				"warehouse": d.warehouse,
+				"delivered_qty": d.delivered_qty
 			});
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
