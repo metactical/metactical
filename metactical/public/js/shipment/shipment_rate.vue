@@ -261,16 +261,21 @@ export default {
 						me.creatingShipments = false;
 						me.doc.rateDialog.hide()
 						me.doc.frm.reload_doc()
-						let html = ''
-						ret.message.forEach(file => {
-							html += `<embed src="${file}" type="application/pdf" frameBorder="0" scrolling="auto"
-							height="100%"
-							width="100%"
-						></embed>`
-						})
-						let newWindow = window.open('', '_new')
-						newWindow.document.write(html)
-						newWindow.document.close()
+						if(!ret.message.printing_disabled){
+							let html = ''
+							ret.message.labels.forEach(file => {
+								html += `<embed src="${file}" type="application/pdf" frameBorder="0" scrolling="auto"
+								height="100%"
+								width="100%"
+							></embed>`
+							})
+							let newWindow = window.open('', '_new')
+							newWindow.document.write(html)
+							newWindow.document.close()
+						}
+						else{
+							frappe.msgprint("Labels created succesfully");
+						}
 					}
 				});
 			}
