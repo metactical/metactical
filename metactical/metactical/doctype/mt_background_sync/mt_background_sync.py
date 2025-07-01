@@ -32,9 +32,9 @@ def start_sync(filters):
 	if sync_doc:
 		sync_doc.last_filters_used = filters
 		sync_doc.save()
+		frappe.db.commit()
   
 	command = get_command()
-	print("Executing command:", command)
 	b_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	frappe.db.set_single_value("MT Background Sync", "pid", b_process.pid, update_modified=False)
 	frappe.db.commit()
@@ -43,34 +43,32 @@ def start_sync(filters):
  
 @frappe.whitelist()
 def stop_sync():
-	"""
-	Stop the web sync process.
-	"""
- 
-	pids = []
-	try:
-		output = subprocess.check_output(["pgrep", "-f", "bench start-background-sync"]).decode().splitlines()
-		pids = [int(pid) for pid in output]
-	except subprocess.CalledProcessError:
-		frappe.msgprint("No background sync process is currently running.")
-		return
-		
-	try:
-		for pid in pids:
-			os.kill(int(pid), signal.SIGKILL)  # Send SIGTERM to the process
-		frappe.db.set_single_value("MT Background Sync", "pid", None, update_modified=False)
-		frappe.db.commit()
-		frappe.msgprint("Background sync process stopped successfully.")
-	except Exception as e:
-		frappe.msgprint(f"Error stopping background sync process: {str(e)}")
+	import os, signal, subprocess, psutil
 
+	killed = []
+
+	for proc in psutil.process_iter(['pid', 'cmdline']):
+		cmd = " ".join(proc.info['cmdline'] or [])
+		if "bench" in cmd and "start-background-sync" in cmd:
+			try:
+				proc.kill()
+				killed.append(proc.pid)
+			except Exception as ex:
+				frappe.log_error(frappe.get_traceback(), "Error killing background sync process")
+				frappe.msgprint(f"Error killing process {proc.pid}: {str(ex)}")
+
+	if killed:
+		frappe.msgprint(f"Killed background sync processes: {killed}")
+	else:
+		frappe.msgprint("No background sync process found.")
+  
 def sync_items_to_websites():
 	
 	sync_doc = frappe.get_single("MT Background Sync")	
 	filters = sync_doc.last_filters_used or {}
 	
 	items_found = True
-	offset = 0
+	offset = sync_doc.last_offset or 0
 	while items_found:
 		items = frappe.db.get_list(
 			"Item",
@@ -94,7 +92,6 @@ def sync_items(items_list, sync_doc, offset):
 	"""
 	try:
 		for item in items_list:
-			print("item", item.name)
 			if sync_doc.sync_item_detail:
 				item_update_webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "webhook_docevent": "on_update", "enabled": 1})
 				if item_update_webhook:
@@ -136,7 +133,6 @@ def sync_items(items_list, sync_doc, offset):
 			if sync_doc.sync_item_with_inventory:
 				frappe.enqueue(update_item_inventory_output, item_code=item.name, queue='default')
 		
-		print(f"Synced {len(items_list)} items successfully.")
 		frappe.db.set_single_value("MT Background Sync", "last_sync_time", frappe.utils.now(), update_modified=False)
 		frappe.db.set_single_value("MT Background Sync", "last_offset", offset, update_modified=False)
 		frappe.db.commit()
