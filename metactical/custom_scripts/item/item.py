@@ -1,11 +1,17 @@
 import frappe
 import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
+from erpnext.stock.doctype.item.item import Item
+from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
+
+def validate(doc, method):
+    load_tags(doc)
 
 def on_update(doc, method):
     # check website specification values
     validate_website_specifications(doc)
     sync_website_specifications(doc)
+    validate_item_group(doc)
 
     # Trigger update for item inventory output if deduct_qty has been updated
     # Retrieve the document state before the update
@@ -36,9 +42,6 @@ def on_update(doc, method):
                     deduct_qty_updated = True
                     break
 
-    if len(doc.custom_neb_website_deduct_qty) and not current_lead_sources:
-        current_lead_sources = [source.lead_source for source in doc.custom_neb_website_deduct_qty]
-
     # Trigger update if deduct_qty was changed
     if deduct_qty_updated or removed_lead_sources:
         is_product_bundle = frappe.db.exists('Product Bundle', doc.item_code)
@@ -47,7 +50,36 @@ def on_update(doc, method):
             update_item_inventory_output(item_code=doc.item_code, net_available_bins=all_bins, bundle=True, voucher_type=doc.doctype)
         else:
             frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+            
+def load_tags(doc):
+    """
+    Load tags for the item based on the website specifications.
+    """
+    
+    tags = doc.sb_tags
+    doc.sb_tags = []
+    tags_list = []
+    
+    for tag in tags:
+        if not tag.label and not tag.description:
+            if tag.sb_tag not in tags_list:
+                doc.append("sb_tags", {
+                    "sb_tag": tag.sb_tag,
+                    "label": tag.label,
+                    "description": tag.description,
+                })
+                tags_list.append(tag.sb_tag)
 
+    for spec in doc.neb_website_specifications:
+        if spec.label and spec.description:
+            tag = get_sb_tag(spec.label, spec.description)
+            if tag and tag not in tags_list:
+                doc.append("sb_tags", {
+                    "sb_tag": tag,
+                    "label": spec.label,
+                    "description": spec.description,
+                })
+    
 def validate_website_specifications(doc):
     for spec in doc.neb_website_specifications:
         if not spec.label:
@@ -107,7 +139,6 @@ def sync_website_specifications(doc):
                     website_spec.label = spec.label
                     website_spec.description = spec.description
                     website_spec.mandatory = spec.mandatory
-                    website_spec.sb_tag = spec.sb_tag
                     website_spec.parent = website_item.name
                     website_spec.parenttype = website_item.doctype
                     website_spec.parentfield = "neb_website_specifications"
@@ -117,11 +148,16 @@ def sync_website_specifications(doc):
                     main_website_spec.label = spec.label
                     main_website_spec.description = spec.description
                     main_website_spec.parent = website_item.name
-                    main_website_spec.sb_tag = spec.sb_tag
                     main_website_spec.parenttype = website_item.doctype
                     main_website_spec.parentfield = "website_specifications"
                     main_website_spec.save()
 
+def validate_item_group(doc):
+    if doc.item_group:
+        is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
+        if is_item_group:
+            frappe.throw("Item Group <b>{0}</b> is a group. Please select a non-group item group.".format(doc.item_group))
+        
 @frappe.whitelist()
 def get_website_specification_description_options(labels):
     labels = json.loads(labels)

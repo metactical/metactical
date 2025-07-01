@@ -12,27 +12,27 @@ class CycleCount(Document):
 		doc.update({
 			"purpose": "Stock Reconciliation",
 			"ais_cycle_count": self.name,
-			"ais_reason_for_adjustment": self.reason_for_adjustment
+			"ais_reason_for_adjustment": self.reason_for_adjustment,
+			"company": frappe.db.get_value("Warehouse", self.warehouse, "company")
 		})
 		for row in self.items:
-			if row.qty != row.expected_qty:
-				doc.append("items", {
-					"item_code": row.item_code,
-					"warehouse": self.warehouse,
-					"qty": row.qty,
-					"valuation_rate": row.valuation_rate
-				})
-		
+			valuation_rate = row.valuation_rate if row.valuation_rate else 0.01
+			if row.qty == row.expected_qty:
+				valuation_rate += 0.01
+	
+			doc.append("items", {
+				"item_code": row.item_code,
+				"warehouse": self.warehouse,
+				"qty": row.qty,
+				"valuation_rate": valuation_rate
+			})
+	
 		if hasattr(doc, "items"):
 			doc.submit()
-   
-	def before_submit(self):
-		if not self.reason_for_adjustment:
-			frappe.throw("Please add the reason for adjustment")
 
 	def validate(self):
-		# if len(self.items) > 99:
-		# 	frappe.throw("You can't add more than 99 items in a Cycle Count")
+		if len(self.items) > 99:
+			frappe.throw("You can't add more than 99 items in a Cycle Count")
 
 		for row in self.items:
 			if row.get("expected_qty") is None:
@@ -71,16 +71,3 @@ def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
-
-@frappe.whitelist()
-def get_items_from_template_sku(template_sku):
-    return frappe.db.get_all("Item", filters={"variant_of": template_sku}, fields=["name", "ifw_retailskusuffix", "ifw_location"])
-
-@frappe.whitelist()
-def get_items_from_retail_sku(retail_sku):
-	return frappe.db.get_all("Item", 
-		filters={	
-			"ifw_retailskusuffix": ["like", f"{retail_sku}%"]
-		},
-		fields=["name", "ifw_retailskusuffix", "ifw_location"]
-	)

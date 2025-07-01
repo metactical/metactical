@@ -549,7 +549,11 @@ def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
 	}
 	
 	# Send the data to ShipStation
-	settings = get_settings()
+	source = None
+	if sales_order.source:
+		source = sales_order.source
+
+	settings = get_settings(source=source)
 	
 	if len(settings) == 0:
 		frappe.throw("No shiptation settings found.")
@@ -590,3 +594,67 @@ def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
 		frappe.log_error(frappe.get_traceback(), "ShipStation Order Creation Error")
 		frappe.throw(f"Failed to create order in ShipStation: {str(e)}")
 
+@frappe.whitelist()
+def get_shipstation_stores(settingid=None):
+	"""
+	Get all stores associated with a Shipstation setting
+	
+	Args:
+		settingid (str, optional): ID of the Shipstation setting. If not provided, the default setting will be used.
+		
+	Returns:
+		list: A list of dictionaries containing store information (store_id, store_name, source)
+	"""
+	settings = get_settings(settingid=settingid)
+	
+	if len(settings) == 0:
+		frappe.msgprint("No Shipstation settings found")
+		return []
+		
+	setting = settings[0]
+	
+	try:
+		# Get stores from Shipstation API
+		response = requests.get(
+			'https://ssapi.shipstation.com/stores',
+			auth=(setting.api_key, setting.get_password('api_secret'))
+		)
+		
+		# This will raise an HTTPError if the status code is 4xx/5xx
+		response.raise_for_status()
+		
+		stores_data = response.json()
+		stores = []
+		
+		# Create a mapping of store_id to source from the store_mapping table
+		store_mapping = {}
+		for mapping in setting.store_mapping:
+			store_mapping[mapping.store_id] = mapping.source
+		
+		# Process each store from the API response
+		for store in stores_data:
+			store_id = str(store.get('storeId'))
+			store_info = {
+				"store_id": store_id,
+				"store_name": store.get('storeName'),
+				"marketplace_name": store.get('marketplaceName'),
+				"source": store_mapping.get(store_id, None)
+			}
+			stores.append(store_info)
+			
+		return stores
+		
+	except requests.exceptions.HTTPError as e:
+		frappe.log_error(
+			message=f"Failed to get stores from Shipstation: {str(e)}",
+			title="Shipstation Stores Error"
+		)
+		frappe.msgprint(f"Error fetching stores: {str(e)}")
+		return []
+	except Exception as e:
+		frappe.log_error(
+			message=f"Error in get_shipstation_stores: {frappe.get_traceback()}",
+			title="Shipstation Stores Error"
+		)
+		frappe.msgprint("An error occurred while retrieving stores")
+		return []

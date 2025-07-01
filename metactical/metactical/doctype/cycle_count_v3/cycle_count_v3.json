@@ -1,0 +1,172 @@
+{
+ "actions": [],
+ "autoname": "CCV3.####",
+ "creation": "2025-05-09 02:05:03.397514",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "warehouse",
+  "scan_barcode",
+  "column_break_nmxtm",
+  "template_sku",
+  "retail_sku",
+  "section_break_6byaq",
+  "is_scanning",
+  "last_scanned_item",
+  "section_break_nchoj",
+  "undo_last_scan",
+  "reset_table",
+  "section_break_hyoof",
+  "items",
+  "section_break_4",
+  "reason_for_adjustment",
+  "column_break_6",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.is_scanning",
+   "fieldname": "scan_barcode",
+   "fieldtype": "Data",
+   "label": "Barcode"
+  },
+  {
+   "fieldname": "column_break_nmxtm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "template_sku",
+   "fieldtype": "Link",
+   "label": "Template SKU",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "label": "Retail SKU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_6byaq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_scanning",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Is Scanning",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_scanned_item",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Last Scanned Item",
+   "no_copy": 1,
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_nchoj",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.last_scanned_item && doc.docstatus==0",
+   "fieldname": "undo_last_scan",
+   "fieldtype": "Button",
+   "label": "Undo Last Scan"
+  },
+  {
+   "depends_on": "eval:doc.items && doc.docstatus == 0",
+   "fieldname": "reset_table",
+   "fieldtype": "Button",
+   "label": "Reset Table"
+  },
+  {
+   "fieldname": "section_break_hyoof",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Cycle Count Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "reason_for_adjustment",
+   "fieldtype": "Small Text",
+   "label": "Reason for Adjustment"
+  },
+  {
+   "fieldname": "column_break_6",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cycle Count V3",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cycle Count V3",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Stock Reconciliation",
+   "link_fieldname": "neb_cycle_count_v3"
+  }
+ ],
+ "modified": "2025-06-12 04:43:52.764230",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Cycle Count V3",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

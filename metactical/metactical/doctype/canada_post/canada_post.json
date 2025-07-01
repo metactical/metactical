@@ -11,10 +11,13 @@
   "api_secret",
   "required_transmit_shipment",
   "get_manifest",
+  "canada_post_supplier",
   "column_break_4",
   "is_sandbox",
   "customer_number",
-  "contract_number"
+  "contract_number",
+  "disabled_services_section",
+  "disabled_services"
  ],
  "fields": [
   {
@@ -63,13 +66,33 @@
   {
    "fieldname": "get_manifest",
    "fieldtype": "Button",
+   "hidden": 1,
    "label": "Get Manifest"
+  },
+  {
+   "description": "For setting in Delivery Notes",
+   "fieldname": "canada_post_supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Canada Post Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "disabled_services_section",
+   "fieldtype": "Section Break",
+   "label": "Disabled Services"
+  },
+  {
+   "fieldname": "disabled_services",
+   "fieldtype": "Table",
+   "options": "Canada Post Disabled Service"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-08-19 15:06:31.241914",
+ "modified": "2025-06-24 15:22:35.073386",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Canada Post",
@@ -87,5 +110,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

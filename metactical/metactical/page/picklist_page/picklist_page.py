@@ -75,6 +75,9 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 	elif sort_by == "order_date":
 		sort_by = "transaction_date"
 
+	# Get the number after which a Pick List is considered wholesale
+	no_for_manual = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
+
 	pick_lists = frappe.db.sql(f"""SELECT
 										pl.name, pl.customer, pl.customer_name, pl.is_rush, pli.sales_order,
 										COUNT(pli.name) AS qty_item,
@@ -100,11 +103,18 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 										AND pl.ais_source <> 'Website - GPD'
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
+									HAVING COUNT(pli.name) < {no_for_manual}
 									ORDER BY 
 										is_rush DESC,
 										{sort_by} {sort_order},
 										pl.date DESC""", 
 								as_dict=1)
+
+	# Add totes for partially picked items
+	for pick_list in pick_lists:
+		if pick_list["status"] == "Partially Picked":
+			tote = frappe.db.get_value("Picklist Tote Item", {"pick_list": pick_list["name"]}, "parent")
+			pick_list["tote"] = tote if tote else ""
 	return pick_lists
 
 @frappe.whitelist()
@@ -140,25 +150,6 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 										AND pli.item_code not in """ + not_include + """
 									ORDER BY pli.ifw_location
 									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
-		# for item in items:
-		# 	if item.is_product_bundle == 1:
-		# 		bundled_items = frappe.db.sql("""
-		# 						SELECT
-		# 						  	bundle_item.name, %(pick_list)s AS pick_list, bundle_item.item_code, 
-		# 						  	item.item_name, item.image, item.ifw_location AS locations, bundle_item.qty,
-		# 						  	bin.actual_qty, 1 AS is_product_bundle_item
-		# 						FROM
-		# 							`tabProduct Bundle Item` AS bundle_item
-		# 						LEFT JOIN
-		# 						  	`tabItem` AS item ON item.name = bundle_item.item_code
-		# 						LEFT JOIN
-		# 							`tabBin` AS bin ON bin.item_code = bundle_item.item_code AND bin.warehouse = %(warehouse)s
-		# 						WHERE
-		# 							bundle_item.parent = %(bundle)s
-		# 						ORDER BY item.ifw_location
-		# 						""", {"bundle": item.item_code, "pick_list": pick_list, "warehouse": warehouse}, as_dict=1)
-		# 		items.remove(item)
-		# 		items.extend(bundled_items)
 		
 		partially_picked = []
 		for item in items:
@@ -313,13 +304,23 @@ def submit_pick_list(items):
 	return "Pick List Submitted"
 
 @frappe.whitelist()
-def mark_as_picked(items, user):
-	items = json.loads(items)
+def mark_as_picked(picked_items, user, all_items):
+	picked_items = json.loads(picked_items)
+	all_items = json.loads(all_items)
 	pick_lists = []
 	totes = []
 	delivery_notes = {}
 	picklist_items = {}
-	for item in items:
+	all_pick_lists = []
+	associated_totes = {}
+
+	for item in all_items:
+		item = frappe._dict(item)
+		if item.pick_list not in pick_lists:
+			all_pick_lists.append(item.pick_list)
+			associated_totes[item.pick_list] = item.get("tote")
+
+	for item in picked_items:
 		item = frappe._dict(item)
 		if item.pick_list not in pick_lists:
 			pick_lists.append(item.pick_list)
@@ -331,9 +332,21 @@ def mark_as_picked(items, user):
 	for pick_list in pick_lists:
 		doc = frappe.get_doc('Pick List', pick_list)
 		status = "Picked"
-		if len(picklist_items[pick_list]) != len(doc.locations):
+		non_shipment_items = []
+		shipping_items = []
+
+		pl_settings = frappe.get_doc("Pick List Settings", "Pick List Settings")
+		for row in pl_settings.shipping_items:
+			shipping_items.append(row.item)
+
+		for row in doc.locations:
+			if row.item_code not in shipping_items:
+				non_shipment_items.append(row)
+
+
+		if len(picklist_items[pick_list]) != len(non_shipment_items):
 			status = "Partially Picked"
-		elif len(picklist_items[pick_list]) == len(doc.locations):
+		elif len(picklist_items[pick_list]) == len(non_shipment_items):
 			for item in picklist_items[pick_list]:
 				if item["qty"] > item["picked_qty"]:
 					status = "Partially Picked"
@@ -351,7 +364,7 @@ def mark_as_picked(items, user):
 	for tote in totes:
 		doc = frappe.get_doc('Picklist Tote', tote)
 		doc.tote_items = []
-		for item in items:
+		for item in picked_items:
 			item = frappe._dict(item)
 			if item.tote == tote:
 				doc.append('tote_items', {
@@ -361,7 +374,22 @@ def mark_as_picked(items, user):
 					"qty": item.picked_qty
 				})
 		doc.update({"current_delivery_note": delivery_notes[doc.tote_items[0].pick_list]})
-		doc.save()			
+		doc.save()		
+
+	# Clear pick lists that have not been picked
+	for pick_list in all_pick_lists:
+		if pick_list not in pick_lists:
+			frappe.db.set_value("Pick List", pick_list, "ais_picked_by", "")
+
+			# Clear totes
+			if associated_totes.get(pick_list):
+				tote = frappe.get_doc("Picklist Tote", associated_totes.get(pick_list))
+				tote.update({
+					"current_delivery_note": "",
+					"tote_items": [],
+					"used_by": ""
+				})
+				tote.save()
 	return "Pick List Picked"
 	
 @frappe.whitelist()

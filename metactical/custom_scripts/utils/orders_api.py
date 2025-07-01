@@ -12,10 +12,12 @@ def receive_rmq_data(parsedContent):
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
 		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
 		country = parsedContent['shippingCountry']['name'] if parsedContent.get("shippingCountry") else "Canada"
+		frappe.form_dict["account"] = ""
 
 		# Retrieve the default company name from the Global Defaults doctype in Frappe.
-		company = frappe.db.get_single_value("Global Defaults", "default_company")
-
+		
+		company = frappe.db.get_value("Lead Source", parsedContent["publisher_site"], "neb_company") or frappe.db.get_single_value("Global Defaults", "default_company")  
+  
 		# Initialize the shipping item as None. If a shipping description exists,
 		# use it to fetch the corresponding shipping item and cost.
 		shipping_item = None
@@ -49,8 +51,14 @@ def receive_rmq_data(parsedContent):
 
 		# Build payment details using transaction data and billing country if transactions exist. Default to None otherwise.
 		if parsedContent.get("transactions"):
+			succesfull_transaction = None
+			for transaction in parsedContent['transactions']:
+				if transaction.get("orderTransactionState") == 3:
+					# If the transaction state is 3, it indicates a successful transaction.
+					succesfull_transaction = transaction
+     
 			payment_detail = {
-				"transactions": parsedContent['transactions'][0],
+				"transactions": succesfull_transaction,
 				"billingCountry": parsedContent['billingCountry']
 			}
 		else:
@@ -63,24 +71,46 @@ def receive_rmq_data(parsedContent):
 		billing_address_doc, shipping_address_doc, customer = get_address_and_customer(parsedContent, billing_address_detail, shipping_address_detail)
 
 		# Create an order using the order details, customer, payment gateway, and shipping address document.
-		order = create_order(order_detail, customer, parsedContent["PaymentGateway"], shipping_address_doc, billing_address_doc)
+		order = create_order(order_detail, customer, shipping_address_doc, billing_address_doc)
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
-		if parsedContent["PaymentGateway"] != "interacetransfer":
-			if order.neb_usaepay_transaction_key:
-				payment = create_payment(payment_detail, order, company)
-			else:
-				from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
-				transaction_key = get_transaction_key(order.source, order.po_no, order.customer)
-				if transaction_key:
-					frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
-					payment = create_payment(payment_detail, order, company)
+		try:
+			if "PaymentGateway" not in parsedContent:
+				return
 
+			if parsedContent["PaymentGateway"] != "interacetransfer" and payment_detail['transactions']:
+				if order.neb_usaepay_transaction_key:
+					payment = create_payment(payment_detail, order, company)
+				else:
+					from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
+					transaction_key = get_transaction_key(order.source, order.po_no, order.customer)
+					if transaction_key:
+						frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
+						payment = create_payment(payment_detail, order, company)
+			elif parsedContent["PaymentGateway"] == "interacetransfer":
+				add_tag(order, "EtransferPaymentPending")
+		except Exception as e:
+			frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
+			post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
 
-
+def add_tag(order, tag):
+	if frappe.db.exists("Tag", tag):
+		try:
+			tag_link = frappe.get_doc({
+				"doctype": "Tag Link",
+				"tag": tag,
+				"document_type": "Sales Order",
+				"document_name": order.name
+			})
+			tag_link.insert()
+			frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(title='Tag Link Error', message=frappe.get_traceback())
+			post_to_rocket_chat([], f"Unable to link tag {tag} to order {order.name}: {str(e)}", rmq=True)
+	
 # This method retrieves or creates billing and shipping addresses, as well as the associated customer.
 # It checks for existing addresses and customers in the system. If none are found, it creates new ones.
 # The method returns the billing address document, shipping address document, and customer record.
@@ -127,7 +157,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, i
 		"total_shipping_amount": parsedContent['totalShippingAmount'],
 		"total_discount_amount": parsedContent['TotalDiscountAmount']["Amount"],
 		"source": parsedContent['publisher_site'],
-		"taxes_and_charges": get_taxes_and_charges(province, country),
+		"taxes_and_charges": get_taxes_and_charges(province, country, company),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
@@ -181,7 +211,7 @@ def get_shipping_address_detail(parsedContent, is_cp_verified):
 # 
 def get_shipping_item(shipping_quote, total):
 	shipping_item = ""
-	if shipping_quote == "Flat Rate Shipping - Standard Shipping":
+	if shipping_quote == "Flat Rate Shipping - Standard Shipping" or shipping_quote == "Flat Rate Shipping - Standard":
 		shipping_item = "Shipping"
 	elif shipping_quote == "Flat Rate Shipping - Express Shipping":
 		shipping_item = "Express Shipping"
@@ -253,7 +283,7 @@ def check_existing_customer(billing_address_doc, billing_address_detail):
 
 	return None
 
-def create_order(order_detail, customer, gateway, shipping_address_doc, billing_address_doc):
+def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
 	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
@@ -271,6 +301,7 @@ def create_order(order_detail, customer, gateway, shipping_address_doc, billing_
 		"currency": order_detail['currency'],
 		"transaction_date": remove_tz_from_date(order_detail['order_date']),
 		"company": order_detail['company'],
+		"company_address": frappe.db.get_value("Lead Source", order_detail['source'], "neb_company_address"),
 		"mena_is_cp_verified": order_detail["is_cp_verified"],
 		"shipping_address_name": shipping_address_doc.name,
 		"billing_address_name": billing_address_doc.name,
@@ -286,10 +317,8 @@ def create_order(order_detail, customer, gateway, shipping_address_doc, billing_
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
 	new_order.set_missing_values()
-	if gateway == "interacetransfer":
-		new_order.save()
-	else:
-		new_order.submit()
+	new_order.save()
+	new_order.submit()
 
 	frappe.db.commit()
 	return new_order
@@ -390,20 +419,23 @@ def create_contact(contact_detail, customer):
 # If a shipping item is provided, it also creates a Sales Order Item for the shipping charges.
 # Finally, it returns a list of all the created Sales Order Item documents.
 def create_payment(payment_detail, order, company):
-	card_type = get_card_type(payment_detail)
+	try:
+		card_type = get_card_type(payment_detail)
 
-	new_payment = get_payment_entry(order.doctype, order.name)
-	new_payment.mode_of_payment = card_type
+		new_payment = get_payment_entry(order.doctype, order.name)
+		new_payment.mode_of_payment = card_type
 
-	account = get_bank_cash_account(company=company, mode_of_payment=card_type)
-	new_payment.paid_to = account["account"]
-	new_payment.reference_no = order.neb_usaepay_transaction_key
-	new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
+		account = get_bank_cash_account(company=company, mode_of_payment=card_type)
+		new_payment.paid_to = account["account"]
+		new_payment.reference_no = order.neb_usaepay_transaction_key
+		new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
+		new_payment.submit()
+		frappe.db.commit()
 
-	new_payment.submit()
-	frappe.db.commit()
+		return new_payment
+	except Exception as e:
+		frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
 
-	return new_payment
 
 def get_card_type(payment_detail):
 	card_type = "Visa"
@@ -438,9 +470,10 @@ def calculate_delivery_date(order_date):
 
 	return frappe.utils.add_to_date(order_date, days=1)
 
-def get_taxes_and_charges(province, country):
-	if country == "United States":
-		return "Export - ICL"
+def get_taxes_and_charges(province, country, company=None):
+	company_code = frappe.db.get_value("Company", company, "abbr")
+	if province == "Texas":
+		return f"Texas - {company_code}"
 	elif province == "Alberta":
 		return "Alberta - ICL"
 	elif province == "British Columbia":
@@ -465,13 +498,17 @@ def get_taxes_and_charges(province, country):
 		return "Northwest Territories - ICL"
 	elif province == "Nunavut":
 		return "Nunavut - ICL"
-	elif province == "Yukon":
+	elif province == "Yukon" or province == "Yukon Territory":
 		return "Yukon - ICL"
+	elif country == "United States":
+		return "United States - " + company_code
 	else:
-		return "Alberta - ICL"
+		return province + " - " + company_code if company_code else province + " - ICL"
 		
 def process_items(items, shipping_item, order_detail):
 	items_list = []
+	warehouse = frappe.db.get_value("Lead Source", order_detail['source'], "neb_default_warehouse") or "W01-WHS-Active Stock - ICL"
+	
 	for item in items:
 		item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item['retailSku']}, "name")
 		if not item_code:
@@ -482,7 +519,7 @@ def process_items(items, shipping_item, order_detail):
 			"item_code": item_code,
 			"qty": item['quantity'],
 			"rate": item['unitPrice'],
-			"warehouse": "W01-WHS-Active Stock - ICL"
+			"warehouse": warehouse
 		})
 
 		items_list.append(new_item)
@@ -493,9 +530,28 @@ def process_items(items, shipping_item, order_detail):
 			"item_code": shipping_item['item_code'],
 			"qty": shipping_item['qty'],
 			"rate": shipping_item['rate'],
-			"warehouse": "W01-WHS-Active Stock - ICL"
+			"warehouse": warehouse
 		})
 
 		items_list.append(new_shipping_item)
 
 	return items_list
+
+def update_signify_detail(parsedContent):    
+	try:
+		sales_order = frappe.db.get_value("Sales Order", {"ifw_signifyd_sid": parsedContent['Sid']}, "name")
+		if sales_order:
+			frappe.db.set_value("Sales Order", sales_order, {
+				"ifw_signifyd_caseid": parsedContent['CaseId'] if parsedContent.get('CaseId') else None,
+				"ifw_signifyd_casestatus": parsedContent['CaseStatus'] if parsedContent.get('CaseStatus') else None,
+				"ifw_signifyd_score": parsedContent['Score'] if parsedContent.get('Score') else None,
+				"ifw_signifyd_approved": parsedContent['IsApproved'] if parsedContent.get('IsApproved') else False,
+				"ifw_signifyd_guaranteedisposition": parsedContent['GuarenteedDisposition'] if parsedContent.get('GuarenteedDisposition') else None,
+				"ifw_signifyd_fulfilled": parsedContent['Fullfilled'] if parsedContent.get('Fullfilled') else None,
+			}, update_modified=False)
+			frappe.db.commit()
+		else:
+			frappe.log_error(title='SignifyD Update Error', message=f"Sales Order not found for SignifyD SID: {parsedContent['Sid']}")
+	except Exception as e:
+		frappe.log_error(title='SignifyD Update Error', message=frappe.get_traceback())
+		post_to_rocket_chat([], f"Unable to update SignifyD details: {str(e)}", rmq=True)

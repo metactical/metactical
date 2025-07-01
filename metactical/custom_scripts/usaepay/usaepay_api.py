@@ -239,9 +239,9 @@ def receive_customer_data():
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
 
 def process_sales_order(event_body, transaction_key):
-	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company"], as_dict=1)
+	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
 	if not sales_order:
-		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company"], as_dict=1)
+		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
 	
 		if not sales_order:
 			return
@@ -252,7 +252,7 @@ def process_sales_order(event_body, transaction_key):
 
 	customer = sales_order.customer
 	sales_order.doctype = "Sales Order"
-	process_credit_card_tokens(event_body, customer)
+	process_credit_card_tokens(event_body, customer, sales_order.source)
 	
 	# create USAePay log
 	log = create_log(sales_order, event_body)
@@ -260,6 +260,9 @@ def process_sales_order(event_body, transaction_key):
 
 def process_payment_entry(event_body, transaction_key):
 	frappe.db.set_value("Payment Entry", event_body["object"]["invoice"], "reference_no", transaction_key)
+	if frappe.db.get_value("Payment Entry", event_body["object"]["invoice"], "docstatus") == 0:
+		frappe.get_doc("Payment Entry", event_body["object"]["invoice"]).submit()
+  
 	customer = frappe.db.get_value("Payment Entry", event_body["object"]["invoice"], "party")
 	
 	# update the sales order with the transaction key
@@ -287,7 +290,7 @@ def process_sales_invoice(event_body, transaction_key):
 	sales_invoice.doctype = "Sales Invoice"
 	
 	# process credit card tokens
-	process_credit_card_tokens(event_body, sales_invoice.customer)
+	process_credit_card_tokens(event_body, sales_invoice.customer, sales_invoice.source)
 
 	log = create_log(sales_invoice, event_body)
 	create_payment_entry(sales_invoice, event_body, log)
@@ -333,7 +336,55 @@ def create_log(doc, event_body):
 		if payment_requests:
 			frappe.db.set_value("USAePay Log", log.name, "request", "<a href='/app/payment-request/{0}'>Payment Request</a>".format(payment_requests[0].name), update_modified=False)
 
+		create_comment(log.name)
 	return log
+
+def create_comment(log):
+    if not frappe.db.exists("USAePay Log", log):
+        log = frappe.get_doc("USAePay Log", log)
+
+        comment = get_comment_message(log)
+        doctypes = {}
+        
+        if log.reference_doctype == "Payment Entry":
+            doctypes["Payment Entry"] = log.reference_docname
+
+            references = frappe.get_doc("Payment Entry", log.reference_docname).references
+            if references:
+                doctypes[references[0].reference_doctype] = references[0].reference_name
+        
+        if log.sales_return:
+            doctypes["Sales Invoice"] = log.sales_return
+        
+        for dt in doctypes:
+            frappe.get_doc({
+				'doctype': 'Comment',
+				'content': comment,
+				'reference_doctype': dt,
+				"comment_type": "Comment",
+				'reference_name': doctypes[dt],
+			}).save(ignore_permissions=True)
+			
+        frappe.db.commit()    
+        
+    
+def get_comment_message(log):
+    comment = "*USAePay Log*\n"    
+    comment += f"Action: {log.action}\n"
+    
+    if log.transaction_key:
+        comment += f"Transaction Key: {log.transaction_key}\n"
+    
+    if log.payment_entry:
+        comment += f"Payment Entry: {log.payment_entry}\n"
+    
+    if log.sales_return:
+        comment += f"Sales Return: {log.sales_return}\n"
+        comment += f"Refund Transaction Key: {log.refund_transaction_key}\n"
+        
+    comment += f"Amount: {log.amount}\n"
+	
+    return comment
 
 def create_payment_entry(doc, data, log):
 	try: 
@@ -356,8 +407,10 @@ def create_payment_entry(doc, data, log):
 			amount = data["object"]["auth_amount"] if "auth_amount" in data["object"] else data["object"]["amount"]
 			if float(allocated) > float(amount):
 				pe.references[0].allocated_amount = int(amount)
-
-		pe.submit()
+		
+		if pe.paid_amount > 0:
+			pe.save()
+			pe.submit()
 
 		if log:
 			frappe.db.set_value("USAePay Log", log.name, "payment_entry", pe.name, update_modified=False)
@@ -365,7 +418,7 @@ def create_payment_entry(doc, data, log):
 	except:
 		frappe.log_error(title="PE Creation from USAePay Error", message=frappe.get_traceback())
 
-def process_credit_card_tokens(event_body, customer):
+def process_credit_card_tokens(event_body, customer, lead_source=None):
 	transaction_key = event_body["object"]["key"]
 
 	if "creditcard" in event_body["object"]:
@@ -384,7 +437,6 @@ def process_credit_card_tokens(event_body, customer):
 
 		credit_card_used_in_transaction = event_body["object"]["creditcard"]
 		is_cc_new = True
-
 		if tokens:
 			for token in tokens:
 				if token.cc_number == credit_card_used_in_transaction["number"]:
@@ -393,23 +445,26 @@ def process_credit_card_tokens(event_body, customer):
 
 		# if the credit card is new, add it to the customer's credit card tokens
 		if is_cc_new:
-			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body)
+			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source)
 		frappe.db.commit()
 
-def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body):
-	headers, usaepay_url = get_headers(event_body)
+def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source=None):
+	headers, usaepay_url = get_headers(event_body, lead_source)
 	token = get_card_token(usaepay_url, transaction_key, headers)
 	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"]
 
-	frappe.get_doc({
-		"doctype": "Customer CC Tokens",
-		"parent": customer_cc,
-		"parentfield": "cc_tokens",
-		"parenttype": "Customer CC",
-		"label": labels[len(tokens)],
-		"token": token,
-		"cc_number": credit_card_used_in_transaction["number"],
-	}).insert()
+	try:
+		frappe.get_doc({
+			"doctype": "Customer CC Tokens",
+			"parent": customer_cc,
+			"parentfield": "cc_tokens",
+			"parenttype": "Customer CC",
+			"label": labels[len(tokens)],
+			"token": token,
+			"cc_number": credit_card_used_in_transaction["number"],
+		}).insert()
+	except Exception as e:
+		frappe.log_error(title="Customer Token Insertion Error", message=frappe.get_traceback())
 
 def get_headers(transaction=None, lead_source=None):
 	if lead_source:
@@ -721,6 +776,7 @@ def adjust_payment(docname, advance_paid=None):
 
 		# frappe.log_error(title="Adjust Payment Error", message=frappe.get_traceback())
 		frappe.msgprint("Unable to adjust payment: {0}".format(e), title="Error")
+		return None, None
 
 def void_payment_in_usaepay(doc):
 	doctype = doc.doctype
