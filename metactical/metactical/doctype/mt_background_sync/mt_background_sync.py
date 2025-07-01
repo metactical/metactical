@@ -28,6 +28,25 @@ def start_sync(filters):
 	# frappe.db.set_single_value("MT Background Sync", "last_filters_used", filters, update_modified=False)
 	# frappe.db.commit()
  
+	items_count = frappe.db.get_list(
+		"Item",
+		filters=filters
+	)
+ 
+	max_number_of_items_to_sync  = frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_sync")
+	if len(items_count) > max_number_of_items_to_sync:
+		frappe.throw(f"Cannot sync more than {max_number_of_items_to_sync} items at a time. Please refine your filters to reduce the number of items to sync.")
+  
+	pids = []
+	try:
+		output = subprocess.check_output(["pgrep", "-f", "bench start-background-sync"]).decode().splitlines()
+		pids = [int(pid) for pid in output]
+	except subprocess.CalledProcessError:
+		pass
+
+	if pids:
+		frappe.throw("A background sync process is already running. Please stop it before starting a new one.")
+  
 	sync_doc = frappe.get_single("MT Background Sync")
 	if sync_doc:
 		sync_doc.last_filters_used = filters
