@@ -17,7 +17,6 @@
   "batch_size",
   "last_offset",
   "last_sync_time",
-  "pid",
   "column_break_hq6sk",
   "sync_item_detail",
   "sync_item_with_price_lists",
@@ -101,18 +100,12 @@
    "fieldtype": "Text",
    "label": "Last Filters Used",
    "read_only": 1
-  },
-  {
-   "fieldname": "pid",
-   "fieldtype": "Data",
-   "label": "PID (background process ID)",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-18 06:23:43.019659",
+ "modified": "2025-07-01 07:22:27.473914",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "MT Background Sync",
