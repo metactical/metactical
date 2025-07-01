@@ -41,7 +41,22 @@ def delete_dormant_customers(context):
 	frappe.connect()
 	delete_unlinked_customers()
 
+@click.command("start-background-sync")
+@pass_context
+def start_background_sync(context):
+	site = get_site(context)
+	if not site:
+		raise SiteNotSpecifiedError
+
+	frappe.init(site=site)
+	frappe.connect()
+ 
+	from metactical.metactical.doctype.mt_background_sync.mt_background_sync import sync_items_to_websites
+	sync_items_to_websites()
+ 
 commands = [
 	rename_customers,
-	delete_dormant_customers
+	delete_dormant_customers,
+	start_background_sync
 ]
+
