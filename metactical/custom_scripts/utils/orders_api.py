@@ -71,11 +71,14 @@ def receive_rmq_data(parsedContent):
 		billing_address_doc, shipping_address_doc, customer = get_address_and_customer(parsedContent, billing_address_detail, shipping_address_detail)
 
 		# Create an order using the order details, customer, payment gateway, and shipping address document.
-		order = create_order(order_detail, customer, parsedContent["PaymentGateway"], shipping_address_doc, billing_address_doc)
+		order = create_order(order_detail, customer, shipping_address_doc, billing_address_doc)
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 		try:
-			if parsedContent["PaymentGateway"] != "interacetransfer":
+			if "PaymentGateway" not in parsedContent:
+				return
+
+			if parsedContent["PaymentGateway"] != "interacetransfer" and payment_detail['transactions']:
 				if order.neb_usaepay_transaction_key:
 					payment = create_payment(payment_detail, order, company)
 				else:
@@ -84,6 +87,8 @@ def receive_rmq_data(parsedContent):
 					if transaction_key:
 						frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
 						payment = create_payment(payment_detail, order, company)
+			elif parsedContent["PaymentGateway"] == "interacetransfer":
+				add_tag(order, "EtransferPaymentPending")
 		except Exception as e:
 			frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
 			post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
@@ -91,7 +96,21 @@ def receive_rmq_data(parsedContent):
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
 
-
+def add_tag(order, tag):
+	if frappe.db.exists("Tag", tag):
+		try:
+			tag_link = frappe.get_doc({
+				"doctype": "Tag Link",
+				"tag": tag,
+				"document_type": "Sales Order",
+				"document_name": order.name
+			})
+			tag_link.insert()
+			frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(title='Tag Link Error', message=frappe.get_traceback())
+			post_to_rocket_chat([], f"Unable to link tag {tag} to order {order.name}: {str(e)}", rmq=True)
+	
 # This method retrieves or creates billing and shipping addresses, as well as the associated customer.
 # It checks for existing addresses and customers in the system. If none are found, it creates new ones.
 # The method returns the billing address document, shipping address document, and customer record.
@@ -264,7 +283,7 @@ def check_existing_customer(billing_address_doc, billing_address_detail):
 
 	return None
 
-def create_order(order_detail, customer, gateway, shipping_address_doc, billing_address_doc):
+def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
 	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
@@ -479,7 +498,7 @@ def get_taxes_and_charges(province, country, company=None):
 		return "Northwest Territories - ICL"
 	elif province == "Nunavut":
 		return "Nunavut - ICL"
-	elif province == "Yukon":
+	elif province == "Yukon" or province == "Yukon Territory":
 		return "Yukon - ICL"
 	elif country == "United States":
 		return "United States - " + company_code
