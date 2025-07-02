@@ -30,9 +30,10 @@ def start_sync(filters):
  
 	items_count = frappe.db.get_list(
 		"Item",
-		filters=filters
+		filters=filters,
+		group_by="item_code"
 	)
- 
+  
 	max_number_of_items_to_sync  = frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_sync")
 	if len(items_count) > max_number_of_items_to_sync:
 		frappe.throw(f"Cannot sync more than {max_number_of_items_to_sync} items at a time. Please refine your filters to reduce the number of items to sync.")
@@ -95,6 +96,7 @@ def sync_items_to_websites():
 			fields=["name", "item_code", "item_name", "image", "variant_of"],
 			page_length=sync_doc.batch_size,
 			start = offset,
+			group_by="item_code"
 		)
 		
 		if items:
