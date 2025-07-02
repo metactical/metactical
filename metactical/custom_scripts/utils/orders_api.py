@@ -532,7 +532,7 @@ def get_taxes_and_charges(province, country, company=None):
 	elif province == "Prince Edward Island":
 		return "Prince Edward Island - ICL"
 	elif province == "Quebec":
-		return "Quebec GST and QST - ICL"
+		return "Quebec - GST - ICL"
 	elif province == "Saskatchewan":
 		return "Saskatchewan - ICL"
 	elif province == "Northwest Territories":
