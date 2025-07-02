@@ -61,8 +61,6 @@ def load_tags(doc):
     """
     Load tags for the item based on the website specifications.
     """
-    if not doc.neb_website_specifications:
-        return
     
     tags = doc.sb_tags
     doc.sb_tags = []

@@ -11,6 +11,7 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		if self.purchase_order:
 			for d in self.items:
 				d.purchase_order = self.purchase_order
+
 	def save(self):
 		if self.docstatus == DocStatus.submitted() and len(self.items) > 100 and \
 			self.ais_queue_status and self.ais_queue_status != "Queued":
