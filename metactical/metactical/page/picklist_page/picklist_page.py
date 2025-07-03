@@ -24,11 +24,17 @@ def load_summary(warehouse, source):
 	rush = 0
 	same = 0
 	where = ''
-	where_filter = {"warehouse": warehouse}
 	if source != "All":
-		where = " AND pl.ais_source = %(source)s "
-		where_filter.update({"source": source})
-	picklists = frappe.db.sql("""
+		where = f" AND pl.ais_source = '{source}' "
+	else:
+		# Add disabled sources
+		pl_settings = frappe.get_doc("Pick List Settings")
+		if len(pl_settings.disabled_sources) > 0:
+			for row in pl_settings.disabled_sources:
+				if row.source != source:
+					where += f" AND pl.ais_source <> '{row.source}'"
+
+	picklists = frappe.db.sql(f"""
 			SELECT
 				pl.name, pl.customer, pl.is_rush, pli.qty
 			FROM
@@ -38,10 +44,11 @@ def load_summary(warehouse, source):
 			LEFT JOIN
 				`tabSales Order` AS sales_order ON pli.sales_order = sales_order.name
 			WHERE
-				pli.warehouse = %(warehouse)s AND pl.docstatus = 1
-				AND pl.status = 'Open'
-				AND sales_order.status <> 'On Hold'""" + where,
-			where_filter, as_dict=1)
+				pli.warehouse = '{warehouse}' AND pl.docstatus = 1
+				AND pl.status = 'Open' 
+				AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
+				AND sales_order.status <> 'On Hold' {where}""", as_dict=1)
+	print("PLS: ", picklists)
 	
 	customers = []
 	orders = []
@@ -68,6 +75,12 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 		where = " AND pl.name LIKE '%{where_f}%'".format(where_f = filters)
 	if source != "All":
 		where = " AND pl.ais_source = '{source}'".format(source = source)
+	else:
+		# Get disabled sources
+		pl_settings = frappe.get_doc("Pick List Settings")
+		if len(pl_settings.disabled_sources) > 0:
+			for row in pl_settings.disabled_sources:
+				where += f" AND pl.ais_source <> '{row.source}'"
 
 	location_order = "DESC"
 	if sort_by == "locations":
@@ -535,3 +548,7 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 	query = """UPDATE `tabPicklist Tote` SET used_by=%(user)s WHERE name IN (""" + where_t + """)"""
 	frappe.db.sql(query, {"user": user})
 	return {"pick_lists": pls_list, "items": items, "partially_picked": partially_picked}
+
+
+def test():
+	load_summary('W01-WHS-Active Stock - ICL', 'All')
