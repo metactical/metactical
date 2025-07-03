@@ -23,6 +23,7 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 from metactical.custom_scripts.utils.metactical_utils import queue_action, check_si_payment_status_for_so
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
 from frappe.model.docstatus import DocStatus
+from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 
 class SalesOrderCustom(SalesOrder):
 	def save(self):
@@ -81,23 +82,27 @@ class SalesOrderCustom(SalesOrder):
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
-	def on_submit(self):
-		super(SalesOrderCustom, self).on_submit()
-
-		# Metactical Customization: Added
-		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
-   
 	def on_update_after_submit(self):
 		super().on_update_after_submit()
 
-		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+		doc_before_update = self.get_doc_before_save()
+		# Metactical Customization: Check if shipping or billing address has changed
+		# and enqueue webhook if it has changed
+		if doc_before_update and doc_before_update.docstatus == 1:
+			original_shipping_address = doc_before_update.shipping_address
+			original_billing_address = doc_before_update.address_display
+   
+			if self.shipping_address != original_shipping_address or self.address_display != original_billing_address:
+				webhook = frappe.db.exists("Webhook", {
+					"webhook_doctype": "Sales Order",
+					"webhook_docevent": "on_update_after_submit",
+					"enabled": 1
+				})
+    
+				if webhook:
+					doc = frappe.get_doc("Sales Order", self.name)
+					enqueue_webhook(doc, frappe.get_doc("Webhook", webhook))
 
-	def on_cancel(self):
-		super(SalesOrderCustom, self).on_cancel()
-
-		# Metactical Customization: Added
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
 
