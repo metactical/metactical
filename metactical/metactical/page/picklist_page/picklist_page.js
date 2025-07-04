@@ -44,18 +44,28 @@ class PicklistPage{
 		this.$list_totes_btn = this.wrapper.find('#multi_order_button');
 		this.$selected_warehouse = this.wrapper.find('#selected_warehouse');
 		this.$selected_source = this.wrapper.find('#selected_source');
+		this.$selected_country = this.wrapper.find('#selected_country');
 		this.$user_name = this.wrapper.find('#user_name');
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
+			console.log("Defaults: ", ret.message);
 			let default_location = ret.message.default_location;
+			let last_country = ret.message.last_country;
 			if(default_location == "" || default_location == null){
 				default_location = "All"
 			}
+			if(last_country == "" || last_country == null){
+				last_country = "All"
+			}
+
 			me.$selected_warehouse.html(ret.message.default_warehouse);
 			me.$selected_source.html(default_location);
+			me.$selected_country.html(last_country);
+
 			metactical.pick_list.selected_warehouse = ret.message.default_warehouse;
 			metactical.pick_list.selected_source = default_location;
 			metactical.pick_list.no_for_manual = ret.message.no_for_manual;
+			metactical.pick_list.selected_country = last_country;
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -83,6 +93,9 @@ class PicklistPage{
 		});
 		this.$selected_source.on('click', function(){
 			me.change_source()
+		});
+		this.$selected_country.on('click', function(){
+			me.change_country()
 		});
 	}
 	
@@ -116,7 +129,40 @@ class PicklistPage{
 				metactical.pick_list.selected_source = values.source
 				me.load_summary();
 			},
-			'Change Warehouse',
+			'Change Source',
+			'Change' 
+		)
+	}
+
+	change_country() {
+		var me = this;
+		frappe.prompt(
+			[{
+					"fieldtype": "Select", 
+					"fieldname": "country", 
+					"options": "All\nCanada\nUnited States", 
+					"label": 'Country'
+			}],
+			function(values){
+				if(typeof values.country == "undefined"){
+					values.country = "All";
+				}
+				frappe.call({
+					method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+					freeze: true,
+					args: {
+						"user": frappe.session.user,
+						"field_name": "last_country",
+						"field_value": values.country
+					},
+					callback: function(r){
+						me.$selected_country.html(values.country);
+						metactical.pick_list.selected_country = values.country;
+						me.load_summary();
+					}
+				});
+			},
+			'Change Order Country',
 			'Change' 
 		)
 	}
@@ -133,7 +179,8 @@ class PicklistPage{
 			"freeze": true,
 			"args": {
 				"warehouse": metactical.pick_list.selected_warehouse,
-				"source": metactical.pick_list.selected_source
+				"source": metactical.pick_list.selected_source,
+				"country": metactical.pick_list.selected_country
 			},
 			"callback": function(ret){
 				me.$summary.ready_to_ship.html(ret.message.ready_to_ship);
@@ -359,6 +406,7 @@ class PicklistPage{
 				"freeze": true,
 				"args": {
 					"warehouse": metactical.pick_list.selected_warehouse,
+					"country": metactical.pick_list.selected_country,
 					"filters": "",
 					"source": source,
 					"sort_by": sort_by,
@@ -572,6 +620,7 @@ class PicklistPage{
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
 				"warehouse": metactical.pick_list.selected_warehouse,
+				"country": metactical.pick_list.selected_country,
 				"filters": filter,
 				"source": metactical.pick_list.selected_source,
 				"sort_by": sort_by,
