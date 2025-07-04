@@ -3,10 +3,10 @@ import json
 import copy
 
 @frappe.whitelist()
-def get_defaults(user):
+def get_defaults():
 	default_settings = {}
 	defaults = frappe.db.sql("""SELECT 
-									default_warehouse, default_location 
+									default_warehouse, default_location, last_filters
 								FROM 
 									`tabPick List Settings Default` AS settings
 								WHERE 
@@ -14,11 +14,25 @@ def get_defaults(user):
 							{"user": frappe.session.user}, as_dict=1)
 	if len(defaults) > 0:
 		default_settings = defaults[0]
+
+		# Parse the last_filters JSON string if it exists
+		if default_settings.get("last_filters"):
+			try:
+				# Try to parse the JSON string
+				filters_dict = json.loads(default_settings.get("last_filters"))
+				# Extract the country filter
+				default_settings["last_country"] = filters_dict.get("last_country", "")
+			except (json.JSONDecodeError, TypeError):
+				# Handle invalid JSON or if last_filters is None
+				default_settings["last_country"] = "All"
+		else:
+			# If last_filters doesn't exist or is empty
+			default_settings["last_country"] = "All"
 	default_settings["no_for_manual"] = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
 	return default_settings
 
 @frappe.whitelist()
-def load_summary(warehouse, source):
+def load_summary(warehouse, source, country):
 	to_ship = 0
 	to_pick = 0
 	rush = 0
@@ -34,25 +48,40 @@ def load_summary(warehouse, source):
 				if row.source != source:
 					where += f" AND pl.ais_source <> '{row.source}'"
 
+	if country != "All":
+		where += f" AND (customer_addr.country = '{country}' OR ship_addr.country = '{country}')"
+
 	picklists = frappe.db.sql(f"""
 			SELECT
-				pl.name, pl.customer, pl.is_rush, pli.qty
+				pl.name, pl.customer, pl.is_rush, pli.item_code, pli.qty
 			FROM
 				`tabPick List Item` AS pli
 			LEFT JOIN
 				`tabPick List` AS pl ON pl.name = pli.parent
 			LEFT JOIN
 				`tabSales Order` AS sales_order ON pli.sales_order = sales_order.name
+			LEFT JOIN
+				`tabAddress` AS customer_addr ON customer_addr.name = sales_order.customer_address
+			LEFT JOIN
+				`tabAddress` AS ship_addr ON ship_addr.name = sales_order.shipping_address_name
 			WHERE
 				pli.warehouse = '{warehouse}' AND pl.docstatus = 1
 				AND pl.status = 'Open' 
 				AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
 				AND sales_order.status <> 'On Hold' {where}""", as_dict=1)
-	print("PLS: ", picklists)
+	print("Pick: ", picklists)
 	
 	customers = []
 	orders = []
+	shipping_items = []
+
+	for row in pl_settings.shipping_items:
+		shipping_items.append(row.item)
+
 	for picklist in picklists:
+		if picklist.item_code in shipping_items:
+			continue
+
 		to_pick += picklist.qty
 		if picklist.is_rush == 1 and picklist.name not in orders:
 			rush += 1
@@ -69,7 +98,7 @@ def load_summary(warehouse, source):
 	return {'ready_to_ship': to_ship, 'items_to_pick': to_pick, 'rush_orders': rush, 'same_address': same}
 	
 @frappe.whitelist()
-def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
+def get_pick_lists(warehouse, country, filters, source, sort_by, sort_order):
 	where = ''
 	if filters != "":
 		where = " AND pl.name LIKE '%{where_f}%'".format(where_f = filters)
@@ -81,6 +110,9 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 		if len(pl_settings.disabled_sources) > 0:
 			for row in pl_settings.disabled_sources:
 				where += f" AND pl.ais_source <> '{row.source}'"
+
+	if country != "All":
+		where += f" AND (customer_addr.country = '{country}' OR ship_addr.country = '{country}')"
 
 	location_order = "DESC"
 	if sort_by == "locations":
@@ -108,6 +140,10 @@ def get_pick_lists(warehouse, filters, source, sort_by, sort_order):
 										`tabItem` AS item ON item.name = pli.item_code
 									LEFT JOIN
 										`tabSales Order` AS sales_order ON sales_order.name = pli.sales_order
+									LEFT JOIN
+										`tabAddress` AS customer_addr ON customer_addr.name = sales_order.customer_address
+									LEFT JOIN
+										`tabAddress` AS ship_addr ON ship_addr.name = sales_order.shipping_address_name
 									WHERE
 										pl.docstatus = 1 AND pl.status in ('Open', 'Partially Picked') AND pli.warehouse = '{warehouse}'
 										AND (item.is_stock_item = 1 OR bundle.name IS NOT NULL)
@@ -549,6 +585,52 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 	frappe.db.sql(query, {"user": user})
 	return {"pick_lists": pls_list, "items": items, "partially_picked": partially_picked}
 
+@frappe.whitelist()
+def update_user_filters(user, field_name, field_value):
+	"""
+	Update a specific default field for a user in Pick List Settings Default
+	
+	Args:
+		user (str): The user to update defaults for (defaults to session user if None)
+		field_name (str): The field name to update ('default_warehouse', 'default_location', or 'last_filters')
+		field_value (str): The value to set for the field
+		
+	Returns:
+		dict: Status of the update operation
+	"""
+	if not user:
+		user = frappe.session.user
+	
+	# Check if user exists in the table
+	user_exists = frappe.db.exists("Pick List Settings Default", {"user": user})
+	
+	if not user_exists:
+		return
+	
+	existing_values = frappe.db.get_value("Pick List Settings Default", user_exists, "last_filters")
+
+	if existing_values is None or existing_values == {}:
+		existing_values = {}
+	
+	existing_values = json.loads(existing_values)
+	existing_values.update({
+		field_name: field_value
+	})
+	
+	frappe.db.set_value("Pick List Settings Default", {"user": user}, "last_filters", json.dumps(existing_values))
+		
+	return {
+		"status": "success", 
+		"message": f"Updated {field_name} for user {user}",
+		"field_name": field_name,
+		"field_value": field_value
+	}
 
 def test():
-	load_summary('W01-WHS-Active Stock - ICL', 'All')
+	print(load_summary("W01-WHS-Active Stock - ICL", "All", "All"))
+
+# 	[{'name': 'ae7m5ooi59', 'customer': 'test', 'is_rush': 0, 'qty': 1.0}, 
+#   {'name': 'cml0h4vj9s', 'customer': '140618e84f35ec327db90c2136139880', 'is_rush': 0, 'qty': 1.0}, 
+#   {'name': 'cml0tf1dhn', 'customer': '140618e84f35ec327db90c2136139880', 'is_rush': 0, 'qty': 4.0}, 
+#   {'name': 'kfpvh3ai79', 'customer': 'Shawn Shishido', 'is_rush': 0, 'qty': 1.0}, 
+#   {'name': 'kfpvmbc3la', 'customer': 'Shawn Shishido', 'is_rush': 0, 'qty': 1.0}]
