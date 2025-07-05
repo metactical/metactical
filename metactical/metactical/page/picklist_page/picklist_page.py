@@ -23,7 +23,13 @@ def get_defaults():
 					default_settings["last_country"] = filters_dict.get("last_country", "")
 
 				if filters_dict.get("last_source"):
-					default_settings["last_source"] = filters_dict.get("last_source");
+					default_settings["last_source"] = filters_dict.get("last_source")
+
+				if filters_dict.get("sort_by"):
+					default_settings["sort_by"] = filters_dict.get("sort_by")
+
+				if filters_dict.get("sort_order"):
+					default_settings["sort_order"] = filters_dict.get("sort_order")
 			
 			except (json.JSONDecodeError, TypeError):
 				# Handle invalid JSON or if last_filters is None

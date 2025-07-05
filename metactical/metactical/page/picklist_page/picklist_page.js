@@ -48,6 +48,7 @@ class PicklistPage{
 		this.$user_name = this.wrapper.find('#user_name');
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
+			console.log("Ret: ", ret);
 			let default_location = ret.message.default_location;
 			let last_country = ret.message.last_country;
 
@@ -70,6 +71,20 @@ class PicklistPage{
 			metactical.pick_list.selected_source = default_location;
 			metactical.pick_list.no_for_manual = ret.message.no_for_manual;
 			metactical.pick_list.selected_country = last_country;
+
+			if(ret.message.sort_order) {
+				metactical.pick_list.order_sort_order = ret.message.sort_order;
+			}
+			else{
+				metactical.pick_list.order_sort_order = "desc";
+			}
+
+			if(ret.message.sort_by) {
+				metactical.pick_list.order_sort_by = ret.message.sort_by;
+			}
+			else{
+				metactical.pick_list.order_sort_by = "qty_item";
+			}
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -392,14 +407,9 @@ class PicklistPage{
 		const me = this;
 		// If it's a reload either by clicking refresh or going back, load the
 		// previous sort values
-		if(is_reload){
-			sort_by = metactical.pick_list.order_sort_by;
-			sort_order = metactical.pick_list.order_sort_order;
-		}
-		else{
-			metactical.pick_list.order_sort_by = sort_by;
-			metactical.pick_list.order_sort_order = sort_order;
-		}
+		sort_by = metactical.pick_list.order_sort_by;
+		sort_order = metactical.pick_list.order_sort_order;
+
 		if(source == ""){
 			source = "All"
 		}
@@ -544,9 +554,32 @@ class PicklistPage{
 				let barcode = $('input[data-fieldname="pl_multi_barcode"]').val();
 				let sort_order = me.sort_selector.sort_order;
 				let sort_by = me.sort_selector.sort_by;
-				metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
-				metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
-				me.list_multi_orders(pl_source, false, barcode, sort_by, sort_order);
+				let field_name = '';
+				let field_value = '';
+
+				if(sort_by != metactical.pick_list.order_sort_by){
+					field_name = 'sort_by';
+					field_value = sort_by;
+					metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
+				}
+				else if(sort_order != metactical.pick_list.order_sort_order){
+					field_name = 'sort_order';
+					field_value = sort_order;
+					metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
+				}
+
+				frappe.call({
+					method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+					freeze: true,
+					args: {
+						"user": frappe.session.user,
+						"field_name": field_name,
+						"field_value": field_value
+					},
+					callback: function(r){
+						me.list_multi_orders(pl_source, false, barcode, sort_by, sort_order);
+					}
+				});
 			}
 		});
 		me.wrapper.find('.pl-list-div').on('click', function(){
@@ -663,16 +696,8 @@ class PicklistPage{
 	list_orders(filter='', sort_by="qty_item", sort_order="desc", is_reload=false){
 		const me = this;
 
-		// If it's a reload either by clicking refresh or going back, load the
-		// previous sort values
-		if(is_reload){
-			sort_by = metactical.pick_list.order_sort_by;
-			sort_order = metactical.pick_list.order_sort_order;
-		}
-		else{
-			metactical.pick_list.order_sort_by = sort_by;
-			metactical.pick_list.order_sort_order = sort_order;
-		}
+		sort_by = metactical.pick_list.order_sort_by;
+		sort_order = metactical.pick_list.order_sort_order;
 
 		// Initialize with the global selected source if available
 		if (metactical.pick_list && metactical.pick_list.selected_source) {
@@ -782,11 +807,40 @@ class PicklistPage{
 					sort_order: sort_order,
 					onchange: function(){
 						let barcode = $('input[data-fieldname="pl_barcode"]').val();
-						let selected_sort_by = me.sort_selector.sort_by;
-						let selected_sort_order = me.sort_selector.sort_order;
-						metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
-						metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
-						me.list_orders(barcode, selected_sort_by, selected_sort_order);
+						let sort_by = me.sort_selector.sort_by;
+						let sort_order = me.sort_selector.sort_order;
+						// metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
+						// metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
+
+						//let barcode = $('input[data-fieldname="pl_multi_barcode"]').val();
+						// let sort_order = me.sort_selector.sort_order;
+						// let sort_by = me.sort_selector.sort_by;
+						let field_name = '';
+						let field_value = '';
+
+						if(sort_by != metactical.pick_list.order_sort_by){
+							field_name = 'sort_by';
+							field_value = sort_by;
+							metactical.pick_list.order_sort_by = me.sort_selector.sort_by;
+						}
+						else if(sort_order != metactical.pick_list.order_sort_order){
+							field_name = 'sort_order';
+							field_value = sort_order;
+							metactical.pick_list.order_sort_order = me.sort_selector.sort_order;
+						}
+
+						frappe.call({
+							method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+							freeze: true,
+							args: {
+								"user": frappe.session.user,
+								"field_name": field_name,
+								"field_value": field_value
+							},
+							callback: function(r){
+								me.list_orders(barcode, sort_by, sort_order);
+							}
+						});
 					}
 				});
 				
