@@ -48,12 +48,16 @@ class PicklistPage{
 		this.$user_name = this.wrapper.find('#user_name');
 		this.$user_name.html('Welcome ' + frappe.session.user_fullname);
 		this.get_defaults().then((ret) => {
-			console.log("Defaults: ", ret.message);
 			let default_location = ret.message.default_location;
 			let last_country = ret.message.last_country;
-			if(default_location == "" || default_location == null){
+
+			if (ret.message.last_source && ret.message.last_source != ""){
+				default_location = ret.message.last_source
+			}
+			else if(default_location == "" || default_location == null){
 				default_location = "All"
 			}
+
 			if(last_country == "" || last_country == null){
 				last_country = "All"
 			}
@@ -122,12 +126,27 @@ class PicklistPage{
 		frappe.prompt(
 			[{"fieldtype": "Link", "fieldname": "source", "options": "Lead Source", "label": 'Source'}],
 			function(values){
+
 				if(typeof values.source == "undefined"){
 					values.source = "All";
 				}
-				me.$selected_source.html(values.source);
-				metactical.pick_list.selected_source = values.source
-				me.load_summary();
+				frappe.call({
+					method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+					args: {
+						user: frappe.session.user,
+						field_name: "last_source",
+						field_value: values.source
+					},
+					callback: function(r) {
+						if (r.message && r.message.status === "success") {
+							console.log("Source filter saved:", values.source);
+						}
+
+						me.$selected_source.html(values.source);
+						metactical.pick_list.selected_source = values.source
+						me.load_summary();
+					}
+				});
 			},
 			'Change Source',
 			'Change' 
@@ -432,6 +451,11 @@ class PicklistPage{
 			me.load_home();
 		});
 
+		// Initialize with the global selected source if available
+		if (metactical.pick_list && metactical.pick_list.selected_source) {
+			pl_source = metactical.pick_list.selected_source;
+		}
+
 		me.pl_source = frappe.ui.form.make_control({
 			parent: $('.pl-multi-source'),
 			df: {
@@ -439,12 +463,40 @@ class PicklistPage{
 				fieldtype: "Link",
 				options: "Lead Source",
 				placeholder: pl_source,
+				default: pl_source !== "All" ? pl_source : "",
 				change: function(){
+					const sourceValue = me.pl_source.get_value() || "All";
+
+					if(pl_source == metactical.pick_list.selected_source){
+						return
+					}
+					
+					// Update global selected source
+					metactical.pick_list.selected_source = sourceValue;
+					
+					// Save the filter preference in the backend
+					frappe.call({
+						method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+						args: {
+							user: frappe.session.user,
+							field_name: "last_source",
+							field_value: sourceValue
+						},
+						callback: function(r) {
+							if (r.message && r.message.status === "success") {
+								console.log("Source filter saved:", sourceValue);
+							}
+						}
+					});
+
 					me.list_multi_orders(me.pl_source.get_value());
 				}
 			},
 			render_input: true
 		});
+
+
+
 		let pl_placeholder = "Search Pick List";
 		if(pl_filter != ""){
 			pl_placeholder = pl_filter;
@@ -511,6 +563,12 @@ class PicklistPage{
 				me.select_pick(pick_list, false);
 			}
 		});
+
+		// After control is rendered, explicitly set the value
+		if (pl_source && pl_source !== "All") {
+			me.pl_source.set_value(pl_source);
+		}
+
 		me.wrapper.find('.pl-multi-barcode').on('keypress', function(){
 			if(event.keyCode == 13){
 				let barcode = me.pl_barcode.get_value();
@@ -616,6 +674,11 @@ class PicklistPage{
 			metactical.pick_list.order_sort_order = sort_order;
 		}
 
+		// Initialize with the global selected source if available
+		if (metactical.pick_list && metactical.pick_list.selected_source) {
+			selected_source = metactical.pick_list.selected_source;
+		}
+
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
@@ -628,7 +691,7 @@ class PicklistPage{
 			},
 			"freeze": true,
 			"callback": function(ret){
-				let selected_source = 'Source';
+				let selected_source = 'All';
 				if(metactical.pick_list.selected_source != "All"){
 					selected_source = metactical.pick_list.selected_source;
 				}
@@ -649,12 +712,40 @@ class PicklistPage{
 						fieldtype: 'Link',
 						options: 'Lead Source',
 						placeholder: selected_source,
+						default: selected_source !== "All" ? selected_source : "",
 						change: function(){
+							// let source = me.pl_source.get_value();
+							// if(source != ""){
+							// 	metactical.pick_list.selected_source = source;
+							// 	me.list_orders(filter=barcode, undefined, undefined, true);
+							// }
+
 							let source = me.pl_source.get_value();
-							if(source != ""){
-								metactical.pick_list.selected_source = source;
-								me.list_orders(filter=barcode, undefined, undefined, true);
+
+							if(source == metactical.pick_list.selected_source) {
+								return
 							}
+							
+							// Update global selected source
+							metactical.pick_list.selected_source = source;
+							
+							// Save the filter preference in the backend
+							frappe.call({
+								method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+								args: {
+									user: frappe.session.user,
+									field_name: "last_source",
+									field_value: source
+								},
+								callback: function(r) {
+									if (r.message && r.message.status === "success") {
+										console.log("Source filter saved:", source);
+									}
+								}
+							});
+							
+							// Update the list with the new filter
+							me.list_orders(filter=filter, undefined, undefined, true);
 						}
 					},
 					render_input: true
@@ -699,6 +790,10 @@ class PicklistPage{
 					}
 				});
 				
+				if (selected_source && selected_source !== "All") {
+					me.pl_source.set_value(selected_source);
+				}
+
 				me.pl_barcode.set_value(filter);
 				me.pl_barcode.set_focus();
 				me.orders = me.wrapper.find('.orders-container');

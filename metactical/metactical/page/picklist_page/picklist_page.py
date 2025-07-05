@@ -15,18 +15,20 @@ def get_defaults():
 	if len(defaults) > 0:
 		default_settings = defaults[0]
 
-		# Parse the last_filters JSON string if it exists
 		if default_settings.get("last_filters"):
 			try:
-				# Try to parse the JSON string
 				filters_dict = json.loads(default_settings.get("last_filters"))
-				# Extract the country filter
-				default_settings["last_country"] = filters_dict.get("last_country", "")
+
+				if filters_dict.get("last_country"):
+					default_settings["last_country"] = filters_dict.get("last_country", "")
+
+				if filters_dict.get("last_source"):
+					default_settings["last_source"] = filters_dict.get("last_source");
+			
 			except (json.JSONDecodeError, TypeError):
 				# Handle invalid JSON or if last_filters is None
 				default_settings["last_country"] = "All"
 		else:
-			# If last_filters doesn't exist or is empty
 			default_settings["last_country"] = "All"
 	default_settings["no_for_manual"] = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
 	return default_settings
@@ -38,11 +40,13 @@ def load_summary(warehouse, source, country):
 	rush = 0
 	same = 0
 	where = ''
+
+
+	pl_settings = frappe.get_doc("Pick List Settings")
 	if source != "All":
 		where = f" AND pl.ais_source = '{source}' "
 	else:
 		# Add disabled sources
-		pl_settings = frappe.get_doc("Pick List Settings")
 		if len(pl_settings.disabled_sources) > 0:
 			for row in pl_settings.disabled_sources:
 				if row.source != source:
@@ -66,7 +70,7 @@ def load_summary(warehouse, source, country):
 				`tabAddress` AS ship_addr ON ship_addr.name = sales_order.shipping_address_name
 			WHERE
 				pli.warehouse = '{warehouse}' AND pl.docstatus = 1
-				AND pl.status = 'Open' 
+				AND pl.status in ('Open', 'Partially Picked')
 				AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
 				AND sales_order.status <> 'On Hold' {where}""", as_dict=1)
 	print("Pick: ", picklists)
