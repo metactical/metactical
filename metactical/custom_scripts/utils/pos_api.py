@@ -1012,7 +1012,7 @@ def get_coupon_code_sql(coupon_code):
     """
     
 @frappe.whitelist()
-def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
+def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     page = int(page or 1)
     limit = int(page_size or 10)
     offset = (page - 1) * limit
@@ -1071,6 +1071,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
     all_warehouses = list(warehouse_map.keys())
     all_price_lists = list(price_list_map.keys())
+    can_see_item_cost = frappe.db.get_value("POS User Settings", user, "can_see_item_cost")
 
     # Attach inventory and pricing data
     for item in items:
@@ -1155,6 +1156,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
+            "Cost": get_item_cost(item.item_code) if can_see_item_cost else "-",
             "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
@@ -1227,3 +1229,18 @@ def warehouses_display_name_mapping():
         "RM02-Oshawa-Active - ZE": "OSH",
         "US01-Houston-Active - AOI": "TEX",
     }
+
+def get_item_cost(item_code):
+    default_supplier = frappe.db.get_value("Item Default", {"parent": item_code}, "default_supplier")
+    if not default_supplier:
+        default_supplier = frappe.db.get_value("Item Supplier", {"parent": item_code}, "supplier")
+        print(default_supplier)
+        
+    if default_supplier:
+        price_list = frappe.db.get_value("Supplier", default_supplier, "default_price_list")
+        if price_list:
+            price_list_rate = frappe.db.get_value("Item Price", {"item_code": item_code, "price_list": price_list}, "price_list_rate")
+            if price_list_rate:
+                return str(price_list_rate)
+
+    return "N/A"
