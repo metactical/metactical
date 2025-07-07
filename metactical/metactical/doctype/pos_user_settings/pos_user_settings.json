@@ -11,7 +11,8 @@
   "user",
   "section_break_leysh",
   "password",
-  "can_disable_auto_logout"
+  "can_disable_auto_logout",
+  "can_see_item_cost"
  ],
  "fields": [
   {
@@ -38,6 +39,12 @@
    "in_list_view": 1,
    "label": "PIN",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "can_see_item_cost",
+   "fieldtype": "Check",
+   "label": "Can See Item Cost"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -47,7 +54,7 @@
    "link_fieldname": "user"
   }
  ],
- "modified": "2025-05-20 10:30:02.790139",
+ "modified": "2025-07-07 05:27:56.465222",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS User Settings",
