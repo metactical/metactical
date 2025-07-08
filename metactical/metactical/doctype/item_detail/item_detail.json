@@ -9,12 +9,16 @@
   "item_name",
   "description",
   "slug",
+<<<<<<< HEAD
   "price_list",
   "productmetasedescription",
   "productmetasekeywords",
   "productmetasetitle",
   "h2",
   "h3"
+=======
+  "price_list"
+>>>>>>> 3fb20d67 (feat: Add Item Detail doctype with fields for item information)
  ],
  "fields": [
   {
@@ -25,7 +29,11 @@
   },
   {
    "fieldname": "description",
+<<<<<<< HEAD
    "fieldtype": "Markdown Editor",
+=======
+   "fieldtype": "Data",
+>>>>>>> 3fb20d67 (feat: Add Item Detail doctype with fields for item information)
    "in_list_view": 1,
    "label": "Description"
   },
@@ -41,6 +49,7 @@
    "in_list_view": 1,
    "label": "Price List",
    "options": "Price List"
+<<<<<<< HEAD
   },
   {
    "fieldname": "productmetasedescription",
@@ -68,12 +77,18 @@
    "fieldtype": "Text",
    "in_list_view": 1,
    "label": "h3"
+=======
+>>>>>>> 3fb20d67 (feat: Add Item Detail doctype with fields for item information)
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
+<<<<<<< HEAD
  "modified": "2025-09-04 06:59:30.857453",
+=======
+ "modified": "2025-07-08 05:59:26.910885",
+>>>>>>> 3fb20d67 (feat: Add Item Detail doctype with fields for item information)
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Detail",

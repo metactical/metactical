@@ -846,6 +846,9 @@ fixtures = [{
 			"BOM-sample_details",
 			"BOM-retail_sku",
 			"BOM-sub_operations"
+			'Item-item_detail',
+			"Item-request_ai_suggestion",
+			"Item-slugs_and_descriptions"
 		]]]
 	},
 	{
