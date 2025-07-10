@@ -10,6 +10,9 @@ def get_context(context):
 	'''if (frappe.session.user == "Guest" or
 		frappe.db.get_value("User", frappe.session.user, "user_type")=="Website User"):
 		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)'''
+	
+	if frappe.session.user == "Guest":
+		raise frappe.PermissionError
 		
 	context.no_cache = True
 	if frappe.request.args:
@@ -169,12 +172,12 @@ def get_items(search_value="", offset=0):
 		item_search_settings = frappe.get_doc("Item Search Settings")
 		#Get US data
 		us_data = {}
-		if item_search_settings.get("us_url") is not None and item_search_settings.get("us_url") != "":
-			us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
-										params={"search_value": search_value})
-			if us_request.status_code == 200:
-				for item in us_request.json().get("message", {}):
-					us_data.update({item["item_code"]: item["actual_qty"]})
+		# if item_search_settings.get("us_url") is not None and item_search_settings.get("us_url") != "":
+		# 	us_request = requests.get(item_search_settings.us_url, auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
+		# 								params={"search_value": search_value})
+		# 	if us_request.status_code == 200:
+		# 		for item in us_request.json().get("message", {}):
+		# 			us_data.update({item["item_code"]: item["actual_qty"]})
 		
 		table_columns = ["RetailSKU", "Item Name", "Price", "GPrice", "SQOH"]
 		table_data = []
