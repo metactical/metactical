@@ -100,6 +100,38 @@ class CanadaPost():
 			"Goods": "SOG",
 			"Other": "OTH",
 		}[s_type]
+	
+	def is_valid_service(self, service):
+		all_services = {
+			"Regular Parcel": "DOM.RP",
+			"Expedited Parcel": "DOM.EP",
+			"Xpresspost": "DOM.XP",	
+			"Priority": "DOM.PC",
+			"Library Books": "DOM.LIB",	
+			"Expedited Parcel USA": "USA.EP	",
+			"Small Packet USA Air": "USA.SP.AIR",
+			"Tracked Packet – USA": "USA.TP",
+			"Tracked Packet – USA (LVM)": "USA.TP.LVM",
+			"Xpresspost USA": "USA.XP",	
+			"Xpresspost International": "INT.XP",	
+			"International Parcel Air": "INT.IP.AIR",	
+			"International Parcel Surface": "INT.IP.SURF",
+			"Small Packet International Air": "INT.SP.AIR",
+			"Small Packet International Surface": "INT.SP.SURF",
+			"Tracked Packet – International": "INT.TP"
+		}
+
+		disabled_services = frappe.db.get_all("Canada Post Disabled Service", fields=["service"], pluck="service")
+		_disabled_services = []
+		for ds in disabled_services:
+			_disabled_services.append(all_services[ds])
+
+		if service in _disabled_services:
+			return False
+		else:
+			return True
+
+
 
 	def get_rate(self, name, context=None):
 		res = []
@@ -122,16 +154,17 @@ class CanadaPost():
 			items = []
 			if response and response['price-quotes'] and response['price-quotes']['price-quote']:
 				for pq in response['price-quotes']['price-quote']:
-					options[pq['service-code']] = pq['service-name']
-					items.append({
-						'carrier_service': pq['service-code'],
-						'service_name': pq['service-name'],
-						'base': pq['price-details']['base'],
-						'shipment_amount': pq['price-details']['due'],
-						'guaranteed_delivery': pq['service-standard']['guaranteed-delivery'],
-						'expected_transit_time': pq['service-standard']['expected-transit-time'],
-						'expected_delivery_date': pq['service-standard']['expected-delivery-date'],
-					})
+					if self.is_valid_service(pq['service-code']):
+						options[pq['service-code']] = pq['service-name']
+						items.append({
+							'carrier_service': pq['service-code'],
+							'service_name': pq['service-name'],
+							'base': pq['price-details']['base'],
+							'shipment_amount': pq['price-details']['due'],
+							'guaranteed_delivery': pq['service-standard']['guaranteed-delivery'],
+							'expected_transit_time': pq['service-standard']['expected-transit-time'],
+							'expected_delivery_date': pq['service-standard']['expected-delivery-date'],
+						})
 			if items:
 				res.append({
 					'name': parcel.name,

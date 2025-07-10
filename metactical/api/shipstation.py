@@ -632,7 +632,7 @@ def get_shipstation_stores(settingid=None):
 			store_mapping[mapping.store_id] = mapping.source
 		
 		# Process each store from the API response
-		for store in stores_data.get('stores', []):
+		for store in stores_data:
 			store_id = str(store.get('storeId'))
 			store_info = {
 				"store_id": store_id,

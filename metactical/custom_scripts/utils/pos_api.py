@@ -218,7 +218,7 @@ def create_sales_order(form_data, customer):
     taxes = form_data['Taxes']
     company = frappe.db.get_value("POS Profile", form_data['POSProfile'] + ' Operators', ['company_address', "company"], as_dict=True)
     if not company:
-        return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators')}
+        return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators'), "status": 500}
     
     so_data = {
         'doctype': 'Sales Order',
@@ -249,14 +249,14 @@ def create_sales_order(form_data, customer):
         sales_order.insert(ignore_permissions=True)
     except Exception as e:
         frappe.clear_last_message()
+        
         so_data['items'] = [{
             'item_code': 2,
             'qty': 1,
-            'rate': form_data['Total'],
+            'rate': form_data['Total'], 
         }]
         
         so_data['taxes'] = []
-        so_data["additional_discount_percentage"] = 0.0
         so_data["coupon_code"] = sales_order.coupon_code if hasattr(sales_order, 'coupon_code') else None
         sales_order = frappe.get_doc(so_data)
         
@@ -794,6 +794,12 @@ def get_item_discount(item, price_list, item_price, company):
 @frappe.whitelist()
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
+    if "ModeOfReturn" not in form_data:
+        frappe.response["Message"] = "Mode of Return is required"
+        frappe.response["Status"] = 500
+        frappe.response["CouponCode"] = None
+        return
+    
     try:
         frappe.set_user(form_data['SalesPerson'])
         log = create_log(form_data, 'Sales Return')
@@ -828,18 +834,29 @@ def create_return(*args, **kwargs):
                     item.margin_type = ""
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
+        
 
         sales_return.items = filtered_items
-        sales_return.update_outstanding_for_self = 0
         sales_return.calculate_taxes_and_totals()
-        
-        total_payment = sum(payment.amount for payment in sales_return.payments)
+
+        sales_return.payments = []
         invoice_total = sales_return.rounded_total or sales_return.grand_total
+        difference = 0.0
+        if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
+            difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)
         
-        if float(total_payment) + float(sales_return.write_off_amount) != float(invoice_total) and sales_return.payments:
-            difference = round(float(invoice_total) - float(total_payment) + float(sales_return.write_off_amount), 2)
-            sales_return.payments[0].amount = total_payment + difference
-    
+        write_off_limit = frappe.db.get_value("POS Profile", sales_return.pos_profile, "write_off_limit")
+        if write_off_limit and abs(difference) > write_off_limit:
+            frappe.response["Status"] = 500
+            frappe.response["Message"] = "Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit)
+            frappe.response["CouponCode"] = None
+            return
+        
+        sales_return.update({"payments":[{
+            "mode_of_payment": form_data["ModeOfReturn"],
+            "amount": -1 * form_data["Total"] + difference
+        }]})
+                
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
@@ -857,18 +874,19 @@ def create_return(*args, **kwargs):
         return
     
     gift_card = None
-    try:
-        gift_card = create_gift_card(sales_return, form_data)
-        frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
-    except Exception as e:
-        frappe.clear_last_message()
-        frappe.set_user("Administrator")
-        
-        frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
-        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
-        
-        frappe.response["Status"] = 500
-        frappe.response["Message"] = str(e)
+    if "ModeOfReturn" in form_data and form_data["ModeOfReturn"] == "Gift Card":
+        try:
+            gift_card = create_gift_card(sales_return, form_data)
+            frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
+        except Exception as e:
+            frappe.clear_last_message()
+            frappe.set_user("Administrator")
+            
+            frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
+            frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+            
+            frappe.response["Status"] = 500
+            frappe.response["Message"] = str(e)
     
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
@@ -881,7 +899,7 @@ def create_gift_card(doc, form_data, coupon_code=None):
     # create pricing rule for the gift card
     try:
         frappe.set_user(form_data['SalesPerson'])
-        pricing_rule = get_or_create_pricing_rule(doc)
+        pricing_rule = get_or_create_pricing_rule(doc, form_data)
         
         existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": doc.customer})
         description = ""
@@ -910,7 +928,7 @@ def create_gift_card(doc, form_data, coupon_code=None):
     except Exception as e:
         frappe.throw("Unable to create Gift Card: {0}".format(str(e)))
 
-def get_or_create_pricing_rule(doc):
+def get_or_create_pricing_rule(doc, form_data):
     pricing_rule = frappe.get_doc({
             "title": "GC-{0}".format(doc.customer),
             "doctype": "Pricing Rule",
@@ -920,7 +938,7 @@ def get_or_create_pricing_rule(doc):
             "selling": 1,
             "valid_from": now_datetime(),
             "rate_or_discount": "Discount Amount",
-            "discount_amount": -1 * doc.grand_total
+            "discount_amount": float(form_data['Total']),
         })
     
     pricing_rule.insert(ignore_permissions=True)
@@ -994,7 +1012,7 @@ def get_coupon_code_sql(coupon_code):
     """
     
 @frappe.whitelist()
-def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
+def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     page = int(page or 1)
     limit = int(page_size or 10)
     offset = (page - 1) * limit
@@ -1053,6 +1071,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
     all_warehouses = list(warehouse_map.keys())
     all_price_lists = list(price_list_map.keys())
+    can_see_item_cost = frappe.db.get_value("POS User Settings", user, "can_see_item_cost")
 
     # Attach inventory and pricing data
     for item in items:
@@ -1137,6 +1156,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
+            "Cost": get_item_cost(item.item_code) if can_see_item_cost else "-",
             "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
@@ -1204,7 +1224,23 @@ def warehouses_display_name_mapping():
         "W01-WHS-Active Stock - ICL": "WHS",
         "R07-Queen-Active Stock - ICL": "QEN",
         "R04-Mon-Active Stock - ICL": "MTL",
+        "SS01-Hubert-Active - SS": "HUB",
         "RM01-Bermondsey-Active - ZE": "BER",
         "RM02-Oshawa-Active - ZE": "OSH",
         "US01-Houston-Active - AOI": "TEX",
     }
+
+def get_item_cost(item_code):
+    default_supplier = frappe.db.get_value("Item Default", {"parent": item_code}, "default_supplier")
+    if not default_supplier:
+        default_supplier = frappe.db.get_value("Item Supplier", {"parent": item_code}, "supplier")
+        print(default_supplier)
+        
+    if default_supplier:
+        price_list = frappe.db.get_value("Supplier", default_supplier, "default_price_list")
+        if price_list:
+            price_list_rate = frappe.db.get_value("Item Price", {"item_code": item_code, "price_list": price_list}, "price_list_rate")
+            if price_list_rate:
+                return str(price_list_rate)
+
+    return "N/A"

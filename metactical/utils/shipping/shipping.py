@@ -30,18 +30,19 @@ def get_rate(name, provider='Canada Post', context=None):
 
 @frappe.whitelist()
 def create_shipping(name, provider='Canada Post', carrier_service=None, service_name={}, shipment_amount=0):
+	printing_disabled = frappe.db.get_single_value("Shipment Settings", "disable_automatic_print")
 	if provider=="Canada Post":
 		cp = CanadaPost()
 		response = cp.create_shipping(name, carrier_service, service_name, shipment_amount)
 		if response:
 			update_delivery_notes(name)
-		return response
+		return {"labels": response, "printing_disabled": printing_disabled}
 	elif provider == "Purolator":
 		purolator = Purolator()
 		response = purolator.create_shipment(name, service_name)
 		if response:
 			update_delivery_notes(name)
-		return response
+		return {"labels": response, "printing_disabled": printing_disabled}
 
 def update_delivery_notes(docname):
 	doc = frappe.get_doc('Shipment', docname)	
