@@ -10,6 +10,9 @@ def get_context(context):
 	'''if (frappe.session.user == "Guest" or
 		frappe.db.get_value("User", frappe.session.user, "user_type")=="Website User"):
 		frappe.throw(_("Please login first to access the Item Search page"), frappe.PermissionError)'''
+	
+	if frappe.session.user == "Guest":
+		raise frappe.PermissionError
 		
 	context.no_cache = True
 	if frappe.request.args:
