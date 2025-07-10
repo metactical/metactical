@@ -20,7 +20,7 @@
   },
   {
    "fieldname": "description",
-   "fieldtype": "Data",
+   "fieldtype": "Markdown Editor",
    "in_list_view": 1,
    "label": "Description"
   },
@@ -41,7 +41,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-07-08 05:59:26.910885",
+ "modified": "2025-07-10 06:43:05.815039",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Detail",
