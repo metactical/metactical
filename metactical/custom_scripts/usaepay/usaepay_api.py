@@ -147,6 +147,7 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 def receive_customer_data():
 	try:  
 		response = frappe.form_dict
+		frappe.log_error(title="USAePay Customer Data", message=response)
 
 		event_body = response.get("event_body")
 		transaction_key = event_body["object"]["key"]
@@ -406,7 +407,7 @@ def create_payment_entry(doc, data, log):
 			
 			amount = data["object"]["auth_amount"] if "auth_amount" in data["object"] else data["object"]["amount"]
 			if float(allocated) > float(amount):
-				pe.references[0].allocated_amount = int(amount)
+				pe.references[0].allocated_amount = float(amount)
 		
 		if pe.paid_amount > 0:
 			pe.save()
