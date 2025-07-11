@@ -6,8 +6,9 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_det
 
 def receive_rmq_data(parsedContent):
 	try:
-		# from metactical.custom_scripts.utils.test import parsedContent
-		frappe.log_error(title='RabbitMQ Data Received', message=str(parsedContent))
+		# from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
+		rmq_log = create_rmq_log(parsedContent)
+		
 		# Assign the shipping province and country based on the parsed content.
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
 		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
@@ -72,6 +73,8 @@ def receive_rmq_data(parsedContent):
 
 		# Create an order using the order details, customer, payment gateway, and shipping address document.
 		order = create_order(order_detail, customer, shipping_address_doc, billing_address_doc)
+		if rmq_log:
+			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 		try:
@@ -89,6 +92,8 @@ def receive_rmq_data(parsedContent):
 						payment = create_payment(payment_detail, order, company)
 			elif parsedContent["PaymentGateway"] == "interacetransfer":
 				add_tag(order, "EtransferPaymentPending")
+    
+			frappe.db.commit()
 		except Exception as e:
 			frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
 			post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
@@ -154,8 +159,8 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, i
 		"items": parsedContent['items'],
 		"discounts": parsedContent['Discounts'],
 		"total_value": parsedContent['totalValueAmount'], 
-		"total_shipping_amount": parsedContent['totalShippingAmount'],
-		"total_discount_amount": parsedContent['TotalDiscountAmount']["Amount"],
+		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
+		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
 		"taxes_and_charges": get_taxes_and_charges(province, country, company),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
@@ -294,7 +299,6 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"source": order_detail['source'],
 		"taxes_and_charges": order_detail['taxes_and_charges'],
 		"delivery_date": calculate_delivery_date(order_detail['order_date']),
-		"discounts": order_detail['discounts'],
 		"total_value": order_detail['total_value'],
 		"total_shipping_amount": order_detail['total_shipping_amount'],
 		"total_discount_amount": order_detail['total_discount_amount'],
@@ -312,7 +316,9 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"ifw_signifyd_score": order_detail['signifyd']['Score'],
 		"ifw_signifyd_guaranteedisposition": order_detail['signifyd']['GuarenteedDisposition'],
 		"ifw_signifyd_fulfilled": order_detail['signifyd']['Fullfilled'],
-		"ifw_store_pickup": order_detail["ifw_store_pickup"]
+		"ifw_store_pickup": order_detail["ifw_store_pickup"],
+		"discount_amount": order_detail["total_discount_amount"],
+		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
 	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
@@ -518,7 +524,7 @@ def process_items(items, shipping_item, order_detail):
 			"doctype": "Sales Order Item",
 			"item_code": item_code,
 			"qty": item['quantity'],
-			"rate": item['unitPrice'],
+			"price_list_rate": item['unitPrice'],
 			"warehouse": warehouse
 		})
 
@@ -529,10 +535,9 @@ def process_items(items, shipping_item, order_detail):
 			"doctype": "Sales Order Item",
 			"item_code": shipping_item['item_code'],
 			"qty": shipping_item['qty'],
-			"rate": shipping_item['rate'],
+			"price_list_rate": shipping_item['rate'],
 			"warehouse": warehouse
-		})
-
+		})  
 		items_list.append(new_shipping_item)
 
 	return items_list
@@ -555,3 +560,29 @@ def update_signify_detail(parsedContent):
 	except Exception as e:
 		frappe.log_error(title='SignifyD Update Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to update SignifyD details: {str(e)}", rmq=True)
+  
+def create_rmq_log(parsedContent):
+	try:
+		publisher_site = parsedContent.get("publisher_site", "Unknown")
+		rmq_log = frappe.get_doc({
+			"doctype": "RabbitMQ Orders Log",
+			"payload": as_unicode(parsedContent),
+			"lead_source": publisher_site
+		})
+		rmq_log.insert()
+		return rmq_log.name
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(title='RMQ Log Creation Error', message=frappe.get_traceback())
+
+
+def as_unicode(text: str, encoding: str = "utf-8") -> str:
+	"""Convert to unicode if required"""
+	if isinstance(text, str):
+		return text
+	elif text is None:
+		return ""
+	elif isinstance(text, bytes):
+		return str(text, encoding)
+	else:
+		return str(text)
