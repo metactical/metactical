@@ -147,6 +147,7 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 def receive_customer_data():
 	try:  
 		response = frappe.form_dict
+		frappe.log_error(title="USAePay Customer Data", message=response)
 
 		event_body = response.get("event_body")
 		transaction_key = event_body["object"]["key"]
