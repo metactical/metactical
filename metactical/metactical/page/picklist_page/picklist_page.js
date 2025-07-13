@@ -698,6 +698,7 @@ class PicklistPage{
 
 		sort_by = metactical.pick_list.order_sort_by;
 		sort_order = metactical.pick_list.order_sort_order;
+		let selected_source = 'All';
 
 		// Initialize with the global selected source if available
 		if (metactical.pick_list && metactical.pick_list.selected_source) {
