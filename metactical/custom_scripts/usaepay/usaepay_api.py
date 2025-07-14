@@ -144,12 +144,15 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 # 		frappe.throw(_("Failed to fetch customer details from USAePay: {0}").format(response.get("error")))
 
 @frappe.whitelist()
-def receive_customer_data():
+def receive_customer_data(response=None, docname=None):
 	try:  
-		response = frappe.form_dict
-		frappe.log_error(title="USAePay Customer Data", message=response)
+		if not response:
+			response = frappe.form_dict
 
 		event_body = response.get("event_body")
+		if response.get('event_type') == "transaction.sale.refunded":
+			return
+
 		transaction_key = event_body["object"]["key"]
 
 		docs_to_check = ["Sales Order", "Sales Invoice", "Payment Entry"]
@@ -188,7 +191,8 @@ def receive_customer_data():
 				event_body["object"] = transaction
 				doctype = "Sales Order"
 			else:
-				if "creditcard" in transaction and not frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "marchant_id": event_body["merchant"]["merch_key"]}):
+				existing_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "merchant_id": event_body["merchant"]["merch_key"]})
+				if "creditcard" in transaction and not existing_transaction:
 					lead_source = usaepay_account.lead_source
 					frappe.get_doc({
 						"doctype": "SO USAePay Transaction", 
@@ -197,7 +201,8 @@ def receive_customer_data():
 						"credit_card": transaction["creditcard"]["number"],
 						"transaction_key": transaction["key"],
 						"merchant_id": event_body["merchant"]["merch_key"],
-						"lead_source": lead_source
+						"lead_source": lead_source,
+						"payload": response
 					}).insert()
 					frappe.db.commit()
 					return
@@ -234,10 +239,24 @@ def receive_customer_data():
 						frappe.get_doc("Payment Entry", log.payment_entry).submit()
 		except Exception as e:
 			frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())	
-   
-		frappe.db.commit()
+
+		if docname:
+			update_usaepay_transaction(docname)
+	except frappe.ValidationError as e:
+		if docname:
+			update_usaepay_transaction(docname)
+		else:
+			frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
+		if docname:
+			update_usaepay_transaction(docname)
+
+def update_usaepay_transaction(docname):    
+	if docname and frappe.db.exists("SO USAePay Transaction", docname):
+		frappe.db.set_value("SO USAePay Transaction", docname, "processed_again", 1)
+		frappe.db.commit()
+
 
 def process_sales_order(event_body, transaction_key):
 	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
@@ -888,3 +907,12 @@ def add_to_log(log):
 
 def get_lead_source(transaction_key):
 	return frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "source")
+
+def process_missed_usaepay_transactions():
+	# Get all USAePay transactions that are not linked to any Sales Order or Payment Entry
+	usaepay_transactions = frappe.get_all("SO USAePay Transaction", filters={"processed_again": 0, "payload": ["is", "set"]}, fields=["name", "payload"])
+
+	for transaction in usaepay_transactions:
+		# convert payload to dict
+		payload = json.loads(transaction.payload)
+		frappe.enqueue(receive_customer_data, job_name="Processing usaepay data", response=payload, queue='long', timeout=600)	

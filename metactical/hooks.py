@@ -201,7 +201,8 @@ scheduler_events = {
 # 	],
 	"cron": {
 		"15 * * * *": [
-			"metactical.custom_scripts.frappe.document.clear_queued_docs"
+			"metactical.custom_scripts.frappe.document.clear_queued_docs",
+			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		]
 	}
 }
