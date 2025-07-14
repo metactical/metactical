@@ -11,7 +11,9 @@
   "credit_card",
   "transaction_key",
   "merchant_id",
-  "lead_source"
+  "lead_source",
+  "processed_again",
+  "payload"
  ],
  "fields": [
   {
@@ -45,11 +47,23 @@
    "fieldtype": "Link",
    "label": "Lead Source",
    "options": "Lead Source"
+  },
+  {
+   "default": "0",
+   "fieldname": "processed_again",
+   "fieldtype": "Check",
+   "label": "Processed Again?"
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "JSON",
+   "label": "Payload",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-29 11:59:16.737341",
+ "modified": "2025-07-14 04:09:35.392532",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SO USAePay Transaction",
@@ -69,5 +83,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }
