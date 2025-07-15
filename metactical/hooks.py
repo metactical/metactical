@@ -823,7 +823,9 @@ fixtures = [{
    			'Item-sb_tag',
 			'Item-item_detail',
 			"Item-request_ai_suggestion",
-			"Item-slugs_and_descriptions"
+			"Item-slugs_and_descriptions",
+			"Shipment-neb_notification_email_sent",
+			"Lead Source-neb_email_account"
 		]]]
 	},
 	{
