@@ -14,7 +14,46 @@ class CustomShipment(Shipment):
 				frappe.msgprint(_("Weight doesn't allow more than 32 Kg"))
 
 		self.update_shipment_parcel()
-		
+  
+	def on_update_after_submit(self):
+		# Set source and customer PO number based on delivery notes
+		can_send_notification = False
+		if self.shipments:
+			for shipment in self.shipments:
+				if shipment.awb_number:
+					can_send_notification = True
+					break
+
+		if can_send_notification and not self.neb_notificaiton_email_sent:
+			self.send_notification_email()
+   
+	def send_notification_email(self):
+		shipping_address = frappe.get_doc("Address", self.delivery_address_name)
+		shipment_settings = frappe.get_doc("Shipment Settings")
+
+		if shipping_address and shipment_settings.send_email_to_customers:
+			email = shipping_address.email_id
+			if email:
+				self.send_notification_email(email, shipment_settings)
+
+		email_template = frappe.get_doc("Email Template", shipment_settings.email_template)
+		subject = frappe.render_template(email_template.subject, {"doc": self})
+		message = frappe.render_template(email_template.response_html, {"doc": self})
+  
+		email_account = frappe.db.get_value("Lead Source", self.neb_source, "neb_email_account")
+		if not email_account:
+			return
+
+		frappe.sendmail(
+			sender=email_account,
+			recipients=[email],
+			subject=subject,
+			message=message
+		)
+  
+		frappe.db.set_value("Shipment", self.name, "neb_notificaiton_email_sent", 1)
+		frappe.db.commit()
+  
 	def update_shipment_parcel(self):
 		shipment_parcels = self.shipment_parcel
 		delivery_notes = self.shipment_delivery_note
