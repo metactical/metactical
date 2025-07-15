@@ -819,10 +819,11 @@ def create_return(*args, **kwargs):
                 
         invoiceId = form_data["InvoiceId"]
         sales_return = make_sales_return(invoiceId)
-        pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["write_off_limit", "ifw_return_warehouse"], as_dict=True)
+        pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
         filtered_items = []
+        sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
 
         for item in items:
             for updated_item in formatted_items:
