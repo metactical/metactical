@@ -294,13 +294,14 @@ def check_existing_customer(billing_address_doc, billing_address_detail):
 	return None
 
 def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
+	items = process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail)
 	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
 		"order_type": "Shopping Cart",
 		"po_date": remove_tz_from_date(order_detail['order_date']),
 		"po_no": order_detail["order_id"],
-		"items": process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail),
+		"items": items,
 		"source": order_detail['source'],
 		"taxes_and_charges": order_detail['taxes_and_charges'],
 		"delivery_date": calculate_delivery_date(order_detail['order_date']),
@@ -324,6 +325,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
+		"is_rush": is_rush(items)
 	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
@@ -333,6 +335,13 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 
 	frappe.db.commit()
 	return new_order
+
+def is_rush(items):
+    for item in items:
+        print(item.get("item_code"))
+        if item.get("item_code") == "99992":
+            return True
+    return False
 
 def create_address(address_detail, customer, address_type):
 	address = frappe.get_doc({
@@ -453,7 +462,14 @@ def create_payment(payment_detail, order, company):
 		new_payment.paid_to = account["account"]
 		new_payment.reference_no = order.neb_usaepay_transaction_key
 		new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
-		new_payment.submit()
+		new_payment.save()
+
+		can_be_submitted = True
+		if transaction_detail.get("paymentGatewayAlias") == "paypalexpress" and transaction_detail.get("orderTransactionState") == 1:
+			can_be_submitted = False
+      
+		if can_be_submitted:
+			new_payment.submit()
 		frappe.db.commit()
 
 		return new_payment
@@ -534,6 +550,9 @@ def process_items(items, shipping_item, order_detail):
 	warehouse = frappe.db.get_value("Lead Source", order_detail['source'], "neb_default_warehouse") or "W01-WHS-Active Stock - ICL"
 	
 	for item in items:
+		if item['isTrashed']:
+			continue
+
 		item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item['retailSku']}, "name")
 		if not item_code:
 			frappe.throw(f"Item with retail SKU {item['retailSku']} not found for order {order_detail['order_id']}")
