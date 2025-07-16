@@ -460,6 +460,7 @@ def create_payment(payment_detail, order, company):
 
 		account = get_bank_cash_account(company=company, mode_of_payment=card_type)
 		new_payment.paid_to = account["account"]
+		new_payment.paid_amount = transaction_detail["amount"]
 		new_payment.reference_no = order.neb_usaepay_transaction_key
 		new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
 		new_payment.save()
