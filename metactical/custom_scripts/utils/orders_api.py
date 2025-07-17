@@ -51,12 +51,16 @@ def receive_rmq_data(parsedContent):
 		order_detail = get_order_detail(parsedContent, province, country, company, shipping_item, is_billing_cp_verified)
 
 		# Build payment details using transaction data and billing country if transactions exist. Default to None otherwise.
+		succesfull_transaction = None
 		if parsedContent.get("transactions"):
-			succesfull_transaction = None
 			for transaction in parsedContent['transactions']:
 				if transaction.get("orderTransactionState") == 3:
 					# If the transaction state is 3, it indicates a successful transaction.
 					succesfull_transaction = transaction
+				elif transaction.get("orderTransactionState") == 1:
+					if "paymentGatewayAlias" in transaction and transaction["paymentGatewayAlias"] == "paypalexpress":
+						# If the transaction state is 1 and the payment gateway is PayPal Express, consider it successful.
+						succesfull_transaction = transaction
      
 			payment_detail = {
 				"transactions": succesfull_transaction,
@@ -78,11 +82,11 @@ def receive_rmq_data(parsedContent):
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 		try:
-			if "PaymentGateway" not in parsedContent:
+			if "paymentGatewayAlias" not in succesfull_transaction:
 				return
-
-			if parsedContent["PaymentGateway"] != "interacetransfer" and payment_detail['transactions']:
-				if order.neb_usaepay_transaction_key:
+			
+			if payment_detail['transactions'] and succesfull_transaction["paymentGatewayAlias"] != "interacetransfer":
+				if order.neb_usaepay_transaction_key or succesfull_transaction['paymentGatewayAlias'] == 'paypalexpress':
 					payment = create_payment(payment_detail, order, company)
 				else:
 					from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
@@ -90,7 +94,8 @@ def receive_rmq_data(parsedContent):
 					if transaction_key:
 						frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
 						payment = create_payment(payment_detail, order, company)
-			elif parsedContent["PaymentGateway"] == "interacetransfer":
+      
+			elif succesfull_transaction["paymentGatewayAlias"] == "interacetransfer":
 				add_tag(order, "EtransferPaymentPending")
     
 			frappe.db.commit()
@@ -289,13 +294,14 @@ def check_existing_customer(billing_address_doc, billing_address_detail):
 	return None
 
 def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
+	items = process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail)
 	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
 		"order_type": "Shopping Cart",
 		"po_date": remove_tz_from_date(order_detail['order_date']),
 		"po_no": order_detail["order_id"],
-		"items": process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail),
+		"items": items,
 		"source": order_detail['source'],
 		"taxes_and_charges": order_detail['taxes_and_charges'],
 		"delivery_date": calculate_delivery_date(order_detail['order_date']),
@@ -319,6 +325,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
+		"is_rush": is_rush(items)
 	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
@@ -328,6 +335,13 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 
 	frappe.db.commit()
 	return new_order
+
+def is_rush(items):
+    for item in items:
+        print(item.get("item_code"))
+        if item.get("item_code") == "99992":
+            return True
+    return False
 
 def create_address(address_detail, customer, address_type):
 	address = frappe.get_doc({
@@ -426,16 +440,37 @@ def create_contact(contact_detail, customer):
 # Finally, it returns a list of all the created Sales Order Item documents.
 def create_payment(payment_detail, order, company):
 	try:
-		card_type = get_card_type(payment_detail)
+		if not payment_detail:
+			frappe.log_error(title='Payment Detail Error', message=f'{order.name} does not have payment details.')
+			return None
+
+		transaction_detail = payment_detail['transactions']
+	
+		if transaction_detail.get("paymentGatewayAlias") == "paypalexpress":
+			country = frappe.db.get_value("Company", company, "country")
+			if country == "Canada":
+				card_type = "PayPal - CAD"
+			else:
+				card_type = "PayPal - USD"
+		else:
+			card_type = get_card_type(payment_detail)
 
 		new_payment = get_payment_entry(order.doctype, order.name)
 		new_payment.mode_of_payment = card_type
 
 		account = get_bank_cash_account(company=company, mode_of_payment=card_type)
 		new_payment.paid_to = account["account"]
+		new_payment.paid_amount = transaction_detail["amount"]
 		new_payment.reference_no = order.neb_usaepay_transaction_key
 		new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
-		new_payment.submit()
+		new_payment.save()
+
+		can_be_submitted = True
+		if transaction_detail.get("paymentGatewayAlias") == "paypalexpress" and transaction_detail.get("orderTransactionState") == 1:
+			can_be_submitted = False
+      
+		if can_be_submitted:
+			new_payment.submit()
 		frappe.db.commit()
 
 		return new_payment
@@ -516,6 +551,9 @@ def process_items(items, shipping_item, order_detail):
 	warehouse = frappe.db.get_value("Lead Source", order_detail['source'], "neb_default_warehouse") or "W01-WHS-Active Stock - ICL"
 	
 	for item in items:
+		if item['isTrashed']:
+			continue
+
 		item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item['retailSku']}, "name")
 		if not item_code:
 			frappe.throw(f"Item with retail SKU {item['retailSku']} not found for order {order_detail['order_id']}")
