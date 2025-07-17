@@ -25,6 +25,7 @@ class CanadaPost():
 	def _init_session(self):
 		self.sess = requests.Session()
 		self.set_default_headers()
+		self.sess.verify = True
 
 	def set_default_headers(self):
 		self.sess.headers = {
@@ -178,30 +179,54 @@ class CanadaPost():
 			for c in range(parcel.idx - exists.get(parcel.name, 0)):
 				body = frappe.render_template(
 					"metactical/utils/shipping/templates/canada_post/request/create_shipment.xml", context)
-				# temp fix to replae the special character which was causing errors
-				body = body.replace("é", "e")
-				response = self.get_response(
-					f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
-																									   'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
-				row = doc.append('shipments', {
-					'shipment_id': response['shipment-info']['shipment-id'],
-					'awb_number': response['shipment-info']['tracking-pin'],
-					'service_provider': 'Canada Post',
-					'service_name': context.parcel.service_name,
-					'carrier_service': context.parcel.carrier_service,
-					'tracking_status': '',
-					'carrier_status': response['shipment-info']['shipment-status'],
-					'row_id': parcel.name
-				})
-				for link in response['shipment-info']['links']['link']:
-					rel = 'tracking' if link['@rel'] == "self" else link['@rel']
-					row.set(
-						f'{rel}_url', f"""<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>""")
-					if link['@rel'] == "label":
-						self.get_label(row, link, 'label', files)
-					elif link['@rel'] == "price":
-						self.set_price(row, link)
-				row.db_insert()
+				
+				# Special character replacement for both lowercase and uppercase characters
+				replacements = {
+					"é": "e", "É": "E",
+					"è": "e", "È": "E",
+					"ê": "e", "Ê": "E",
+					"ë": "e", "Ë": "E",
+					"à": "a", "À": "A",
+					"â": "a", "Â": "A",
+					"ç": "c", "Ç": "C",
+					"î": "i", "Î": "I",
+					"ï": "i", "Ï": "I",
+					"ô": "o", "Ô": "O",
+					"ù": "u", "Ù": "U",
+					"û": "u", "Û": "U",
+					"ü": "u", "Ü": "U"
+				}
+				
+				for char, replacement in replacements.items():
+					body = body.replace(char, replacement)
+
+				try:
+					response = self.get_response(
+						f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
+																										'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
+					row = doc.append('shipments', {
+						'shipment_id': response['shipment-info']['shipment-id'],
+						'awb_number': response['shipment-info']['tracking-pin'],
+						'service_provider': 'Canada Post',
+						'service_name': context.parcel.service_name,
+						'carrier_service': context.parcel.carrier_service,
+						'tracking_status': '',
+						'carrier_status': response['shipment-info']['shipment-status'],
+						'row_id': parcel.name
+					})
+					for link in response['shipment-info']['links']['link']:
+						rel = 'tracking' if link['@rel'] == "self" else link['@rel']
+						row.set(
+							f'{rel}_url', f"""<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>""")
+						if link['@rel'] == "label":
+							self.get_label(row, link, 'label', files)
+						elif link['@rel'] == "price":
+							self.set_price(row, link)
+					row.db_insert()
+				except Exception as e:
+					frappe.log_error(f"Canada Post API Error: {str(e)}", "Canada Post Error")
+					frappe.throw(f"Error creating shipment: {str(e)}")
+
 		doc.ais_shipment_status = "Shipped"
 		doc.save()
 		frappe.db.set_value("Shipment", name, "service_provider", "Canada Post")
@@ -484,8 +509,11 @@ class CanadaPost():
 		if headers:
 			self.sess.headers.update(headers)
 		try:
-			r = self.sess.request(method, url if url.startswith(
-				'https://') else f'{self.settings.host}{url}', data=body)
+			r = self.sess.request(
+					method, 
+					url if url.startswith('https://') else f'{self.settings.host}{url}', 
+					data=body,
+					timeout=30)
 			r.raise_for_status()
 			if return_request:
 				return r
