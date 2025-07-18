@@ -28,6 +28,9 @@ def start_sync(filters):
 	# frappe.db.set_single_value("MT Background Sync", "last_filters_used", filters, update_modified=False)
 	# frappe.db.commit()
  
+	if filters == '[]':
+		frappe.throw("Please select filters to sync items.")
+ 
 	items_count = frappe.db.get_list(
 		"Item",
 		filters=filters,
