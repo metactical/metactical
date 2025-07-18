@@ -1,11 +1,19 @@
 import frappe
 import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
+from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 
 def validate(doc, method):
     load_tags(doc)
 
 def on_update(doc, method):
+    if frappe.flags.in_import:
+        webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "webhook_docevent": "on_update", "enabled": 1})
+        if webhook:
+            webhook = frappe.get_doc("Webhook", webhook)
+            # Enqueue the webhook for the item update
+            enqueue_webhook(doc, webhook)     
+               
     # check website specification values
     validate_website_specifications(doc)
     sync_website_specifications(doc)

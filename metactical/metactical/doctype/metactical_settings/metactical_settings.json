@@ -18,7 +18,9 @@
   "roles_to_make_payment",
   "roles_to_cancel_payment",
   "pos_section",
-  "pos_url"
+  "pos_url",
+  "background_sync_tab",
+  "max_number_of_items_to_sync"
  ],
  "fields": [
   {
@@ -91,12 +93,23 @@
    "fieldname": "pos_url",
    "fieldtype": "Data",
    "label": "POS URL"
+  },
+  {
+   "fieldname": "background_sync_tab",
+   "fieldtype": "Tab Break",
+   "label": "Background Sync"
+  },
+  {
+   "fieldname": "max_number_of_items_to_sync",
+   "fieldtype": "Int",
+   "label": "Max. number of Items to Sync",
+   "permlevel": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-04-09 08:01:43.022513",
+ "modified": "2025-07-01 08:50:42.163545",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",
