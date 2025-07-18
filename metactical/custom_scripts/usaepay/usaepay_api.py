@@ -8,6 +8,9 @@ from metactical.custom_scripts.utils.metactical_utils import (
 	get_usaepay_account
 )
 
+import sys
+import time
+
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
 
@@ -186,8 +189,13 @@ def receive_customer_data(response=None, docname=None):
 			if not transaction or "orderid" not in transaction:
 				return
 
+			sys.stdout.flush()
+			time.sleep(10)
+			frappe.db.commit()
+
 			# check if the SO is created by the SB before usaepay webhook response
-			if frappe.db.exists("Sales Order", {"po_no": transaction["orderid"]}):
+			order_exists = frappe.db.sql("SELECT name FROM `tabSales Order` WHERE po_no = %s", (transaction["orderid"],), as_dict=True)
+			if len(order_exists) > 0:
 				event_body["object"] = transaction
 				doctype = "Sales Order"
 			else:
@@ -429,7 +437,7 @@ def create_payment_entry(doc, data, log):
 			if float(allocated) > float(amount):
 				pe.references[0].allocated_amount = float(amount)
 		
-		if pe.paid_amount > 0:
+		if float(pe.paid_amount) > 0:
 			pe.save()
 			pe.submit()
 
