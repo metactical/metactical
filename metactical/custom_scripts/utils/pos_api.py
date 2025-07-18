@@ -820,9 +820,11 @@ def create_return(*args, **kwargs):
                 
         invoiceId = form_data["InvoiceId"]
         sales_return = make_sales_return(invoiceId)
+        pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
         filtered_items = []
+        sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
 
         for item in items:
             for updated_item in formatted_items:
@@ -833,9 +835,9 @@ def create_return(*args, **kwargs):
                     item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
                     item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
                     item.margin_type = ""
+                    item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
-        
 
         sales_return.items = filtered_items
         sales_return.calculate_taxes_and_totals()
@@ -846,7 +848,7 @@ def create_return(*args, **kwargs):
         if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
             difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)
         
-        write_off_limit = frappe.db.get_value("POS Profile", sales_return.pos_profile, "write_off_limit")
+        write_off_limit = pos_profile.write_off_limit
         if write_off_limit and abs(difference) > write_off_limit:
             frappe.response["Status"] = 500
             frappe.response["Message"] = "Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit)
