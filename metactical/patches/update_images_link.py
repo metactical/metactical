@@ -18,7 +18,7 @@ def execute():
     
 def update_items_image_link(items):
     for item in items:
-        frappe.db.set_value('Item', item["item"], 'image', item["image"])
+        frappe.db.set_value('Item', item["item"], 'image', item["image"], update_modified=False)
         
     frappe.db.commit()
     
