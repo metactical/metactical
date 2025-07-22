@@ -14,7 +14,8 @@ def get_command():
 	file_path = os.path.abspath(__file__)	
 	main_dir = file_path.split("apps")[0][:-1]
 
-	command = "bench start-background-sync"
+	site = frappe.local.site
+	command = f"bench --site {site} start-background-sync"
 	command = f"cd {main_dir} && {command}"	
  
 	return command
@@ -39,8 +40,10 @@ def start_sync(filters):
 		frappe.throw(f"Cannot sync more than {max_number_of_items_to_sync} items at a time. Please refine your filters to reduce the number of items to sync.")
   
 	pids = []
+	site = frappe.local.site
+	frappe.log_error(f"Starting background sync for site: {site} with filters: {filters}", "Background Sync Start")
 	try:
-		output = subprocess.check_output(["pgrep", "-f", "bench start-background-sync"]).decode().splitlines()
+		output = subprocess.check_output(["pgrep", "-f", f"bench --site {site} start-background-sync"]).decode().splitlines()
 		pids = [int(pid) for pid in output]
 	except subprocess.CalledProcessError:
 		pass
@@ -55,10 +58,11 @@ def start_sync(filters):
 		frappe.db.commit()
   
 	command = get_command()
-	b_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	frappe.db.set_single_value("MT Background Sync", "pid", b_process.pid, update_modified=False)
-	frappe.db.commit()
- 
+	try:
+		b_process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Error starting background sync process")
 	frappe.msgprint("Background sync process started.")
  
 @frappe.whitelist()
