@@ -162,7 +162,7 @@ def receive_customer_data(response=None, docname=None):
 		doctype = ""
 
 		# check if the trnsaction is initiated from a payment Entry in the ERP
-		if "invoice" in event_body["object"]:
+		if "invoice" in event_body["object"] and event_body["object"]["invoice"]:
 			if event_body["object"]["invoice"]:
 				for doc in docs_to_check:
 					if frappe.db.exists(doc, event_body["object"]["invoice"]):
@@ -190,8 +190,9 @@ def receive_customer_data(response=None, docname=None):
 				return
 
 			sys.stdout.flush()
-			time.sleep(10)
+			time.sleep(15)
 			frappe.db.commit()
+   
 
 			# check if the SO is created by the SB before usaepay webhook response
 			order_exists = frappe.db.sql("SELECT name FROM `tabSales Order` WHERE po_no = %s", (transaction["orderid"],), as_dict=True)
@@ -417,10 +418,12 @@ def get_comment_message(log):
 def create_payment_entry(doc, data, log):
 	try: 
 		mode_of_payment = "Visa"
-		if data["object"]["creditcard"]["category_code"] == "AX":
-			mode_of_payment = "Amex"
-		elif data["object"]["creditcard"]["category_code"] == "M":
-			mode_of_payment = "Master Card"
+		
+		if 'category_code' in data["object"]["creditcard"]:
+			if data["object"]["creditcard"]["category_code"] == "AX":
+				mode_of_payment = "Amex"
+			elif data["object"]["creditcard"]["category_code"] == "M":
+				mode_of_payment = "Master Card"
 
 		pe = get_payment_entry(doc.doctype, doc.name)
 		pe.mode_of_payment = mode_of_payment
