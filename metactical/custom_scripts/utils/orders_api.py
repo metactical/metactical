@@ -140,18 +140,13 @@ def get_address_and_customer(parsedContent, billing_address_detail, shipping_add
 		customer = get_or_create_customer(parsedContent['publisher_site'], billing_address_detail, shipping_address_detail)
 		billing_address_doc = create_address(billing_address_detail, customer, "Billing")
 
-	# if same address is used for billing and shipping, return the billing address as the shipping address
-	if not parsedContent["PickInLocation"]:
-		shipping_address_doc = billing_address_doc
+	existing_shipping_address = check_existing_address(shipping_address_detail, "Shipping")
+	if existing_shipping_address:
+		# If an existing shipping address is found, fetch its document.
+		shipping_address_doc = frappe.get_doc("Address", existing_shipping_address)
 	else:
-		# if "In store pickup" is selected, create a new address for the shipping address if it does not exist
-		existing_shipping_address = check_existing_address(shipping_address_detail, "Shipping")
-		if existing_shipping_address:
-			# If an existing shipping address is found, fetch its document.
-			shipping_address_doc = frappe.get_doc("Address", existing_shipping_address)
-		else:
-			# If no shipping address is found, create a new one.
-			shipping_address_doc = create_address(shipping_address_detail, customer, "Shipping")
+		# If no shipping address is found, create a new one.
+		shipping_address_doc = create_address(shipping_address_detail, customer, "Shipping")
 
 	# Return the billing address document, shipping address document, and th
 	return billing_address_doc, shipping_address_doc, customer
