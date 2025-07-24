@@ -1,4 +1,6 @@
 {
+ "actions": [],
+ "allow_import": 1,
  "creation": "2021-12-04 15:12:17.344371",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -32,7 +34,8 @@
    "reqd": 1
   }
  ],
- "modified": "2021-12-04 15:14:04.798310",
+ "links": [],
+ "modified": "2025-07-23 08:08:05.019641",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "City Symbol",
@@ -54,5 +57,6 @@
  "quick_entry": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
