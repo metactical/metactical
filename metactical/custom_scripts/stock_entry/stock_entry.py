@@ -100,10 +100,10 @@ class CustomStockEntry(StockEntry):
 				t_warehouses.append(row.warehouse)
 			
 			for row in self.items:
-				if row.s_warehouse not in s_warehouses:
+				if row.s_warehouse and row.s_warehouse not in s_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, frappe.session.user))
 					
-				if row.t_warehouse not in t_warehouses:
+				if row.t_warehouse and row.t_warehouse not in t_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
 				
 	def on_submit(self):
