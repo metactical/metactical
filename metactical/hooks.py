@@ -825,7 +825,8 @@ fixtures = [{
 			"Item-request_ai_suggestion",
 			"Item-slugs_and_descriptions",
 			"Shipment-neb_notification_email_sent",
-			"Lead Source-neb_email_account"
+			"Lead Source-neb_email_account",
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
 	{
@@ -1360,8 +1361,7 @@ fixtures = [{
 			"Sales Taxes and Charges-autoname",
 			"Bin-autoname",
 			"Custom Field-label-width",
-			"Shipment Parcel-weight-precision",
-			"Shipment-custom_nondelivery_handling_option"
+			"Shipment Parcel-weight-precision"
 		]]]
 	},
   	{
