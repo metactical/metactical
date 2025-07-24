@@ -818,7 +818,8 @@ fixtures = [{
 			'Lead Source-neb_company',
 			'Shipment-custom_dangerous_goods',
 			'Shipment-custom_dangerous_goods_class',
-			'Shipment-custom_dangerous_goods_mode'
+			'Shipment-custom_dangerous_goods_mode',
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
 	{
@@ -1353,8 +1354,7 @@ fixtures = [{
 			"Sales Taxes and Charges-autoname",
 			"Bin-autoname",
 			"Custom Field-label-width",
-			"Shipment Parcel-weight-precision",
-			"Shipment-custom_nondelivery_handling_option"
+			"Shipment Parcel-weight-precision"
 		]]]
 	},
   	{
