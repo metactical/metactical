@@ -61,6 +61,14 @@ class CanadaPost():
 		else:
 			delivery_address_doc.pincode = delivery_address_doc.pincode.upper()
 
+		# Check if shipment is to the US and validate the non-delivery handling option
+		if delivery_address_doc.country == "United States" or delivery_address_doc.country_code == "US":
+			if not doc.custom_nondelivery_handling_option:
+				frappe.throw(_(
+					"For US shipments, the Non-Delivery Handling Option is required. "
+					"Please set the 'Non-Delivery Handling Option' field in the shipment document."
+				))
+			
 		pickup_address_doc = frappe.get_doc(
 			'Address', doc.pickup_address_name).as_dict()
 		
@@ -165,8 +173,18 @@ class CanadaPost():
 		if doc.custom_ais_require_signature:
 			context.options.append('SO')
 
-		if doc.custom_ais_do_not_safe_drop:
+		if doc.custom_ais_do_not_safe_drop and context.delivery_address_doc.country == "Canada":
 			context.options.append('DNS')
+
+		if context.delivery_address_doc.country == "United States" and doc.custom_nondelivery_handling_option:
+			non_delivery_options = {
+				"Return at Sender's Expense": "RASE",
+				"Return to Sender": "RTS",
+				"Abandon": "ABAN"
+			}
+
+			if non_delivery_options.get(doc.custom_nondelivery_handling_option):
+				context.options.append(non_delivery_options.get(doc.custom_nondelivery_handling_option))
 
 		for parcel in context.doc.shipment_parcel:
 			context.parcel = parcel

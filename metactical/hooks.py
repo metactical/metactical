@@ -1360,11 +1360,15 @@ fixtures = [{
 			"Sales Taxes and Charges-autoname",
 			"Bin-autoname",
 			"Custom Field-label-width",
-			"Shipment Parcel-weight-precision"
+			"Shipment Parcel-weight-precision",
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
   	{
 		"dt": "Provinces"
+	},
+	{
+		"dt": "City Symbol"
 	},
 	{
 		"dt": "Email Template",
