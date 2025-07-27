@@ -896,7 +896,7 @@ def process_missed_usaepay_transactions():
 		if order and order.advance_paid == 0:
 			try:
 				frappe.enqueue(get_usaepay_order_detail, 
-							   so_transaction=so_transaction, 
+							   transaction=so_transaction, 
 							   order=order, 
 							   queue='long', 
 							   timeout=600, 
