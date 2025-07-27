@@ -33,12 +33,12 @@ def get_transaction_from_usaepay(usaepay_transaction_key, headers, merchant_id=N
 	if response.status_code == 200:
 		transaction = json.loads(response.text)
 		if transaction.get("error"):
-			frappe.throw(_("Failed to fetch transaction details from USAePay: {0}").format(cstr(transaction.get("error"))))
-
+			# frappe.throw(_("Failed to fetch transaction details from USAePay: {0}").format(cstr(transaction.get("error"))))
+			frappe.throw(_("{0} - Failed to fetch transaction details from USAePay - {1}").format(usaepay_transaction_key, cstr(transaction.get("error"))))
 		return transaction
 	else:
 		response = json.loads(response.text)
-		frappe.throw(_("Failed to fetch transaction details from USAePay: {0}").format(response.get("error")))
+		frappe.throw(_("{0} - Failed to fetch transaction details from USAePay: {1}").format(usaepay_transaction_key, response.get("error")))
 	
 	return None
 
@@ -170,52 +170,7 @@ def receive_customer_data(response=None, docname=None):
 						break
 			else:
 				return
-		# when the payment is created from the website and the SO is not created yet
-		# webhook's response will be added to a temporary doc and then will be processed when the SO is created.
-		# This is to avoid the case where the webhook response comes before the SO is created in the ERP
-		else:
-			usaepay_account = get_usaepay_account(merchant_id=event_body["merchant"]["merch_key"])
-			if not usaepay_account:
-				return
-			
-			token_hash = get_token_hash(usaepay_account)
-			headers = {
-				"Content-Type": "application/json",
-				"Authorization": token_hash
-			}
 
-			transaction = event_body["object"]["key"]
-			transaction = get_transaction_from_usaepay(transaction, headers, event_body["merchant"]["merch_key"])
-			if not transaction or "orderid" not in transaction:
-				return
-
-			sys.stdout.flush()
-			time.sleep(15)
-			frappe.db.commit()
-   
-
-			# check if the SO is created by the SB before usaepay webhook response
-			order_exists = frappe.db.sql("SELECT name FROM `tabSales Order` WHERE po_no = %s", (transaction["orderid"],), as_dict=True)
-			if len(order_exists) > 0:
-				event_body["object"] = transaction
-				doctype = "Sales Order"
-			else:
-				existing_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id": transaction["orderid"], "merchant_id": event_body["merchant"]["merch_key"]})
-				if "creditcard" in transaction and not existing_transaction:
-					lead_source = usaepay_account.lead_source
-					frappe.get_doc({
-						"doctype": "SO USAePay Transaction", 
-						"order_id": transaction["orderid"],
-						"invoice": transaction["invoice"],
-						"credit_card": transaction["creditcard"]["number"],
-						"transaction_key": transaction["key"],
-						"merchant_id": event_body["merchant"]["merch_key"],
-						"lead_source": lead_source,
-						"payload": response
-					}).insert()
-					frappe.db.commit()
-					return
-		
 		# doctype = the doctype referenced in the Payment Entry or the Sales order created by the SB
 		if not doctype:
 			return
@@ -249,23 +204,33 @@ def receive_customer_data(response=None, docname=None):
 		except Exception as e:
 			frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())	
 
-		if docname:
-			update_usaepay_transaction(docname)
 	except frappe.ValidationError as e:
-		if docname:
-			update_usaepay_transaction(docname)
-		else:
-			frappe.db.commit()
+		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
-		if docname:
-			update_usaepay_transaction(docname)
 
-def update_usaepay_transaction(docname):    
-	if docname and frappe.db.exists("SO USAePay Transaction", docname):
-		frappe.db.set_value("SO USAePay Transaction", docname, "processed_again", 1)
+def get_usaepay_order_detail(transaction, order):
+	usaepay_account = get_usaepay_account(lead_source=order.source)
+	if not usaepay_account:
+		frappe.throw(_("USAePay account not found for the lead source {0}").format(order.source))
+		
+	headers, usaepay_url = get_headers(lead_source=order.source)
+	if not usaepay_url:
+		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in Metactical Settings for the lead source {0}".format(order.source))
+
+	if not transaction["authorizeTransactionId"]:
+		return 
+
+	transaction = get_transaction_from_usaepay(transaction["authorizeTransactionId"], headers, usaepay_account.get("merchant_id"))
+	event_body = {}
+	event_body["object"] = frappe._dict(transaction)
+
+	# create payment entry if the transaction is successful
+	process_sales_order(event_body, transaction["key"])
+	so_usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", {"order_id": order.name}, "name")
+	if so_usaepay_transaction:
+		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 		frappe.db.commit()
-
 
 def process_sales_order(event_body, transaction_key):
 	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
@@ -922,9 +887,24 @@ def get_lead_source(transaction_key):
 
 def process_missed_usaepay_transactions():
 	# Get all USAePay transactions that are not linked to any Sales Order or Payment Entry
-	usaepay_transactions = frappe.get_all("SO USAePay Transaction", filters={"processed_again": 0, "payload": ["is", "set"]}, fields=["name", "payload"])
-
+	usaepay_transactions = frappe.get_all("SO USAePay Transaction", fields=["name", "transaction_key", "order_id"])
 	for transaction in usaepay_transactions:
 		# convert payload to dict
-		payload = json.loads(transaction.payload)
-		frappe.enqueue(receive_customer_data, job_name="Processing usaepay data", response=payload, queue='long', timeout=600)	
+		order = frappe.get_doc("Sales Order", transaction.order_id)
+		so_transaction = {"authorizeTransactionId": transaction.transaction_key}
+
+		if order and order.advance_paid == 0:
+			try:
+				frappe.enqueue(get_usaepay_order_detail, 
+							   transaction=so_transaction, 
+							   order=order, 
+							   queue='long', 
+							   timeout=600, 
+							   event='get_usaepay_order_detail')
+			except Exception as e:
+				frappe.log_error(title="USAePay Order Detail Fetch Error", message=frappe.get_traceback())
+		else:
+			if order.advance_paid > 0:
+				frappe.delete_doc("SO USAePay Transaction", transaction["name"])
+			else:
+				frappe.log_error(title="USAePay Order Not Found", message="Sales Order not found for transaction {0}".format(transaction["transaction_key"]))
