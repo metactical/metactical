@@ -35,6 +35,13 @@ class CustomShipment(Shipment):
 			sender_name = frappe.db.get_value("Lead Source", self.neb_source, "neb_email_account")
 			sender_account = frappe.db.get_value("Email Account", sender_name, "email_id") if sender_name else None
 			email = shipping_address.email_id
+			if not self.service_provider:
+				self.service_provider = self.shipments[0].service_provider if self.shipments else None
+    
+			if not self.service_provider:
+				frappe.msgprint(_("Service Provider is not set for the shipment. Please set it to send notification email."))
+				return
+
 			if email and sender_account:
 				email_template = frappe.get_doc("Email Template", shipment_settings.email_template)
 				subject = frappe.render_template(email_template.subject, {"doc": self})
