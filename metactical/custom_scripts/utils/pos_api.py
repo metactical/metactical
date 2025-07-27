@@ -911,10 +911,10 @@ def create_restock_invoice(total_restock_fee, sales_return, form_data):
         "posting_date": now_datetime(),
         "due_date": now_datetime(),
         "is_pos": 1,
-        # "pos_profile": form_data['POSProfile'] + ' Operators',
+        "pos_profile": form_data['POSProfile'] + ' Operators',
         "company": sales_return.company,
         "exempt_from_sales_tax": 1,
-        "neb_return_invoice": sales_return.name,
+        "neb_return_document": sales_return.name,
         "items": [{
             "item_code": "2",
             "item_name": "Restock Fee",
