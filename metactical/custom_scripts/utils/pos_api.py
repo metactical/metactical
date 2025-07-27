@@ -541,6 +541,7 @@ def get_items(form_data):
             'qty': qty,
             'discount_percentage': item['Discount'],
             'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
+            'restock_fee': item['RestockFee'] if 'RestockFee' in item else 0.0,
         }
 
         if item_code == "2":
@@ -824,9 +825,11 @@ def create_return(*args, **kwargs):
         items = sales_return.items.copy()
         filtered_items = []
         sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
-
+        total_restock_fee = 0.0
+        
         for item in items:
             for updated_item in formatted_items:
+                total_restock_fee += updated_item["restock_fee"] if "restock_fee" in updated_item else 0.0
                 if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
                     (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
                     item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
@@ -862,6 +865,9 @@ def create_return(*args, **kwargs):
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
+        
+        if total_restock_fee > 0:
+           create_restock_invoice(total_restock_fee, sales_return, form_data)
     except Exception as e:
         frappe.db.rollback()
         frappe.clear_last_message()
@@ -895,6 +901,40 @@ def create_return(*args, **kwargs):
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = sales_return.grand_total
+    frappe.db.commit()
+    
+def create_restock_invoice(total_restock_fee, sales_return, form_data):
+    frappe.set_user(form_data['SalesPerson'])
+    restock_invoice_data = {
+        "doctype": "Sales Invoice",
+        "customer": sales_return.customer,
+        "posting_date": now_datetime(),
+        "due_date": now_datetime(),
+        "is_pos": 1,
+        "pos_profile": form_data['POSProfile'] + ' Operators',
+        "company": sales_return.company,
+        "exempt_from_sales_tax": 1,
+        "neb_return_document": sales_return.name,
+        "items": [{
+            "item_code": "2",
+            "item_name": "Restock Fee",
+            "qty": 1,
+            "rate": total_restock_fee,
+        }],
+        "payments": [{
+            "mode_of_payment": form_data["ModeOfReturn"],
+            "amount": total_restock_fee
+        }],
+    }
+    
+    restock_invoice = frappe.get_doc(restock_invoice_data)
+    restock_invoice.taxes_and_charges = sales_return.taxes_and_charges,
+    restock_invoice.insert(ignore_permissions=True)
+
+    # remove taxes from the restock invoice
+    restock_invoice.taxes = []
+    restock_invoice.save()
+    restock_invoice.submit()
     frappe.db.commit()
     
 def create_gift_card(doc, form_data, coupon_code=None):
