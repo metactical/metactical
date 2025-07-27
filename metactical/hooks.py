@@ -120,9 +120,6 @@ doc_events = {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
 	},
-	"Address": {
-		"validate": "metactical.custom_scripts.address.address.validate"
-	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
@@ -147,6 +144,10 @@ doc_events = {
 	},
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+	},
+	"Item": {
+		"on_update": "metactical.custom_scripts.item.item.on_update",
+		"validate": "metactical.custom_scripts.item.item.validate",
 	}
 }
 
@@ -173,7 +174,7 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
- 	"Item": "metactical.custom_scripts.item.item.CustomItem",
+	"Address": "metactical.custom_scripts.address.address.CustomAddress"
 }
 
 # Scheduled Tasks
@@ -200,7 +201,8 @@ scheduler_events = {
 # 	],
 	"cron": {
 		"15 * * * *": [
-			"metactical.custom_scripts.frappe.document.clear_queued_docs"
+			"metactical.custom_scripts.frappe.document.clear_queued_docs",
+			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		]
 	}
 }
@@ -811,7 +813,20 @@ fixtures = [{
 			'Sales Order-custom_ais_address_verified',
 			'POS Profile User-neb_send_welcome_email',
 			'Coupon Code-custom_sales_invoice',
-			'Contact-custom_ais_contactnotes'
+			'Contact-custom_ais_contactnotes',
+			'Lead Source-neb_default_warehouse',
+			'Lead Source-neb_company',
+			'Shipment-custom_dangerous_goods',
+			'Shipment-custom_dangerous_goods_class',
+			'Shipment-custom_dangerous_goods_mode',
+			"Lead Source-neb_company_address",
+   			'Item-sb_tag',
+			'Item-item_detail',
+			"Item-request_ai_suggestion",
+			"Item-slugs_and_descriptions",
+			"Shipment-neb_notification_email_sent",
+			"Lead Source-neb_email_account",
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
 	{
@@ -1353,6 +1368,9 @@ fixtures = [{
 		"dt": "Provinces"
 	},
 	{
+		"dt": "City Symbol"
+	},
+	{
 		"dt": "Email Template",
 		"filters": [["name", "in", [
 			"POS User Welcome Email"
@@ -1373,7 +1391,8 @@ jinja = {
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info",
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
- 		"metactical.custom_scripts.utils.metactical_utils.get_password"
+ 		"metactical.custom_scripts.utils.metactical_utils.get_password",
+		"metactical.barcode_generator.get_barcode_for_print_format"
 	]
 }
 

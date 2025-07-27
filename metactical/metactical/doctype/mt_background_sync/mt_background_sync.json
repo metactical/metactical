@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-06-16 04:38:45.858476",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "filter_area",
+  "column_break_hoqxp",
+  "last_filters_used",
+  "section_break_snehf",
+  "filters_detail",
+  "section_break_kavoo",
+  "delay_time",
+  "batch_size",
+  "last_offset",
+  "last_sync_time",
+  "column_break_hq6sk",
+  "sync_item_detail",
+  "sync_item_with_price_lists",
+  "sync_item_with_discounts",
+  "sync_item_with_inventory"
+ ],
+ "fields": [
+  {
+   "fieldname": "filter_area",
+   "fieldtype": "HTML",
+   "label": "Filter Area"
+  },
+  {
+   "fieldname": "column_break_hoqxp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_snehf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "sync_item_with_price_lists",
+   "fieldtype": "Check",
+   "label": "Sync Item With Price Lists"
+  },
+  {
+   "default": "1",
+   "fieldname": "sync_item_with_discounts",
+   "fieldtype": "Check",
+   "label": "Sync Item With Discounts"
+  },
+  {
+   "default": "1",
+   "fieldname": "sync_item_with_inventory",
+   "fieldtype": "Check",
+   "label": "Sync Item With Inventory"
+  },
+  {
+   "fieldname": "filters_detail",
+   "fieldtype": "HTML"
+  },
+  {
+   "fieldname": "section_break_kavoo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_hq6sk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "fieldname": "delay_time",
+   "fieldtype": "Int",
+   "label": "Delay Time (in seconds)"
+  },
+  {
+   "default": "10",
+   "fieldname": "batch_size",
+   "fieldtype": "Int",
+   "label": "Batch Size"
+  },
+  {
+   "fieldname": "last_offset",
+   "fieldtype": "Int",
+   "label": "Last Offset"
+  },
+  {
+   "fieldname": "last_sync_time",
+   "fieldtype": "Datetime",
+   "label": "Last Sync Time"
+  },
+  {
+   "default": "1",
+   "fieldname": "sync_item_detail",
+   "fieldtype": "Check",
+   "label": "Sync Item Detail"
+  },
+  {
+   "fieldname": "last_filters_used",
+   "fieldtype": "Text",
+   "label": "Last Filters Used",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-07-01 07:22:27.473914",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "MT Background Sync",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

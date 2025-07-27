@@ -1,0 +1,569 @@
+[
+ {
+  "city": "Nunavut",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.801361",
+  "name": "5e66e4404f",
+  "symbol": "NU"
+ },
+ {
+  "city": "Northwest Territories",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.819904",
+  "name": "183eb3b24a",
+  "symbol": "NT"
+ },
+ {
+  "city": "Yukon",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.835528",
+  "name": "e9dd473c3a",
+  "symbol": "YT"
+ },
+ {
+  "city": "British Columbia",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.848261",
+  "name": "a199300cbf",
+  "symbol": "BC"
+ },
+ {
+  "city": "Alberta",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.860174",
+  "name": "899cf07837",
+  "symbol": "AB"
+ },
+ {
+  "city": "Saskatchewan",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.872619",
+  "name": "cb8d01cd45",
+  "symbol": "SK"
+ },
+ {
+  "city": "Manitoba",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.882928",
+  "name": "00f9dbda3a",
+  "symbol": "MB"
+ },
+ {
+  "city": "Ontario",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.892579",
+  "name": "95a42312ae",
+  "symbol": "ON"
+ },
+ {
+  "city": "Quebec",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.903647",
+  "name": "7bdfe3ec7f",
+  "symbol": "QC"
+ },
+ {
+  "city": "New Brunswick",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.914432",
+  "name": "0d592443d1",
+  "symbol": "NB"
+ },
+ {
+  "city": "Nova Scotia",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.925571",
+  "name": "842460198e",
+  "symbol": "NS"
+ },
+ {
+  "city": "Prince Edward Island",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.936325",
+  "name": "411721ff58",
+  "symbol": "PE"
+ },
+ {
+  "city": "Newfoundland and Labrador",
+  "country": "Canada",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2021-12-07 02:27:23.947190",
+  "name": "01dda3b6f6",
+  "symbol": "NL"
+ },
+ {
+  "city": "Alabama",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.444561",
+  "name": "johm90tdd5",
+  "symbol": "AL"
+ },
+ {
+  "city": "Alaska",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.490994",
+  "name": "johms5h1s7",
+  "symbol": "AK"
+ },
+ {
+  "city": "Arizona",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.497651",
+  "name": "johm316fmd",
+  "symbol": "AZ"
+ },
+ {
+  "city": "Arkansas",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.509356",
+  "name": "johnj4gf7r",
+  "symbol": "AR"
+ },
+ {
+  "city": "California",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.518282",
+  "name": "johnhfu000",
+  "symbol": "CA"
+ },
+ {
+  "city": "Colorado",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.524436",
+  "name": "johnb5no55",
+  "symbol": "CO"
+ },
+ {
+  "city": "Connecticut",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.529733",
+  "name": "johnrgvt44",
+  "symbol": "CT"
+ },
+ {
+  "city": "Delaware",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.538869",
+  "name": "johnus3re5",
+  "symbol": "DE"
+ },
+ {
+  "city": "Florida",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.550285",
+  "name": "john0blvg4",
+  "symbol": "FL"
+ },
+ {
+  "city": "Georgia",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.560806",
+  "name": "john7vmdlk",
+  "symbol": "GA"
+ },
+ {
+  "city": "Hawaii",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.568263",
+  "name": "johnb00dpf",
+  "symbol": "HI"
+ },
+ {
+  "city": "Idaho",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.580952",
+  "name": "johnrtjqqs",
+  "symbol": "ID"
+ },
+ {
+  "city": "Illinois",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.589000",
+  "name": "johnflvjq9",
+  "symbol": "IL"
+ },
+ {
+  "city": "Indiana",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.594041",
+  "name": "johnsibl8j",
+  "symbol": "IN"
+ },
+ {
+  "city": "Iowa",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.602152",
+  "name": "joho8ttmfp",
+  "symbol": "IA"
+ },
+ {
+  "city": "Kansas",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.612055",
+  "name": "johos41s2o",
+  "symbol": "KS"
+ },
+ {
+  "city": "Kentucky",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.627424",
+  "name": "joho6no7mk",
+  "symbol": "KY"
+ },
+ {
+  "city": "Louisiana",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.632689",
+  "name": "johogioi26",
+  "symbol": "LA"
+ },
+ {
+  "city": "Maine",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.637594",
+  "name": "joho7g46eh",
+  "symbol": "ME"
+ },
+ {
+  "city": "Maryland",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.642501",
+  "name": "johojl14h6",
+  "symbol": "MD"
+ },
+ {
+  "city": "Massachusetts",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.650412",
+  "name": "johoehr5gj",
+  "symbol": "MA"
+ },
+ {
+  "city": "Michigan",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.654341",
+  "name": "johoos42ml",
+  "symbol": "MI"
+ },
+ {
+  "city": "Minnesota",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.657798",
+  "name": "johoh50joc",
+  "symbol": "MN"
+ },
+ {
+  "city": "Mississippi",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.661468",
+  "name": "joho3fkdo6",
+  "symbol": "MS"
+ },
+ {
+  "city": "Missouri",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.665120",
+  "name": "johoslm9es",
+  "symbol": "MO"
+ },
+ {
+  "city": "Montana",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.683781",
+  "name": "johoqhp5q5",
+  "symbol": "MT"
+ },
+ {
+  "city": "Nebraska",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.689933",
+  "name": "johovm4ufq",
+  "symbol": "NE"
+ },
+ {
+  "city": "Nevada",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.692948",
+  "name": "johoi5e8k4",
+  "symbol": "NV"
+ },
+ {
+  "city": "New Hampshire",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.698050",
+  "name": "joho99j7jk",
+  "symbol": "NH"
+ },
+ {
+  "city": "New Jersey",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.701453",
+  "name": "johpurvqmf",
+  "symbol": "NJ"
+ },
+ {
+  "city": "New Mexico",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.705325",
+  "name": "johpa8m4u9",
+  "symbol": "NM"
+ },
+ {
+  "city": "New York",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.711856",
+  "name": "johplq0cd9",
+  "symbol": "NY"
+ },
+ {
+  "city": "North Carolina",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.724009",
+  "name": "johp6s8o5p",
+  "symbol": "NC"
+ },
+ {
+  "city": "North Dakota",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.729916",
+  "name": "johp1fq70k",
+  "symbol": "ND"
+ },
+ {
+  "city": "Ohio",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.735358",
+  "name": "johpn83m8t",
+  "symbol": "OH"
+ },
+ {
+  "city": "Oklahoma",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.740075",
+  "name": "johpmq6juq",
+  "symbol": "OK"
+ },
+ {
+  "city": "Oregon",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.745667",
+  "name": "johphg22ab",
+  "symbol": "OR"
+ },
+ {
+  "city": "Pennsylvania",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.749953",
+  "name": "johpomr18g",
+  "symbol": "PA"
+ },
+ {
+  "city": "Rhode_Island",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.754283",
+  "name": "johptr190h",
+  "symbol": "RI"
+ },
+ {
+  "city": "South_Carolina",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.757845",
+  "name": "johp6m93jc",
+  "symbol": "SC"
+ },
+ {
+  "city": "South_Dakota",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.762718",
+  "name": "johp78rvmh",
+  "symbol": "SD"
+ },
+ {
+  "city": "Tennessee",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.772341",
+  "name": "johpo1mr88",
+  "symbol": "TN"
+ },
+ {
+  "city": "Texas",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.775938",
+  "name": "johp4mvu54",
+  "symbol": "TX"
+ },
+ {
+  "city": "Utah",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.779822",
+  "name": "johpj10uk1",
+  "symbol": "UT"
+ },
+ {
+  "city": "Vermont",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.782753",
+  "name": "johp7o6vms",
+  "symbol": "VT"
+ },
+ {
+  "city": "Virginia",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.786234",
+  "name": "johpiuseop",
+  "symbol": "VA"
+ },
+ {
+  "city": "Washington",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.789264",
+  "name": "johpv838ob",
+  "symbol": "WA"
+ },
+ {
+  "city": "West_Virginia",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.793239",
+  "name": "johp2oj2oq",
+  "symbol": "WV"
+ },
+ {
+  "city": "Wisconsin",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.796449",
+  "name": "johptcj1d3",
+  "symbol": "WI"
+ },
+ {
+  "city": "Wyoming",
+  "country": "United States",
+  "docstatus": 0,
+  "doctype": "City Symbol",
+  "modified": "2025-07-23 08:17:25.799443",
+  "name": "johpaqnf5e",
+  "symbol": "WY"
+ }
+]

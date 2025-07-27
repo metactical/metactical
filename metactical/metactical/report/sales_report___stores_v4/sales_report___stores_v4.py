@@ -187,8 +187,29 @@ def get_data(conditions, filters):
 	data = []
 
 	if digit_rows_with_location:
-		# sort by the first part of the location and then by the second part if there is a tie
-		data += sorted(digit_rows_with_location, key=lambda x: (int(x['ifw_location'].split("-")[0]), x['ifw_location'].split("-")[1], x['ifw_location'].split("-")[2]))
+		def safe_location_sort(x):
+			parts = x['ifw_location'].split("-")
+			
+			# Handle first segment (numeric part)
+			first_segment = int(parts[0]) if parts and parts[0].isdigit() else 0
+			
+			# Handle second segment (safely get if exists)
+			second_segment = parts[1] if len(parts) > 1 else ""
+			
+			# Handle third segment (safely get if exists)
+			# Split by common separators in case the format is different
+			if len(parts) > 1:
+				# Check if second segment contains additional separators
+				second_part = parts[1]
+				sub_parts = second_part.split("|") if "|" in second_part else second_part.split()
+				third_segment = sub_parts[1] if len(sub_parts) > 1 else ""
+			else:
+				third_segment = ""
+				
+			return (first_segment, second_segment, third_segment)
+			
+		# Sort using the safe sorting function
+		data += sorted(digit_rows_with_location, key=safe_location_sort)
 		
 	if non_digit_rows_with_location:
 		data += sorted(non_digit_rows_with_location, key=lambda x: x['ifw_location'])

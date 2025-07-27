@@ -115,7 +115,6 @@ class STEPackingSlip(Document):
 				ch.ste_detail = item.name
 				ch.batch_no = item.batch_no
 				ch.qty = flt(item.qty) - flt(item.packed_qty)
-    
 				# copy custom fields
 				for d in custom_fields:
 					if item.get(d.fieldname):

@@ -8,7 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "province",
-  "country"
+  "country",
+  "abbr"
  ],
  "fields": [
   {
@@ -24,14 +25,21 @@
    "label": "Country",
    "options": "Country",
    "reqd": 1
+  },
+  {
+   "fieldname": "abbr",
+   "fieldtype": "Data",
+   "label": "Abbr",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-05-21 09:57:09.608838",
+ "modified": "2025-07-27 05:16:35.227327",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Provinces",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -58,5 +66,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

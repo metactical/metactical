@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-06-25 13:33:45.337837",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "default_shipping_service",
+  "default_cp_service",
+  "default_purolator_service",
+  "column_break_oiv49",
+  "disable_automatic_print",
+  "email_notifications_section",
+  "send_email_to_customers",
+  "email_template"
+ ],
+ "fields": [
+  {
+   "fieldname": "default_shipping_service",
+   "fieldtype": "Select",
+   "label": "Default Shipping Service Provider",
+   "options": "\nCanada Post\nPurolator"
+  },
+  {
+   "depends_on": "eval:doc.default_shipping_service===\"Canada Post\";",
+   "fieldname": "default_cp_service",
+   "fieldtype": "Select",
+   "label": "Default Service",
+   "mandatory_depends_on": "eval:doc.default_shipping_service==\"Canada Post\";",
+   "options": "\nRegular Parcel\nExpedited Parcel\nXpresspost\nPriority\nLibrary Books\nExpedited Parcel USA\nSmall Packet USA Air\nTracked Packet \u2013 USA\nTracked Packet \u2013 USA (LVM)\nXpresspost USA\nXpresspost International\nInternational Parcel Air\nInternational Parcel Surface\nSmall Packet International Air\nSmall Packet International Surface\nTracked Packet \u2013 International"
+  },
+  {
+   "depends_on": "eval:doc.default_shipping_service===\"Purolator\";",
+   "fieldname": "default_purolator_service",
+   "fieldtype": "Select",
+   "label": "Default Service",
+   "mandatory_depends_on": "eval:doc.default_shipping_service===\"Purolator\";",
+   "options": "\nPurolatorExpress9AM\nPurolatorExpress10:30AM\nPurolatorExpress12PM\nPurolatorExpress\nPurolatorExpressEvening\nPurolatorExpressEnvelope9AM\nPurolatorExpressEnvelope10:30AM\nPurolatorExpressEnvelope12PM\nPurolatorExpressEnvelope\nPurolatorExpressEnvelopeEvening\nPurolatorExpressPack9AM\nPurolatorExpressPack10:30AM\nPurolatorExpressPack12PM\nPurolatorExpressPack\nPurolatorExpressPackEvening\nPurolatorExpressBox9AM\nPurolatorExpressBox10:30AM\nPurolatorExpressBox12PM\nPurolatorExpressBox\nPurolatorExpressBoxEvening\nPurolatorGround\nPurolatorGround9AM\nPurolatorGround10:30AM\nPurolatorGroundEvening\nPurolatorQuickShip\nPurolatorQuickShipEnvelope\nPurolatorQuickShipPack\nPurolatorQuickShipBox\nPurolatorExpressInternationalPack12:00\nPurolatorExpressBoxInternational\nPurolatorExpressInternationalBox9AM\nPurolatorExpressInternationalBox10:30AM\nPurolatorExpressInternationalBox12:00\nPurolatorExpressU.S.\nPurolatorExpressU.S.9AM\nPurolatorExpressU.S.10:30AM\nPurolatorExpressU.S.12:00\nPurolatorExpressEnvelopeU.S.\nPurolatorExpressU.S.Envelope9AM\nPurolatorExpressU.S.Envelope10:30AM\nPurolatorExpressU.S.Envelope12:00\nPurolatorExpressPackU.S.\nPurolatorExpressU.S.Pack9AM\nPurolatorExpressU.S.Pack10:30AM\nPurolatorExpressU.S.Pack12:00\nPurolatorExpressBoxU.S.\nPurolatorExpressU.S.Box9AM\nPurolatorExpressU.S.Box10:30AM\nPurolatorExpressU.S.Box12:00\nPurolatorGroundU.S.\nPurolatorExpressInternational\nPurolatorExpressInternational9AM\nPurolatorExpressInternational10:30AM\nPurolatorExpressInternational12:00\nPurolatorExpressEnvelopeInternational\nPurolatorExpressInternationalEnvelope9AM\nPurolatorExpressInternationalEnvelope10:30AM\nPurolatorExpressInternationalEnvelope12:00\nPurolatorExpressPackInternational\nPurolatorExpressInternationalPack9AM\nPurolatorExpressInternationalPack10:30AM"
+  },
+  {
+   "fieldname": "column_break_oiv49",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "disable_automatic_print",
+   "fieldtype": "Check",
+   "label": "Disable Automatic Printing"
+  },
+  {
+   "fieldname": "email_notifications_section",
+   "fieldtype": "Section Break",
+   "label": "Email Notifications"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_email_to_customers",
+   "fieldtype": "Check",
+   "label": "Send Email To Customers"
+  },
+  {
+   "depends_on": "eval:doc.send_email_to_customers",
+   "fieldname": "email_template",
+   "fieldtype": "Link",
+   "label": "Email Template",
+   "options": "Email Template"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-07-15 14:19:25.508913",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Shipment Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

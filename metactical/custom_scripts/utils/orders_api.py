@@ -6,7 +6,8 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_det
 
 def receive_rmq_data(parsedContent):
 	try:
-		# from metactical.custom_scripts.utils.loggedinuser import parsedContent
+		# from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
+		rmq_log = create_rmq_log(parsedContent)
 		
 		# Assign the shipping province and country based on the parsed content.
 		# If not provided, default to "Alberta" for the province and "Canada" for the country.
@@ -50,9 +51,19 @@ def receive_rmq_data(parsedContent):
 		order_detail = get_order_detail(parsedContent, province, country, company, shipping_item, is_billing_cp_verified)
 
 		# Build payment details using transaction data and billing country if transactions exist. Default to None otherwise.
+		succesfull_transaction = None
 		if parsedContent.get("transactions"):
+			for transaction in parsedContent['transactions']:
+				if transaction.get("orderTransactionState") == 3:
+					# If the transaction state is 3, it indicates a successful transaction.
+					succesfull_transaction = transaction
+				elif transaction.get("orderTransactionState") == 1:
+					if "paymentGatewayAlias" in transaction and transaction["paymentGatewayAlias"] == "paypalexpress":
+						# If the transaction state is 1 and the payment gateway is PayPal Express, consider it successful.
+						succesfull_transaction = transaction
+     
 			payment_detail = {
-				"transactions": parsedContent['transactions'][0],
+				"transactions": succesfull_transaction,
 				"billingCountry": parsedContent['billingCountry']
 			}
 		else:
@@ -65,24 +76,63 @@ def receive_rmq_data(parsedContent):
 		billing_address_doc, shipping_address_doc, customer = get_address_and_customer(parsedContent, billing_address_detail, shipping_address_detail)
 
 		# Create an order using the order details, customer, payment gateway, and shipping address document.
-		order = create_order(order_detail, customer, parsedContent["PaymentGateway"], shipping_address_doc, billing_address_doc)
+		order = create_order(order_detail, customer, shipping_address_doc, billing_address_doc)
+		if rmq_log:
+			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
-		if parsedContent["PaymentGateway"] != "interacetransfer":
-			if order.neb_usaepay_transaction_key:
-				payment = create_payment(payment_detail, order, company)
-			else:
-				from metactical.custom_scripts.sales_order.sales_order import get_transaction_key
-				transaction_key = get_transaction_key(order.source, order.po_no, order.customer)
-				if transaction_key:
-					frappe.db.set_value("Sales Order", order.name, "neb_usaepay_transaction_key", transaction_key, update_modified=False)
+		try:
+			if "paymentGatewayAlias" not in succesfull_transaction:
+				return
+			
+			if payment_detail['transactions'] and succesfull_transaction["paymentGatewayAlias"] != "interacetransfer":
+				if order.neb_usaepay_transaction_key or succesfull_transaction['paymentGatewayAlias'] == 'paypalexpress':
 					payment = create_payment(payment_detail, order, company)
-
+				else:
+					process_payment_entry(succesfull_transaction, order)
+      
+			elif succesfull_transaction["paymentGatewayAlias"] == "interacetransfer":
+				add_tag(order, "EtransferPaymentPending")
+    
+			frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
+			post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
 
-
+def process_payment_entry(transaction, order):
+    from metactical.custom_scripts.usaepay.usaepay_api import get_usaepay_order_detail
+    
+    # Hold the transaction information
+    frappe.get_doc({
+		"doctype": "SO USAePay Transaction", 
+		"order_id": order.name,
+		"po_no": order.po_no,
+		"transaction_key": transaction["authorizeTransactionId"],
+		"lead_source": order.source,
+	}).insert()
+    frappe.db.commit()
+    
+    # get transaction details from USAePay and create payment entry
+    get_usaepay_order_detail(transaction, order)
+    
+def add_tag(order, tag):
+	if frappe.db.exists("Tag", tag):
+		try:
+			tag_link = frappe.get_doc({
+				"doctype": "Tag Link",
+				"tag": tag,
+				"document_type": "Sales Order",
+				"document_name": order.name
+			})
+			tag_link.insert()
+			frappe.db.commit()
+		except Exception as e:
+			frappe.log_error(title='Tag Link Error', message=frappe.get_traceback())
+			post_to_rocket_chat([], f"Unable to link tag {tag} to order {order.name}: {str(e)}", rmq=True)
+	
 # This method retrieves or creates billing and shipping addresses, as well as the associated customer.
 # It checks for existing addresses and customers in the system. If none are found, it creates new ones.
 # The method returns the billing address document, shipping address document, and customer record.
@@ -102,18 +152,13 @@ def get_address_and_customer(parsedContent, billing_address_detail, shipping_add
 		customer = get_or_create_customer(parsedContent['publisher_site'], billing_address_detail, shipping_address_detail)
 		billing_address_doc = create_address(billing_address_detail, customer, "Billing")
 
-	# if same address is used for billing and shipping, return the billing address as the shipping address
-	if not parsedContent["PickInLocation"]:
-		shipping_address_doc = billing_address_doc
+	existing_shipping_address = check_existing_address(shipping_address_detail, "Shipping")
+	if existing_shipping_address:
+		# If an existing shipping address is found, fetch its document.
+		shipping_address_doc = frappe.get_doc("Address", existing_shipping_address)
 	else:
-		# if "In store pickup" is selected, create a new address for the shipping address if it does not exist
-		existing_shipping_address = check_existing_address(shipping_address_detail, "Shipping")
-		if existing_shipping_address:
-			# If an existing shipping address is found, fetch its document.
-			shipping_address_doc = frappe.get_doc("Address", existing_shipping_address)
-		else:
-			# If no shipping address is found, create a new one.
-			shipping_address_doc = create_address(shipping_address_detail, customer, "Shipping")
+		# If no shipping address is found, create a new one.
+		shipping_address_doc = create_address(shipping_address_detail, customer, "Shipping")
 
 	# Return the billing address document, shipping address document, and th
 	return billing_address_doc, shipping_address_doc, customer
@@ -126,8 +171,8 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, i
 		"items": parsedContent['items'],
 		"discounts": parsedContent['Discounts'],
 		"total_value": parsedContent['totalValueAmount'], 
-		"total_shipping_amount": parsedContent['totalShippingAmount'],
-		"total_discount_amount": parsedContent['TotalDiscountAmount']["Amount"],
+		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
+		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
 		"taxes_and_charges": get_taxes_and_charges(province, country, company),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
@@ -255,24 +300,25 @@ def check_existing_customer(billing_address_doc, billing_address_detail):
 
 	return None
 
-def create_order(order_detail, customer, gateway, shipping_address_doc, billing_address_doc):
+def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
+	items = process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail)
 	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
 		"order_type": "Shopping Cart",
 		"po_date": remove_tz_from_date(order_detail['order_date']),
 		"po_no": order_detail["order_id"],
-		"items": process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail),
+		"items": items,
 		"source": order_detail['source'],
 		"taxes_and_charges": order_detail['taxes_and_charges'],
 		"delivery_date": calculate_delivery_date(order_detail['order_date']),
-		"discounts": order_detail['discounts'],
 		"total_value": order_detail['total_value'],
 		"total_shipping_amount": order_detail['total_shipping_amount'],
 		"total_discount_amount": order_detail['total_discount_amount'],
 		"currency": order_detail['currency'],
 		"transaction_date": remove_tz_from_date(order_detail['order_date']),
 		"company": order_detail['company'],
+		"company_address": frappe.db.get_value("Lead Source", order_detail['source'], "neb_company_address"),
 		"mena_is_cp_verified": order_detail["is_cp_verified"],
 		"shipping_address_name": shipping_address_doc.name,
 		"billing_address_name": billing_address_doc.name,
@@ -283,18 +329,26 @@ def create_order(order_detail, customer, gateway, shipping_address_doc, billing_
 		"ifw_signifyd_score": order_detail['signifyd']['Score'],
 		"ifw_signifyd_guaranteedisposition": order_detail['signifyd']['GuarenteedDisposition'],
 		"ifw_signifyd_fulfilled": order_detail['signifyd']['Fullfilled'],
-		"ifw_store_pickup": order_detail["ifw_store_pickup"]
+		"ifw_store_pickup": order_detail["ifw_store_pickup"],
+		"discount_amount": order_detail["total_discount_amount"],
+		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
+		"is_rush": is_rush(items)
 	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
 	new_order.set_missing_values()
-	if gateway == "interacetransfer":
-		new_order.save()
-	else:
-		new_order.submit()
+	new_order.save()
+	new_order.submit()
 
 	frappe.db.commit()
 	return new_order
+
+def is_rush(items):
+    for item in items:
+        print(item.get("item_code"))
+        if item.get("item_code") == "99992":
+            return True
+    return False
 
 def create_address(address_detail, customer, address_type):
 	address = frappe.get_doc({
@@ -393,16 +447,37 @@ def create_contact(contact_detail, customer):
 # Finally, it returns a list of all the created Sales Order Item documents.
 def create_payment(payment_detail, order, company):
 	try:
-		card_type = get_card_type(payment_detail)
+		if not payment_detail:
+			frappe.log_error(title='Payment Detail Error', message=f'{order.name} does not have payment details.')
+			return None
+
+		transaction_detail = payment_detail['transactions']
+	
+		if transaction_detail.get("paymentGatewayAlias") == "paypalexpress":
+			country = frappe.db.get_value("Company", company, "country")
+			if country == "Canada":
+				card_type = "PayPal - CAD"
+			else:
+				card_type = "PayPal - USD"
+		else:
+			card_type = get_card_type(payment_detail)
 
 		new_payment = get_payment_entry(order.doctype, order.name)
 		new_payment.mode_of_payment = card_type
 
 		account = get_bank_cash_account(company=company, mode_of_payment=card_type)
 		new_payment.paid_to = account["account"]
+		new_payment.paid_amount = transaction_detail["amount"]
 		new_payment.reference_no = order.neb_usaepay_transaction_key
 		new_payment.reference_date = remove_tz_from_date(payment_detail['transactions']["createdOn"])
-		new_payment.submit()
+		new_payment.save()
+
+		can_be_submitted = True
+		if transaction_detail.get("paymentGatewayAlias") == "paypalexpress" and transaction_detail.get("orderTransactionState") == 1:
+			can_be_submitted = False
+      
+		if can_be_submitted:
+			new_payment.submit()
 		frappe.db.commit()
 
 		return new_payment
@@ -464,14 +539,14 @@ def get_taxes_and_charges(province, country, company=None):
 	elif province == "Prince Edward Island":
 		return "Prince Edward Island - ICL"
 	elif province == "Quebec":
-		return "Quebec GST and QST - ICL"
+		return "Quebec - GST - ICL"
 	elif province == "Saskatchewan":
 		return "Saskatchewan - ICL"
 	elif province == "Northwest Territories":
 		return "Northwest Territories - ICL"
 	elif province == "Nunavut":
 		return "Nunavut - ICL"
-	elif province == "Yukon":
+	elif province == "Yukon" or province == "Yukon Territory":
 		return "Yukon - ICL"
 	elif country == "United States":
 		return "United States - " + company_code
@@ -483,6 +558,9 @@ def process_items(items, shipping_item, order_detail):
 	warehouse = frappe.db.get_value("Lead Source", order_detail['source'], "neb_default_warehouse") or "W01-WHS-Active Stock - ICL"
 	
 	for item in items:
+		if item['isTrashed']:
+			continue
+
 		item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item['retailSku']}, "name")
 		if not item_code:
 			frappe.throw(f"Item with retail SKU {item['retailSku']} not found for order {order_detail['order_id']}")
@@ -491,7 +569,7 @@ def process_items(items, shipping_item, order_detail):
 			"doctype": "Sales Order Item",
 			"item_code": item_code,
 			"qty": item['quantity'],
-			"rate": item['unitPrice'],
+			"price_list_rate": item['unitPrice'],
 			"warehouse": warehouse
 		})
 
@@ -502,10 +580,9 @@ def process_items(items, shipping_item, order_detail):
 			"doctype": "Sales Order Item",
 			"item_code": shipping_item['item_code'],
 			"qty": shipping_item['qty'],
-			"rate": shipping_item['rate'],
+			"price_list_rate": shipping_item['rate'],
 			"warehouse": warehouse
-		})
-
+		})  
 		items_list.append(new_shipping_item)
 
 	return items_list
@@ -528,3 +605,29 @@ def update_signify_detail(parsedContent):
 	except Exception as e:
 		frappe.log_error(title='SignifyD Update Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to update SignifyD details: {str(e)}", rmq=True)
+  
+def create_rmq_log(parsedContent):
+	try:
+		publisher_site = parsedContent.get("publisher_site", "Unknown")
+		rmq_log = frappe.get_doc({
+			"doctype": "RabbitMQ Orders Log",
+			"payload": as_unicode(parsedContent),
+			"lead_source": publisher_site
+		})
+		rmq_log.insert()
+		return rmq_log.name
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(title='RMQ Log Creation Error', message=frappe.get_traceback())
+
+
+def as_unicode(text: str, encoding: str = "utf-8") -> str:
+	"""Convert to unicode if required"""
+	if isinstance(text, str):
+		return text
+	elif text is None:
+		return ""
+	elif isinstance(text, bytes):
+		return str(text, encoding)
+	else:
+		return str(text)
