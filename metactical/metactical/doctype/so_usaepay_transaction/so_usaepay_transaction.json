@@ -7,24 +7,16 @@
  "engine": "InnoDB",
  "field_order": [
   "order_id",
-  "invoice",
+  "po_no",
   "credit_card",
   "transaction_key",
-  "merchant_id",
-  "lead_source",
-  "processed_again",
-  "payload"
+  "lead_source"
  ],
  "fields": [
   {
    "fieldname": "order_id",
    "fieldtype": "Data",
    "label": "Order ID"
-  },
-  {
-   "fieldname": "invoice",
-   "fieldtype": "Data",
-   "label": "Invoice"
   },
   {
    "fieldname": "credit_card",
@@ -38,32 +30,20 @@
    "label": "Transaction Key"
   },
   {
-   "fieldname": "merchant_id",
-   "fieldtype": "Data",
-   "label": "Merchant ID"
-  },
-  {
    "fieldname": "lead_source",
    "fieldtype": "Link",
    "label": "Lead Source",
    "options": "Lead Source"
   },
   {
-   "default": "0",
-   "fieldname": "processed_again",
-   "fieldtype": "Check",
-   "label": "Processed Again?"
-  },
-  {
-   "fieldname": "payload",
-   "fieldtype": "JSON",
-   "label": "Payload",
-   "read_only": 1
+   "fieldname": "po_no",
+   "fieldtype": "Data",
+   "label": "Customer's Purchase Order - Website Order No"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-07-14 04:09:35.392532",
+ "modified": "2025-07-27 06:34:36.997766",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SO USAePay Transaction",
