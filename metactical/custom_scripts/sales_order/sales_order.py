@@ -19,9 +19,6 @@ from metactical.custom_scripts.utils.metactical_utils import (
 	queue_action, 
 	check_si_payment_status_for_so
 )
-from metactical.custom_scripts.usaepay.usaepay_api import (
-	process_credit_card_tokens
-)
 
 class SalesOrderCustom(SalesOrder):
 	def save(self):
@@ -42,9 +39,6 @@ class SalesOrderCustom(SalesOrder):
 		super(SalesOrderCustom, self).validate()
 		self.pull_reserved_qty()
 		
-		if self.po_no and not self.neb_usaepay_transaction_key:
-			self.neb_usaepay_transaction_key = get_transaction_key(self.source, self.po_no, self.customer)
-
 	def pull_reserved_qty(self):
 		for row in self.items:
 			#Check if bin exists
@@ -233,33 +227,3 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	doclist.set_onload("ignore_price_list", True)
  
 	return doclist
-
-@frappe.whitelist()
-def get_transaction_key(source, po_no, customer):
-	try:
-		if not po_no:
-			return
-
-		so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"order_id":po_no, "lead_source": source})
-		if not so_usaepay_transaction:
-			so_usaepay_transaction = frappe.db.exists("SO USAePay Transaction", {"invoice": po_no, "lead_source": source})
-			if not so_usaepay_transaction:
-				return
-
-		usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", so_usaepay_transaction, ["transaction_key", "credit_card"], as_dict=True)
-
-		obj = {
-			"object": {
-				"key": usaepay_transaction.transaction_key,
-				"creditcard": {
-					"number": usaepay_transaction.credit_card
-				}
-			}
-		}
-		process_credit_card_tokens(obj, customer)
-		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
-
-		return usaepay_transaction.transaction_key
-	except Exception as e:
-		frappe.log_error(title="Error in get_transaction_key", message=frappe.get_traceback())
-		return None
