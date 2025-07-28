@@ -485,13 +485,17 @@ def remove_tz_from_date(date):
 	# Truncate to six digits
 	# '%Y-%m-%dT%H:%M:%S.%fZ'  check if the date has this format
 	# if not, add the missing part
+ 
 	date_str_fixed = date
 	if len(date) == 19:
 		date_str_fixed = date + ".000000Z"
 	elif len(date) > 26:
 		date_str_fixed = date[:26] + "Z"
 	elif len(date) > 19 and len(date) < 26:
-		date_str_fixed = date + "0" * (26 - len(date)) + "Z"
+		if date[-1] == "Z":
+			date_str_fixed = date
+		else:
+			date_str_fixed = date + "0" * (26 - len(date)) + "Z"
 
 	parsed_date = datetime.strptime(date_str_fixed, "%Y-%m-%dT%H:%M:%S.%fZ")
 
