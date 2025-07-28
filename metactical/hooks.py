@@ -822,7 +822,8 @@ fixtures = [{
 			'Shipment-custom_dangerous_goods_class',
 			'Shipment-custom_dangerous_goods_mode',
 			"Lead Source-neb_company_address",
-   			'Item-sb_tag'
+   			'Item-sb_tag',
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
 	{
@@ -1362,6 +1363,9 @@ fixtures = [{
 	},
   	{
 		"dt": "Provinces"
+	},
+	{
+		"dt": "City Symbol"
 	},
 	{
 		"dt": "Email Template",

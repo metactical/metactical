@@ -9,6 +9,7 @@ import ast
 from PyPDF2 import PdfFileMerger
 from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
+import re
 
 
 class CanadaPost():
@@ -60,6 +61,14 @@ class CanadaPost():
 		else:
 			delivery_address_doc.pincode = delivery_address_doc.pincode.upper()
 
+		# Check if shipment is to the US and validate the non-delivery handling option
+		if delivery_address_doc.country == "United States" or delivery_address_doc.country_code == "US":
+			if not doc.custom_nondelivery_handling_option:
+				frappe.throw(_(
+					"For US shipments, the Non-Delivery Handling Option is required. "
+					"Please set the 'Non-Delivery Handling Option' field in the shipment document."
+				))
+			
 		pickup_address_doc = frappe.get_doc(
 			'Address', doc.pickup_address_name).as_dict()
 		
@@ -164,8 +173,18 @@ class CanadaPost():
 		if doc.custom_ais_require_signature:
 			context.options.append('SO')
 
-		if doc.custom_ais_do_not_safe_drop:
+		if doc.custom_ais_do_not_safe_drop and context.delivery_address_doc.country == "Canada":
 			context.options.append('DNS')
+
+		if context.delivery_address_doc.country == "United States" and doc.custom_nondelivery_handling_option:
+			non_delivery_options = {
+				"Return at Sender's Expense": "RASE",
+				"Return to Sender": "RTS",
+				"Abandon": "ABAN"
+			}
+
+			if non_delivery_options.get(doc.custom_nondelivery_handling_option):
+				context.options.append(non_delivery_options.get(doc.custom_nondelivery_handling_option))
 
 		for parcel in context.doc.shipment_parcel:
 			context.parcel = parcel
@@ -200,32 +219,28 @@ class CanadaPost():
 				for char, replacement in replacements.items():
 					body = body.replace(char, replacement)
 
-				try:
-					response = self.get_response(
-						f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
-																										'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
-					row = doc.append('shipments', {
-						'shipment_id': response['shipment-info']['shipment-id'],
-						'awb_number': response['shipment-info']['tracking-pin'],
-						'service_provider': 'Canada Post',
-						'service_name': context.parcel.service_name,
-						'carrier_service': context.parcel.carrier_service,
-						'tracking_status': '',
-						'carrier_status': response['shipment-info']['shipment-status'],
-						'row_id': parcel.name
-					})
-					for link in response['shipment-info']['links']['link']:
-						rel = 'tracking' if link['@rel'] == "self" else link['@rel']
-						row.set(
-							f'{rel}_url', f"""<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>""")
-						if link['@rel'] == "label":
-							self.get_label(row, link, 'label', files)
-						elif link['@rel'] == "price":
-							self.set_price(row, link)
-					row.db_insert()
-				except Exception as e:
-					frappe.log_error(f"Canada Post API Error: {str(e)}", "Canada Post Error")
-					frappe.throw(f"Error creating shipment: {str(e)}")
+				response = self.get_response(
+					f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
+																									'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
+				row = doc.append('shipments', {
+					'shipment_id': response['shipment-info']['shipment-id'],
+					'awb_number': response['shipment-info']['tracking-pin'],
+					'service_provider': 'Canada Post',
+					'service_name': context.parcel.service_name,
+					'carrier_service': context.parcel.carrier_service,
+					'tracking_status': '',
+					'carrier_status': response['shipment-info']['shipment-status'],
+					'row_id': parcel.name
+				})
+				for link in response['shipment-info']['links']['link']:
+					rel = 'tracking' if link['@rel'] == "self" else link['@rel']
+					row.set(
+						f'{rel}_url', f"""<link rel="{link['@rel']}" href="{link['@href']}" media-type="{link['@media-type']}"></link>""")
+					if link['@rel'] == "label":
+						self.get_label(row, link, 'label', files)
+					elif link['@rel'] == "price":
+						self.set_price(row, link)
+				row.db_insert()
 
 		doc.ais_shipment_status = "Shipped"
 		doc.save()
@@ -523,41 +538,113 @@ class CanadaPost():
 			if not retry:
 				self.get_response(url, body, headers,
 								  return_request, method, True)
-		except:
+		except Exception as e:
 			if 'r' not in locals():
 				frappe.throw(frappe.get_traceback())
 			res = r.content
 			error_code = None
 			try:
 				content = self.xml_to_json(res)
-				if content and isinstance(content['messages']['message'], (dict, list)):
+				if content and isinstance(content.get('messages', {}).get('message'), (dict, list)):
 					if isinstance(content['messages']['message'], dict):
 						content['messages']['message'] = [
 							content['messages']['message']]
-					error_code = content["messages"]["message"][0]["code"]	
+					error_code = content["messages"]["message"][0].get("code")
+					
+					# Transform XML validation errors into user-friendly messages
+					for i, message in enumerate(content['messages']['message']):
+						description = message.get('description', '')
+						
+						# Handle common XML validation errors
+						if 'cvc-simple-type' in description:
+							# Extract field name from error
+							field_match = re.search(r'element.*?\}([a-zA-Z-]+)', description)
+							if field_match:
+								field_name = field_match.group(1)
+								
+								# Map XML field names to user-friendly names
+								field_mapping = {
+									'prov-state': 'Province/State',
+									'postal-zip-code': 'Postal/ZIP Code',
+									'city': 'City',
+									'country-code': 'Country',
+									'address-line-1': 'Address Line 1',
+									'name': 'Name',
+									'phone': 'Phone Number',
+									'address-line-2': 'Address Line 2',
+									'company': 'Company Name',
+									'client-id': 'Client ID'
+								}
+								
+								friendly_field = field_mapping.get(field_name, field_name.replace('-', ' ').title())
+								
+								if 'may not be empty' in description:
+									content['messages']['message'][i]['description'] = f"The {friendly_field} field is required but was empty."
+								elif 'is not valid' in description:
+									content['messages']['message'][i]['description'] = f"The {friendly_field} field has an invalid format."
+								elif 'length must be' in description:
+									length_match = re.search(r'length must be ([0-9]+)', description)
+									if length_match:
+										length = length_match.group(1)
+										content['messages']['message'][i]['description'] = f"The {friendly_field} field must be exactly {length} characters long."
+					
+					# Create a formatted HTML table of errors
 					res = frappe.render_template("""
 						<table class="table table-bordered">
 						<tr>
-							<th>Code</th>
-							<th> Description </th>
+							<th>Error</th>
+							<th>Description</th>
 						</tr>
 						{% for message in messages.message %}
 						<tr>
-							<th>{{ message.code }} </th>
+							<th>{{ message.code if message.code else "Validation Error" }} </th>
 							<td>{{ message.description }} </td>
+						</tr>
 						{% endfor %}
 						</table>
 					""", content)
-			except:
-				pass
+			except Exception as parse_error:
+				frappe.log_error(f"Error parsing Canada Post response: {str(parse_error)}", "Canada Post Error")
+				
+				# Handle unparseable responses
+				if isinstance(res, bytes):
+					try:
+						res = res.decode('utf-8')
+					except:
+						res = "Unable to decode response from Canada Post"
+				
+				# Try to extract meaningful information from unparsed response
+				if isinstance(res, str) and 'cvc-simple-type' in res:
+					res = self.convert_validation_error_to_friendly_message(res)
 			
-			# If error code is 9122 then get means the manifest is already created, get the manifest
+			# If error code is 9122 then it means the manifest is already created, get the manifest
 			if error_code is not None and error_code == "9122":
 				raise ValueError("9122")
 			else:
 				frappe.throw(
-					res, title=f"Error from Provider Server, Code: {r.status_code}")
-
-def test():
-	cp = CanadaPost()
-	cp.create_manifest(manifest="MF-02-17-2025-235937")
+					res, title=f"Canada Post Shipping Error")
+				
+	def convert_validation_error_to_friendly_message(self, error_text):
+		"""Convert technical XML validation errors to user-friendly messages"""
+		
+		# Common error patterns and their user-friendly versions
+		if 'prov-state' in error_text and 'may not be empty' in error_text:
+			return "The Province/State field is required but was empty. Please check both the delivery and pickup addresses."
+		
+		elif 'postal-zip-code' in error_text:
+			if 'may not be empty' in error_text:
+				return "The Postal/ZIP Code is required but was empty. Please check both addresses."
+			else:
+				return "The Postal/ZIP Code format is invalid. For Canadian addresses, use format 'A1A 1A1'. For US addresses, use '12345' or '12345-6789'."
+		
+		elif 'city' in error_text and 'may not be empty' in error_text:
+			return "The City field is required but was empty. Please check both the delivery and pickup addresses."
+		
+		elif 'country-code' in error_text:
+			return "The Country field is invalid or empty. Please use a valid two-letter country code (CA for Canada, US for United States)."
+		
+		elif 'address-line-1' in error_text and 'may not be empty' in error_text:
+			return "The Address Line 1 field is required but was empty. Please check both the delivery and pickup addresses."
+		
+		# If no specific pattern matched, provide a general message
+		return "There was a validation error with the address information. Please verify that all required fields are filled out correctly."

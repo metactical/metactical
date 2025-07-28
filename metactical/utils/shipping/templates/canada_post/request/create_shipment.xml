@@ -23,6 +23,9 @@
         <destination>
             <name>{{ [delivery_contact_doc.first_name, delivery_contact_doc.middle_name or "", delivery_contact_doc.last_name or ""]|join(" ") }}</name>
             <company>{{ delivery_contact_doc.company_name or "" }}</company>
+            {% if delivery_address_doc.country == "United States" %}
+                <client-voice-number>{{ delivery_address_doc.phone }}</client-voice-number>
+            {% endif %}
             <address-details>
                 <address-line-1>{{ delivery_address_doc.address_line1 }}</address-line-1>
 				{% if delivery_address_doc.address_line2 %}
@@ -96,5 +99,8 @@
 			{% endfor %}
 		</options>
 		{% endif %}
+		<references>
+			<customer-ref-1>{{ doc.name }}</customer-ref-1>
+		</references>
     </delivery-spec>
 </shipment>
