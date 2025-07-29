@@ -836,6 +836,10 @@ def create_return(*args, **kwargs):
                     filtered_items.append(item)
         
 
+
+        for items in form_data["Items"]:
+            total_restock_fee += items["RestockFee"] if "RestockFee" in items else 0.0
+        
         sales_return.items = filtered_items
         sales_return.calculate_taxes_and_totals()
 
@@ -893,6 +897,7 @@ def create_return(*args, **kwargs):
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = sales_return.grand_total
+    frappe.response["TotalAfterRestockFee"] = round(sales_return.grand_total + total_restock_fee, 2)
     frappe.db.commit()
     
 def create_gift_card(doc, form_data, coupon_code=None):
