@@ -825,7 +825,6 @@ fixtures = [{
 			"Item-request_ai_suggestion",
 			"Item-slugs_and_descriptions",
 			"Shipment-neb_notification_email_sent",
-			"Lead Source-neb_email_account",
 			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
