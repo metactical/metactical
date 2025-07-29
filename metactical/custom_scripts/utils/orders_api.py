@@ -89,7 +89,7 @@ def receive_rmq_data(parsedContent):
 				if order.neb_usaepay_transaction_key or succesfull_transaction['paymentGatewayAlias'] == 'paypalexpress':
 					payment = create_payment(payment_detail, order, company)
 				else:
-					process_payment_entry(succesfull_transaction, order)
+					frappe.enqueue(process_payment_entry, transaction=succesfull_transaction, order=order, timeout=2000)
       
 			elif succesfull_transaction["paymentGatewayAlias"] == "interacetransfer":
 				add_tag(order, "EtransferPaymentPending")
@@ -103,21 +103,23 @@ def receive_rmq_data(parsedContent):
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
 
 def process_payment_entry(transaction, order):
-    from metactical.custom_scripts.usaepay.usaepay_api import get_usaepay_order_detail
-    
-    # Hold the transaction information
-    frappe.get_doc({
-		"doctype": "SO USAePay Transaction", 
-		"order_id": order.name,
-		"po_no": order.po_no,
-		"transaction_key": transaction["authorizeTransactionId"],
-		"lead_source": order.source,
-	}).insert()
-    frappe.db.commit()
-    
-    # get transaction details from USAePay and create payment entry
-    get_usaepay_order_detail(transaction, order)
-    
+	from metactical.custom_scripts.usaepay.usaepay_api import get_usaepay_order_detail
+	try:
+		frappe.get_doc({
+			"doctype": "SO USAePay Transaction", 
+			"order_id": order.name,
+			"po_no": order.po_no,
+			"transaction_key": transaction["authorizeTransactionId"],
+			"lead_source": order.source,
+		}).insert()
+		frappe.db.commit()
+		
+		# get transaction details from USAePay and create payment entry
+		get_usaepay_order_detail(transaction, order)
+	except Exception as e:
+		frappe.log_error(title='Payment Entry Processing Error', message=frappe.get_traceback())
+		post_to_rocket_chat([], f"Unable to process payment entry for order {order.name}: {str(e)}", rmq=True)
+  
 def add_tag(order, tag):
 	if frappe.db.exists("Tag", tag):
 		try:
