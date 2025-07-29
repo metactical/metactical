@@ -830,7 +830,6 @@ def create_return(*args, **kwargs):
         
         for item in items:
             for updated_item in formatted_items:
-                total_restock_fee += updated_item["restock_fee"] if "restock_fee" in updated_item else 0.0
                 if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
                     (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
                     item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
@@ -842,6 +841,10 @@ def create_return(*args, **kwargs):
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
 
+
+        for items in form_data["Items"]:
+            total_restock_fee += items["RestockFee"] if "RestockFee" in items else 0.0
+        
         sales_return.items = filtered_items
         sales_return.calculate_taxes_and_totals()
 
@@ -902,6 +905,7 @@ def create_return(*args, **kwargs):
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = sales_return.grand_total
+    frappe.response["TotalAfterRestockFee"] = round(sales_return.grand_total + total_restock_fee, 2)
     frappe.db.commit()
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):
