@@ -9,7 +9,12 @@
   "item_name",
   "description",
   "slug",
-  "price_list"
+  "price_list",
+  "productmetasedescription",
+  "productmetasekeywords",
+  "productmetasetitle",
+  "h2",
+  "h3"
  ],
  "fields": [
   {
@@ -36,12 +41,39 @@
    "in_list_view": 1,
    "label": "Price List",
    "options": "Price List"
+  },
+  {
+   "fieldname": "productmetasedescription",
+   "fieldtype": "Long Text",
+   "label": "ProductMetaSEDescription"
+  },
+  {
+   "fieldname": "productmetasekeywords",
+   "fieldtype": "Text",
+   "label": "ProductMetaSEKeywords"
+  },
+  {
+   "fieldname": "productmetasetitle",
+   "fieldtype": "Text",
+   "label": "ProductMetaSETitle"
+  },
+  {
+   "fieldname": "h2",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "h2"
+  },
+  {
+   "fieldname": "h3",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "h3"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-07-10 06:43:05.815039",
+ "modified": "2025-07-29 05:37:30.879584",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Detail",
