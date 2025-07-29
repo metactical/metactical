@@ -29,10 +29,20 @@ class CustomShipment(Shipment):
    
 	def send_notification_email(self):
 		shipping_address = frappe.get_doc("Address", self.delivery_address_name)
-		shipment_settings = frappe.get_doc("Shipment Settings")
+		send_email_to_customers = frappe.db.get_single_value("Shipment Settings", "send_email_to_customers")
 
-		if shipping_address and shipment_settings.send_email_to_customers:
-			sender_name = frappe.db.get_value("Lead Source", self.neb_source, "neb_email_account")
+		if not shipping_address:
+			frappe.msgprint(_("Shipping address not found. Cannot send notification email."))
+			return
+
+		if shipping_address and send_email_to_customers:
+			lead_source_email_settings = frappe.get_all("Shipment Notification Settings", {"lead_source": self.neb_source}, ["email_template", "email_account", "bcc_emails"])
+			if lead_source_email_settings:
+				shipment_settings = lead_source_email_settings[0]
+			else:
+				return 
+   
+			sender_name = shipment_settings.email_account
 			sender_account = frappe.db.get_value("Email Account", sender_name, "email_id") if sender_name else None
 			email = shipping_address.email_id
 			if not self.service_provider:
@@ -50,6 +60,7 @@ class CustomShipment(Shipment):
 				frappe.sendmail(
 					sender=sender_account,
 					recipients=[email],
+					bcc=shipment_settings.bcc_emails.split(",") if shipment_settings.bcc_emails else [],
 					subject=subject,
 					message=message
 				)

@@ -14,7 +14,7 @@
   "disable_automatic_print",
   "email_notifications_section",
   "send_email_to_customers",
-  "email_template"
+  "email_settings"
  ],
  "fields": [
   {
@@ -62,16 +62,16 @@
   },
   {
    "depends_on": "eval:doc.send_email_to_customers",
-   "fieldname": "email_template",
-   "fieldtype": "Link",
-   "label": "Email Template",
-   "options": "Email Template"
+   "fieldname": "email_settings",
+   "fieldtype": "Table",
+   "label": "Email Settings",
+   "options": "Shipment Notification Settings"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-07-15 14:19:25.508913",
+ "modified": "2025-07-29 07:33:15.886093",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Shipment Settings",

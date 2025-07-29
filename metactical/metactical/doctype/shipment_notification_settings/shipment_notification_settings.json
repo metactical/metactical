@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-29 07:25:10.835683",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "lead_source",
+  "email_account",
+  "email_template",
+  "bcc_emails"
+ ],
+ "fields": [
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Lead Source",
+   "options": "Lead Source",
+   "reqd": 1
+  },
+  {
+   "fieldname": "email_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Email Account",
+   "options": "Email Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "email_template",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Email Template",
+   "options": "Email Template",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bcc_emails",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "BCC Emails"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-07-29 07:32:09.529703",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Shipment Notification Settings",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
