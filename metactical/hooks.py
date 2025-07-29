@@ -824,7 +824,8 @@ fixtures = [{
 			'Item-item_detail',
 			"Item-request_ai_suggestion",
 			"Item-slugs_and_descriptions",
-			"Shipment-neb_notification_email_sent"
+			"Shipment-neb_notification_email_sent",
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
 	{
@@ -1364,6 +1365,9 @@ fixtures = [{
 	},
   	{
 		"dt": "Provinces"
+	},
+	{
+		"dt": "City Symbol"
 	},
 	{
 		"dt": "Email Template",

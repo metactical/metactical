@@ -100,6 +100,9 @@ class Purolator:
 		if len(state) > 2:
 			state = get_state_code(state)
 
+			if not state:
+				frappe.throw("Error: Incorrect customer's state. Please fix and try again")
+
 		receiver_address = {
 			"City": customer_address.city,
 			"Province": state.upper(),
@@ -282,6 +285,11 @@ class Purolator:
 			},
 			'PrinterType': 'Thermal'
 		}
+
+		if receiver_address.country != "Canada":
+			request['Shipment']['InternationalInformation'] = {
+				"DocumentsOnlyIndicator": True
+			}
 		print(request)
 
 		validate_shipment = client.service.ValidateShipment(Shipment=request["Shipment"])
@@ -528,9 +536,9 @@ def test():
 	# ret = cp.get_rate(name="SHIPMENT-00124")
 	# print(ret)
 	purolator = Purolator()
-	#ret = purolator.create_shipment("SHIPMENT-00140", '{"hl16dou0bg": "PurolatorGround"}')
+	ret = purolator.create_shipment("SHIPMENT-00195", '{"d4u1o7u699": "PurolatorExpressU.S."}')
 	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
 	#ret = purolator.void_shipment('SHIPMENT-00128', '["bcobed5l9v"]')
-	ret = purolator.get_rate('SHIPMENT-00142')
+	#ret = purolator.get_rate('SHIPMENT-00142')
 	#ret = purolator.consolidate_shipments('MF-10-17-2023-201952', '2025-01-23')
 	print(ret)
