@@ -652,8 +652,6 @@ fixtures = [{
 			'Purchase Receipt Item-tax_rate',
 			'Purchase Receipt Item-tax_amount',
 			'Purchase Receipt Item-total_amount',
-			'Sales Invoice-restaurant',
-			'Sales Invoice-restaurant_table',
 			'Delivery Note-ais_skip_auto_invoice',
 			'Item-ais_blockfrmstoresale',
 			'Material Request-ais_suppliers',
