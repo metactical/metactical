@@ -120,9 +120,6 @@ doc_events = {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
 	},
-	"Address": {
-		"validate": "metactical.custom_scripts.address.address.validate"
-	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
@@ -177,6 +174,7 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
+	"Address": "metactical.custom_scripts.address.address.CustomAddress"
 }
 
 # Scheduled Tasks
@@ -203,7 +201,8 @@ scheduler_events = {
 # 	],
 	"cron": {
 		"15 * * * *": [
-			"metactical.custom_scripts.frappe.document.clear_queued_docs"
+			"metactical.custom_scripts.frappe.document.clear_queued_docs",
+			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		]
 	}
 }
@@ -826,7 +825,9 @@ fixtures = [{
 			"Item-request_ai_suggestion",
 			"Item-slugs_and_descriptions",
 			"Item-neb_paypal_restricted",
-			"Item-neb_airship_restricted"
+			"Item-neb_airship_restricted",
+			"Shipment-neb_notification_email_sent",
+			"Shipment-custom_nondelivery_handling_option"
 		]]]
 	},
 	{
@@ -1368,6 +1369,9 @@ fixtures = [{
 		"dt": "Provinces"
 	},
 	{
+		"dt": "City Symbol"
+	},
+	{
 		"dt": "Email Template",
 		"filters": [["name", "in", [
 			"POS User Welcome Email"
@@ -1388,7 +1392,8 @@ jinja = {
 		"metactical.custom_scripts.sales_invoice.sales_invoice.get_customer_info",
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
- 		"metactical.custom_scripts.utils.metactical_utils.get_password"
+ 		"metactical.custom_scripts.utils.metactical_utils.get_password",
+		"metactical.barcode_generator.get_barcode_for_print_format"
 	]
 }
 

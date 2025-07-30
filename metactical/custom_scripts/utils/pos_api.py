@@ -541,6 +541,7 @@ def get_items(form_data):
             'qty': qty,
             'discount_percentage': item['Discount'],
             'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
+            'restock_fee': item['RestockFee'] if 'RestockFee' in item else 0.0,
         }
 
         if item_code == "2":
@@ -819,10 +820,13 @@ def create_return(*args, **kwargs):
                 
         invoiceId = form_data["InvoiceId"]
         sales_return = make_sales_return(invoiceId)
+        pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
         filtered_items = []
-
+        sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
+        total_restock_fee = 0.0
+        
         for item in items:
             for updated_item in formatted_items:
                 if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
@@ -832,10 +836,14 @@ def create_return(*args, **kwargs):
                     item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
                     item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
                     item.margin_type = ""
+                    item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
-        
 
+
+        for items in form_data["Items"]:
+            total_restock_fee += items["RestockFee"] if "RestockFee" in items else 0.0
+        
         sales_return.items = filtered_items
         sales_return.calculate_taxes_and_totals()
 
@@ -845,7 +853,7 @@ def create_return(*args, **kwargs):
         if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
             difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)
         
-        write_off_limit = frappe.db.get_value("POS Profile", sales_return.pos_profile, "write_off_limit")
+        write_off_limit = pos_profile.write_off_limit
         if write_off_limit and abs(difference) > write_off_limit:
             frappe.response["Status"] = 500
             frappe.response["Message"] = "Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit)
@@ -860,6 +868,9 @@ def create_return(*args, **kwargs):
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
+        
+        if total_restock_fee > 0:
+           create_restock_invoice(total_restock_fee, sales_return, form_data)
     except Exception as e:
         frappe.db.rollback()
         frappe.clear_last_message()
@@ -893,6 +904,41 @@ def create_return(*args, **kwargs):
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = sales_return.grand_total
+    frappe.response["TotalAfterRestockFee"] = round(sales_return.grand_total + total_restock_fee, 2)
+    frappe.db.commit()
+    
+def create_restock_invoice(total_restock_fee, sales_return, form_data):
+    frappe.set_user(form_data['SalesPerson'])
+    restock_invoice_data = {
+        "doctype": "Sales Invoice",
+        "customer": sales_return.customer,
+        "posting_date": now_datetime(),
+        "due_date": now_datetime(),
+        "is_pos": 1,
+        "pos_profile": form_data['POSProfile'] + ' Operators',
+        "company": sales_return.company,
+        "exempt_from_sales_tax": 1,
+        "neb_return_document": sales_return.name,
+        "items": [{
+            "item_code": "2",
+            "item_name": "Restock Fee",
+            "qty": 1,
+            "rate": total_restock_fee,
+        }],
+        "payments": [{
+            "mode_of_payment": form_data["ModeOfReturn"],
+            "amount": total_restock_fee
+        }],
+    }
+    
+    restock_invoice = frappe.get_doc(restock_invoice_data)
+    restock_invoice.taxes_and_charges = sales_return.taxes_and_charges,
+    restock_invoice.insert(ignore_permissions=True)
+
+    # remove taxes from the restock invoice
+    restock_invoice.taxes = []
+    restock_invoice.save()
+    restock_invoice.submit()
     frappe.db.commit()
     
 def create_gift_card(doc, form_data, coupon_code=None):
@@ -1012,7 +1058,7 @@ def get_coupon_code_sql(coupon_code):
     """
     
 @frappe.whitelist()
-def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
+def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     page = int(page or 1)
     limit = int(page_size or 10)
     offset = (page - 1) * limit
@@ -1071,6 +1117,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
 
     all_warehouses = list(warehouse_map.keys())
     all_price_lists = list(price_list_map.keys())
+    can_see_item_cost = frappe.db.get_value("POS User Settings", user, "can_see_item_cost")
 
     # Attach inventory and pricing data
     for item in items:
@@ -1155,6 +1202,7 @@ def get_item_by_retail_sku(retail_sku, branch, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
+            "Cost": get_item_cost(item.item_code) if can_see_item_cost else "-",
             "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
@@ -1227,3 +1275,18 @@ def warehouses_display_name_mapping():
         "RM02-Oshawa-Active - ZE": "OSH",
         "US01-Houston-Active - AOI": "TEX",
     }
+
+def get_item_cost(item_code):
+    default_supplier = frappe.db.get_value("Item Default", {"parent": item_code}, "default_supplier")
+    if not default_supplier:
+        default_supplier = frappe.db.get_value("Item Supplier", {"parent": item_code}, "supplier")
+        print(default_supplier)
+        
+    if default_supplier:
+        price_list = frappe.db.get_value("Supplier", default_supplier, "default_price_list")
+        if price_list:
+            price_list_rate = frappe.db.get_value("Item Price", {"item_code": item_code, "price_list": price_list}, "price_list_rate")
+            if price_list_rate:
+                return str(price_list_rate)
+
+    return "N/A"

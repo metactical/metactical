@@ -52,6 +52,20 @@ def set_order_defaults(
 			child_item.warehouse = trans_item.get("warehouse")
 		else:
 			child_item.warehouse = get_item_warehouse(item, p_doc, overwrite_warehouse=True)
+
+		# Because online orders have always same warehouse, auto-assign it from the first item
+		if not child_item.warehouse and len(p_doc.items) > 0:
+			for so_item in p_doc.items:
+				if so_item.warehouse:
+					child_item.warehouse = so_item.warehouse
+					break
+			
+		# Metactical Customization: If warehouse is still not set, get the default warehouse from lead source
+		if not child_item.warehouse:
+			default_warehouse = frappe.db.get_value("Lead Source", p_doc.source, "neb_default_warehouse")
+			if default_warehouse:
+				child_item.warehouse = default_warehouse
+		
 		if not child_item.warehouse:
 			frappe.throw(
 				_("Cannot find {} for item {}. Please set the same in Item Master or Stock Settings.").format(
