@@ -411,7 +411,8 @@ def create_payment_entry(doc, data, log):
 
 		if log:
 			frappe.db.set_value("USAePay Log", log.name, "payment_entry", pe.name, update_modified=False)
-
+		
+		frappe.db.commit()
 	except:
 		frappe.log_error(title="PE Creation from USAePay Error", message=frappe.get_traceback())
 
