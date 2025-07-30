@@ -824,6 +824,8 @@ fixtures = [{
 			'Item-item_detail',
 			"Item-request_ai_suggestion",
 			"Item-slugs_and_descriptions",
+			"Item-neb_paypal_restricted",
+			"Item-neb_airship_restricted",
 			"Shipment-neb_notification_email_sent",
 			"Shipment-custom_nondelivery_handling_option"
 		]]]
