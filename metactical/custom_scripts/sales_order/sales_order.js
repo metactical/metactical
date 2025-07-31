@@ -135,7 +135,7 @@ frappe.ui.form.on('Sales Order', {
 		];
 		var data = [];
 		frm.doc.items.forEach(function(row){
-			if(row.delivered_by_supplier != 1 && row.delivered_qty == 0){
+			if(row.delivered_by_supplier != 1){
 				data.push({
 					"docname": row.name,
 					"item_code": row.item_code,
