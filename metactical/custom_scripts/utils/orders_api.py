@@ -79,6 +79,11 @@ def receive_rmq_data(parsedContent):
 		order = create_order(order_detail, customer, shipping_address_doc, billing_address_doc)
 		if rmq_log:
 			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
+   
+		if succesfull_transaction:
+			# If the payment gateway is "usaepay", create a USAePay transaction record.
+			if succesfull_transaction["paymentGatewayAlias"] == "usaepay":
+				create_so_usaepay(order, succesfull_transaction)
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 		try:
@@ -102,18 +107,20 @@ def receive_rmq_data(parsedContent):
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
 
+def create_so_usaepay(order, transaction):
+    # Hold the transaction information
+    frappe.get_doc({
+		"doctype": "SO USAePay Transaction", 
+		"order_id": order.name,
+		"po_no": order.po_no,
+		"transaction_key": transaction["authorizeTransactionId"] if "authorizeTransactionId" in transaction else None,
+		"lead_source": order.source,
+	}).insert()
+    frappe.db.commit()
+
 def process_payment_entry(transaction, order):
 	from metactical.custom_scripts.usaepay.usaepay_api import get_usaepay_order_detail
 	try:
-		frappe.get_doc({
-			"doctype": "SO USAePay Transaction", 
-			"order_id": order.name,
-			"po_no": order.po_no,
-			"transaction_key": transaction["authorizeTransactionId"],
-			"lead_source": order.source,
-		}).insert()
-		frappe.db.commit()
-		
 		# get transaction details from USAePay and create payment entry
 		get_usaepay_order_detail(transaction, order)
 	except Exception as e:
