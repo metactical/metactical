@@ -1,109 +1,123 @@
 [
  {
+  "abbr": "AB",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:37:30.598955",
+  "modified": "2025-07-27 09:49:14.374216",
   "name": "Alberta",
   "province": "Alberta"
  },
  {
+  "abbr": "BC",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:37:55.434977",
+  "modified": "2025-07-27 05:16:53.123962",
   "name": "British Columbia",
   "province": "British Columbia"
  },
  {
+  "abbr": "MB",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:38:05.184640",
+  "modified": "2025-07-27 09:49:14.352459",
   "name": "Manitoba",
   "province": "Manitoba"
  },
  {
+  "abbr": "NB",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:38:13.756027",
+  "modified": "2025-07-27 09:49:14.336803",
   "name": "New Brunswick",
   "province": "New Brunswick"
  },
  {
+  "abbr": "NL",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:38:28.554844",
+  "modified": "2025-07-27 09:49:14.322319",
   "name": "Newfoundland and Labrador",
   "province": "Newfoundland and Labrador"
  },
  {
+  "abbr": "NS",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:38:38.830675",
+  "modified": "2025-07-27 09:49:14.306785",
   "name": "Nova Scotia",
   "province": "Nova Scotia"
  },
  {
+  "abbr": "ON",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:38:48.888469",
+  "modified": "2025-07-27 09:49:14.289906",
   "name": "Ontario",
   "province": "Ontario"
  },
  {
+  "abbr": "PE",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:38:56.803503",
+  "modified": "2025-07-27 09:49:14.263964",
   "name": "Prince Edward Island",
   "province": "Prince Edward Island"
  },
  {
+  "abbr": "QC",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:39:04.176807",
+  "modified": "2025-07-27 09:49:14.248462",
   "name": "Quebec",
   "province": "Quebec"
  },
  {
+  "abbr": "SK",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:39:09.721834",
+  "modified": "2025-07-27 09:49:14.234899",
   "name": "Saskatchewan",
   "province": "Saskatchewan"
  },
  {
+  "abbr": "NT",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:39:19.070281",
+  "modified": "2025-07-27 09:49:14.225476",
   "name": "Northwest Territories",
   "province": "Northwest Territories"
  },
  {
+  "abbr": "NU",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:39:26.222730",
+  "modified": "2025-07-27 09:49:14.216642",
   "name": "Nunavut",
   "province": "Nunavut"
  },
  {
+  "abbr": "YT",
   "country": "Canada",
   "docstatus": 0,
   "doctype": "Provinces",
-  "modified": "2024-05-21 09:39:47.363808",
+  "modified": "2025-07-27 09:49:14.200816",
   "name": "Yukon",
   "province": "Yukon"
  },
  {
+  "abbr": null,
   "country": "Australia",
   "docstatus": 0,
   "doctype": "Provinces",
