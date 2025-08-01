@@ -306,7 +306,7 @@ class Purolator:
 				shipment_pin = None
 
 				if create_shipment.body.ShipmentPIN:
-					shipment_pin = create_shipment.body.ShipmentPIN
+					shipment_pin = create_shipment.body.ShipmentPIN.Value
 
 				for row in create_shipment.body.PiecePINs.PIN:
 					piece_pin = row.Value
@@ -329,7 +329,7 @@ class Purolator:
 				shipment.ais_shipment_status = "Shipped"
 				shipment.save()
 				frappe.db.set_value("Shipment", shipment.name, "service_provider", "Purolator")
-				self.update_delivery_note(shipment, shipment_pin)
+				self.update_delivery_notes(shipment, shipment_pin)
 				return labels
 			else:
 				errors = self.render_error(create_shipment.body.ResponseInformation.Errors)
