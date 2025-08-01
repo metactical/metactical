@@ -821,7 +821,8 @@ fixtures = [{
 			'Shipment-custom_dangerous_goods_mode',
 			"Lead Source-neb_company_address",
    			'Item-sb_tag',
-			"Shipment-custom_nondelivery_handling_option"
+			"Shipment-custom_nondelivery_handling_option",
+			"Shipment-neb_notification_email_sent"
 		]]]
 	},
 	{
