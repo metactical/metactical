@@ -51,7 +51,8 @@ doctype_js = {
 	"Contact": "custom_scripts/contact/contact.js",
 	"Item": "custom_scripts/item/item.js",
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
-	"Item Group": "custom_scripts/item_group/item_group.js"
+ 	"Item Group": "custom_scripts/item_group/item_group.js",
+	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -828,7 +829,9 @@ fixtures = [{
 			"Item-neb_airship_restricted",
 			"Shipment-neb_notification_email_sent",
 			"Shipment-custom_nondelivery_handling_option",
-			"Purchase Receipt Item-custom_neb_comment"
+			"Purchase Receipt Item-custom_neb_comment",
+			"Shipment-neb_notification_email_sent",
+			"Shipment Parcel Template-custom_disabled"
 		]]]
 	},
 	{
