@@ -1,4 +1,4 @@
-import frappe, hashlib, base64, time, requests, json
+import frappe, hashlib, base64, time, requests, json, time
 from frappe.utils import cstr
 from frappe import _
 from metactical.custom_scripts.utils.metactical_utils import (
@@ -28,7 +28,7 @@ def get_transaction_from_usaepay(usaepay_transaction_key, headers, merchant_id=N
 		frappe.throw(_("USAePay URL not set in Metactical Settings"))
 
 	url = usaepay_url + "/transactions/" + usaepay_transaction_key
-	response = requests.get(url, headers=headers)
+	response = safe_get(url, headers)
 
 	if response.status_code == 200:
 		transaction = json.loads(response.text)
@@ -96,7 +96,8 @@ def get_card_token(usaepay_url, transaction_key, headers):
 		"trankey": transaction_key
 	}
 
-	response = requests.post(usaepay_url + "/tokens", headers=headers, data=json.dumps(payload))
+	# response = requests.post(usaepay_url + "/tokens", headers=headers, data=json.dumps(payload))
+	response = safe_post(usaepay_url + "/tokens", headers, payload)
 	if response.status_code == 200:
 		token = json.loads(response.text)
 		if token.get("error"):
@@ -105,6 +106,26 @@ def get_card_token(usaepay_url, transaction_key, headers):
 	else:
 		response = json.loads(response.text)
 		frappe.throw(_(f"Failed to get card token from USAePay: {response}"))
+  
+def safe_post(url, headers, payload, retries=3, backoff=2):
+    for attempt in range(retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=15)
+            return response
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if attempt < retries - 1:
+                time.sleep(backoff * (2 ** attempt))  # exponential backoff
+            else:
+                raise e
+
+def safe_get(url, headers, retries=3, backoff=2):
+	for attempt in range(retries):
+		try:
+			response = requests.get(url, headers=headers, timeout=15)
+			return response
+		except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+			if attempt < retries - 1:
+				time.sleep(backoff * (2 ** attempt))
 
 def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 	payload = {
