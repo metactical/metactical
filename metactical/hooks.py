@@ -830,6 +830,7 @@ fixtures = [{
 			"Shipment-neb_notification_email_sent",
 			"Shipment-custom_nondelivery_handling_option",
 			"Purchase Receipt Item-custom_neb_comment",
+			"Sales Invoice-neb_return_document",
 			"Shipment-neb_notification_email_sent",
 			"Shipment Parcel Template-custom_disabled"
 		]]]
