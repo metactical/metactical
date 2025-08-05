@@ -4,9 +4,10 @@ from metactical.custom_scripts.payment_entry.payment_entry import get_payment_en
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_details
 
-def receive_rmq_data(parsedContent):
+@frappe.whitelist()
+def receive_rmq_data():
 	try:
-		# from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
+		from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
 		rmq_log = create_rmq_log(parsedContent)
 		
 		# Assign the shipping province and country based on the parsed content.
@@ -23,7 +24,9 @@ def receive_rmq_data(parsedContent):
 		# use it to fetch the corresponding shipping item and cost.
 		shipping_item = None
 		if parsedContent.get("shippingDescription"):
-			shipping_item = get_shipping_item(parsedContent["shippingDescription"], parsedContent["totalShipping"])
+			is_far_distance_shipping = parsedContent.get("farDistanceCharge", False)
+			total_amount = parsedContent.get("farDistanceChargeAmount", 0.0) if is_far_distance_shipping else parsedContent.get("totalShipping", 0.0)
+			shipping_item = get_shipping_item(parsedContent["shippingDescription"], total_amount, is_far_distance_shipping)
 
 		# check if the billing and shipping addresses are points verified from canada post.
 		is_billing_cp_verified = False
@@ -81,9 +84,12 @@ def receive_rmq_data(parsedContent):
 			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
    
 		if succesfull_transaction:
+			frappe.log_error(title=f'Testing-RMQ {order.po_no}', message=f'Order {order.name} processed successfully with transaction {succesfull_transaction["authorizeTransactionId"] if "authorizeTransactionId" in succesfull_transaction else "N/A"}')
 			# If the payment gateway is "usaepay", create a USAePay transaction record.
 			if succesfull_transaction["paymentGatewayAlias"] == "usaepay":
 				create_so_usaepay(order, succesfull_transaction)
+		else:
+			frappe.log_error(title=f'Testing RMQ Failed-{order.po_no}', message=f'Order {order.name} processed without a successful transaction')
 
 		# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 		try:
@@ -235,12 +241,15 @@ def get_shipping_address_detail(parsedContent, is_cp_verified):
 	}
 
 # 
-def get_shipping_item(shipping_quote, total):
+def get_shipping_item(shipping_quote, total, is_far_distance_shipping=False):
 	shipping_item = ""
-	if shipping_quote == "Flat Rate Shipping - Standard Shipping" or shipping_quote == "Flat Rate Shipping - Standard":
-		shipping_item = "Shipping"
-	elif shipping_quote == "Flat Rate Shipping - Express Shipping":
-		shipping_item = "Express Shipping"
+	if is_far_distance_shipping:
+		shipping_item = "Far Distance Charge"
+	else:
+		if shipping_quote == "Flat Rate Shipping - Standard Shipping" or shipping_quote == "Flat Rate Shipping - Standard":
+			shipping_item = "Shipping"
+		elif shipping_quote == "Flat Rate Shipping - Express Shipping":
+			shipping_item = "Express Shipping"
 
 	if not shipping_item:
 		return None
@@ -260,7 +269,6 @@ def get_or_create_customer(lead_source, billing_address_detail, shipping_address
 	# If a billing address document exists, attempt to find an existing customer based on it.
 	if billing_address_doc:
 		existing_customer = check_existing_customer(billing_address_doc, billing_address_detail)
-		
 		# If an existing customer is found, return it immediately.
 		if existing_customer:
 			return existing_customer
@@ -289,6 +297,17 @@ def get_or_create_customer(lead_source, billing_address_detail, shipping_address
 			"link_doctype": "Customer",  # The doctype to link (Customer in this case)
 			"link_name": customer.name  # The name of the newly created customer
 		})
+  
+	if shipping_address_doc:
+		# If a shipping address document exists, create a Dynamic Link to associate it with the new Customer.
+		dynamic_link_shipping = frappe.new_doc("Dynamic Link")
+		dynamic_link_shipping.update({
+			"link_doctype": "Customer",
+			"link_name": customer.name
+		})
+
+		# Append the shipping address link to the customer.
+		shipping_address_doc.links.append(dynamic_link_shipping)
 
 	# Create a Contact record for the Customer using their billing details.
 	contact = create_contact(billing_address_detail, customer.name)
@@ -330,7 +349,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"company_address": frappe.db.get_value("Lead Source", order_detail['source'], "neb_company_address"),
 		"mena_is_cp_verified": order_detail["is_cp_verified"],
 		"shipping_address_name": shipping_address_doc.name,
-		"billing_address_name": billing_address_doc.name,
+		"customer_address": billing_address_doc.name,
 		"ifw_signifyd_sid": order_detail['signifyd']['Sid'],
 		"ifw_signifyd_caseid": order_detail['signifyd']['CaseId'],
 		"ifw_signifyd_casestatus": order_detail['signifyd']['CaseStatus'],
@@ -345,16 +364,24 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
-	new_order.set_missing_values()
+	new_order.set_missing_values()	
 	new_order.save()
-	new_order.submit()
-
 	frappe.db.commit()
+ 
+	new_order.submit()
+	frappe.db.commit()
+
+	order = frappe.get_doc("Sales Order", new_order.name)
+	if order.shipping_address_name != shipping_address_doc.name:
+		order.shipping_address_name = shipping_address_doc.name
+		order.customer_address = billing_address_doc.name
+		order.save()
+		frappe.db.commit()
+
 	return new_order
 
 def is_rush(items):
     for item in items:
-        print(item.get("item_code"))
         if item.get("item_code") == "99992":
             return True
     return False
@@ -363,7 +390,6 @@ def create_address(address_detail, customer, address_type):
 	address = frappe.get_doc({
 		"doctype": "Address",
 		"ifw_first_name": address_detail["first_name"],
-		"ifw_last_name": address_detail["last_name"],
 		"email_id": address_detail["email"],
 		"phone": address_detail["phone"],
 		"company": address_detail["company"],
@@ -395,7 +421,6 @@ def check_existing_address(address_detail, address_type):
 	return frappe.db.exists("Address", 
 						{
 							"ifw_first_name": address_detail["first_name"],
-							"ifw_last_name": address_detail["last_name"],
 							"phone": address_detail["phone"], 
 							"address_type": address_type,
 							"pincode": address_detail["postal_code"],
