@@ -828,7 +828,8 @@ fixtures = [{
 			"Item-neb_airship_restricted",
 			"Shipment-neb_notification_email_sent",
 			"Shipment-custom_nondelivery_handling_option",
-			"Purchase Receipt Item-custom_neb_comment"
+			"Purchase Receipt Item-custom_neb_comment",
+			"Sales Invoice-neb_return_document"
 		]]]
 	},
 	{
