@@ -7,6 +7,14 @@ metactical.ShipmentController = class ShipmentController extends frappe.ui.form.
 		if (this.has_shipments(false)) {
 			this.avoid_shipment_btn()
 		}
+
+		this.frm.set_query("parcel_template", function() {
+			return {
+				filters: {
+					"custom_disabled": 0
+				}
+			};
+		});
 	}
 
 	has_shipments(fully = true) {
