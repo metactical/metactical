@@ -278,6 +278,7 @@ def create_sales_order(form_data, customer):
     return {"success": True, "sales_order": sales_order, "error": ""}
 
 def check_coupon_code(sales_order, form_data):
+    total_restock_fee = 0.0
     for payment in form_data['Payment']:
         if payment['ModeOfPayment'] == "Gift Card" and not payment['CouponCode']:
             frappe.throw("Coupon Code is required for Gift Card payment")
@@ -300,7 +301,7 @@ def check_coupon_code(sales_order, form_data):
                             "customer": sales_order.customer
                         })
                             
-                        new_gift_card = create_gift_card(doc, form_data, coupon_code["coupon_name"])
+                        new_gift_card = create_gift_card(doc, form_data, total_restock_fee, coupon_code["coupon_name"])
                         remaining_amount = coupon_code["discount_amount"] - payment['Amount']
                         
                         frappe.db.set_value('Pricing Rule', coupon_code.pricing_rule, 'discount_amount', remaining_amount)
@@ -542,6 +543,7 @@ def get_items(form_data):
             'qty': qty,
             'discount_percentage': item['Discount'],
             'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
+            'restock_fee': item['RestockFee'] if 'RestockFee' in item else 0.0,
         }
 
         if item_code == "2":
@@ -795,6 +797,7 @@ def get_item_discount(item, price_list, item_price, company):
 @frappe.whitelist()
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
+    total_restock_fee = 0.0
     if "ModeOfReturn" not in form_data:
         frappe.response["Message"] = "Mode of Return is required"
         frappe.response["Status"] = 500
@@ -825,7 +828,8 @@ def create_return(*args, **kwargs):
         items = sales_return.items.copy()
         filtered_items = []
         sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
-
+        total_restock_fee = 0.0
+        
         for item in items:
             for updated_item in formatted_items:
                 if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
@@ -839,6 +843,11 @@ def create_return(*args, **kwargs):
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
 
+
+        for items in form_data["Items"]:
+            total_restock_fee += items["RestockFee"] if "RestockFee" in items else 0.0
+        
+        form_data["Total"] += total_restock_fee
         sales_return.items = filtered_items
         sales_return.calculate_taxes_and_totals()
 
@@ -863,6 +872,9 @@ def create_return(*args, **kwargs):
         sales_return.save()
         sales_return.submit()
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
+        
+        if total_restock_fee > 0:
+           create_restock_invoice(total_restock_fee, sales_return, form_data)
     except Exception as e:
         frappe.db.rollback()
         frappe.clear_last_message()
@@ -879,7 +891,7 @@ def create_return(*args, **kwargs):
     gift_card = None
     if "ModeOfReturn" in form_data and form_data["ModeOfReturn"] == "Gift Card":
         try:
-            gift_card = create_gift_card(sales_return, form_data)
+            gift_card = create_gift_card(sales_return, form_data, total_restock_fee)
             frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
         except Exception as e:
             frappe.clear_last_message()
@@ -891,18 +903,56 @@ def create_return(*args, **kwargs):
             frappe.response["Status"] = 500
             frappe.response["Message"] = str(e)
     
+    total = round(sales_return.grand_total + total_restock_fee, 2)
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
-    frappe.response["Total"] = sales_return.grand_total
+    frappe.response["Total"] = total
+    frappe.response["TotalAfterRestockFee"] = total
     frappe.db.commit()
     
-def create_gift_card(doc, form_data, coupon_code=None):
+def create_restock_invoice(total_restock_fee, sales_return, form_data):
+    frappe.set_user(form_data['SalesPerson'])
+    restock_invoice_data = {
+        "doctype": "Sales Invoice",
+        "customer": sales_return.customer,
+        "posting_date": now_datetime(),
+        "due_date": now_datetime(),
+        "is_pos": 1,
+        "pos_profile": form_data['POSProfile'] + ' Operators',
+        "company": sales_return.company,
+        "exempt_from_sales_tax": 1,
+        "neb_return_document": sales_return.name,
+        "items": [{
+            "item_code": "2",
+            "item_name": "Restock Fee",
+            "qty": 1,
+            "rate": total_restock_fee,
+        }],
+        "payments": [{
+            "mode_of_payment": form_data["ModeOfReturn"],
+            "amount": total_restock_fee
+        }],
+    }
+    
+    restock_invoice = frappe.get_doc(restock_invoice_data)
+    restock_invoice.taxes_and_charges = sales_return.taxes_and_charges,
+    restock_invoice.insert(ignore_permissions=True)
+
+    # remove taxes from the restock invoice
+    restock_invoice.taxes = []
+    restock_invoice.save()
+    restock_invoice.submit()
+    frappe.db.commit()
+    
+    return restock_invoice
+
+def create_gift_card(doc, form_data, total_restock_fee, coupon_code=None):
     # create pricing rule for the gift card
     try:
         frappe.set_user(form_data['SalesPerson'])
-        pricing_rule = get_or_create_pricing_rule(doc, form_data)
+        pricing_rule = get_or_create_pricing_rule(doc, form_data, total_restock_fee)
         
         existing_coupon_codes = frappe.db.count("Coupon Code", {"customer": doc.customer})
         description = ""
@@ -931,7 +981,7 @@ def create_gift_card(doc, form_data, coupon_code=None):
     except Exception as e:
         frappe.throw("Unable to create Gift Card: {0}".format(str(e)))
 
-def get_or_create_pricing_rule(doc, form_data):
+def get_or_create_pricing_rule(doc, form_data, total_restock_fee):
     pricing_rule = frappe.get_doc({
             "title": "GC-{0}".format(doc.customer),
             "doctype": "Pricing Rule",
@@ -941,7 +991,7 @@ def get_or_create_pricing_rule(doc, form_data):
             "selling": 1,
             "valid_from": now_datetime(),
             "rate_or_discount": "Discount Amount",
-            "discount_amount": float(form_data['Total']),
+            "discount_amount": float(form_data['Total']) - float(total_restock_fee),
         })
     
     pricing_rule.insert(ignore_permissions=True)
