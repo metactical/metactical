@@ -4,10 +4,9 @@ from metactical.custom_scripts.payment_entry.payment_entry import get_payment_en
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_details
 
-@frappe.whitelist()
-def receive_rmq_data():
+def receive_rmq_data(parsedContent):
 	try:
-		from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
+		# from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
 		rmq_log = create_rmq_log(parsedContent)
 		
 		# Assign the shipping province and country based on the parsed content.
