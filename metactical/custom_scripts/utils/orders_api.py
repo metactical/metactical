@@ -153,17 +153,16 @@ def add_tag(order, tag):
 def get_address_and_customer(parsedContent, billing_address_detail, shipping_address_detail):
 	# Check if a billing address already exists in the system.
 	existing_billing_address = check_existing_address(billing_address_detail, "Billing")
-	customer = None
+		
+	customer = get_or_create_customer(
+		parsedContent['publisher_site'], 
+		billing_address_detail
+	)
 
 	if existing_billing_address:
 		# If an existing billing address is found, fetch its document.
 		billing_address_doc = frappe.get_doc("Address", existing_billing_address)
-
-		# Retrieve or create a customer associated with the billing address.
-		customer = get_or_create_customer(parsedContent['publisher_site'], billing_address_detail, shipping_address_detail, billing_address_doc)
 	else:
-		# If no billing address is found, create a new customer and billing address.
-		customer = get_or_create_customer(parsedContent['publisher_site'], billing_address_detail, shipping_address_detail)
 		billing_address_doc = create_address(billing_address_detail, customer, "Billing")
 
 	existing_shipping_address = check_existing_address(shipping_address_detail, "Shipping")
@@ -264,52 +263,35 @@ def get_shipping_item(shipping_quote, total, is_far_distance_shipping=False):
 	}
 
 
-def get_or_create_customer(lead_source, billing_address_detail, shipping_address_detail, billing_address_doc=None, shipping_address_doc=None):
+def get_or_create_customer(lead_source, billing_address_detail):
 	# If a billing address document exists, attempt to find an existing customer based on it.
-	if billing_address_doc:
-		existing_customer = check_existing_customer(billing_address_doc, billing_address_detail)
-		# If an existing customer is found, return it immediately.
-		if existing_customer:
-			return existing_customer
+	customer = None
+	if billing_address_detail:
+		existing_customer = check_existing_customer(billing_address_detail)
 
-	# Create a new Customer record in the system using billing address details.
-	customer = frappe.get_doc({
-		"doctype": "Customer",
-		"first_name": billing_address_detail['first_name'],  # Customer's first name
-		"last_name": billing_address_detail['last_name'],    # Customer's last name
-		"customer_name": billing_address_detail['first_name'] + " " + billing_address_detail['last_name'],  # Full name
-		"territory": billing_address_detail['country'],  # Country as the territory
-		# Default price list is fetched from the Lead Source; if not available, fallback to "RET - Camo".
-		"default_price_list": frappe.db.get_value("Lead Source", lead_source, "custom_neb_price_list") or "RET - Camo",
-		"billing_currency": billing_address_detail['currency'],  # Customer's billing currency
-		"posa_referral_code": billing_address_detail['account_id'],  # Referral code from billing details
-		"pincode": billing_address_detail['postal_code'],  # Customer's postal code
-	})
-
-	# Insert the new Customer record into the database.
-	customer.insert()
-
-	# If a billing address document exists, create a Dynamic Link to associate it with the new Customer.
-	if billing_address_doc:
-		dynamic_link = frappe.new_doc("Dynamic Link")
-		dynamic_link.update({
-			"link_doctype": "Customer",  # The doctype to link (Customer in this case)
-			"link_name": customer.name  # The name of the newly created customer
-		})
+	if existing_customer and frappe.db.exists("Customer", existing_customer):
+		customer = frappe.get_doc("Customer", existing_customer)
   
-	if shipping_address_doc:
-		# If a shipping address document exists, create a Dynamic Link to associate it with the new Customer.
-		dynamic_link_shipping = frappe.new_doc("Dynamic Link")
-		dynamic_link_shipping.update({
-			"link_doctype": "Customer",
-			"link_name": customer.name
+	if not customer:
+		# Create a new Customer record in the system using billing address details.
+		customer = frappe.get_doc({
+			"doctype": "Customer",
+			"first_name": billing_address_detail['first_name'],  # Customer's first name
+			"last_name": billing_address_detail['last_name'],    # Customer's last name
+			"customer_name": billing_address_detail['first_name'] + " " + billing_address_detail['last_name'],  # Full name
+			"territory": billing_address_detail['country'],  # Country as the territory
+			# Default price list is fetched from the Lead Source; if not available, fallback to "RET - Camo".
+			"default_price_list": frappe.db.get_value("Lead Source", lead_source, "custom_neb_price_list") or "RET - Camo",
+			"billing_currency": billing_address_detail['currency'],  # Customer's billing currency
+			"posa_referral_code": billing_address_detail['account_id'],  # Referral code from billing details
+			"pincode": billing_address_detail['postal_code'],  # Customer's postal code
 		})
 
-		# Append the shipping address link to the customer.
-		shipping_address_doc.links.append(dynamic_link_shipping)
+		# Insert the new Customer record into the database.
+		customer.insert()
 
 	# Create a Contact record for the Customer using their billing details.
-	contact = create_contact(billing_address_detail, customer.name)
+	create_contact(billing_address_detail, customer.name)
 
 	# Commit the changes to the database to save the new Customer and Contact records.
 	frappe.db.commit()
@@ -317,15 +299,15 @@ def get_or_create_customer(lead_source, billing_address_detail, shipping_address
 	# Return the name of the newly created Customer.
 	return customer.name
 
-def check_existing_customer(billing_address_doc, billing_address_detail):
-	if billing_address_doc.links:
-		for link in billing_address_doc.links:
-			if link.get("link_doctype") == "Customer":
-				first_name, last_name = frappe.db.get_value("Customer", link.get("link_name"), ["first_name", "last_name"])
-				if first_name == billing_address_detail["first_name"] and last_name == billing_address_detail["last_name"]:
-					return link.get("link_name")
+def check_existing_customer(billing_address_detail):
+	customer = frappe.db.exists("Customer", {
+		"first_name": billing_address_detail['first_name'],
+		"last_name": billing_address_detail['last_name'],
+		"pincode": billing_address_detail['postal_code'],
+		"territory": billing_address_detail['country'],
+	})
 
-	return None
+	return customer
 
 def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
 	items = process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail)
@@ -388,6 +370,7 @@ def is_rush(items):
 def create_address(address_detail, customer, address_type):
 	address = frappe.get_doc({
 		"doctype": "Address",
+		"title": address_detail["first_name"] + " " + address_detail["last_name"],
 		"ifw_first_name": address_detail["first_name"],
 		"email_id": address_detail["email"],
 		"phone": address_detail["phone"],
