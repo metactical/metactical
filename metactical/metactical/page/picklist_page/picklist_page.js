@@ -672,7 +672,7 @@ class PicklistPage{
 					console.log('No orders');
 				}
 				else{
-					me.wrapper.html(frappe.render_template('totes_items_list'));
+					me.wrapper.html(frappe.render_template('totes_items_list', {"pl_texts": ret.message.pl_texts}));
 					metactical.pick_list.items_to_pick = ret.message.items;
 					metactical.pick_list.picked_items = ret.message.partially_picked;
 					me.item_barcode = frappe.ui.form.make_control({
