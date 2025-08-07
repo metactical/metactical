@@ -428,7 +428,11 @@ def create_payment_entry(doc, data, log):
 		
 		if float(pe.paid_amount) > 0:
 			pe.save()
-			pe.submit()
+			frappe.db.commit()
+			try:
+				pe.submit()
+			except Exception as e:
+				frappe.log_error(title="Payment Entry Submission Error", message=frappe.get_traceback())
 
 		if log:
 			frappe.db.set_value("USAePay Log", log.name, "payment_entry", pe.name, update_modified=False)
