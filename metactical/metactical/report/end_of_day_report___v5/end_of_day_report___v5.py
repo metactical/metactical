@@ -250,6 +250,8 @@ def get_website_stores_data(filters, location):
 			
 	return (data, total_with_tax, total_without_tax, total_mtd, total_pmtd, total_cash_sales)
 
+def get
+
 def get_payments_with_store_credit(filters):
     date = filters.get("date")
     
@@ -262,18 +264,6 @@ def get_cash_sales(lead_source, date):
 		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.neb_payment_completed_at = %s
 		AND `tabSales Invoice`.docstatus = 1 AND `tabSales Invoice Payment`.mode_of_payment="Cash"
 	""", (lead_source, date), as_dict=1)
-
-	# payment_entries = frappe.db.sql("""
-	# 	SELECT COALESCE(SUM(`tabPayment Entry`.paid_amount), 0) AS paid_amount
-	# 	FROM `tabPayment Entry Reference`
-	# 	JOIN `tabPayment Entry` ON `tabPayment Entry`.name = `tabPayment Entry Reference`.parent
-	# 	JOIN `tabSales Invoice` ON `tabPayment Entry Reference`.reference_name = `tabSales Invoice`.name
-	# 	WHERE `tabSales Invoice`.source = %s
-	# 	AND `tabPayment Entry`.docstatus = 1 
-	# 	AND `tabPayment Entry`.mode_of_payment = "Cash"
-	# 	AND `tabSales Invoice`.docstatus = 1
-	# 	AND `tabSales Invoice`.neb_payment_completed_at = %s
-	# """, (lead_source, date), as_dict=1)
 
 	# return sales_invoice_payments[0].paid_amount + payment_entries[0].paid_amount if len(sales_invoice_payments) > 0 else 0
 	return sales_invoice_payments[0].paid_amount if len(sales_invoice_payments) > 0 else 0
