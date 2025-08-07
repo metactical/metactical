@@ -189,7 +189,8 @@ scheduler_events = {
 #     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
 #	],
 	"daily": [
-		"metactical.reserved_calculation.recalculate_reserved_qty"
+		"metactical.reserved_calculation.recalculate_reserved_qty",
+		"metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
 	],
 #	"hourly": [
 #		"metactical.api.shipstation.sync_shipping_status"
