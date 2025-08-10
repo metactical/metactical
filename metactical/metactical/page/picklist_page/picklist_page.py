@@ -139,7 +139,7 @@ def get_pick_lists(warehouse, country, filters, source, sort_by, sort_order):
 										GROUP_CONCAT(item.ifw_location ORDER BY item.ifw_location {location_order} 
 											SEPARATOR '<br>') AS locations,
 										DATE_FORMAT(sales_order.transaction_date, '%d-%m-%Y') AS order_date,
-										pl.status
+										pl.status, pl.pl_text
 									FROM
 										`tabPick List Item` AS pli
 									LEFT JOIN
@@ -534,9 +534,11 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 	items = frappe.db.sql(f"""SELECT 
 								pli.name, pli.item_code, pli.item_name, item.image,
 								pli.ifw_location AS locations, pli.qty, bin.actual_qty,
-								pli.parent AS pick_list
+								pli.parent AS pick_list, pl.pl_text
 							FROM
 								`tabPick List Item` AS pli
+							LEFT JOIN
+								`tabPick List` AS pl ON pl.name = pli.parent
 							LEFT JOIN
 								`tabItem` AS item ON item.name = pli.item_code
 							LEFT JOIN
@@ -554,6 +556,8 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 		assigned_totes[row["pick_list"]] = row["tote_name"]
 
 	#SEt the pick list to being picked
+	processed_pls = {}
+	pl_texts = []
 	query = frappe.db.sql("""UPDATE `tabPick List` SET ais_picked_by = %(user)s WHERE name in """ + where_pick, {"user": user})
 	for item in items:
 		barcodes = frappe.db.sql("""SELECT barcode FROM `tabItem Barcode` 
@@ -586,6 +590,14 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 		#assign a tote
 		item.tote = assigned_totes[item.pick_list]
 
+		if item.pl_text and item.pl_text is not None:
+			if item.pick_list not in processed_pls:
+				pl_texts.append({
+					"pick_list": item.pick_list,
+					"pl_text": item.pl_text,
+					"tote": item.tote
+				})
+
 	#Set the totes to being used
 	where_t = ''
 	for tote in totes:
@@ -593,7 +605,7 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 	where_t = where_t[1:]
 	query = """UPDATE `tabPicklist Tote` SET used_by=%(user)s WHERE name IN (""" + where_t + """)"""
 	frappe.db.sql(query, {"user": user})
-	return {"pick_lists": pls_list, "items": items, "partially_picked": partially_picked}
+	return {"pick_lists": pls_list, "items": items, "partially_picked": partially_picked, "pl_texts": pl_texts}
 
 @frappe.whitelist()
 def update_user_filters(user, field_name, field_value):

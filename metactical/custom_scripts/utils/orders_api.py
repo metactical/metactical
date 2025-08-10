@@ -170,6 +170,7 @@ def process_payment_entry(transaction, order):
 	try:
 		# get transaction details from USAePay and create payment entry
 		get_usaepay_order_detail(transaction, order, logger)
+
 	except Exception as e:
 		frappe.log_error(title='Payment Entry Processing Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process payment entry for order {order.name}: {str(e)}", rmq=True)
@@ -336,6 +337,17 @@ def get_or_create_customer(lead_source, billing_address_detail):
 			"posa_referral_code": billing_address_detail['account_id'],  # Referral code from billing details
 			"pincode": billing_address_detail['postal_code'],  # Customer's postal code
 		})
+  
+	if shipping_address_doc:
+		# If a shipping address document exists, create a Dynamic Link to associate it with the new Customer.
+		dynamic_link_shipping = frappe.new_doc("Dynamic Link")
+		dynamic_link_shipping.update({
+			"link_doctype": "Customer",
+			"link_name": customer.name
+		})
+
+		# Append the shipping address link to the customer.
+		shipping_address_doc.links.append(dynamic_link_shipping)
 
 		# Insert the new Customer record into the database.
 		customer.insert()
@@ -421,6 +433,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		order.customer_address = billing_address_doc.name
 		order.save()
 		logger.error(f"Order {new_order.name} updated with correct addresss: Shipping Address: {shipping_address_doc.name}, Billing Address: {billing_address_doc.name}")
+
 		frappe.db.commit()
 
 	return new_order
