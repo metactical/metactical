@@ -230,8 +230,9 @@ def receive_customer_data(response=None, docname=None):
 	except Exception as e:
 		frappe.log_error(title="USAePay Log Update Error", message=frappe.get_traceback())
 
-def get_usaepay_order_detail(transaction, order):
+def get_usaepay_order_detail(transaction, order, logger):
 	usaepay_account = get_usaepay_account(lead_source=order.source)
+	logger.error(f"USAePay account: {usaepay_account.lead_source}, authorizeTransactionId: {transaction.get('authorizeTransactionId')}")
 	if not usaepay_account:
 		frappe.throw(_("USAePay account not found for the lead source {0}").format(order.source))
 		
@@ -243,22 +244,29 @@ def get_usaepay_order_detail(transaction, order):
 		return 
 
 	transaction = get_transaction_from_usaepay(transaction["authorizeTransactionId"], headers, usaepay_account.get("merchant_id"))
+	if transaction:
+		logger.error(f"Transaction details fetched from USAePay")
+	else:
+		logger.error(f"Transaction details not found in USAePay for transaction key: {transaction['authorizeTransactionId']}")
+
 	event_body = {}
 	event_body["object"] = frappe._dict(transaction)
 
 	# create payment entry if the transaction is successful
-	process_sales_order(event_body, transaction["key"])
+	process_sales_order(event_body, transaction["key"], logger)
 	so_usaepay_transaction = frappe.db.get_value("SO USAePay Transaction", {"order_id": order.name}, "name")
 	if so_usaepay_transaction:
 		frappe.delete_doc("SO USAePay Transaction", so_usaepay_transaction)
 		frappe.db.commit()
 
-def process_sales_order(event_body, transaction_key):
+def process_sales_order(event_body, transaction_key, logger=None):
 	sales_order = frappe.db.get_value("Sales Order", {"po_no": event_body["object"]["invoice"]}, ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
 	if not sales_order:
 		sales_order = frappe.db.get_value("Sales Order", event_body["object"]["invoice"], ["name", "customer", "neb_usaepay_transaction_key", "po_no", "company", "source"], as_dict=1)
 	
 		if not sales_order:
+			if logger:
+				logger.error(f"Sales Order not found for PO No: {event_body['object']['invoice']}")
 			return
 
 	if not sales_order["neb_usaepay_transaction_key"]:
@@ -267,11 +275,15 @@ def process_sales_order(event_body, transaction_key):
 
 	customer = sales_order.customer
 	sales_order.doctype = "Sales Order"
-	process_credit_card_tokens(event_body, customer, sales_order.source)
+	process_credit_card_tokens(event_body, customer, sales_order.source, logger)
 	
 	# create USAePay log
 	log = create_log(sales_order, event_body)
-	create_payment_entry(sales_order, event_body, log)
+	payment_entry = create_payment_entry(sales_order, event_body, log, logger)
+	if logger and payment_entry:
+		logger.error("Process Completed for Sales Order: {0} and Payment Entry: {1}".format(sales_order.name, payment_entry.name))
+	else: 
+		logger.error("Unable to create Payment Entry for Sales Order: {0}".format(sales_order.name))
 
 def process_payment_entry(event_body, transaction_key):
 	frappe.db.set_value("Payment Entry", event_body["object"]["invoice"], "reference_no", transaction_key)
@@ -401,8 +413,10 @@ def get_comment_message(log):
 	
     return comment
 
-def create_payment_entry(doc, data, log):
+def create_payment_entry(doc, data, log, logger=None):
 	try: 
+		if logger:
+			logger.error(f"Creating payment entry for {doc.name}")
 		mode_of_payment = "Visa"
 		
 		if 'category_code' in data["object"]["creditcard"]:
@@ -428,23 +442,38 @@ def create_payment_entry(doc, data, log):
 		
 		if float(pe.paid_amount) > 0:
 			pe.save()
-			pe.submit()
+			frappe.db.commit()
+			if logger:
+				logger.error(f"Payment Entry {pe.name} created with amount {pe.paid_amount}")
+			try:
+				pe.submit()
+				logger.error(f"Payment Entry {pe.name} submitted")
+			except Exception as e:
+				frappe.log_error(title="Payment Entry Submission Error", message=frappe.get_traceback())
 
 		if log:
 			frappe.db.set_value("USAePay Log", log.name, "payment_entry", pe.name, update_modified=False)
-
-	except:
+		
+		frappe.db.commit()
+		return pe
+	except Exception as e:
+		logger.error(f"Error creating payment entry for {doc.name}: {e}")
 		frappe.log_error(title="PE Creation from USAePay Error", message=frappe.get_traceback())
 
-def process_credit_card_tokens(event_body, customer, lead_source=None):
+def process_credit_card_tokens(event_body, customer, lead_source=None, logger=None):
 	transaction_key = event_body["object"]["key"]
-
+	
+	if logger:
+		logger.error(f"Processing credit card tokens for customer: {customer}, transaction key: {transaction_key}")
+  
 	if "creditcard" in event_body["object"]:
 		tokens = []
 		customer_cc = frappe.db.exists("Customer CC", {"erpnext_customer_id": customer})
 		if customer_cc:
 			existing_cc_tokens = frappe.get_doc("Customer CC", customer_cc)
 			tokens = existing_cc_tokens.cc_tokens    
+			if logger:
+				logger.error(f"Customer CC found: {customer_cc}")
 		else:
 			customer_cc = frappe.get_doc({
 				"doctype": "Customer CC",
@@ -453,6 +482,9 @@ def process_credit_card_tokens(event_body, customer, lead_source=None):
 
 			customer_cc = customer_cc.name
 
+			if logger:
+				logger.error(f"Customer CC is created")
+   
 		credit_card_used_in_transaction = event_body["object"]["creditcard"]
 		is_cc_new = True
 		if tokens:
@@ -465,6 +497,9 @@ def process_credit_card_tokens(event_body, customer, lead_source=None):
 		if is_cc_new:
 			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source)
 		frappe.db.commit()
+	
+		if logger:
+			logger.error(f"Credit card tokens processed for customer: {customer}")
 
 def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source=None):
 	headers, usaepay_url = get_headers(event_body, lead_source)
