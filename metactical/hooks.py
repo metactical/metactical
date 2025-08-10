@@ -51,7 +51,8 @@ doctype_js = {
 	"Contact": "custom_scripts/contact/contact.js",
 	"Item": "custom_scripts/item/item.js",
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
-	"Item Group": "custom_scripts/item_group/item_group.js"
+ 	"Item Group": "custom_scripts/item_group/item_group.js",
+	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -188,7 +189,8 @@ scheduler_events = {
 #     "metactical.custom_scripts.rabbitmq.integration.subscribe_to_rabbitmq"
 #	],
 	"daily": [
-		"metactical.reserved_calculation.recalculate_reserved_qty"
+		"metactical.reserved_calculation.recalculate_reserved_qty",
+		"metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
 	],
 #	"hourly": [
 #		"metactical.api.shipstation.sync_shipping_status"
@@ -828,7 +830,10 @@ fixtures = [{
 			"Item-neb_airship_restricted",
 			"Shipment-neb_notification_email_sent",
 			"Shipment-custom_nondelivery_handling_option",
-			"Purchase Receipt Item-custom_neb_comment"
+			"Purchase Receipt Item-custom_neb_comment",
+			"Sales Invoice-neb_return_document",
+			"Shipment-neb_notification_email_sent",
+			"Shipment Parcel Template-custom_disabled"
 		]]]
 	},
 	{

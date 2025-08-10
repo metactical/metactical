@@ -1,7 +1,16 @@
 <div class="row">
 	<div class="col-md-4"><b><a class="list-top-nav-desk alt-color back-to-list" href="#">Back</a></b></div>
 	<div class="col-md-4"><center><h5 id="#order_no"></h5></center></div>
-	<div class="col-md-4" style="text-align: right;"><b><a class="list-top-nav-desk alt-color submit-items-btn" href="#">Submit</a></b></div>
+	<div class="col-md-4" style="text-align: right;">
+		<b><a class="list-top-nav-desk alt-color submit-items-btn" href="#">Submit</a></b>
+	</div>
+	{% if pl_texts %}
+		<div class="col-md-12" style="background-color: #fff; margin-right: 20px; margin-left: 10px; padding: 10px; border-radius: 10px; margin-bottom: 20px;" >
+			{% for row in pl_texts %}
+				<b>{{row.pick_list}} ({{row.tote}}): </b>{{row.pl_text}}<br>
+			{% endfor %}
+		</div>
+	{% endif %}
 	<div class="col-lg-6 col-md-12 col-sm-12 col-xs-12" id="pick-list-items-div">
 		<h4 class="items-header"><center>Items to Pick</center></h4>
 		<div class="item-barcode"></div>

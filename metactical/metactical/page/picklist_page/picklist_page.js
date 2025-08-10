@@ -6,7 +6,10 @@ frappe.pages['picklist-page'].on_page_load = function(wrapper) {
 
 class PicklistPage{
 	constructor(wrapper) {
-		this.make_page(wrapper);
+		this.make_page(wrapper).then(() => {
+			this.setupPageCloseListeners();
+			this.setupPageReturnListeners();
+		});
 	}
 	
 	make_page(wrapper){
@@ -17,23 +20,29 @@ class PicklistPage{
 			single_column: true
 		});
 		this.wrapper = $(wrapper).find(".page-content");
-		this.load_home();
 		
-		//Remove picked by
-		$(document).on('page-change', function() {
-			if(metactical.pick_list.current_pick != undefined){
-				me.close_pick_list(metactical.pick_list.current_pick);
+		return new Promise((resolve) => {
+			me.load_home();
+			
+			//Remove picked by
+			$(document).on('page-change', function() {
+				if(metactical.pick_list.current_pick != undefined){
+					me.close_pick_list(metactical.pick_list.current_pick);
+				}
+			});
+			
+			window.onbeforeunload = function(){
+				if(metactical.pick_list.current_pick != undefined){
+					me.close_pick_list(metactical.pick_list.current_pick).then(()=>{
+						//Just so it waits
+						setTimeout(1000);
+					});
+				}
 			}
+			
+			// Resolve the promise after everything is set up
+			resolve();
 		});
-		
-		window.onbeforeunload = function(){
-			if(metactical.pick_list.current_pick != undefined){
-				me.close_pick_list(metactical.pick_list.current_pick).then(()=>{
-					//Just so it waits
-					setTimeout(1000);
-				});
-			}
-		}
 	}
 	
 	load_home(){
@@ -85,6 +94,13 @@ class PicklistPage{
 			else{
 				metactical.pick_list.order_sort_by = "qty_item";
 			}
+
+			// Initialize to pick and picked items
+			if(metactical.pick_list.picked_items == undefined || metactical.pick_list.items_to_pick == undefined){
+				metactical.pick_list.picked_items = [];
+				metactical.pick_list.items_to_pick = [];
+			}
+
 			me.load_summary();
 		});
 		this.$single_order_button.on('click', function(){
@@ -672,7 +688,7 @@ class PicklistPage{
 					console.log('No orders');
 				}
 				else{
-					me.wrapper.html(frappe.render_template('totes_items_list'));
+					me.wrapper.html(frappe.render_template('totes_items_list', {"pl_texts": ret.message.pl_texts}));
 					metactical.pick_list.items_to_pick = ret.message.items;
 					metactical.pick_list.picked_items = ret.message.partially_picked;
 					me.item_barcode = frappe.ui.form.make_control({
@@ -1307,5 +1323,114 @@ class PicklistPage{
 				"pick_lists": pick_lists
 			}
 		});
+	}
+
+	setupPageCloseListeners() {
+		const me = this;
+		
+		// Initialize global variables if they're undefined
+		if (!metactical.pick_list) {
+			metactical.pick_list = {};
+		}
+		
+		if (!metactical.pick_list.items_to_pick) {
+			metactical.pick_list.items_to_pick = [];
+		}
+		
+		if (!metactical.pick_list.picked_items) {
+			metactical.pick_list.picked_items = [];
+		}
+		
+		// Helper function to check if cleanup is needed
+		const needsCleanup = function() {
+			// Always get fresh values from the global object
+			const itemsToPick = metactical.pick_list.items_to_pick || [];
+			const pickedItems = metactical.pick_list.picked_items || [];
+			const currentPick = metactical.pick_list.current_pick;
+			
+			return (itemsToPick.length > 0 || pickedItems.length > 0 || currentPick !== undefined);
+		};
+		
+		// Helper function to perform cleanup
+		const performCleanup = function() {
+			const currentPick = metactical.pick_list.current_pick;
+			
+			// First clear totes
+			me.clear_totes_picklists();
+			
+			// Then close pick list if there is one
+			if (currentPick !== undefined) {
+				me.close_pick_list(currentPick);
+			}
+		};
+		
+		// Handle tab/window close
+		window.addEventListener('beforeunload', function(e) {
+			if (needsCleanup()) {
+				// Cancel the event
+				e.preventDefault();
+				// Chrome requires returnValue to be set
+				e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+				
+				// Attempt to clean up
+				performCleanup();
+				
+				// Return a string to show dialog box in most browsers
+				return 'You have unsaved changes. Are you sure you want to leave?';
+			} else {
+				console.log("Page close - no cleanup needed");
+			}
+		});
+		
+		// Handle page navigation within Frappe
+		$(document).on('page-change', function() {
+			if (needsCleanup()) {
+				performCleanup();
+			}
+		});
+		
+		// Handle browser back button
+		window.addEventListener('popstate', function() {
+			if (needsCleanup()) {
+				performCleanup();
+			}
+		});
+		
+		// Handle user session timeout/expiry
+		$(document).on('session_expired', function() {
+			if (needsCleanup()) {
+				performCleanup();
+			}
+		});
+	}
+
+	setupPageReturnListeners() {
+		const me = this;
+		
+		// Set up router change handler
+		frappe.router.on('change', function() {
+			if (frappe.get_route_str() === 'picklist-page' && me.page_initialized) {
+				me.refresh_data();
+			}
+		});
+		
+		// This is called when the page is shown
+		$(document).on('page-show', function(e, page_name) {
+			if (page_name === 'picklist-page' && me.page_initialized) {
+				me.refresh_data();
+			}
+		});
+		
+		// Set flag once page is fully initialized
+		this.page_initialized = true;
+	}
+	
+	refresh_data() {
+		
+		if (metactical.pick_list.current_pick !== undefined) {
+			this.close_pick_list(metactical.pick_list.current_pick);
+		}
+		// Reload necessary data when returning to the page
+		this.load_home();
 	}
 }
