@@ -10,13 +10,9 @@ from metactical.custom_scripts.controllers.accounts_controller import update_chi
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = frappe.logger("rmq_log", allow_site=True, file_count=100)
 
-@frappe.whitelist()
-def receive_rmq_data(parsedContent=None):
+def receive_rmq_data(parsedContent):
 	try:
-		from metactical.custom_scripts.utils.loggedinuser4 import parsedContent
 		rmq_log = create_rmq_log(parsedContent)
-		frappe.db.commit()
-  
 		
 		logger.error("\n\n")
 		logger.error(f"Received RMQ data: Order Number: {parsedContent['orderNumber']}, Publisher Site: {parsedContent['publisher_site']}")
