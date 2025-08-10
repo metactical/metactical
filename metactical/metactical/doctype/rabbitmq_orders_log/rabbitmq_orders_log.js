@@ -9,12 +9,10 @@ frappe.ui.form.on('RabbitMQ Orders Log', {
 				args: {
 					order_id: frm.doc.name
 				},
+				freeze: true,
+				freeze_message: __('Re-syncing order...'),
 				callback: function(r) {
-					if (r.message) {
-						frappe.show_alert(__('Order re-synced successfully.'));
-					} else {
-						frappe.show_alert(__('Failed to re-sync order.'));
-					}
+					frappe.msgprint(__('Order re-synced successfully.'));
 				}
 			});
 		})

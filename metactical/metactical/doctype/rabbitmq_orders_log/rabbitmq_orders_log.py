@@ -11,5 +11,4 @@ class RabbitMQOrdersLog(Document):
 @frappe.whitelist()
 def re_sync_order(order_id):
 	"""Re-sync orders from RabbitMQ"""
-	print("Re-syncing orders for:", order_id)
 	re_sync_rmq_order(order_id)
