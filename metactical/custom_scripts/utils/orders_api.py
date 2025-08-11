@@ -29,12 +29,8 @@ def receive_rmq_data(parsedContent):
   
 		# Initialize the shipping item as None. If a shipping description exists,
 		# use it to fetch the corresponding shipping item and cost.
-		shipping_item = None
-		if parsedContent.get("shippingDescription"):
-			is_far_distance_shipping = parsedContent.get("farDistanceCharge", False)
-			total_amount = parsedContent.get("farDistanceChargeAmount", 0.0) if is_far_distance_shipping else parsedContent.get("totalShipping", 0.0)
-			shipping_item = get_shipping_item(parsedContent["shippingDescription"], total_amount, is_far_distance_shipping)
-
+		shipping_item = get_shipping_detail(parsedContent)
+  
 		# check if the billing and shipping addresses are points verified from canada post.
 		is_billing_cp_verified, is_shipping_cp_verified = check_if_cp_verified(parsedContent)
 
@@ -69,6 +65,15 @@ def receive_rmq_data(parsedContent):
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
 
+def get_shipping_detail(parsedContent):
+    shipping_item = None
+    
+    if parsedContent.get("shippingDescription"):
+        is_far_distance_shipping = parsedContent.get("farDistanceCharge", False)
+        total_amount = parsedContent.get("farDistanceChargeAmount", 0.0) if is_far_distance_shipping else parsedContent.get("totalShipping", 0.0)
+        shipping_item = get_shipping_item(parsedContent["shippingDescription"], total_amount, is_far_distance_shipping)
+    return shipping_item
+ 
 def create_so_usaepay(order, transaction):
     # Hold the transaction information
     frappe.get_doc({
@@ -865,10 +870,7 @@ def verify_items(parsedContent, sales_order):
 	This function verifies the items in the Sales Order against the parsed content.
 	It updates the items in the Sales Order if they differ from the parsed content.
 	"""
-	shipping_item = None
-	if parsedContent.get("shippingQuote"):
-		shipping_item = get_shipping_item(parsedContent["shippingQuote"], parsedContent['totalValueAmount']['Amount'], parsedContent.get("isFarDistanceShipping", False))
-
+	shipping_item = get_shipping_detail(parsedContent)
 
 	order_detail = get_order_detail(parsedContent, 
 		parsedContent.get("billingRegion", {}).get("name"), 
@@ -882,6 +884,7 @@ def verify_items(parsedContent, sales_order):
 	items_updated = False
 
 	so_item_row = {}
+	logger.error(f"Verifying items for Sales Order {sales_order.name}. Expected items: {len(items)}, Actual items: {len(sales_order.items)}")
 	for i, item in enumerate(sales_order.items):
 		if item.item_code != items[i].item_code or item.qty != items[i].qty or item.price_list_rate != items[i].price_list_rate:
 			items_updated = True
