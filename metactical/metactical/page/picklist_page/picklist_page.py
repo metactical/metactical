@@ -33,9 +33,11 @@ def get_defaults():
 			
 			except (json.JSONDecodeError, TypeError):
 				# Handle invalid JSON or if last_filters is None
-				default_settings["last_country"] = "All"
+				default_settings["last_country"] = frappe.db.get_single_value("Pick List Settings", "default_country") or "All"
 		else:
-			default_settings["last_country"] = "All"
+			default_settings["last_country"] = frappe.db.get_single_value("Pick List Settings", "default_country") or "All"
+	
+	default_settings["default_country"] = frappe.db.get_single_value("Pick List Settings", "default_country") or "All"
 	default_settings["no_for_manual"] = frappe.db.get_single_value("Pick List Settings", "no_for_manual")
 	return default_settings
 
