@@ -44,7 +44,7 @@ def send_mail(entry, email_campaign):
 			doctype="Email Campaign",
 			name=email_campaign.name,
 			subject=frappe.render_template(email_template.get("subject"), context),
-			content=frappe.render_template(email_template.get("response_html"), context),
+			content=frappe.render_template(email_template.get("response_html"), context, {"email": receipient}),
 			sender=sender,
 			recipients=[receipient],
 			communication_medium="Email",
