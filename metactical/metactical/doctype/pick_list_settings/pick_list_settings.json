@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "no_for_manual",
+  "default_country",
   "default_settings",
   "shipping_items",
   "disabled_sources"
@@ -34,12 +35,19 @@
    "fieldtype": "Table",
    "label": "Disabled Sources in EPL",
    "options": "Pick List Settings Disabled Source"
+  },
+  {
+   "default": "All",
+   "fieldname": "default_country",
+   "fieldtype": "Select",
+   "label": "Default Country",
+   "options": "All\nCanada\nUnited States"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-07-03 10:13:59.597356",
+ "modified": "2025-08-13 11:07:47.833409",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Pick List Settings",

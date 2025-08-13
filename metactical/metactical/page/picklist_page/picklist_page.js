@@ -69,7 +69,7 @@ class PicklistPage{
 			}
 
 			if(last_country == "" || last_country == null){
-				last_country = "All"
+				last_country = ret.message.default_country || "All";
 			}
 
 			me.$selected_warehouse.html(ret.message.default_warehouse);
@@ -154,10 +154,20 @@ class PicklistPage{
 	
 	change_source() {
 		var me = this;
-		frappe.prompt(
-			[{"fieldtype": "Link", "fieldname": "source", "options": "Lead Source", "label": 'Source'}],
-			function(values){
-
+		
+		// Create the dialog
+		var d = new frappe.ui.Dialog({
+			title: 'Change Source',
+			fields: [
+				{
+					"fieldtype": "Link", 
+					"fieldname": "source", 
+					"options": "Lead Source", 
+					"label": 'Source'
+				},
+			],
+			primary_action_label: 'Change',
+			primary_action: function(values) {
 				if(typeof values.source == "undefined"){
 					values.source = "All";
 				}
@@ -177,11 +187,37 @@ class PicklistPage{
 						metactical.pick_list.selected_source = values.source
 						me.load_summary();
 					}
-				});
-			},
-			'Change Source',
-			'Change' 
-		)
+					});
+				d.hide();
+			}
+		});
+
+		// Add a custom "All" button in the dialog's standard footer
+		d.set_secondary_action_label("All Sources");
+		d.set_secondary_action(function() {
+			// Set the source to "All" and trigger the same save functionality
+			frappe.call({
+				method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+				args: {
+					user: frappe.session.user,
+					field_name: "last_source",
+					field_value: "All"
+				},
+				callback: function(r) {
+					if (r.message && r.message.status === "success") {
+						console.log("Source filter saved: All");
+					}
+
+					me.$selected_source.html("All");
+					metactical.pick_list.selected_source = "All";
+					me.load_summary();
+				}
+			});
+			d.hide();
+		});
+
+		// Show the dialog
+		d.show();
 	}
 
 	change_country() {
