@@ -461,18 +461,20 @@ def clear_totes_picklist(totes, pick_lists):
 	pick_lists = json.loads(pick_lists)
 	
 	#Clear totes
-	where_t = ""
-	for tote in totes:
-		where_t += ",'{}'".format(tote)
-	where_t = where_t[1:]
-	frappe.db.sql("""UPDATE `tabPicklist Tote` SET used_by = '' WHERE name IN ({})""".format(where_t))
+	if len(totes) > 0:
+		where_t = ""
+		for tote in totes:
+			where_t += ",'{}'".format(tote)
+		where_t = where_t[1:]
+		frappe.db.sql("""UPDATE `tabPicklist Tote` SET used_by = '' WHERE name IN ({})""".format(where_t))
 	
 	#Clear pick lists
-	where_p = ""
-	for pick_list in pick_lists:
-		where_p += ",'{}'".format(pick_list)
-	where_p = where_p[1:]
-	frappe.db.sql("""UPDATE `tabPick List` SET ais_picked_by='' WHERE name IN ({})""".format(where_p))		
+	if len(pick_lists) > 0:
+		where_p = ""
+		for pick_list in pick_lists:
+			where_p += ",'{}'".format(pick_list)
+		where_p = where_p[1:]
+		frappe.db.sql("""UPDATE `tabPick List` SET ais_picked_by='' WHERE name IN ({})""".format(where_p))		
 	
 @frappe.whitelist()
 def get_totes(warehouse, pick_lists=""):
