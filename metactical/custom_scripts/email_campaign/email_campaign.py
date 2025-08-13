@@ -38,13 +38,14 @@ def send_mail(entry, email_campaign):
 	email_template = frappe.get_doc("Email Template", entry.get("email_template"))
 	sender = frappe.db.get_value("User", email_campaign.get("sender"), "email")
 	for receipient in recipient_list:
-		context = {"doc": frappe.get_doc(email_campaign.email_campaign_for, email_campaign.recipient)}
+		context = {"doc": frappe.get_doc(email_campaign.email_campaign_for, email_campaign.recipient), "email": receipient}
+
 		# send mail and link communication to document
 		comm = make(
 			doctype="Email Campaign",
 			name=email_campaign.name,
 			subject=frappe.render_template(email_template.get("subject"), context),
-			content=frappe.render_template(email_template.get("response_html"), context, {"email": receipient}),
+			content=frappe.render_template(email_template.get("response_html"), context),
 			sender=sender,
 			recipients=[receipient],
 			communication_medium="Email",
