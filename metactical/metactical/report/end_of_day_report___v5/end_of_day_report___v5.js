@@ -3,7 +3,7 @@
 /* eslint-disable */
 
 var tday = new Date().toISOString().split('T')[0];
-frappe.query_reports["End of Day Report - V4"] = {
+frappe.query_reports["End of Day Report - V5"] = {
 	"filters": [
 		{
 			"fieldname": "date",
