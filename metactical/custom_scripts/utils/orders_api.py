@@ -122,7 +122,7 @@ def continue_to_payment(order, payment_detail):
 
 def get_payment_detail(parsedContent):
 	payment_detail = {}
-	succsfull_transaction = None
+	succesfull_transaction = None
 
 	if parsedContent.get("transactions"):
 		for transaction in parsedContent['transactions']:
@@ -757,8 +757,8 @@ def create_rmq_log(parsedContent):
 			"lead_source": publisher_site
 		})
 		rmq_log.insert()
-		return rmq_log.name
 		frappe.db.commit()
+		return rmq_log.name
 	except Exception as e:
 		frappe.log_error(title='RMQ Log Creation Error', message=frappe.get_traceback())
 
