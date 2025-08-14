@@ -16,8 +16,8 @@ def execute(filters=None):
 	# Get Canada and US data
 	data = get_ca_data(filters)
 
-	# Get USA data
-	us_data = get_us_report_data(filters.get("date"))
+	# # Get USA data
+	us_data = get_us_data(filters)
 	if len(us_data) > 0:
 		data.append({"Location": "USA"})
 		data.extend(us_data)
@@ -51,7 +51,6 @@ def get_columns(filters):
 			"label": "Difference",
 			"width": 120,
 			"options": "Currency",
-			"hidden": 1
 		},
 		{
 			"fieldname": "space",
@@ -76,40 +75,77 @@ def get_columns(filters):
 	
 def get_ca_data(filters):
 	data = []
-	#Get stores data
-	# data.append({"Location": "Stores"})
-	total_data = get_website_stores_data(filters, "Stores")
-	stores_data = total_data[0]
-	total_stores_with_tax = total_data[1]
-	total_stores_without_tax = total_data[2]
-	stores_total_mtd = total_data[3]
-	stores_total_pmtd = total_data[4]
-	total_cash_sales = total_data[5]
-
+ 
+	default_company = frappe.db.get_single_value("Global Defaults", "default_company")
+	sources = frappe.db.get_list("Lead Source", ['name', 'ais_report_label'], {
+									"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Store - Camo - Montreal"]],
+									"neb_company": default_company,
+								})
+ 
+	total_store_data = get_website_stores_data(filters, "Stores", sources)
+	stores_data = total_store_data[0]
+	
 	# sort the data based on the array given
-	order = [ "Store - Camo - Downtown", 
-          		"Store - Camo - Edmonds", 
-            	"Store - Camo - Victoria",
-             	"Store - Camo - Queen", 
-              	"Store - Gorilla - Vancouver"
-            ]
-	order_index = {name: i for i, name in enumerate(order)}
-
-	stores_data = sorted(stores_data, key=lambda x:  order_index.get(x.get("name"), len(order)))
+	stores_order = [ "Store - Camo - Downtown", 
+		  		"Store - Camo - Edmonds", 
+				"Store - Camo - Victoria",
+			 	"Store - Camo - Queen", 
+			  	"Store - Gorilla - Vancouver"
+			]
+ 
+	order_index = {name: i for i, name in enumerate(stores_order)}
+	stores_data = sorted(stores_data, key=lambda x:  order_index.get(x.get("name"), len(stores_order)))
 	data.extend(stores_data)
 
 	data.append({"Location": "Online"})
-	total_data = get_website_stores_data(filters, "Website")
-	# web_data, total_web_with_tax, total_web_without_tax, web_total_mtd, web_total_pmtd
-	web_data = total_data[0]
-	total_web_with_tax = total_data[1]
-	total_web_without_tax = total_data[2]
-	web_total_mtd = total_data[3]
-	web_total_pmtd = total_data[4]
+	total_web_data = get_website_stores_data(filters, "Website", sources)
+	web_data = total_web_data[0]
 
-	order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD"]
-	web_data = sorted(web_data, key=lambda x:  order_index.get(x.get("name"), len(order)))
+	websites_order = ["Website - RAS", "Website - Camo", "Website - Gorilla", "Website - GPD"]
+	web_data = sorted(web_data, key=lambda x:  order_index.get(x.get("name"), len(websites_order)))
 	data.extend(web_data)
+ 
+	add_totals(data, total_store_data, total_web_data, "CAD")
+ 	
+	return data
+
+def get_us_data(filters):
+	data = []
+	us_companies = frappe.db.get_list("Company",
+		filters={"country": "United States", "is_group": 0},
+		fields=["name"]
+	)
+	
+	if not us_companies:
+		return []
+
+	companies = [company.name for company in us_companies]
+	sources = frappe.db.get_all("Lead Source", {"neb_company": ["in", companies]}, ['name', 'ais_report_label'])
+	
+	total_store_data = get_website_stores_data(filters, "Stores", sources)
+	stores_data = total_store_data[0]
+	data.extend(stores_data)
+
+	data.append({"Location": "Online"})
+	total_web_data = get_website_stores_data(filters, "Website", sources)
+	web_data = total_web_data[0]
+	data.extend(web_data)
+ 
+	add_totals(data, total_store_data, total_web_data, "USD")
+ 	
+	return data
+
+def add_totals(data, total_store_data, total_web_data, currency):
+	total_stores_with_tax = total_store_data[1]
+	total_stores_without_tax = total_store_data[2]
+	stores_total_mtd = total_store_data[3]
+	stores_total_pmtd = total_store_data[4]
+	total_cash_sales = total_store_data[5]
+ 
+	total_web_with_tax = total_web_data[1]
+	total_web_without_tax = total_web_data[2]
+	web_total_mtd = total_web_data[3]
+	web_total_pmtd = total_web_data[4]
 	
 	#Add an empty row followed with totals rows
 	data.append({})
@@ -130,7 +166,7 @@ def get_ca_data(filters):
 		"total_pmtd": web_total_pmtd
 	})
 	data.append({
-		"location": "CAD Total",
+		"location": f"{currency} Total",
 		"total_with_tax": total_stores_with_tax + total_web_with_tax,
 		"total_without_tax": total_stores_without_tax + total_web_without_tax,
 		"cash_sales": total_cash_sales,
@@ -138,9 +174,7 @@ def get_ca_data(filters):
 		"total_pmtd": stores_total_pmtd + web_total_pmtd,
 	})
 	
-	return data
-	
-def get_website_stores_data(filters, location):
+def get_website_stores_data(filters, location, sources):
 	data = []
 	total_with_tax = 0
 	total_without_tax = 0
@@ -149,13 +183,7 @@ def get_website_stores_data(filters, location):
 	total_cash_sales = 0
 	
 	date = filters.get("date")
-	default_company = frappe.db.get_single_value("Global Defaults", "default_company")
-	sources = frappe.db.get_list("Lead Source", 
-									['name', 'ais_report_label'], 
-									{
-										"name": ["not in", ["Website - Valley", "Website - MRK", "Website - Zelen", "Store - Camo - Montreal"]],
-										"neb_company": default_company,
-									})
+	
 	for source in sources:
 		matches = False
 		doctype = ""
@@ -172,20 +200,20 @@ def get_website_stores_data(filters, location):
 			and source.ais_report_label is not None and source.ais_report_label != "":
 			matches = True
 			doctype = "tabSales Invoice"
-		
+   		
+		store_credit_payments = 0
 		if matches:
 			if doctype == "tabSales Order":
-				query = get_website_orders_sql(source.name, date, field="total_without_tax")
+				sales_data = get_website_orders_sql(source.name, date, field="total_without_tax")
 			elif doctype == "tabSales Invoice":
-				query = get_stores_sql(source.name, date, field="total_without_tax")
+				sales_data = get_stores_sql(source.name, date, field="total_without_tax")
+				store_credit_payments = get_store_credit_payments(source.name, filters.get("date"), filters.get("date"))
 
-			store_credit_payments = store_credit_payments(source.name, filters.get("date"), filters.get("end_date"))
-
-			if len(query) > 0:
+			if len(sales_data) > 0:
 				row.update({
-					"total_without_tax": query[0].total_without_tax - store_credit_payments
+					"total_without_tax": sales_data[0].total_without_tax - store_credit_payments
 				})
-				total_without_tax += query[0].total_without_tax - store_credit_payments
+				total_without_tax += sales_data[0].total_without_tax - store_credit_payments
 			else:
 				row.update({
 					"total_without_tax": 0.0 - store_credit_payments
@@ -201,38 +229,41 @@ def get_website_stores_data(filters, location):
 			start_date = datetime.strftime(selected_date, "%Y-%m-01")
 
 			if doctype == "tabSales Order":
-				query = get_website_orders_sql(source.name, start_date, end_date=date, field="total_mtd")
+				sales_data = get_website_orders_sql(source.name, start_date, end_date=date, field="total_mtd")
 			elif doctype == "tabSales Invoice":
-				query = get_stores_sql(source.name, start_date, end_date=date, field="total_mtd")
+				sales_data = get_stores_sql(source.name, start_date, end_date=date, field="total_mtd")
+				store_credit_payments = get_store_credit_payments(source.name, start_date, selected_date)
 
-			if len(query) > 0:
+			if len(sales_data) > 0:
 				row.update({
-					"total_mtd": query[0].total_mtd
+					"total_mtd": sales_data[0].total_mtd - store_credit_payments
 				})
-				total_mtd += query[0].total_mtd
+				total_mtd += sales_data[0].total_mtd - store_credit_payments
 			else:
 				row.update({
-					"total_mtd": 0.0
+					"total_mtd": 0.0 - store_credit_payments
 				})
-				
+					
 			# Get previous years month to date
 			previous_month = selected_date + relativedelta(years=-1)
 			start_date = datetime.strftime(previous_month, "%Y-%m-01")
 			end_date = datetime.strftime(previous_month, "%Y-%m-%d")
    
 			if doctype == "tabSales Order":
-				query = get_website_orders_sql(source.name, start_date, end_date=end_date, field="total_pmtd")
+				sales_data = get_website_orders_sql(source.name, start_date, end_date=end_date, field="total_pmtd")
 			elif doctype == "tabSales Invoice":
-				query = get_stores_sql(source.name, start_date, end_date=end_date, field="total_pmtd")
-   
-			if len(query) > 0:
+				sales_data = get_stores_sql(source.name, start_date, end_date=end_date, field="total_pmtd")
+				store_credit_payments = get_store_credit_payments(source.name, start_date, end_date)
+	
+			if len(sales_data) > 0:
 				row.update({
-					"total_pmtd": query[0].total_pmtd
+					"total_pmtd": sales_data[0].total_pmtd - store_credit_payments
 				})
-				total_pmtd += query[0].total_pmtd
+			
+				total_pmtd += sales_data[0].total_pmtd - store_credit_payments
 			else:
 				row.update({
-					"total_pmtd": 0.0
+					"total_pmtd": 0.0 - store_credit_payments
 				})
 
 			if location == "Stores":
@@ -256,31 +287,28 @@ def get_website_stores_data(filters, location):
 	return (data, total_with_tax, total_without_tax, total_mtd, total_pmtd, total_cash_sales)
 
 def get_website_orders_sql(source, date, end_date=None, field="total_without_tax"):
-    if end_date is None:
-        end_date = date
+	if end_date is None:
+		end_date = date
 
-    sql = """
-        SELECT 
-            COALESCE(SUM(net_total), 0) AS `{field}`
-        FROM
-            `tabSales Order`
-        JOIN
-            `tabPayment Entry Reference`
-            ON `tabPayment Entry Reference`.reference_name = `tabSales Order`.name
-        JOIN
-            `tabPayment Entry`
-            ON `tabPayment Entry`.name = `tabPayment Entry Reference`.parent
-        WHERE
-            source = %(source)s
-            AND transaction_date BETWEEN %(date)s AND %(end_date)s
-            AND `tabPayment Entry`.paid_amount >= `tabSales Order`.grand_total
-    """.format(field=field)
+	sql = """
+		SELECT 
+			COALESCE(SUM(net_total), 0) AS `{field}`
+		FROM
+			`tabSales Order`
+		JOIN
+			`tabGL Entry` ON `tabSales Order`.name = `tabGL Entry`.against_voucher
+		WHERE
+			`tabSales Order`.source = %(source)s
+			AND `tabSales Order`.transaction_date BETWEEN %(date)s AND %(end_date)s
+			AND `tabSales Order`.docstatus = 1
+			AND `tabGL Entry`.is_cancelled = 0
+	""".format(field=field)
 
-    return frappe.db.sql(sql, {
-        "source": source,
-        "date": date,
-        "end_date": end_date
-    }, as_dict=1)
+	return frappe.db.sql(sql, {
+		"source": source,
+		"date": date,
+		"end_date": end_date
+	}, as_dict=1)
 
  
 def get_stores_sql(source, date, end_date=None, field="total_without_tax"):
@@ -291,106 +319,61 @@ def get_stores_sql(source, date, end_date=None, field="total_without_tax"):
 		SELECT 
 			COALESCE(SUM(net_total), 0) AS `{field}`
 		FROM `tabSales Invoice`
-		LEFT JOIN `tabSales Invoice Payment`
-			ON `tabSales Invoice Payment`.parent = `tabSales Invoice`.name
 		WHERE
 			source = %(source)s
-			AND neb_payment_completed_at BETWEEN %(date)s AND %(end_date)s
-			AND docstatus = 1
-			AND `tabSales Invoice Payment`.mode_of_payment != "Gift Card"
+			AND posting_date BETWEEN %(date)s AND %(end_date)s
+			AND `tabSales Invoice`.docstatus = 1
 	""".format(field=field)
-
+ 
 	return frappe.db.sql(sql, {"source": source, "date": date, "end_date": end_date}, as_dict=1)
 
 def get_cash_sales(lead_source, date):
 	sales_invoice_payments = frappe.db.sql("""
-		SELECT COALESCE(SUM(amount), 0) AS paid_amount
+		SELECT COALESCE(SUM(amount), 0) - COALESCE(SUM(change_amount), 0) AS paid_amount 
 		FROM `tabSales Invoice Payment`
 		JOIN `tabSales Invoice` ON `tabSales Invoice`.name = `tabSales Invoice Payment`.parent
-		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.neb_payment_completed_at = %s
+		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.posting_date = %s
 		AND `tabSales Invoice`.docstatus = 1 AND `tabSales Invoice Payment`.mode_of_payment="Cash"
 	""", (lead_source, date), as_dict=1)
  
 	return sales_invoice_payments[0].paid_amount if len(sales_invoice_payments) > 0 else 0
 
-def store_credit_payments(lead_source, start_date, end_date):
+def get_store_credit_payments(lead_source, start_date, end_date):
 	sql = """
-		SELECT COALESCE(SUM(amount), 0) AS paid_amount
-		FROM `tabSales Invoice Payment`
-		JOIN `tabSales Invoice` ON `tabSales Invoice`.name = `tabSales Invoice Payment`.parent
-		WHERE `tabSales Invoice`.source = %s
-		AND `tabSales Invoice`.posting_date BETWEEN %s AND %s	
- 		AND `tabStore Invoice`.docstatus = 1
-		AND `tabSales Invoice Payment`.mode_of_payment = "Gift Card"
-	"""
+		SELECT
+			si.name  AS invoice,
+			sip.mode_of_payment AS mop,
+			sip.amount AS amount,
+			si.grand_total AS grand_total,
+			si.total_taxes_and_charges AS taxes
+		FROM `tabSales Invoice Payment` AS sip
+		JOIN `tabSales Invoice` AS si ON si.name = sip.parent
+		WHERE si.source = %s
+		AND si.posting_date BETWEEN %s AND %s
+		AND si.docstatus = 1
+		AND si.is_pos = 1
+		AND sip.mode_of_payment = "Gift Card"
+	;"""
  
-	paid_amount = frappe.db.sql(sql, (lead_source, start_date, end_date), as_dict=1)
-	return paid_amount[0].paid_amount if len(paid_amount) > 0 else 0
+	store_credits = frappe.db.sql(sql, (lead_source, start_date, end_date), as_dict=1)
+	net_store_credit_payments = compute_net_summaries(store_credits)
+	return net_store_credit_payments
 
-def get_us_data(item_search_settings, filters):
-	us_data = []
-	
-	if item_search_settings.get("daily_report_url") is not None and item_search_settings.get("daily_report_url") != "":
-		us_request = requests.get(item_search_settings.get("daily_report_url"), 
-						auth=(item_search_settings.api_key, item_search_settings.get_password("api_secret")),
-									params={"date": filters.get("date")})
+def compute_net_summaries(rows):
+	store_credit_net_total = 0
 
-		if us_request.status_code == 200:
-			for row in us_request.json().get("message", {}):
-				us_data.append(row)
-	
-	for row in us_data:
-		if row.get("location") == "Total Stores":
-			row.update({"location": "Stores Total"})
-		elif row.get("location") == "Total Websites":
-			row.update({"location": "Websites Total"})
-		elif row.get("location") == "USD Total":
-			row.update({"location": "Total - USD"})
+	for r in rows:
+		inv = r["invoice"]
+		amount = r["amount"]
+		gt = r["grand_total"]
+		taxes = r["taxes"]
+		# net factor = NT / GT = (GT - taxes) / GT
+		net_factor = (gt - taxes) / gt if gt != 0 else 0
+		net_part = round(amount * net_factor, 2)
 
-	return us_data
+		store_credit_net_total += net_part
 
-def get_rameen_data(item_search_settings,  filters):
-	item_search_settings = frappe.get_doc("Item Search Settings")
-	rameen_data = []
-	if item_search_settings.get("rameen_daily_report_url") is not None and item_search_settings.get("rameen_daily_report_url") != "":
-		us_request = requests.get(item_search_settings.get("rameen_daily_report_url"), 
-						auth=(item_search_settings.rameen_api_key, item_search_settings.get_password("rameen_api_secret")),
-									params={"date": filters.get("date")})
-
-		if us_request.status_code == 200:
-			for row in us_request.json().get("message", {}):
-				rameen_data.append(row)
-
-	for row in rameen_data:
-		if row.get("location") == "Total Stores":
-			row.update({"location": "Stores Total"})
-		elif row.get("location") == "Total Websites":
-			row.update({"location": "Websites Total"})
-		elif row.get("location") == "USD Total":
-			row.update({"location": "Total - USD"})
-	
-	return rameen_data
-
-def get_qc1_data(item_search_settings, filters):
-	qc1_data = []
-	if item_search_settings.get("qc1_daily_report_url") is not None and item_search_settings.get("qc1_daily_report_url") != "":
-		us_request = requests.get(item_search_settings.get("qc1_daily_report_url"), 
-						auth=(item_search_settings.qc1_api_key, item_search_settings.get_password("qc1_api_secret")),
-									params={"date": filters.get("date")})
-
-		if us_request.status_code == 200:
-			for row in us_request.json().get("message", {}):
-				qc1_data.append(row)
-
-	for row in qc1_data:
-		if row.get("location") == "Total Stores":
-			row.update({"location": "Stores Total"})
-		elif row.get("location") == "Total Websites":
-			row.update({"location": "Websites Total"})
-		elif row.get("location") == "USD Total":
-			row.update({"location": "Total - USD"})
-	
-	return qc1_data
+	return store_credit_net_total
 
 @frappe.whitelist()
 def export_to_excel(date):
@@ -401,10 +384,10 @@ def export_to_excel(date):
 	}
 
 	data = {
-		'report_name': 'End of Day Report - V4', 
+		'report_name': 'End of Day Report - V5', 
 		'file_format_type': 'Excel', 
 		'filters': dates
 	}
 
-	sub_headers = ["Stores", "Online", "USA", "QC1", "Rameen"]
+	sub_headers = ["Stores", "Online", "USA"]
 	export_query(data, sub_headers)
