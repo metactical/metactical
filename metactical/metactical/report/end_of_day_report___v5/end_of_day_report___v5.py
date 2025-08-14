@@ -12,7 +12,6 @@ def execute(filters=None):
 	columns = get_columns(filters)
 
 	filters.end_date = filters.get("date")
-	item_search_settings = frappe.get_doc("Item Search Settings")
 
 	# Get Canada and US data
 	data = get_ca_data(filters)
@@ -45,6 +44,14 @@ def get_columns(filters):
 			"fieldtype": "Currency",
 			"label": "Cash Sales",
 			"width": 120
+		},
+		{
+			"fieldname": "difference",
+			"fieldtype": "Currency",
+			"label": "Difference",
+			"width": 120,
+			"options": "Currency",
+			"hidden": 1
 		},
 		{
 			"fieldname": "space",
@@ -152,11 +159,9 @@ def get_website_stores_data(filters, location):
 	for source in sources:
 		matches = False
 		doctype = ""
-		date_column = ""
 		wtype = source.name.split("-")
 		row = {"location": source.ais_report_label, "total_with_tax": 0, "total_without_tax": 0}
-		sql = ""
-		
+  		
 		#Check if you're getting website or stores data
 		if location == "Website" and len(wtype) > 0 and wtype[0].strip() == "Website" \
 			and source.ais_report_label is not None and source.ais_report_label != "":
@@ -169,25 +174,21 @@ def get_website_stores_data(filters, location):
 			doctype = "tabSales Invoice"
 		
 		if matches:
-      
-      
-			sql = """SELECT 
-						COALESCE(SUM(total), 0) AS total_without_tax
-					FROM
-						`""" + doctype + """`
-					WHERE
-						source = %(source)s AND neb_payment_completed_at = %(date)s
-						AND docstatus = 1"""
+			if doctype == "tabSales Order":
+				query = get_website_orders_sql(source.name, date, field="total_without_tax")
+			elif doctype == "tabSales Invoice":
+				query = get_stores_sql(source.name, date, field="total_without_tax")
 
-			query = frappe.db.sql(sql, {"source": source.name, "date": date}, as_dict=1)
+			store_credit_payments = store_credit_payments(source.name, filters.get("date"), filters.get("end_date"))
+
 			if len(query) > 0:
 				row.update({
-					"total_without_tax": query[0].total_without_tax
+					"total_without_tax": query[0].total_without_tax - store_credit_payments
 				})
-				total_without_tax += query[0].total_without_tax
+				total_without_tax += query[0].total_without_tax - store_credit_payments
 			else:
 				row.update({
-					"total_without_tax": 0.0
+					"total_without_tax": 0.0 - store_credit_payments
 				})
 
 			row.update({
@@ -195,16 +196,15 @@ def get_website_stores_data(filters, location):
 			})
 			
 			#Get month to date values
+			date = filters.get("date")
 			selected_date = datetime.strptime(date, "%Y-%m-%d")
 			start_date = datetime.strftime(selected_date, "%Y-%m-01")
-			query = frappe.db.sql("""SELECT
-										COALESCE(SUM(total), 0) AS total_mtd
-									FROM
-										`""" + doctype + """`
-									WHERE
-										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
-										AND %(end_date)s AND docstatus = 1""",
-								{"source": source.name, "start_date": start_date, "end_date": date}, as_dict=1)
+
+			if doctype == "tabSales Order":
+				query = get_website_orders_sql(source.name, start_date, end_date=date, field="total_mtd")
+			elif doctype == "tabSales Invoice":
+				query = get_stores_sql(source.name, start_date, end_date=date, field="total_mtd")
+
 			if len(query) > 0:
 				row.update({
 					"total_mtd": query[0].total_mtd
@@ -219,14 +219,12 @@ def get_website_stores_data(filters, location):
 			previous_month = selected_date + relativedelta(years=-1)
 			start_date = datetime.strftime(previous_month, "%Y-%m-01")
 			end_date = datetime.strftime(previous_month, "%Y-%m-%d")
-			query = frappe.db.sql("""SELECT
-										COALESCE(SUM(total), 0) AS total_pmtd
-									FROM
-										`""" + doctype + """`
-									WHERE
-										source = %(source)s AND neb_payment_completed_at BETWEEN %(start_date)s
-										AND %(end_date)s AND docstatus = 1""", 
-								{"source": source.name, "start_date": start_date, "end_date": end_date}, as_dict=1)
+   
+			if doctype == "tabSales Order":
+				query = get_website_orders_sql(source.name, start_date, end_date=end_date, field="total_pmtd")
+			elif doctype == "tabSales Invoice":
+				query = get_stores_sql(source.name, start_date, end_date=end_date, field="total_pmtd")
+   
 			if len(query) > 0:
 				row.update({
 					"total_pmtd": query[0].total_pmtd
@@ -244,17 +242,65 @@ def get_website_stores_data(filters, location):
 				row.update({
 					"cash_sales": cash_sales
 				})
-				
+	
+				end_of_day_difference = frappe.db.get_value("End of Day Closing", {"lead_source": source.name, "closing_date": filters.date}, "mop_total_difference")		
+				if end_of_day_difference is not None:
+					row.update({
+						"difference": end_of_day_difference
+					})		
+
+
 			#Add row to data
 			data.append(row)
 			
 	return (data, total_with_tax, total_without_tax, total_mtd, total_pmtd, total_cash_sales)
 
-def get
+def get_website_orders_sql(source, date, end_date=None, field="total_without_tax"):
+    if end_date is None:
+        end_date = date
 
-def get_payments_with_store_credit(filters):
-    date = filters.get("date")
-    
+    sql = """
+        SELECT 
+            COALESCE(SUM(net_total), 0) AS `{field}`
+        FROM
+            `tabSales Order`
+        JOIN
+            `tabPayment Entry Reference`
+            ON `tabPayment Entry Reference`.reference_name = `tabSales Order`.name
+        JOIN
+            `tabPayment Entry`
+            ON `tabPayment Entry`.name = `tabPayment Entry Reference`.parent
+        WHERE
+            source = %(source)s
+            AND transaction_date BETWEEN %(date)s AND %(end_date)s
+            AND `tabPayment Entry`.paid_amount >= `tabSales Order`.grand_total
+    """.format(field=field)
+
+    return frappe.db.sql(sql, {
+        "source": source,
+        "date": date,
+        "end_date": end_date
+    }, as_dict=1)
+
+ 
+def get_stores_sql(source, date, end_date=None, field="total_without_tax"):
+	if end_date is None:
+		end_date = date
+
+	sql = """
+		SELECT 
+			COALESCE(SUM(net_total), 0) AS `{field}`
+		FROM `tabSales Invoice`
+		LEFT JOIN `tabSales Invoice Payment`
+			ON `tabSales Invoice Payment`.parent = `tabSales Invoice`.name
+		WHERE
+			source = %(source)s
+			AND neb_payment_completed_at BETWEEN %(date)s AND %(end_date)s
+			AND docstatus = 1
+			AND `tabSales Invoice Payment`.mode_of_payment != "Gift Card"
+	""".format(field=field)
+
+	return frappe.db.sql(sql, {"source": source, "date": date, "end_date": end_date}, as_dict=1)
 
 def get_cash_sales(lead_source, date):
 	sales_invoice_payments = frappe.db.sql("""
@@ -264,9 +310,22 @@ def get_cash_sales(lead_source, date):
 		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.neb_payment_completed_at = %s
 		AND `tabSales Invoice`.docstatus = 1 AND `tabSales Invoice Payment`.mode_of_payment="Cash"
 	""", (lead_source, date), as_dict=1)
-
-	# return sales_invoice_payments[0].paid_amount + payment_entries[0].paid_amount if len(sales_invoice_payments) > 0 else 0
+ 
 	return sales_invoice_payments[0].paid_amount if len(sales_invoice_payments) > 0 else 0
+
+def store_credit_payments(lead_source, start_date, end_date):
+	sql = """
+		SELECT COALESCE(SUM(amount), 0) AS paid_amount
+		FROM `tabSales Invoice Payment`
+		JOIN `tabSales Invoice` ON `tabSales Invoice`.name = `tabSales Invoice Payment`.parent
+		WHERE `tabSales Invoice`.source = %s
+		AND `tabSales Invoice`.posting_date BETWEEN %s AND %s	
+ 		AND `tabStore Invoice`.docstatus = 1
+		AND `tabSales Invoice Payment`.mode_of_payment = "Gift Card"
+	"""
+ 
+	paid_amount = frappe.db.sql(sql, (lead_source, start_date, end_date), as_dict=1)
+	return paid_amount[0].paid_amount if len(paid_amount) > 0 else 0
 
 def get_us_data(item_search_settings, filters):
 	us_data = []
