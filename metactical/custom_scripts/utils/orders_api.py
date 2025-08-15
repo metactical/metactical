@@ -4,13 +4,22 @@ from metactical.custom_scripts.payment_entry.payment_entry import get_payment_en
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_details
 import logging
-import json, ast
+import json, ast, os, sys, pathlib, subprocess
 from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = frappe.logger("rmq_log", allow_site=True, file_count=100)
 
-def receive_rmq_data(parsedContent):
+def get_bench_path():
+	# Start from current directory and move upward until we find `sites` folder
+	current = os.path.abspath(os.getcwd())
+	while current != os.path.dirname(current):  # stop at root
+		if os.path.isdir(os.path.join(current, "sites")):
+			return current
+		current = os.path.dirname(current)
+	return None
+  
+def process_rmq_data(parsedContent):
 	try:
 		rmq_log = create_rmq_log(parsedContent)
 		
@@ -64,10 +73,11 @@ def receive_rmq_data(parsedContent):
 		continue_to_payment(order, payment_detail)
 		frappe.db.commit()
   
-		re_sync_rmq_order(rmq_log, order.name)
+		re_sync_rmq_order(parsedContent, order.name)
 	except Exception as e:
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
-		post_to_rocket_chat([], f"Unable to process order from RMQ: {str(e)}", rmq=True)
+		message = f"Error processing order {parsedContent['orderNumber']} from RMQ:\nSource: {parsedContent['publisher_site']}\nError: {str(e)}"
+		post_to_rocket_chat([], message, rmq=True)
 
 def create_so_usaepay(order, transaction):
     # Hold the transaction information
@@ -113,11 +123,11 @@ def continue_to_payment(order, payment_detail):
 		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title='Payment Creation Error', message=frappe.get_traceback())
-		post_to_rocket_chat([], f"Unable to create payment for order {order.name}: {str(e)}", rmq=True)
+		message = f"Error creating payment for order {order.name}:\nSource: {order.source}\nError: {str(e)}"
+		post_to_rocket_chat([], message, rmq=True)
 
 def get_payment_detail(parsedContent):
 	payment_detail = {}
-	succsfull_transaction = None
 
 	if parsedContent.get("transactions"):
 		for transaction in parsedContent['transactions']:
@@ -741,22 +751,35 @@ def update_signify_detail(parsedContent):
 			frappe.log_error(title='SignifyD Update Error', message=f"Sales Order not found for SignifyD SID: {parsedContent['Sid']}")
 	except Exception as e:
 		frappe.log_error(title='SignifyD Update Error', message=frappe.get_traceback())
-		post_to_rocket_chat([], f"Unable to update SignifyD details: {str(e)}", rmq=True)
+		message = f"Unable to update SignifyD details for SID {parsedContent['Sid']}: {str(e)}"
+		post_to_rocket_chat([], message, rmq=True)
   
 def create_rmq_log(parsedContent):
 	try:
 		publisher_site = parsedContent.get("publisher_site", "Unknown")
+		bench_path = get_bench_path()
+		last_commit = "N/A"  # Default value if no commit is found
+		if  bench_path:
+			# Assuming you want the last commit from the 'frappe' app
+			frappe_app_path = os.path.join(bench_path, "apps", "metactical")
+
+			last_commit = subprocess.check_output(
+				["git", "-C", frappe_app_path, "log", "-1", "--pretty=%H %s"],
+				text=True
+			).strip()
+	
 		rmq_log = frappe.get_doc({
 			"doctype": "RabbitMQ Orders Log",
 			"payload": as_unicode(parsedContent),
-			"lead_source": publisher_site
+			"lead_source": publisher_site,
+			"last_commit": last_commit
 		})
-		rmq_log.insert()
-		return rmq_log.name
+  
+		rmq_log.insert()		
 		frappe.db.commit()
+		return rmq_log.name
 	except Exception as e:
 		frappe.log_error(title='RMQ Log Creation Error', message=frappe.get_traceback())
-
 
 def as_unicode(text: str, encoding: str = "utf-8") -> str:
 	"""Convert to unicode if required"""
@@ -818,7 +841,7 @@ def re_sync_rmq_order(parsedContent, sales_order=None):
 		else:
 			logger.error(f"No existing Sales Order found for order number {order_number}. Proceeding with re-sync.")
 			print(f"No existing Sales Order found for order number {order_number}. Proceeding with re-sync.")
-			receive_rmq_data(parsedContent)
+			process_rmq_data(parsedContent)
 		
 		# # Extract province and country information from the parsed content.
 	except Exception as e:
