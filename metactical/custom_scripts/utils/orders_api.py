@@ -67,7 +67,7 @@ def process_rmq_data(parsedContent):
 			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
    
 		continue_to_payment(order, payment_detail)
-		frappe.db.commit()
+		frappe.db.commit() 
   
 		re_sync_rmq_order(parsedContent, order.name)
 	except Exception as e:
