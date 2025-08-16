@@ -143,9 +143,19 @@ class PicklistPage{
 		frappe.prompt(
 			[{"fieldtype": "Link", "fieldname": "warehouse", "options": "Warehouse", "label": 'Warehouse'}],
 			function(values){
-				me.$selected_warehouse.html(values.warehouse);
-				metactical.pick_list.selected_warehouse = values.warehouse
-				me.load_summary();
+				frappe.call({
+					method: "metactical.metactical.page.picklist_page.picklist_page.update_user_filters",
+					args: {
+						user: frappe.session.user,
+						field_name: "last_warehouse",
+						field_value: values.warehouse
+					},
+					callback: function(r) {
+						me.$selected_warehouse.html(values.warehouse);
+						metactical.pick_list.selected_warehouse = values.warehouse
+						me.load_summary();
+					}
+				});
 			},
 			'Change Warehouse',
 			'Change' 
