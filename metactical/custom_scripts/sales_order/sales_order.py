@@ -57,21 +57,18 @@ class SalesOrderCustom(SalesOrder):
 			if all_invoices_paid:
 				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
 
-		if self.status == "To Deliver":
+		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"]:
 			# check if there is return delivery note created in 
-			rows = frappe.db.sql("""
-				SELECT DISTINCT
-					dn.name AS delivery_note, dn.status
-				FROM `tabDelivery Note` dn
-				JOIN `tabDelivery Note Item` dni
-				ON dni.parent = dn.name
-				WHERE  dni.against_sales_order = %(sales_order)s
-				AND dn.docstatus = 1
-				AND dn.status != 'Cancelled'
-				AND dn.is_return = 1
-			""", {"sales_order": self.name}, as_dict=True)	
-   
-			if rows:
+			has_linked_return = False
+			return_delivery_notes = get_return_delivery_note(self.name)
+			if not return_delivery_notes:
+				return_sales_invoices = get_return_sales_invoices(self.name)
+				if return_sales_invoices:
+					has_linked_return = True
+			else:
+				has_linked_return = True
+    
+			if has_linked_return:
 				self.db_set("status", "Closed", notify=True)	
    
 	def on_submit(self):
@@ -93,6 +90,39 @@ class SalesOrderCustom(SalesOrder):
 
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+   
+   
+def get_return_delivery_note(sales_order):
+	rows = frappe.db.sql("""
+				SELECT DISTINCT
+					dn.name AS delivery_note, dn.status
+				FROM `tabDelivery Note` dn
+				JOIN `tabDelivery Note Item` dni
+				ON dni.parent = dn.name
+				WHERE  dni.against_sales_order = %(sales_order)s
+				AND dn.docstatus = 1
+				AND dn.status != 'Cancelled'
+				AND dn.is_return = 1
+			""", {"sales_order": sales_order}, as_dict=True)	
+   
+	return rows
+
+def get_return_sales_invoices(sales_order):
+	rows = frappe.db.sql("""
+				SELECT DISTINCT
+					si.name AS sales_invoice, si.status
+				FROM `tabSales Invoice` si
+				JOIN `tabSales Invoice Item` sii
+				ON sii.parent = si.name
+				WHERE  sii.sales_order = %(sales_order)s
+				AND si.docstatus = 1
+				AND si.status != 'Cancelled'
+				AND si.is_return = 1
+				AND si.update_stock = 1
+			""", {"sales_order": sales_order}, as_dict=True)	
+   
+	return rows
+
 
 			
 @frappe.whitelist()
