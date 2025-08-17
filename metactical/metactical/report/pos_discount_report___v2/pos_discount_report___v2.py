@@ -18,7 +18,7 @@ def execute(filters=None):
  
 	for d in item_sales:
 		if d.item_code != "9999-tempt" and d.variant_of != "9999-tempt": #remove shipping items from list
-			if d.get('price_list_rate') > 0:
+			if d.get('price_list_rate') > 0 and d.get("item_name") != "Restock Fee":
 				price_list_rate = frappe.db.get_value("Item Price", 
 					{"price_list": d.get('selling_price_list'), "selling": 1, "item_code": d.get('item_code')}, "price_list_rate")
 				if price_list_rate is not None:
