@@ -57,9 +57,23 @@ class SalesOrderCustom(SalesOrder):
 			if all_invoices_paid:
 				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
 
-		elif self.billing_status != "Fully Billed" and self.neb_payment_completed_at:
-			self.db_set("neb_payment_completed_at", None, notify=True)
-
+		if self.status == "To Deliver":
+			# check if there is return delivery note created in 
+			rows = frappe.db.sql("""
+				SELECT DISTINCT
+					dn.name AS delivery_note, dn.status
+				FROM `tabDelivery Note` dn
+				JOIN `tabDelivery Note Item` dni
+				ON dni.parent = dn.name
+				WHERE  dni.against_sales_order = %(sales_order)s
+				AND dn.docstatus = 1
+				AND dn.status != 'Cancelled'
+				AND dn.is_return = 1
+			""", {"sales_order": self.name}, as_dict=True)	
+   
+			if rows:
+				self.db_set("status", "Closed", notify=True)	
+   
 	def on_submit(self):
 		super(SalesOrderCustom, self).on_submit()
 
