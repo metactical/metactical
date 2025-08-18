@@ -42,6 +42,8 @@ class CustomPickList(PickList):
 
 	def before_save(self):
 		super(CustomPickList, self).before_save()
+		self.reorder_items_by_location()
+
 		# Metactical Customization: removed auto location assignement. Will remove the whole
 		# set_item_location in the future from this page
 		# self.set_item_locations()
@@ -336,7 +338,7 @@ class CustomPickList(PickList):
 		
 	def before_submit(self):
 		super(CustomPickList, self).before_submit()
-		self.reorder_items_by_location()
+		# self.reorder_items_by_location()
 
 	def reorder_items_by_location(self):
 		# Sort items based on their location
