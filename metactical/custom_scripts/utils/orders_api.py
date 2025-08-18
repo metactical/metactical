@@ -38,8 +38,8 @@ def process_rmq_data(parsedContent):
   
 		# Initialize the shipping item as None. If a shipping description exists,
 		# use it to fetch the corresponding shipping item and cost.
-		shipping_item = get_shipping_detail(parsedContent)
-  
+		shipping_item, far_distance_shipping_item = get_shipping_items(parsedContent)
+
 		# check if the billing and shipping addresses are points verified from canada post.
 		is_billing_cp_verified, is_shipping_cp_verified = check_if_cp_verified(parsedContent)
 
@@ -51,7 +51,7 @@ def process_rmq_data(parsedContent):
 		logger.error(f"Billing Address Detail: {billing_address_detail}, Shipping Address Detail: {shipping_address_detail}")
   
 		# Extract order details using the parsed content, province, and country information.
-		order_detail = get_order_detail(parsedContent, province, country, company, shipping_item, is_billing_cp_verified)
+		order_detail = get_order_detail(parsedContent, province, country, company, shipping_item, far_distance_shipping_item,  is_billing_cp_verified)
 
 		# Build payment details using transaction data and billing country if transactions exist. Default to None otherwise.
 		payment_detail = get_payment_detail(parsedContent)
@@ -74,15 +74,19 @@ def process_rmq_data(parsedContent):
 		frappe.log_error(title='RabbitMQ Error', message=frappe.get_traceback())
 		message = f"Error processing order {parsedContent['orderNumber']} from RMQ:\nSource: {parsedContent['publisher_site']}\nError: {str(e)}"
 		post_to_rocket_chat([], message, rmq=True)
-
-def get_shipping_detail(parsedContent):
-    shipping_item = None
-    
-    if parsedContent.get("shippingDescription"):
-        is_far_distance_shipping = parsedContent.get("farDistanceCharge", False)
-        total_amount = parsedContent.get("farDistanceChargeAmount", 0.0) if is_far_distance_shipping else parsedContent.get("totalShipping", 0.0)
-        shipping_item = get_shipping_item(parsedContent["shippingDescription"], total_amount, is_far_distance_shipping)
-    return shipping_item
+  
+def get_shipping_items(parsedContent):
+	shipping_item = None
+	far_distance_shipping_item = None
+	if parsedContent.get("shippingDescription"):
+		is_far_distance_shipping = parsedContent.get("farDistanceCharge", False)
+		total_amount = parsedContent.get("totalShipping", 0.0)
+		shipping_item = get_shipping_item(parsedContent["shippingDescription"], total_amount)
+		if is_far_distance_shipping:
+			total_amount = parsedContent.get("farDistanceChargeAmount", 0.0)
+			far_distance_shipping_item = get_shipping_item(parsedContent["shippingDescription"], total_amount, True)
+			
+	return shipping_item, far_distance_shipping_item
  
 def create_so_usaepay(order, transaction):
     # Hold the transaction information
@@ -237,7 +241,7 @@ def get_address_and_customer(parsedContent, billing_address_detail, shipping_add
 	return billing_address_doc, shipping_address_doc, customer
 
 # extract order details from the parsed content
-def get_order_detail(parsedContent, province, country, company, shipping_item, is_billing_cp_verified):
+def get_order_detail(parsedContent, province, country, company, shipping_item, far_distance_shipping_item, is_billing_cp_verified):
 	return {
 		"order_id": parsedContent['orderNumber'],
 		"order_date": parsedContent['orderDate'], 
@@ -251,6 +255,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, i
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
+		"far_distance_shipping_item": far_distance_shipping_item,
 		"signifyd": parsedContent['SignifyD'],
 		"is_cp_verified": is_billing_cp_verified,
 		"ifw_store_pickup": parsedContent["PickInLocation"]
@@ -381,7 +386,7 @@ def check_existing_customer(billing_address_detail):
 
 def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
 	logger.error(f"Creating order for customer: {customer}, Order ID: {order_detail['order_id']}")
-	items = process_items(order_detail['items'], shipping_item=order_detail['shipping_item'], order_detail=order_detail)
+	items = process_items(order_detail['items'], order_detail=order_detail)
 	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
@@ -705,7 +710,7 @@ def get_taxes_and_charges(province, country, company=None):
 	else:
 		return province + " - " + company_code if company_code else province + " - ICL"
 		
-def process_items(items, shipping_item, order_detail):
+def process_items(items, order_detail):
 	items_list = []
 	warehouse = frappe.db.get_value("Lead Source", order_detail['source'], "neb_default_warehouse") or "W01-WHS-Active Stock - ICL"
 	
@@ -727,6 +732,7 @@ def process_items(items, shipping_item, order_detail):
 
 		items_list.append(new_item)
 
+	shipping_item = order_detail['shipping_item']
 	if shipping_item:
 		new_shipping_item = frappe.get_doc({
 			"doctype": "Sales Order Item",
@@ -736,6 +742,17 @@ def process_items(items, shipping_item, order_detail):
 			"warehouse": warehouse
 		})  
 		items_list.append(new_shipping_item)
+  
+	if order_detail['far_distance_shipping_item']:
+		far_distance_shipping_item = order_detail['far_distance_shipping_item']
+		new_far_distance_shipping_item = frappe.get_doc({
+			"doctype": "Sales Order Item",
+			"item_code": far_distance_shipping_item['item_code'],
+			"qty": far_distance_shipping_item['qty'],
+			"price_list_rate": far_distance_shipping_item['rate'],
+			"warehouse": warehouse
+		})
+		items_list.append(new_far_distance_shipping_item)
 
 	return items_list
 
@@ -893,17 +910,17 @@ def verify_items(parsedContent, sales_order):
 	This function verifies the items in the Sales Order against the parsed content.
 	It updates the items in the Sales Order if they differ from the parsed content.
 	"""
-	shipping_item = get_shipping_detail(parsedContent)
-
+	shipping_item, far_distance_shipping_item = get_shipping_items(parsedContent)
 	order_detail = get_order_detail(parsedContent, 
 		parsedContent.get("billingRegion", {}).get("name"), 
 		parsedContent.get("billingCountry", {}).get("name"), 
 		sales_order.company, 
 		shipping_item, 
+		far_distance_shipping_item,
 		sales_order.mena_is_cp_verified
 	)
 
-	items = process_items(order_detail['items'], shipping_item=shipping_item, order_detail=order_detail)
+	items = process_items(order_detail['items'], order_detail=order_detail)
 	items_updated = False
 
 	so_item_row = {}
