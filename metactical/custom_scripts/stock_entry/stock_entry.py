@@ -116,6 +116,33 @@ class CustomStockEntry(StockEntry):
 		stoBarcode = sv.getvalue()
 		self.ais_ste_barcode = stoBarcode.decode('ISO-8859-1')
 
+	def set_material_request_transfer_status(self, status):
+		material_requests = []
+		if self.outgoing_stock_entry:
+			parent_se = frappe.get_value("Stock Entry", self.outgoing_stock_entry, "add_to_transit")
+
+		for item in self.items:
+			material_request = item.material_request or None
+			if self.purpose == "Material Transfer" and material_request not in material_requests:
+				if self.outgoing_stock_entry and parent_se:
+					material_request = frappe.get_value(
+						"Stock Entry Detail", item.ste_detail, "material_request"
+					)
+     
+			all_completed = True
+			if material_request and material_request not in material_requests:
+				material_requests.append(material_request)
+				material_request_items = frappe.get_doc(
+					"Material Request", material_request
+				).get("items")
+				for item in material_request_items:
+					if item.ordered_qty != item.qty and item.received_qty != item.qty:
+						all_completed = False
+						break  
+
+				if all_completed:
+					frappe.db.set_value("Material Request", material_request, "transfer_status", status)
+
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):
 	def update_item_quantity(source, target, source_parent):

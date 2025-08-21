@@ -7025,22 +7025,6 @@
  },
  {
   "default_value": null,
-  "doc_type": "Pick List",
-  "docstatus": 0,
-  "doctype": "Property Setter",
-  "doctype_or_field": "DocField",
-  "field_name": "ais_queued_by",
-  "is_system_generated": 0,
-  "modified": "2025-04-23 12:45:01.237039",
-  "module": null,
-  "name": "Pick List-ais_queued_by-no_copy",
-  "property": "no_copy",
-  "property_type": "Check",
-  "row_name": null,
-  "value": "1"
- },
- {
-  "default_value": null,
   "doc_type": "Delivery Note",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -8478,5 +8462,21 @@
   "property_type": null,
   "row_name": null,
   "value": "Draft\nOpen\nPicked\nPartially Picked\nCompleted\nCancelled"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Material Request",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "transfer_status",
+  "is_system_generated": 0,
+  "modified": "2025-08-18 06:35:31.802724",
+  "module": null,
+  "name": "Material Request-transfer_status-no_copy",
+  "property": "no_copy",
+  "property_type": "Check",
+  "row_name": null,
+  "value": "1"
  }
 ]

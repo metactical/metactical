@@ -1362,7 +1362,8 @@ fixtures = [{
 			"Sales Taxes and Charges-autoname",
 			"Bin-autoname",
 			"Custom Field-label-width",
-			"Shipment Parcel-weight-precision"
+			"Shipment Parcel-weight-precision",
+			"Material Request-transfer_status-no_copy"
 		]]]
 	},
   	{
