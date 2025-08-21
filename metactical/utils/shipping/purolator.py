@@ -39,7 +39,8 @@ class Purolator:
 				'api_key': settings.api_key,
 				'api_password': settings.get_password('api_password'),
 				'is_sandbox': settings.is_sandbox,
-				'billing_account': settings.billing_account
+				'billing_account': settings.billing_account,
+				'purolator_supplier': settings.purolator_supplier
 			})
 	
 	def breakdown_phone_number(self, phone_number):
@@ -302,14 +303,18 @@ class Purolator:
 				shipment.shipments = []
 				piece_row = 0
 				labels = []
+				shipment_pin = None
+
+				if create_shipment.body.ShipmentPIN:
+					shipment_pin = create_shipment.body.ShipmentPIN.Value
+
 				for row in create_shipment.body.PiecePINs.PIN:
-					shipment_pin = row.Value
-					print(f"Shipment Pin: {shipment_pin}")
-					label = self.get_documents(docname, shipment_pin)[0]
+					piece_pin = row.Value
+					label = self.get_documents(docname, piece_pin)[0]
 					labels.append(label)
 					shipment.append("shipments", {
 						"service_provider": "Purolator",
-						"shipment_id": shipment_pin,
+						"shipment_id": piece_pin,
 						"carrier_service": selected_service[shipment.shipment_parcel[0].name],
 						"row_id": shipment.shipment_parcel[piece_row].name,
 						"carrier_status": "created",
@@ -318,13 +323,30 @@ class Purolator:
 					})
 					piece_row += 1
 
+					if not shipment_pin:
+						shipment_pin = piece_pin
+
 				shipment.ais_shipment_status = "Shipped"
 				shipment.save()
 				frappe.db.set_value("Shipment", shipment.name, "service_provider", "Purolator")
+				self.update_delivery_notes(shipment, shipment_pin)
 				return labels
 			else:
 				errors = self.render_error(create_shipment.body.ResponseInformation.Errors)
 				frappe.throw(errors)
+
+	def update_delivery_notes(self, shipment, tracking_no):
+		delivery_notes = []
+		for row in shipment.shipment_delivery_note:
+			if row.delivery_note not in delivery_notes:
+				delivery_notes.append(row.delivery_note)
+
+		purolator_supplier = self.settings.purolator_supplier
+		if purolator_supplier:
+			for delivery_note in delivery_notes:
+				frappe.db.set_value("Delivery Note", delivery_note, "transporter", purolator_supplier)
+				frappe.db.set_value("Delivery Note", delivery_note, "lr_no", tracking_no)
+				frappe.db.set_value("Delivery Note", delivery_note, "lr_date", frappe.utils.nowdate())
 
 	def get_documents(self, docname, pin):
 		if self.settings.is_sandbox:
