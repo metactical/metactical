@@ -20,7 +20,7 @@
 	<div class="col-md-12 pl-container">
 		{% for pl in pick_lists %}
 			<div class="pl-list-div col-md-12 picklist-box" data-pick-list="{{pl.name}}" style="display: flex;">
-				<div class="col-md-6">
+				<div class="col-md-4">
 					<div class="pl-check-div">
 						<input class="pl-check" type="checkbox" id="check-{{pl.name}}" value="{{pl.name}}" data-pick-list="{{pl.name}}" 
 							{% for pick_list in selected_pick_lists %}
@@ -44,7 +44,10 @@
 						<b>QtyItems:</b> {{pl.qty_item}}
 					</span>
 				</div>
-				<div class="col-md-6">
+				<div class="col-md-4">
+					{{pl.pl_text}}
+				</div>
+				<div class="col-md-4">
 					{% if pl.is_rush == 1 %}
 						<span class="pick-list-rush indicator-pill green ellipsis">Rush</span>
 					{% endif %}
