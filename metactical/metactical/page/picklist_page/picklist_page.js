@@ -340,15 +340,17 @@ class PicklistPage{
 				me.wrapper.find('.tote-barcode').on('keypress', function(){
 					if(event.keyCode == 13){
 						let tote_barcode = me.tote_barcode.get_value();
+						let tote_check = $('div[data-tote-list="' + tote_barcode + '"]').find(".tote-check");
 						if(tote_barcode != ""){
-							me.scan_tote(tote_barcode);
+							me.scan_tote(tote_barcode, true, tote_check);
 						}
 					}
 				});
 				me.wrapper.find('.tote-barcode').on('focusout', function(){
 					let tote_barcode = me.tote_barcode.get_value();
+					let tote_check = $('div[data-tote-list="' + tote_barcode + '"]').find(".tote-check");
 					if(tote_barcode != ""){
-						me.scan_tote(tote_barcode);
+						me.scan_tote(tote_barcode, false, tote_check);
 					}
 				})
 				me.wrapper.find('.tote-list-div').on('click', function(){
