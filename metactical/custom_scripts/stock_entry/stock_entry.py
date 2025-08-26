@@ -11,6 +11,7 @@ from barcode.writer import ImageWriter
 from io import BytesIO
 from frappe.utils import cint, comma_or, cstr, flt, format_time, formatdate, getdate, nowdate
 from erpnext.stock.stock_ledger import NegativeStockError, get_previous_sle, get_valuation_rate
+from metactical.custom_scripts.utils.metactical_utils import sort_items_by_location
 
 class CustomStockEntry(StockEntry):
 	def before_submit(self):
@@ -273,3 +274,11 @@ def move_stock(source_name, target_doc=None):
 	)
 
 	return doclist
+
+
+@frappe.whitelist()
+def sort_items(docname):
+    doc = frappe.get_doc("Stock Entry", docname)
+    doc.items = sort_items_by_location(doc.items, "Stock Entry Detail")
+    doc.save()
+    return doc
