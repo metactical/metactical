@@ -539,3 +539,58 @@ def get_password(doc):
   
 	doc = frappe.get_doc(doc.doctype, doc.name)	
 	return doc.get_password(raise_exception=False)
+
+def sort_items_by_location(data, child_doctype):
+	# Sort data by location
+	rows_with_none_location = []
+	digit_rows_with_location = []
+	non_digit_rows_with_location = []
+ 
+	data_dict = [d.as_dict() for d in data]
+
+	for row in data_dict:
+		# row = frappe._dict(row)
+		if row["ifw_location"] is None:
+			rows_with_none_location.append(row)
+		else:
+			if row["ifw_location"].split("-")[0].isdigit():
+				digit_rows_with_location.append(row)
+			else:
+				non_digit_rows_with_location.append(row)
+
+	data = []
+	if digit_rows_with_location:
+		def safe_location_sort(x):
+			parts = x["ifw_location"].split("-")
+			segments = []
+			for part in parts:
+				# Try to parse each segment as an int, fallback to string
+				try:
+					segments.append(int(part))
+				except ValueError:
+					segments.append(part)
+			return tuple(segments)
+
+		# Sort using the updated sorting function
+		data += sorted(digit_rows_with_location, key=safe_location_sort)
+		
+	if non_digit_rows_with_location:
+		data += sorted(non_digit_rows_with_location, key=lambda x: x["ifw_location"])
+
+	if rows_with_none_location:
+		data += rows_with_none_location
+    
+	items = []
+	for i, row in enumerate(data):
+		items.append(create_child_item(row, child_doctype, i))
+	
+	return items
+
+def create_child_item(row, doctype, idx):
+	new_item = frappe.new_doc(doctype)
+	for key, value in iteritems(row):
+		if key != "name":
+			new_item.set(key, value)
+   
+	new_item.idx = idx + 1
+	return new_item
