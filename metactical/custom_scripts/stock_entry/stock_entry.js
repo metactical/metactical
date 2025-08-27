@@ -21,31 +21,7 @@ frappe.ui.form.on('Stock Entry', {
 				}
 			}
 		}
-		else{
-			if (!frm.is_new()){
-				frm.add_custom_button(__('Sort Items by Location'), function() {
-					frm.events.sort_items_by_location(frm);
-				}, 'Actions');
-			}
-		}
 	},
-	sort_items_by_location: function(frm){
-		if(frm.doc.items && frm.doc.items.length > 0){
-			frappe.call({
-				method: "metactical.custom_scripts.stock_entry.stock_entry.sort_items",
-				args: {
-					"docname": frm.doc.name
-				},
-				freeze: true,
-				callback: function(ret){
-					if(ret.message != undefined){
-						frm.reload_doc();
-					}
-				}
-			});
-		}
-	},
-	
 	onload_post_render: function(frm){
 		frm.$wrapper.on('keypress', function(event){
 			if(event.keyCode == 13)
