@@ -566,7 +566,7 @@ def get_password(doc):
 	doc = frappe.get_doc(doc.doctype, doc.name)	
 	return doc.get_password(raise_exception=False)
 
-def sort_items_by_location(data, child_doctype):
+def sort_items_by_location(data):
 	# Sort data by location
 	rows_with_none_location = []
 	digit_rows_with_location = []
@@ -608,15 +608,6 @@ def sort_items_by_location(data, child_doctype):
     
 	items = []
 	for i, row in enumerate(data):
-		items.append(create_child_item(row, child_doctype, i))
+		items.append(frappe._dict(row))
 	
 	return items
-
-def create_child_item(row, doctype, idx):
-	new_item = frappe.new_doc(doctype)
-	for key, value in iteritems(row):
-		if key != "name":
-			new_item.set(key, value)
-   
-	new_item.idx = idx + 1
-	return new_item
