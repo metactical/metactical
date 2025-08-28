@@ -15,7 +15,8 @@
   "api_key",
   "billing_account",
   "column_break_lk9uv",
-  "api_password"
+  "api_password",
+  "purolator_supplier"
  ],
  "fields": [
   {
@@ -60,11 +61,18 @@
    "fieldname": "billing_account",
    "fieldtype": "Data",
    "label": "Billing Account"
+  },
+  {
+   "fieldname": "purolator_supplier",
+   "fieldtype": "Link",
+   "label": "Purolator Supplier",
+   "options": "Supplier",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-12-16 04:37:56.735047",
+ "modified": "2025-08-01 07:08:10.928281",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purolator Settings",

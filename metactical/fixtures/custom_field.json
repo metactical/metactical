@@ -19446,7 +19446,7 @@
   "collapsible": 0,
   "collapsible_depends_on": null,
   "columns": 0,
-  "default": "1",
+  "default": null,
   "depends_on": null,
   "description": null,
   "docstatus": 0,
