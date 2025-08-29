@@ -417,7 +417,8 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
-		"is_rush": is_rush(items)
+		"is_rush": is_rush(items),
+		"apply_discount_on": "Net Total"
 	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
