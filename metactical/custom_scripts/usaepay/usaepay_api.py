@@ -25,7 +25,7 @@ def get_transaction_from_usaepay(usaepay_transaction_key, headers, merchant_id=N
 
 	usaepay_url = usaepay_account.get("usaepay_url")
 	if not usaepay_url:
-		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+		frappe.throw(_("USAePay URL not set in USAePay Settings"))
 
 	url = usaepay_url + "/transactions/" + usaepay_transaction_key
 	response = safe_get(url, headers)
@@ -48,7 +48,7 @@ def get_token_hash(usaepay_account):
 	seed = str(int(time.time()))
 
 	if not api_key or not pin:
-		frappe.throw(_("API Key and PIN are required in Metactical Settings"))
+		frappe.throw(_("API Key and PIN are required in USAePay Settings"))
 
 	prehash = api_key + seed + pin
 
@@ -150,9 +150,9 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 		frappe.throw(_("Failed to make adjustment in USAePay: {0}").format(response.get("error")))
 
 # def get_customer_detail(customer_key, headers):
-# 	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
+# 	usaepay_url = frappe.db.get_single_value("USAePay Settings", "usaepay_url")
 # 	if not usaepay_url:
-# 		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+# 		frappe.throw(_("USAePay URL not set in USAePay Settings"))
 
 # 	url += "/customers/" + customer_key
 # 	response = requests.get(url, headers=headers)
@@ -238,7 +238,7 @@ def get_usaepay_order_detail(transaction, order, logger):
 		
 	headers, usaepay_url = get_headers(lead_source=order.source)
 	if not usaepay_url:
-		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in Metactical Settings for the lead source {0}".format(order.source))
+		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in USAePay Settings for the lead source {0}".format(order.source))
 
 	if not transaction["authorizeTransactionId"]:
 		return 
@@ -505,13 +505,14 @@ def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, 
 	headers, usaepay_url = get_headers(event_body, lead_source)
 	token = get_card_token(usaepay_url, transaction_key, headers)
 	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"]
-
+	print(credit_card_used_in_transaction)
 	try:
 		frappe.get_doc({
 			"doctype": "Customer CC Tokens",
 			"parent": customer_cc,
 			"parentfield": "cc_tokens",
 			"parenttype": "Customer CC",
+			"card_holder": credit_card_used_in_transaction.get("cardholder"),
 			"label": labels[len(tokens)],
 			"token": token,
 			"cc_number": credit_card_used_in_transaction["number"],
@@ -550,7 +551,7 @@ def get_token_hash(usaepay_account, pin=None):
 	
 	seed = str(int(time.time()))
 	if not api_key or not pin:
-		frappe.throw(_("API Key and PIN are required in Metactical Settings"))
+		frappe.throw(_("API Key and PIN are required in USAePay Settings"))
 	
 	prehash = api_key + seed + pin
 
@@ -601,6 +602,7 @@ def make_payment(customer, amount, token, payment_entry=None):
 		"command": "cc:sale",
 		"invoice": reference,
 		"creditcard": {
+			
 			"number": token
 		},
 		"billing": addresses["billing"]
@@ -888,7 +890,7 @@ def void_payment_in_usaepay(doc):
 @frappe.whitelist()
 def get_usaepay_roles():
 	try:
-		metactical_settings = frappe.get_single("Metactical Settings")
+		metactical_settings = frappe.get_single("USAePay Settings")
 		
 		refund = metactical_settings.get("roles_to_refund")
 		adjust = metactical_settings.get("roles_to_adjust_payment")
