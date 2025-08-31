@@ -231,7 +231,8 @@ override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
-	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
+	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
+	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
 }
 #
 # each overriding function accepts a `data` argument;
@@ -1390,7 +1391,8 @@ jinja = {
 		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
-		"metactical.barcode_generator.get_barcode_for_print_format"
+		"metactical.barcode_generator.get_barcode_for_print_format",
+		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location"
 	]
 }
 
