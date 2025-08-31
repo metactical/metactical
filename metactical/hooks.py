@@ -52,7 +52,8 @@ doctype_js = {
 	"Item": "custom_scripts/item/item.js",
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
  	"Item Group": "custom_scripts/item_group/item_group.js",
-	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js"
+	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js",
+	"Email Campaign": "custom_scripts/email_campaign/email_campaign.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -193,7 +194,7 @@ scheduler_events = {
 #	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty",
-		"metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
+		# "metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
 	],
 #	"hourly": [
 #		"metactical.api.shipstation.sync_shipping_status"
