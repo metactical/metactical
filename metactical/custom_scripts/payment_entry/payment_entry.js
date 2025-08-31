@@ -70,11 +70,11 @@ frappe.ui.form.on("Payment Entry", {
                     frm
                 );
 
-                adjust_payment_button(
-                    roles_allowed_to_adjust_payment,
-                    user_roles,
-                    frm
-                );
+                // adjust_payment_button(
+                //     roles_allowed_to_adjust_payment,
+                //     user_roles,
+                //     frm
+                // );
             },
         });
     },
@@ -195,7 +195,7 @@ var make_payment_button = function (
     ) {
         if (
             frm.doc.payment_type == "Receive" &&
-            frm.doc.party &&
+            frm.doc.party && 
             !frm.doc.reference_no &&
             !frm.doc.__islocal &&
             frm.doc.docstatus < 2
@@ -340,7 +340,7 @@ var goto_payment_form = function (frm) {
                     },
                     {
                         fieldtype: "Select",
-                        label: __("Payment Method"),
+                        label: __("Credit Card"),
                         fieldname: "payment_method",
                         options: options,
                         reqd: 1,

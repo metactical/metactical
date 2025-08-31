@@ -185,7 +185,7 @@ def get_customer_payment_information(customer, payment_entry, reference_no=None)
 	# form_hash = form_hash[6:] if form_hash else None
 	
 	if not form_hash:
-		frappe.log_error(title="Metactical Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
+		frappe.log_error(title="Usaepay Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
 		frappe.throw(_("Failed to generate form hash. Please check the MetaTactical settings"))
 
 	frappe.response["tokens"] = tokens

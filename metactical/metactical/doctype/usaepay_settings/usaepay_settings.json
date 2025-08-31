@@ -1,0 +1,82 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-08-28 11:01:49.779329",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "usaepay_accounts",
+  "section_break_w7mqn",
+  "roles_to_refund",
+  "roles_to_cancel_payment",
+  "column_break_uobuh",
+  "roles_to_make_payment",
+  "roles_to_adjust_payment"
+ ],
+ "fields": [
+  {
+   "fieldname": "usaepay_accounts",
+   "fieldtype": "Table",
+   "label": "USAePay Accounts",
+   "options": "USAePay Accounts"
+  },
+  {
+   "fieldname": "section_break_w7mqn",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "roles_to_refund",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Process Refund",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "roles_to_adjust_payment",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "Roles Allowed To Adjust Payment",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "column_break_uobuh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "roles_to_make_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Make Payment",
+   "options": "MT Roles List"
+  },
+  {
+   "fieldname": "roles_to_cancel_payment",
+   "fieldtype": "Table",
+   "label": "Roles Allowed To Cancel Payment",
+   "options": "MT Roles List"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-08-28 11:07:57.226387",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "USAePay Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
