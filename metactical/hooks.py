@@ -51,7 +51,8 @@ doctype_js = {
 	"Contact": "custom_scripts/contact/contact.js",
 	"Item": "custom_scripts/item/item.js",
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
-	"Item Group": "custom_scripts/item_group/item_group.js"
+	"Item Group": "custom_scripts/item_group/item_group.js",
+	"Email Campaign": "custom_scripts/email_campaign/email_campaign.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
