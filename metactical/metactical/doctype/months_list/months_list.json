@@ -13,6 +13,7 @@
   {
    "fieldname": "month",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Month",
    "options": "Month"
   }
@@ -20,7 +21,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-09-01 12:52:18.994677",
+ "modified": "2025-09-01 13:26:47.504374",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Months List",
