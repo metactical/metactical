@@ -1280,6 +1280,7 @@ def warehouses_display_name_mapping():
         "RM01-Bermondsey-Active - ZE": "BER",
         "RM02-Oshawa-Active - ZE": "OSH",
         "US01-Houston-Active - AOI": "TEX",
+        "R08-Chilliwack-Active Stock - ICL": "CLI"
     }
 
 def get_item_cost(item_code):
