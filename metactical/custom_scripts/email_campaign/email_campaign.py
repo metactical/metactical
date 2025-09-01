@@ -29,8 +29,14 @@ def send_email_to_leads_or_contacts(docname):
 	for entry in campaign.get("campaign_schedules"):
 		scheduled_date = add_days(email_campaign.get("start_date"), entry.get("send_after_days"))
 		if scheduled_date == getdate(today()):
-			print(f"Sending email for campaign: {email_campaign.name} on {scheduled_date}")
-			send_mail(entry, email_campaign)
+			frappe.enqueue(
+				send_mail,
+				job_name=f"send_campaign_email_{email_campaign.name}",
+				queue="long",
+				timeout=1600,
+				entry=entry,
+				email_campaign=email_campaign,
+			)
 		else:
 			frappe.msgprint(
 				_("No emails to send today. Next scheduled date is {0}").format(scheduled_date)
