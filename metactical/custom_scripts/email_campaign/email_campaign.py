@@ -47,7 +47,7 @@ def send_mail(entry, email_campaign):
     sender = frappe.db.get_value("User", email_campaign.get("sender"), "email")
 
     batch_size = 100  # emails per batch
-    fetch_limit = 1000  # how many recipients to fetch from DB at once
+    fetch_limit = 500  # how many recipients to fetch from DB at once
 
     if email_campaign.email_campaign_for == "Email Group":
         start = 0
