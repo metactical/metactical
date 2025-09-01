@@ -4,7 +4,7 @@ from frappe import _
 from frappe.core.doctype.communication.email import make
 from frappe.model.document import Document
 from frappe.utils import add_days, getdate, today
-
+import time, sys
 
 # called through hooks to send campaign mails to leads
 def send_email_to_leads_or_contacts():
@@ -79,6 +79,9 @@ def send_mail(entry, email_campaign):
                     email_template=email_template,
                     sender=sender,
                 )
+            
+            sys.stdout.flush()
+            time.sleep(30)
 
             # Move to next chunk
             start += fetch_limit
