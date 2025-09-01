@@ -58,13 +58,27 @@ def send_mail(entry, email_campaign):
 
 	email_template = frappe.get_doc("Email Template", entry.get("email_template"))
 	sender = frappe.db.get_value("User", email_campaign.get("sender"), "email")
+ 
+	batch_size = 1  # Number of emails to send in each batch
+	for i in range(0, len(recipient_list), batch_size):
+		batch_recipients = recipient_list[i:i + batch_size]
+		frappe.enqueue(
+			send_email_batch,
+			job_name=f"send_email_batch_{email_campaign.name}_{i//batch_size}",
+			timeout=1600,
+			recipient_list=batch_recipients,
+			email_campaign=email_campaign,
+			email_template=email_template,
+			sender=sender,
+		)
+
+def send_email_batch(recipient_list, email_campaign, email_template, sender):
+	comm = None
 	for receipient in recipient_list:
 		context = {"doc": frappe.get_doc(email_campaign.email_campaign_for, email_campaign.recipient), "email": receipient}
 
 		# send mail and link communication to document
 		comm = make(
-			doctype="Email Campaign",
-			name=email_campaign.name,
 			subject=frappe.render_template(email_template.get("subject"), context),
 			content=frappe.render_template(email_template.get("response_html"), context),
 			sender=sender,
