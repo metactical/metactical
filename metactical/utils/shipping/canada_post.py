@@ -10,6 +10,7 @@ from PyPDF2 import PdfFileMerger
 from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
 import re
+import time
 
 
 class CanadaPost():
@@ -520,7 +521,7 @@ class CanadaPost():
 		doc.save()
 		return doc.as_dict()
 
-	def get_response(self, url, body, headers=None, return_request=False, method='POST', retry=False):
+	def get_response(self, url, body, headers=None, return_request=False, method='POST', retry=False, retry_count=0):
 		if headers:
 			self.sess.headers.update(headers)
 		try:
@@ -534,10 +535,22 @@ class CanadaPost():
 				return r
 			if r.status_code == 200:
 				return self.xml_to_json(r.content)
-		except requests.exceptions.SSLError:
-			if not retry:
-				self.get_response(url, body, headers,
-								  return_request, method, True)
+		except (requests.exceptions.SSLError, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+			# Handle both SSL and timeout errors with retry logic
+			if not retry and retry_count < 3:  # Max 3 retries
+				# Calculate delay with exponential backoff: 4s, 8s, 16s
+				delay = 4 * (2 ** retry_count)
+				error_type = "SSL" if isinstance(e, requests.exceptions.SSLError) else "Timeout"
+				frappe.logger().info(f"{error_type} Error, retrying in {delay} seconds...")
+				time.sleep(delay)
+				return self.get_response(url, body, headers,
+								  return_request, method, True, retry_count + 1)
+			else:
+				frappe.log_error(
+					f"Max retries reached for {url}. Error: {str(e)}", 
+					"Canada Post API Error"
+				)
+				raise
 		except Exception as e:
 			if 'r' not in locals():
 				frappe.throw(frappe.get_traceback())
