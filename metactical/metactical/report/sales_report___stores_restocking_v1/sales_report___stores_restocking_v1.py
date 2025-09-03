@@ -35,9 +35,9 @@ def get_data(filters):
 		row["in_transit"] = frappe.db.get_value("Bin", {"warehouse": transit_warehouse, "item_code": d.item_code}, "actual_qty") or 0
 		row["button"] = '<button onClick="create_material_request(\'{}\')">Create Material Request</button>'.format(
 							filters.get("warehouse", ""))
-		row['preorder_level'] = d.ais_poreorderlevel
-		row['preorder_qty'] = d.ais_poreorderqty
-		months_to_block_order = frappe.db.get_list("Months List", filters={"parent": row['item_code']}, pluck="month")
+		row['preorder_level'] = d.warehouse_reorder_level
+		row['preorder_qty'] = d.warehouse_reorder_qty
+		months_to_block_order = frappe.db.get_all("Months List", filters={"parent": row['item_code']}, pluck="month")
 		if months_to_block_order:
 			current_month = datetime.now().strftime("%B")
 			if current_month in months_to_block_order:
@@ -138,13 +138,17 @@ def get_transit_warehouse(warehouse):
 def get_report_data(filters):
 	warehouse = filters.get("warehouse")
 	data = frappe.db.sql(f"""
-		select ais_poreorderqty, ais_poreorderlevel, i.item_code, i.item_name, i.ifw_retailskusuffix, i.ifw_location, b.warehouse,
+		select warehouse_reorder_qty, warehouse_reorder_level, i.item_code, i.item_name, i.ifw_retailskusuffix, i.ifw_location, b.warehouse,
 			actual_qty, reserved_qty
 		from `tabBin` b
-		inner join `tabItem` i on b.item_code = i.item_code	
-		where warehouse = '{warehouse}' and ais_poreorderlevel > 0 and ais_poreorderqty > 0
-	""", as_dict=True)
- 
+		inner join `tabItem` i on b.item_code = i.item_code
+		inner join `tabItem Reorder` ir on i.item_code = ir.parent
+		where b.warehouse = '{warehouse}' 
+  		and warehouse_reorder_level > 0 
+    	and warehouse_reorder_qty > 0
+		and material_request_type = 'Transfer'
+		and ir.warehouse = '{warehouse}'
+	""", as_dict=True) 
 	
 	# Sort data by location
 	rows_with_none_location = []
