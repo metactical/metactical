@@ -515,6 +515,20 @@ def connect_to_frappe(site):
 
     except Exception as e:
         LOGGER.info(f"Error connecting to Frappe: {str(e)}")
+        
+def stop_existing_consumers(current_pid):
+	import psutil
+
+	for proc in psutil.process_iter(['pid', 'cmdline']):
+		cmd = " ".join(proc.info['cmdline'] or [])
+		if "custom_scripts/rabbitmq/rmq_consumer.py" in cmd and current_pid != proc.pid:
+			try:
+				print(f"Killing process {proc.pid} with command: {cmd}")
+				proc.kill()
+			except Exception as ex:
+				frappe.log_error(frappe.get_traceback(), "Error killing background sync process")
+				print(f"Error killing process {proc.pid}: {str(ex)}")
+
 
 def main(site):
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -537,6 +551,8 @@ def main(site):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Enter site name to start RMQ consumer")
     parser.add_argument("site", type=str, help="full site name (eg. test.metactical.com)")
+
+    stop_existing_consumers(os.getpid())  # Stop any existing consumers before starting a new one
     
     args = parser.parse_args()
     main(args.site)

@@ -17,7 +17,7 @@
 	<div class="col-md-12 orders-container">
 		{% for pl in pick_lists %}
 			<div class="order-list-div picklist-box col-md-12" data-pick-list="{{pl.name}}" style="display: flex;">
-				<div class="col-md-6">
+				<div class="col-md-4">
 					<b><span class="pick-list-name">{{pl.name}}</span></b>
 					{% if pl.status == "Partially Picked" %} 
 						<span style="color:#333c44; font-size: small; font-weight: 500;"> ({{pl.status}})</span>
@@ -35,7 +35,10 @@
 						<b>Order Date:</b> {{pl.order_date}}
 					</span>
 				</div>
-				<div class="col-md-6">
+				<div class="col-md-4">
+					{{pl.pl_text}}
+				</div>
+				<div class="col-md-4">
 					{% if pl.is_rush == 1 %}
 						<span class="pick-list-rush indicator-pill green ellipsis">Rush</span>
 					{% endif %}

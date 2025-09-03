@@ -927,7 +927,7 @@ def create_restock_invoice(total_restock_fee, sales_return, form_data):
             "item_code": "2",
             "item_name": "Restock Fee",
             "qty": 1,
-            "rate": total_restock_fee,
+            "price_list_rate": total_restock_fee,
         }],
         "payments": [{
             "mode_of_payment": form_data["ModeOfReturn"],
@@ -1280,6 +1280,7 @@ def warehouses_display_name_mapping():
         "RM01-Bermondsey-Active - ZE": "BER",
         "RM02-Oshawa-Active - ZE": "OSH",
         "US01-Houston-Active - AOI": "TEX",
+        "R08-Chilliwack-Active Stock - ICL": "CLI"
     }
 
 def get_item_cost(item_code):
