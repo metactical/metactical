@@ -831,8 +831,21 @@ fixtures = [{
 			"Sales Invoice-neb_return_document",
 			"Shipment-neb_notification_email_sent",
 			"Shipment Parcel Template-custom_disabled",
+<<<<<<< HEAD
 			"Item-reorder_months",
 			"Item-months_to_reorder"
+=======
+			"Sub Operation-time_in_secs",
+			"BOM Operation-time_in_secs",
+			"BOM Item-supplier",
+			"BOM-total_operation_time",
+			"BOM-operation_time",
+			"BOM-output_per_day",
+			"BOM-no_of_workers",
+			"BOM-sample_details",
+			"BOM-retail_sku",
+			"BOM-sub_operations"
+>>>>>>> 85187fb4 (custom fields in paki)
 		]]]
 	},
 	{
