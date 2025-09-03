@@ -52,7 +52,9 @@ doctype_js = {
 	"Item": "custom_scripts/item/item.js",
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
  	"Item Group": "custom_scripts/item_group/item_group.js",
-	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js"
+	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js",
+	"BOM" : "custom_scripts/bom/bom.js",
+	"Operation": "custom_scripts/bom_operation/bom_operation.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
