@@ -19,6 +19,9 @@ def get_defaults():
 			try:
 				filters_dict = json.loads(default_settings.get("last_filters"))
 
+				if filters_dict.get("last_warehouse"):
+					default_settings["default_warehouse"] = filters_dict.get("last_warehouse")
+
 				if filters_dict.get("last_country"):
 					default_settings["last_country"] = filters_dict.get("last_country", "")
 
@@ -412,10 +415,14 @@ def mark_as_picked(picked_items, user, all_items):
 				if item["qty"] > item["picked_qty"]:
 					status = "Partially Picked"
 					break
-			
+		
+		picked_by = user
+		if status == "Partially Picked":
+			picked_by = ""
+
 		doc.update({
 			"status": status,
-			"ais_picked_by": user
+			"ais_picked_by": picked_by
 		})
 		doc.save()
 		#Get associated delivery note

@@ -53,6 +53,15 @@ class CustomPurchaseOrder(PurchaseOrder):
 					frappe.msgprint(_("Barcode is not set for item {0}").format(item.item_code))
         
 
+	def before_submit(self):
+		self.barcode_check()
+
+	def barcode_check(self):
+		for item in self.items:
+			barcode_exists = frappe.db.exists("Item Barcode", {"parent": item.item_code})
+			if not barcode_exists:
+				frappe.throw(f"Error: Please add a barcode for item {item.item_code}")
+
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def shipping_address_query(doctype, txt, searchfield, start, page_len, filters):
