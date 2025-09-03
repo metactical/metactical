@@ -833,7 +833,17 @@ fixtures = [{
 			"Purchase Receipt Item-custom_neb_comment",
 			"Sales Invoice-neb_return_document",
 			"Shipment-neb_notification_email_sent",
-			"Shipment Parcel Template-custom_disabled"
+			"Shipment Parcel Template-custom_disabled",
+			"Sub Operation-time_in_secs",
+			"BOM Operation-time_in_secs",
+			"BOM Item-supplier",
+			"BOM-total_operation_time",
+			"BOM-operation_time",
+			"BOM-output_per_day",
+			"BOM-no_of_workers",
+			"BOM-sample_details",
+			"BOM-retail_sku",
+			"BOM-sub_operations"
 		]]]
 	},
 	{

@@ -1,0 +1,76 @@
+{
+    "actions": [],
+    "creation": "2024-05-13 12:36:55.481497",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+     "parent_operation",
+     "operation",
+     "time_in_mins",
+     "time_in_secs",
+     "workstation",
+     "column_break_5",
+     "description"
+    ],
+    "fields": [
+     {
+      "fieldname": "parent_operation",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Parent Operation",
+      "options": "Operation"
+     },
+     {
+      "fieldname": "operation",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Sub Operation",
+      "options": "Operation"
+     },
+     {
+      "default": "0",
+      "description": "Time in mins",
+      "fieldname": "time_in_mins",
+      "fieldtype": "Float",
+      "in_list_view": 1,
+      "label": "Operation Time"
+     },
+     {
+      "fieldname": "time_in_secs",
+      "fieldtype": "Float",
+      "in_list_view": 1,
+      "label": "Operation Time (In Sec.)",
+      "precision": "2"
+     },
+     {
+      "fieldname": "workstation",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Workstation",
+      "options": "Workstation"
+     },
+     {
+      "fieldname": "column_break_5",
+      "fieldtype": "Column Break"
+     },
+     {
+      "fieldname": "description",
+      "fieldtype": "Small Text",
+      "label": "Description"
+     }
+    ],
+    "index_web_pages_for_search": 1,
+    "istable": 1,
+    "links": [],
+    "modified": "2024-05-13 12:36:55.481497",
+    "modified_by": "Administrator",
+    "module": "Metactical",
+    "name": "Paki Sub Operation",
+    "owner": "Administrator",
+    "permissions": [],
+    "quick_entry": 1,
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "track_changes": 1
+   }
