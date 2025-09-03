@@ -37,8 +37,7 @@ def get_data(filters):
 							filters.get("warehouse", ""))
 		row['preorder_level'] = d.ais_poreorderlevel
 		row['preorder_qty'] = d.ais_poreorderqty
-  
-		months_to_block_order = frappe.db.get_list("Months List", filter={"parent": row['item_code']}, pluck="months")
+		months_to_block_order = frappe.db.get_list("Months List", filters={"parent": row['item_code']}, pluck="month")
 		if months_to_block_order:
 			current_month = datetime.now().strftime("%B")
 			if current_month in months_to_block_order:
