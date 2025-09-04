@@ -829,14 +829,10 @@ fixtures = [{
 			"Shipment-neb_notification_email_sent",
 			"Purchase Receipt Item-custom_neb_comment",
 			"Sales Invoice-neb_return_document",
-<<<<<<< HEAD
-			"Shipment Parcel Template-custom_disabled"
-=======
 			"Shipment-neb_notification_email_sent",
 			"Shipment Parcel Template-custom_disabled",
 			"Item-reorder_months",
 			"Item-months_to_reorder"
->>>>>>> 1c8eee7c (feat: Add Month and Months List DocTypes with associated files)
 		]]]
 	},
 	{
