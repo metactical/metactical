@@ -163,7 +163,7 @@ def get_report_data(filters):
 				digit_rows_with_location.append(row)
 			else:
 				non_digit_rows_with_location.append(row)
-
+	print(data)
 	data = []
 
 	if digit_rows_with_location:
