@@ -92,13 +92,13 @@ def get_column():
 		},
 		{
 			"fieldname":"preorder_level",
-			"label": "PreOrderLevel",
+			"label": "Re-order Level",
 			"width": 120,
 			"fieldtype": "Int",
 		},
 		{
 			"fieldname":"preorder_qty",
-			"label": "PreOrderQty",
+			"label": "Re-order Qty",
 			"width": 120,
 			"fieldtype": "Int",
 		},
