@@ -1,0 +1,54 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2025-02-20 18:02:52.032466",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+     "report_settings_section",
+     "item_groups_whatcanwemake",
+     "item_groups_stock_reorder"
+    ],
+    "fields": [
+     {
+      "fieldname": "report_settings_section",
+      "fieldtype": "Section Break",
+      "label": "Report Settings"
+     },
+     {
+      "fieldname": "item_groups_whatcanwemake",
+      "fieldtype": "Table MultiSelect",
+      "label": "Item Groups for WhatCanWeMakeReport",
+      "options": "Item Groups List"
+     },
+     {
+      "fieldname": "item_groups_stock_reorder",
+      "fieldtype": "Table MultiSelect",
+      "label": "Item Groups for Stock Report to Re-order",
+      "options": "Item Groups List"
+     }
+    ],
+    "index_web_pages_for_search": 1,
+    "issingle": 1,
+    "links": [],
+    "modified": "2025-02-26 09:18:25.394359",
+    "modified_by": "Administrator",
+    "module": "Metactical",
+    "name": "Paki Settings",
+    "owner": "Administrator",
+    "permissions": [
+     {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "print": 1,
+      "read": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+     }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC"
+   }

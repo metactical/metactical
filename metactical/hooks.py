@@ -53,7 +53,9 @@ doctype_js = {
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
  	"Item Group": "custom_scripts/item_group/item_group.js",
 	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js",
-	"Email Campaign": "custom_scripts/email_campaign/email_campaign.js"
+	"Email Campaign": "custom_scripts/email_campaign/email_campaign.js",
+	"BOM" : "custom_scripts/bom/bom.js",
+	"Operation": "custom_scripts/bom_operation/bom_operation.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -824,12 +826,24 @@ fixtures = [{
 			'Shipment-custom_dangerous_goods_class',
 			'Shipment-custom_dangerous_goods_mode',
 			"Lead Source-neb_company_address",
-   		'Item-sb_tag',
+   			'Item-sb_tag',
 			"Shipment-custom_nondelivery_handling_option",
 			"Shipment-neb_notification_email_sent",
 			"Purchase Receipt Item-custom_neb_comment",
 			"Sales Invoice-neb_return_document",
-			"Shipment Parcel Template-custom_disabled"
+			"Shipment Parcel Template-custom_disabled",
+			"Item-reorder_months",
+			"Item-months_to_reorder",
+			"Sub Operation-time_in_secs",
+			"BOM Operation-time_in_secs",
+			"BOM Item-supplier",
+			"BOM-total_operation_time",
+			"BOM-operation_time",
+			"BOM-output_per_day",
+			"BOM-no_of_workers",
+			"BOM-sample_details",
+			"BOM-retail_sku",
+			"BOM-sub_operations"
 		]]]
 	},
 	{
