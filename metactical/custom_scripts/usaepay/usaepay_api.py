@@ -510,7 +510,7 @@ def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, 
 	headers, usaepay_url = get_headers(event_body, lead_source)
 	token = get_card_token(usaepay_url, transaction_key, headers)
 	labels = ["Primary", "Secondary", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"]
-	print(credit_card_used_in_transaction)
+
 	try:
 		frappe.get_doc({
 			"doctype": "Customer CC Tokens",
