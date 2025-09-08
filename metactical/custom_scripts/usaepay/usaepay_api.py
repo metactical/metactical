@@ -487,15 +487,20 @@ def process_credit_card_tokens(event_body, customer, lead_source=None, logger=No
    
 		credit_card_used_in_transaction = event_body["object"]["creditcard"]
 		is_cc_new = True
+		existing_token_id = None
 		if tokens:
 			for token in tokens:
 				if token.cc_number == credit_card_used_in_transaction["number"]:
 					is_cc_new = False
+					existing_token_id = token.name
 					break
 
 		# if the credit card is new, add it to the customer's credit card tokens
 		if is_cc_new:
 			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source)
+		else:
+			frappe.db.set_value("Customer CC Tokens", existing_token_id, "card_holder", credit_card_used_in_transaction.get("cardholder"))
+   
 		frappe.db.commit()
 	
 		if logger:
@@ -569,7 +574,9 @@ def make_payment(customer, amount, token, payment_entry=None):
 		frappe.throw(_("Customer is required"))
 
 	if token:
-		token = frappe.db.get_value("Customer CC Tokens", token, "token")
+		customer_cc = frappe.db.get_value("Customer CC Tokens", token, ["token", "card_holder"], as_dict=1)
+		if not customer_cc:
+			frappe.throw(_("Invalid card token"))
 
 	# get billing address
 	addresses = get_customer_address(customer)
@@ -602,8 +609,8 @@ def make_payment(customer, amount, token, payment_entry=None):
 		"command": "cc:sale",
 		"invoice": reference,
 		"creditcard": {
-			
-			"number": token
+			"cardholder": customer_cc.card_holder if customer_cc and customer_cc.card_holder else (customer_names.get("first_name") + " " + customer_names.get("last_name")) if customer_names else "",
+			"number": customer_cc.token,
 		},
 		"billing": addresses["billing"]
 	}
