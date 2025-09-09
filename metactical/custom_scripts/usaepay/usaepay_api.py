@@ -409,6 +409,9 @@ def get_comment_message(log):
         comment += f"Sales Return: {log.sales_return}\n"
         comment += f"Refund Transaction Key: {log.refund_transaction_key}\n"
         
+    if frappe.session.user:
+        comment += f"Processed by: {frappe.session.user}\n"
+        
     comment += f"Amount: {log.amount}\n"
 	
     return comment
@@ -631,7 +634,11 @@ def make_payment(customer, amount, token, payment_entry=None):
 			frappe.db.set_value("Sales Order", reference, "neb_usaepay_transaction_key", log.transaction_key)
 
 		# submit payment entry
-		frappe.get_doc("Payment Entry", payment_entry).submit()
+		payment_entry_doc = frappe.get_doc("Payment Entry", payment_entry)
+		if payment_entry_doc.docstatus == 0:
+			payment_entry_doc.submit()
+  
+		create_doc_comment(payment_entry_doc, log)
 		
 	except Exception as e:
 		handle_payment_exception(e, log)
@@ -880,6 +887,8 @@ def void_payment_in_usaepay(doc):
 
 			frappe.response["message"] = f"Payment voided successfully"
 			frappe.response["success"] = True
+   
+			create_doc_comment(doc, log)
 
 			return void_response, log.name
 		else:
@@ -973,3 +982,17 @@ def process_missed_usaepay_transactions():
 				frappe.delete_doc("SO USAePay Transaction", transaction["name"])
 			else:
 				frappe.log_error(title="USAePay Order Not Found", message="Sales Order not found for transaction {0}".format(transaction["transaction_key"]))
+
+
+def create_doc_comment(doc, log):
+    message = f"{frappe.session.user} performed '{log.action}' action in USAePay and the log is <a href='/app/usaepay-log/{log.name}'>here</a>."
+    
+    frappe.get_doc({
+		"doctype": "Comment",
+		"comment_type": "Info",
+		"reference_doctype": doc.doctype,
+		"reference_name": doc.name,
+		"comment_type": "Comment",
+		"content": message
+	}).insert(ignore_permissions=True)
+    frappe.db.commit()
