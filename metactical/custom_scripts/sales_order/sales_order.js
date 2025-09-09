@@ -185,6 +185,11 @@ frappe.ui.form.on('Sales Order', {
 	},
 	
 	create_pick_list_custom: function(frm) {
+		// validate shipping address before creating pick list
+		if (!frm.doc.shipping_address_name) {
+			frappe.throw(__("Please select Shipping Address Name"));
+		}
+
 		// confirm item availability
 		var items = cur_frm.doc.items
 		var flag = 0;
