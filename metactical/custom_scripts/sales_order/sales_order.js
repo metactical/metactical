@@ -185,10 +185,20 @@ frappe.ui.form.on('Sales Order', {
 	},
 	
 	create_pick_list_custom: function(frm) {
-		// validate shipping address before creating pick list
+		// validating shipping address name is selected
 		if (!frm.doc.shipping_address_name) {
-			frappe.throw(__("Please select Shipping Address Name"));
+			frappe.throw(__("Please select Shipping Address Name before proceeding to create Pick List."));
 		}
+
+		// Validating there is no duplicated items
+		var items = cur_frm.doc.items
+		var item_list = [];
+		items.forEach(function(row){
+			item_list.push(row.item_code);
+			if (item_list.includes(row.item_code)) {
+				frappe.throw(__("Item " + row.item_code + " is duplicated. Please remove the duplicate before proceeding to create Pick List.") );
+			}
+		});
 
 		// confirm item availability
 		var items = cur_frm.doc.items
