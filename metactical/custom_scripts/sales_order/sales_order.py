@@ -271,3 +271,29 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	doclist.set_onload("ignore_price_list", True)
  
 	return doclist
+
+@frappe.whitelist()
+def submit_order(doc):
+	# Metactical Customization: Submit order in background if more than 10 items
+	doc = frappe.get_doc("Sales Order", doc)
+	if len(doc.items) > 25:
+		msgprint(
+			_(
+				"The task has been enqueued as a background job. In case there is any issue on processing in background, the system will add a comment about the error on this document and revert to the Draft stage"
+			)
+		)
+		queue_action(doc, "submit", timeout=2000)
+	else:
+		doc._submit()
+    
+def is_product_bundle(item_code):
+	return frappe.db.exists("Product Bundle", {"name": item_code, "disabled": 0})
+
+@frappe.whitelist()
+def get_product_bundle_items(item_code):
+	items = []
+	if is_product_bundle(item_code):
+		items = frappe.get_all("Product Bundle Item", 
+			filters={"parent": item_code},
+			fields=["item_code"])
+	return items
