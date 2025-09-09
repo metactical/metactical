@@ -25,7 +25,7 @@ def get_transaction_from_usaepay(usaepay_transaction_key, headers, merchant_id=N
 
 	usaepay_url = usaepay_account.get("usaepay_url")
 	if not usaepay_url:
-		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+		frappe.throw(_("USAePay URL not set in USAePay Settings"))
 
 	url = usaepay_url + "/transactions/" + usaepay_transaction_key
 	response = safe_get(url, headers)
@@ -48,7 +48,7 @@ def get_token_hash(usaepay_account):
 	seed = str(int(time.time()))
 
 	if not api_key or not pin:
-		frappe.throw(_("API Key and PIN are required in Metactical Settings"))
+		frappe.throw(_("API Key and PIN are required in USAePay Settings"))
 
 	prehash = api_key + seed + pin
 
@@ -150,9 +150,9 @@ def adjust_amount(amount, transaction, usaepay_url, log, headers=None):
 		frappe.throw(_("Failed to make adjustment in USAePay: {0}").format(response.get("error")))
 
 # def get_customer_detail(customer_key, headers):
-# 	usaepay_url = frappe.db.get_single_value("Metactical Settings", "usaepay_url")
+# 	usaepay_url = frappe.db.get_single_value("USAePay Settings", "usaepay_url")
 # 	if not usaepay_url:
-# 		frappe.throw(_("USAePay URL not set in Metactical Settings"))
+# 		frappe.throw(_("USAePay URL not set in USAePay Settings"))
 
 # 	url += "/customers/" + customer_key
 # 	response = requests.get(url, headers=headers)
@@ -238,7 +238,7 @@ def get_usaepay_order_detail(transaction, order, logger):
 		
 	headers, usaepay_url = get_headers(lead_source=order.source)
 	if not usaepay_url:
-		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in Metactical Settings for the lead source {0}".format(order.source))
+		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in USAePay Settings for the lead source {0}".format(order.source))
 
 	if not transaction["authorizeTransactionId"]:
 		return 
@@ -409,6 +409,9 @@ def get_comment_message(log):
         comment += f"Sales Return: {log.sales_return}\n"
         comment += f"Refund Transaction Key: {log.refund_transaction_key}\n"
         
+    if frappe.session.user:
+        comment += f"Processed by: {frappe.session.user}\n"
+        
     comment += f"Amount: {log.amount}\n"
 	
     return comment
@@ -487,15 +490,20 @@ def process_credit_card_tokens(event_body, customer, lead_source=None, logger=No
    
 		credit_card_used_in_transaction = event_body["object"]["creditcard"]
 		is_cc_new = True
+		existing_token_id = None
 		if tokens:
 			for token in tokens:
 				if token.cc_number == credit_card_used_in_transaction["number"]:
 					is_cc_new = False
+					existing_token_id = token.name
 					break
 
 		# if the credit card is new, add it to the customer's credit card tokens
 		if is_cc_new:
 			add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, transaction_key, event_body, lead_source)
+		else:
+			frappe.db.set_value("Customer CC Tokens", existing_token_id, "card_holder", credit_card_used_in_transaction.get("cardholder"))
+   
 		frappe.db.commit()
 	
 		if logger:
@@ -512,6 +520,7 @@ def add_credit_card_token(customer_cc, tokens, credit_card_used_in_transaction, 
 			"parent": customer_cc,
 			"parentfield": "cc_tokens",
 			"parenttype": "Customer CC",
+			"card_holder": credit_card_used_in_transaction.get("cardholder"),
 			"label": labels[len(tokens)],
 			"token": token,
 			"cc_number": credit_card_used_in_transaction["number"],
@@ -550,7 +559,7 @@ def get_token_hash(usaepay_account, pin=None):
 	
 	seed = str(int(time.time()))
 	if not api_key or not pin:
-		frappe.throw(_("API Key and PIN are required in Metactical Settings"))
+		frappe.throw(_("API Key and PIN are required in USAePay Settings"))
 	
 	prehash = api_key + seed + pin
 
@@ -568,7 +577,9 @@ def make_payment(customer, amount, token, payment_entry=None):
 		frappe.throw(_("Customer is required"))
 
 	if token:
-		token = frappe.db.get_value("Customer CC Tokens", token, "token")
+		customer_cc = frappe.db.get_value("Customer CC Tokens", token, ["token", "card_holder"], as_dict=1)
+		if not customer_cc:
+			frappe.throw(_("Invalid card token"))
 
 	# get billing address
 	addresses = get_customer_address(customer)
@@ -601,7 +612,8 @@ def make_payment(customer, amount, token, payment_entry=None):
 		"command": "cc:sale",
 		"invoice": reference,
 		"creditcard": {
-			"number": token
+			"cardholder": customer_cc.card_holder if customer_cc and customer_cc.card_holder else (customer_names.get("first_name") + " " + customer_names.get("last_name")) if customer_names else "",
+			"number": customer_cc.token,
 		},
 		"billing": addresses["billing"]
 	}
@@ -622,7 +634,11 @@ def make_payment(customer, amount, token, payment_entry=None):
 			frappe.db.set_value("Sales Order", reference, "neb_usaepay_transaction_key", log.transaction_key)
 
 		# submit payment entry
-		frappe.get_doc("Payment Entry", payment_entry).submit()
+		payment_entry_doc = frappe.get_doc("Payment Entry", payment_entry)
+		if payment_entry_doc.docstatus == 0:
+			payment_entry_doc.submit()
+  
+		create_doc_comment(payment_entry_doc, log)
 		
 	except Exception as e:
 		handle_payment_exception(e, log)
@@ -871,6 +887,8 @@ def void_payment_in_usaepay(doc):
 
 			frappe.response["message"] = f"Payment voided successfully"
 			frappe.response["success"] = True
+   
+			create_doc_comment(doc, log)
 
 			return void_response, log.name
 		else:
@@ -888,7 +906,7 @@ def void_payment_in_usaepay(doc):
 @frappe.whitelist()
 def get_usaepay_roles():
 	try:
-		metactical_settings = frappe.get_single("Metactical Settings")
+		metactical_settings = frappe.get_single("USAePay Settings")
 		
 		refund = metactical_settings.get("roles_to_refund")
 		adjust = metactical_settings.get("roles_to_adjust_payment")
@@ -964,3 +982,18 @@ def process_missed_usaepay_transactions():
 				frappe.delete_doc("SO USAePay Transaction", transaction["name"])
 			else:
 				frappe.log_error(title="USAePay Order Not Found", message="Sales Order not found for transaction {0}".format(transaction["transaction_key"]))
+
+
+def create_doc_comment(doc, log):
+	try:
+		message = f"{frappe.session.user} performed '{log.action}' action in USAePay and the log is <a href='/app/usaepay-log/{log.name}'>here</a>."
+		frappe.get_doc({
+			"doctype": "Comment",
+			"reference_doctype": doc.doctype,
+			"reference_name": doc.name,
+			"comment_type": "Comment",
+			"content": message
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(title="Comment Creation Error", message=frappe.get_traceback())

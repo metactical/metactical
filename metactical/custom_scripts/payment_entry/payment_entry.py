@@ -15,7 +15,8 @@ from metactical.custom_scripts.usaepay.usaepay_api import (
 	refund_payment, 
 	adjust_payment,
 	get_usaepay_roles,
-	void_payment_in_usaepay
+	void_payment_in_usaepay,
+	create_doc_comment
 )
 import json
 
@@ -236,6 +237,8 @@ def make_refund(doc):
 					frappe.db.set_value("USAePay Log", log, "sales_return", sales_invoice.name)
 					frappe.db.commit()
 					frappe.msgprint(f"$ {doc.paid_amount} refunded successfully for {sales_order}")
+
+					create_doc_comment(doc, log)
 					return True
 				else:
 					frappe.msgprint(f"Unable to process refund. Please check <a href='/app/usaepay-log/{log}'>USAePay Log</a> for more details.")
@@ -385,20 +388,15 @@ def void_payment(name):
 
 @frappe.whitelist()
 def get_mode_of_payment(reference_doctype, reference_name):
-	reference = ""
-
 	if reference_doctype == "Sales Invoice":
-		sales_order = frappe.db.get_value("Sales Invoice Item", {"parent": reference_name}, "sales_order")
-		is_return = frappe.db.get_value("Sales Invoice", reference_name, "is_return")
-		if sales_order and not is_return:
-			reference = frappe.db.get_value("Sales Order", sales_order, "neb_usaepay_transaction_key")
-		
-	elif reference_doctype == "Sales Order":
-		reference = frappe.db.get_value(reference_doctype, reference_name, "neb_usaepay_transaction_key")
-
-	if reference:
-		frappe.response["mode_of_payment"] = "Credit Card"
-		frappe.response["reference_no"] = reference
-	else:
-		frappe.response["mode_of_payment"] = ""
-		frappe.response["reference_no"] = ""
+		return_doc = frappe.get_doc("Sales Invoice", reference_name)
+		advances = frappe.get_doc("Sales Invoice", return_doc.return_against).advances
+		if advances:
+			for adv in advances:
+				pe_detail = frappe.db.get_value("Payment Entry", adv.reference_name, ["mode_of_payment", "reference_no"], as_dict=True)
+				if pe_detail.mode_of_payment:
+					frappe.msgprint(f"Mode of Payment picked from advance payments")
+					break
+     
+	frappe.response["mode_of_payment"] = pe_detail.mode_of_payment if pe_detail else ""
+	frappe.response["reference_no"] = pe_detail.reference_no if pe_detail else ""
