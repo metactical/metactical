@@ -238,9 +238,6 @@ def make_refund(doc):
 					frappe.db.commit()
 					frappe.msgprint(f"$ {doc.paid_amount} refunded successfully for {sales_order}")
 
-					references = [ref for ref in doc.references]
-					references = references.join(", ")
-     
 					create_doc_comment(doc, log)
 					return True
 				else:

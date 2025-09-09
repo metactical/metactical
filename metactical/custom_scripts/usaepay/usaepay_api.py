@@ -985,14 +985,15 @@ def process_missed_usaepay_transactions():
 
 
 def create_doc_comment(doc, log):
-    message = f"{frappe.session.user} performed '{log.action}' action in USAePay and the log is <a href='/app/usaepay-log/{log.name}'>here</a>."
-    
-    frappe.get_doc({
-		"doctype": "Comment",
-		"comment_type": "Info",
-		"reference_doctype": doc.doctype,
-		"reference_name": doc.name,
-		"comment_type": "Comment",
-		"content": message
-	}).insert(ignore_permissions=True)
-    frappe.db.commit()
+	try:
+		message = f"{frappe.session.user} performed '{log.action}' action in USAePay and the log is <a href='/app/usaepay-log/{log.name}'>here</a>."
+		frappe.get_doc({
+			"doctype": "Comment",
+			"reference_doctype": doc.doctype,
+			"reference_name": doc.name,
+			"comment_type": "Comment",
+			"content": message
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(title="Comment Creation Error", message=frappe.get_traceback())
