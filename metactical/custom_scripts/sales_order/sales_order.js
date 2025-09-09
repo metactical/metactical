@@ -191,13 +191,33 @@ frappe.ui.form.on('Sales Order', {
 		}
 
 		// Validating there is no duplicated items
-		var items = cur_frm.doc.items
 		var item_list = [];
-		items.forEach(function(row){
-			item_list.push(row.item_code);
+		cur_frm.doc.items.forEach(function(row) {
+			frappe.call({
+				'method': 'metactical.custom_scripts.sales_order.sales_order.get_product_bundle_items',
+				'args': {
+					'item_code': row.item_code
+				},
+				'callback': function(result) {
+					if (result.message.length > 0) {
+						console.log("Product Bundle Items: ", result.message);
+						var product_bundle_items = result.message;
+						product_bundle_items.forEach(function(pb_item) {
+							if (item_list.includes(pb_item.item_code)) {
+								console.log("Duplicated Item in Product Bundle: ", pb_item.item_code);
+								console.log("Item List: ", item_list);
+								frappe.throw(__("Item " + pb_item.item_code + " is duplicated from the product bundle. Please remove the duplicate before proceeding to create Pick List."));
+							}
+							item_list.push(pb_item.item_code);
+						});
+					}
+				}
+			});
 			if (item_list.includes(row.item_code)) {
-				frappe.throw(__("Item " + row.item_code + " is duplicated. Please remove the duplicate before proceeding to create Pick List.") );
+				frappe.throw(__("Item " + row.item_code + " is duplicated. Please remove the duplicate before proceeding to create Pick List."));
 			}
+
+			item_list.push(row.item_code);
 		});
 
 		// confirm item availability
