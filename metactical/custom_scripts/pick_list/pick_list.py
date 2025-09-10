@@ -87,13 +87,13 @@ class CustomPickList(PickList):
 		if len(self.locations) > 0:
 			if self.locations[0].get('sales_order'):
 				rv = BytesIO()
-				_barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
+				# _barcode.get('code128', self.locations[0].sales_order).write(rv, {"module_width":0.4})
 				bstring = rv.getvalue()
 				self.barcode = bstring.decode('ISO-8859-1')
 				
 				# STO Barcode
 				sv = BytesIO()
-				_barcode.get('code128', self.name).write(sv, {"module_width":0.4})
+				# _barcode.get('code128', self.name).write(sv, {"module_width":0.4})
 				stoBarcode = sv.getvalue()
 				self.sal_sto_barcode = stoBarcode.decode('ISO-8859-1')
 
