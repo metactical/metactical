@@ -237,7 +237,8 @@ def make_refund(doc):
 					frappe.db.set_value("USAePay Log", log, "sales_return", sales_invoice.name)
 					frappe.db.commit()
 					frappe.msgprint(f"$ {doc.paid_amount} refunded successfully for {sales_order}")
-
+					
+					log = frappe.get_doc("USAePay Log", log)
 					create_doc_comment(doc, log)
 					return True
 				else:
@@ -384,10 +385,12 @@ def void_payment(name):
 			frappe.throw(_("No reference number found for this Payment Entry."))
 	except Exception as e:
 		frappe.log_error(title="Void Payment Error", message=e)
+		frappe.clear_last_message()
 		frappe.throw(_("Unable to void payment. {0}").format(e))
 
 @frappe.whitelist()
 def get_mode_of_payment(reference_doctype, reference_name):
+	pe_detail = None
 	if reference_doctype == "Sales Invoice":
 		return_doc = frappe.get_doc("Sales Invoice", reference_name)
 		advances = frappe.get_doc("Sales Invoice", return_doc.return_against).advances

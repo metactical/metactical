@@ -19,7 +19,7 @@ frappe.ui.form.on("Payment Entry", {
             },
             callback: function (r) {
                 frm.set_value("mode_of_payment", r.mode_of_payment);
-                frm.set_value("reference_no", r.reference_no);
+                frm.set_value("reference_no", "");
             },
         });
     },
@@ -217,7 +217,12 @@ var refund_payment_button = function (
                     frm.add_custom_button(
                         __("Refund Payment"),
                         function () {
-                            make_refund(frm);
+                            frappe.confirm(
+                                __("Are you sure you want to refund this Payment?"),
+                                function () {
+                                    make_refund(frm);
+                                }
+                            );
                         },
                         "USAePay"
                     );
