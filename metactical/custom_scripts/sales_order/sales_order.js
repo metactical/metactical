@@ -183,46 +183,7 @@ frappe.ui.form.on('Sales Order', {
 		dialog.show();
 	},
 	
-	create_pick_list_custom: async function(frm) {
-		// validating shipping address name
-		if (!frm.doc.shipping_address_name) {
-			frappe.throw(__("Please select Shipping Address Name before proceeding to create Pick List."));
-		}
-
-		// Validating there is no duplicated items
-		var item_list = [];
-		var duplicated = false;
-		var duplicated_item = [];
-		for (const row of cur_frm.doc.items) {
-			let result = await frappe.call({
-				'method': 'metactical.custom_scripts.sales_order.sales_order.get_product_bundle_items',
-				'args': { 'item_code': row.item_code }
-			});
-
-			if (result.message && result.message.length > 0) {
-				let product_bundle_items = result.message;
-				for (const pb_item of product_bundle_items) {
-					if (item_list.includes(pb_item.item_code)) {
-						duplicated = true;
-						duplicated_item.push(pb_item.item_code);
-					}
-					item_list.push(pb_item.item_code);
-				}
-			}
-
-			if (item_list.includes(row.item_code)) {
-				duplicated = true;
-				duplicated_item.push(row.item_code);
-			}
-
-			item_list.push(row.item_code);
-		}
-
-		if (duplicated) {
-			duplicated_item = [...new Set(duplicated_item)];
-			frappe.throw(__("Item(s) " + duplicated_item.join(", ") + " are duplicated. Please remove the duplicate before proceeding to create Pick List."));
-		}
-		
+	create_pick_list_custom: function(frm) {
 		// confirm item availability
 		var items = cur_frm.doc.items
 		var flag = 0;
