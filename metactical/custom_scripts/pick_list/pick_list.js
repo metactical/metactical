@@ -16,6 +16,71 @@ frappe.ui.form.on('Pick List', {
 		dashboard_pick_list_doctype(frm, "Sales Order");
 
 	},
+
+	before_save: async function(frm) {
+		// validate if items table is not empty
+		if (frm.doc.locations.length == 0) {
+			frappe.throw(__("Please add items to the Pick List before saving."));
+		}
+
+		// validate if the reference sales order has a shipping address
+		let sales_orders = frm.doc.locations.map(location => location.sales_order);
+
+		if (sales_orders.length > 0) {
+			// remove duplicates
+			sales_orders = [...new Set(sales_orders)];
+
+			for (const sales_order of sales_orders) {
+				let r = await frappe.call({
+					'method': 'frappe.client.get',
+					'args': {
+						'doctype': 'Sales Order',
+						'name': sales_order
+					}
+				});
+
+				if (!r.exc) {
+					if (!r.message.shipping_address_name) {
+						frappe.throw(__("Please make sure all referenced Sales Orders have a Shipping Address before saving the Pick List. Sales Order {0} does not have a Shipping Address.", [sales_order]));
+					}
+				}
+			}
+		}
+
+		// Validating there is no duplicated items
+		var item_list = [];
+		var duplicated = false;
+		var duplicated_item = [];
+		for (const row of frm.doc.locations) {
+			let result = await frappe.call({
+				'method': 'metactical.custom_scripts.sales_order.sales_order.get_product_bundle_items',
+				'args': { 'item_code': row.item_code }
+			});
+
+			if (result.message && result.message.length > 0) {
+				let product_bundle_items = result.message;
+				for (const pb_item of product_bundle_items) {
+					if (item_list.includes(pb_item.item_code)) {
+						duplicated = true;
+						duplicated_item.push(pb_item.item_code);
+					}
+					item_list.push(pb_item.item_code);
+				}
+			}
+
+			if (item_list.includes(row.item_code)) {
+				duplicated = true;
+				duplicated_item.push(row.item_code);
+			}
+
+			item_list.push(row.item_code);
+		}
+
+		if (duplicated) {
+			duplicated_item = [...new Set(duplicated_item)];
+			frappe.throw(__("Item(s) " + duplicated_item.join(", ") + " are duplicated. Please remove the duplicate before proceeding to create Pick List."));
+		}
+	},
 	
 	on_submit: function(frm){	
 		setTimeout(function(){
