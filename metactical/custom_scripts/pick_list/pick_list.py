@@ -41,8 +41,37 @@ class CustomPickList(PickList):
 			super().save()
 			
 	def validate(self):
-		super(CustomPickList, self).validate()
+		# super(CustomPickList, self).validate()
 		self.check_for_existing_draft()
+		self.validate_sales_order_shipping_address()
+		self.validate_duplicated_items()
+  
+	def validate_sales_order_shipping_address(self):
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
+		frappe.msgprint(_("Validating shipping address..."))
+		sales_orders = set(sales_orders)
+		for so in sales_orders:
+			so_doc = frappe.get_doc("Sales Order", so)
+			if not so_doc.shipping_address_name:
+				frappe.throw(_("Please set a shipping address in Sales Order {0}").format(so))
+
+
+	def validate_duplicated_items(self):
+		item_list = []
+		duplicated_items = []
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
+		sales_orders = set(sales_orders)
+		for so in sales_orders:
+			sales_order = frappe.get_doc("Sales Order", so)
+			for item in sales_order.items:
+				if item.item_code in item_list:
+					duplicated_items.append(item.item_code)
+				else:
+					item_list.append(item.item_code)
+
+		if duplicated_items:
+			duplicated_items = set(duplicated_items)
+			frappe.throw(_("Sales Order {0} has duplicated items: {1}. Please remove the duplicated items.").format(so, ", ".join(duplicated_items)))
 
 	def update_sales_order_item(self, item, picked_qty, item_code):
 		item_table = "Sales Order Item" if not item.product_bundle_item else "Packed Item"

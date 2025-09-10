@@ -302,15 +302,3 @@ def submit_order(doc):
 		queue_action(doc, "submit", timeout=2000)
 	else:
 		doc._submit()
-    
-def is_product_bundle(item_code):
-	return frappe.db.exists("Product Bundle", {"name": item_code, "disabled": 0})
-
-@frappe.whitelist()
-def get_product_bundle_items(item_code):
-	items = []
-	if is_product_bundle(item_code):
-		items = frappe.get_all("Product Bundle Item", 
-			filters={"parent": item_code},
-			fields=["item_code"])
-	return items
