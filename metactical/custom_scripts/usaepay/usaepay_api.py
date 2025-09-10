@@ -703,17 +703,17 @@ def get_usaepay_transaction_detail(transaction, docname):
 
 		transaction = get_transaction_from_usaepay(transaction, headers)
 
-		# # refunds
-		# refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
-		# if refunds:
-		# 	transaction["refunds"] = refunds
+		# refunds
+		refunds = frappe.get_all("USAePay Log", filters={"reference_docname": docname, "action": "Refund"}, fields=["refund_amount", "transaction_key"])
+		if refunds:
+			transaction["refunds"] = refunds
 			
-		# 	total_refund = sum([flt(refund.get("refund_amount")) for refund in refunds])
-		# 	if total_refund:
-		# 		transaction["available_amount"] = float(transaction.get("amount")) - total_refund
-		# else:
-		# 	transaction["refunds"] = []
-		# 	transaction["available_amount"] = transaction.get("amount")
+			total_refund = sum([flt(refund.get("refund_amount")) for refund in refunds])
+			if total_refund:
+				transaction["available_amount"] = float(transaction.get("amount")) - total_refund
+		else:
+			transaction["refunds"] = []
+			transaction["available_amount"] = transaction.get("amount")
 
 		if transaction:
 			frappe.response["transaction"] = transaction
@@ -757,10 +757,10 @@ def refund_payment(docname, refund_reason, refund_amount):
 			# Generate card token
 			card_token = get_card_token(usaepay_url, transaction.get("key"), headers)
 			transaction["creditcard"]["number"] = card_token
+			card_holder = transaction["creditcard"].get("cardholder")
 
 			# process refund
 			payload, refund_response = create_refund(transaction, refund_amount, usaepay_url, headers)
-
 			log.request = format_json_for_html(payload)
 			log.response = format_json_for_html(refund_response)
 			log.amount = refund_amount
@@ -771,7 +771,7 @@ def refund_payment(docname, refund_reason, refund_amount):
 
 			# create USAePay log
 			refunded_amount = refund_amount if refund_amount else transaction["amount"]
-			if refund_response.get("creditcard"):
+			if card_holder:
 				if "cardholder" in refund_response.get("creditcard"):
 					card_holder = refund_response.get("creditcard").get("cardholder")
 					frappe.msgprint(f"<b>$ {refunded_amount}</b> is refunded successfully for <b>{card_holder}</b>.")
