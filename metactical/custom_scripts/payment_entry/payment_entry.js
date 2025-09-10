@@ -487,7 +487,8 @@ var map_fields_to_address = function (address, address_type) {
 var make_payment = function (frm, values, tokens) {
     var options = [];
     tokens.forEach((token) => {
-        options.push(token.card_holder + " - " + token.cc_number);
+        var card_holder = token.card_holder.trim() ? token.card_holder : "No Name"
+        options.push(card_holder + " - " + token.cc_number);
     });
 
     var selected_token = "";
