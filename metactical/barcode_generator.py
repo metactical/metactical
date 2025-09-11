@@ -39,14 +39,14 @@ def get_barcode(name):
 	bstring = rv.getvalue()
 	return bstring.decode('ISO-8859-1')
 
-def get_barcode_for_print_format(name, height=9, module_width=0.23):
+def get_barcode_for_print_format(name, height=9, module_width=0.23, write_text=True):
 	# Use ImageWriter to generate a PNG
 	CODE128 = barcode.get_barcode_class('code128')
 	code128 = CODE128(name, writer=ImageWriter())
-	
+ 	
 	# Define writer options (customize size, text, etc.)
 	options = {
-		"write_text": True,  # Do not write text below the barcode
+		"write_text": write_text,  # Do not write text below the barcode
 		"module_height": 6,  # Height of the barcode
 		"dpi": 500,  # DPI for the image
 		"font_size": 6,  # Since we are not writing text
