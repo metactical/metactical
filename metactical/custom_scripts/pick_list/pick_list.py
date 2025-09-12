@@ -39,6 +39,37 @@ class CustomPickList(PickList):
 			queue_action(self, "submit", timeout=2000)
 		else:
 			super().save()
+			
+	def validate(self):
+		super(CustomPickList, self).validate()
+		self.validate_sales_order_shipping_address()
+		self.validate_duplicated_items()
+  
+	def validate_sales_order_shipping_address(self):
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
+		sales_orders = set(sales_orders)
+		for so in sales_orders:
+			so_doc = frappe.get_doc("Sales Order", so)
+			if not so_doc.shipping_address_name:
+				frappe.throw(_("Please set a shipping address in Sales Order {0}").format(so))
+
+
+	def validate_duplicated_items(self):
+		item_list = []
+		duplicated_items = []
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
+		sales_orders = set(sales_orders)
+		for so in sales_orders:
+			sales_order = frappe.get_doc("Sales Order", so)
+			for item in sales_order.items:
+				if item.item_code in item_list:
+					duplicated_items.append(item.item_code)
+				else:
+					item_list.append(item.item_code)
+
+		if duplicated_items:
+			duplicated_items = set(duplicated_items)
+			frappe.throw(_("Sales Order {0} contains duplicate items: {1}. Please remove the duplicates.").format(so, ", ".join(duplicated_items)))
 
 	def before_save(self):
 		super(CustomPickList, self).before_save()
