@@ -42,7 +42,6 @@ class CustomPickList(PickList):
 			
 	def validate(self):
 		super(CustomPickList, self).validate()
-		self.check_for_existing_draft()
 		self.validate_sales_order_shipping_address()
 		self.validate_duplicated_items()
   
