@@ -20,7 +20,7 @@ frappe.ui.form.on('Sales Order', {
 			
 			frm.remove_custom_button("Pick List", 'Create'); 
 			frm.add_custom_button(__('Pick List'), () => frm.events.create_pick_list_custom(frm), __("Create"));
-			frm.remove_custom_button("Work Order", 'Create');
+			// frm.remove_custom_button("Work Order", 'Create');
 			frm.remove_custom_button("Request for Raw Materials", 'Create'); 
 			frm.remove_custom_button("Project", 'Create'); 
 			frm.remove_custom_button("Subscription", 'Create'); 
