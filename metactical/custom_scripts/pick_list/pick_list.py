@@ -72,32 +72,6 @@ class CustomPickList(PickList):
 			duplicated_items = set(duplicated_items)
 			frappe.throw(_("Sales Order {0} contains duplicate items: {1}. Please remove the duplicates.").format(so, ", ".join(duplicated_items)))
 
-	def update_sales_order_item(self, item, picked_qty, item_code):
-		item_table = "Sales Order Item" if not item.product_bundle_item else "Packed Item"
-		stock_qty_field = "stock_qty" if not item.product_bundle_item else "qty"
-		
-		# Metactical Customization: Take into consideration returned qty
-		already_picked, actual_qty, returned_qty = frappe.db.get_value(
-			item_table,
-			item.sales_order_item,
-			["picked_qty", stock_qty_field, "returned_qty"],
-		)
-		
-		if returned_qty is None:
-			returned_qty = 0
-
-		if self.docstatus == 1:
-			if (((already_picked + picked_qty - returned_qty) / actual_qty) * 100) > (
-				100 + flt(frappe.db.get_single_value("Stock Settings", "over_delivery_receipt_allowance"))
-			):
-				frappe.throw(
-					_(
-						"You are picking more than required quantity for {}. Check if there is any other pick list created for {}"
-					).format(item_code, item.sales_order)
-				)
-
-		frappe.db.set_value(item_table, item.sales_order_item, "picked_qty", already_picked + picked_qty)
-
 	def before_save(self):
 		super(CustomPickList, self).before_save()
 
