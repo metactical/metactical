@@ -28,7 +28,7 @@ def execute(filters=None):
 						comment, approver = get_comment_and_approver(d.item_code, d.name)
 
 						row['si_date'] = d.posting_date
-						row['warehouse'] = get_branch_name_mapping().get(d.warehouse, d.warehouse)
+						row['warehouse'] = get_branch_name_mapping().get(d.warehouse, "")
 						row['si_name'] = d.name
 						row['ifw_retailskusuffix'] = d.ifw_retailskusuffix
 						row['item_code'] = d.item_code
@@ -166,5 +166,6 @@ def get_branch_name_mapping():
 		"R05-DTN-Active Stock - ICL": "Camo - DT",
 		"R03-Vic-Active Stock - ICL": "Camo - Vic",
 		"R02-Edm-Active Stock - ICL": "Camo - Edm",
-		"R01-Gor-Active Stock - ICL": "Gorilla - Van"
+		"R01-Gor-Active Stock - ICL": "Gorilla - Van",
+		"R08-Chilliwack-Active Stock - ICL": "Camo - Chi"
 	}
