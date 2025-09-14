@@ -7,13 +7,6 @@ def validate(doc, method):
     load_tags(doc)
 
 def on_update(doc, method):
-    if frappe.flags.in_import:
-        webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "webhook_docevent": "on_update", "enabled": 1})
-        if webhook:
-            webhook = frappe.get_doc("Webhook", webhook)
-            # Enqueue the webhook for the item update
-            enqueue_webhook(doc, webhook)     
-               
     # check website specification values
     validate_website_specifications(doc)
     sync_website_specifications(doc)

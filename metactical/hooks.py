@@ -849,7 +849,8 @@ fixtures = [{
 			"BOM-sub_operations",
 			"Item-reorder_months",
 			"Item-months_to_reorder",
-			"Employee-short_code"
+			"Employee-short_code",
+			"Item-last_pinged_on"
 		]]]
 	},
 	{
