@@ -205,7 +205,7 @@ class ItemFromExcel(Document):
 		if is_last_item_of_template and item.variant_of in templates_with_ai_request:
 			template_item = frappe.get_doc("Item", item.variant_of)
 			template_item.request_ai_suggestion = 1
-			template_item.flags.in_import = False
+			frappe.flags.in_import = False
 			template_item.save()
    
 	def create_item_defaults(self, item, supplier):
