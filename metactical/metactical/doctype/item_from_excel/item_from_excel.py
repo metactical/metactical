@@ -171,6 +171,13 @@ class ItemFromExcel(Document):
 		if not is_template:
 			self.create_item_price(price_list_rows)
    
+		# trigger AI update for the last variant of the template
+		if is_last_item_of_template:
+			template_item = frappe.get_doc("Item", item.variant_of)
+			template_item.request_ai_suggestion = 1
+			frappe.flags.in_import = False
+			template_item.save()
+   
 	def create_item_defaults(self, item, supplier):
 		frappe.get_doc({
 			"doctype": "Item Default",
