@@ -24,7 +24,7 @@ class ItemImageFromExcel(Document):
 					about the error on this document and revert to the Draft stage"
 				)
 			)
-			queue_action(self, "submit", timeout=3600)
+			queue_action(self, "submit", timeout=4000)
 		else:
 			super().save()
 	
@@ -74,7 +74,7 @@ class ItemImageFromExcel(Document):
 		return file_content, extn
 
 	def update_items(self, file_content):
-		batch_size = 250
+		batch_size = 1000
 		items = []
 
 		item_code_index = None
