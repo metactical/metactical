@@ -43,7 +43,7 @@ class ReorderQtyFromExcel(Document):
 	def on_submit(self):
 		file_content = self.check_file()
 		self.check_mandatory(file_content)
-		self.update_items(file_content)
+		self.update_items(file_content)	
 
 	def check_file(self):
 		file_content, extn = self.read_file()
@@ -78,6 +78,8 @@ class ReorderQtyFromExcel(Document):
 	def update_items(self, data):
 		header = data[0]
 		indexes = self.get_column_indexes(header)
+		errors = []
+		items = []
 
 		for i, row in enumerate(data[1:], start=2):
 			if not any(row):
@@ -95,21 +97,35 @@ class ReorderQtyFromExcel(Document):
 					continue
 
 				item = frappe.get_doc("Item", item_code)
-    
+
 				months_to_reorder = [m.strip() for m in str(row[indexes["months_to_block_reorder"]]).split(",") if m]
 				item.set("months_to_reorder", [])
 				for month in months_to_reorder:
-					item.append("months_to_reorder", {
-						"month": month
-					})
+					if frappe.db.exists("Month", month):
+						item.append("months_to_reorder", {
+							"month": month
+						})
+					else:
+						frappe.throw(f"Month '{month}' does not exist.")
 
-				warehouses_group = [g.strip() for g in str(row[indexes["check_in_group"]]).split(",") if g]
-				warehouses = [w.strip() for w in str(row[indexes["request_for"]]).split(",") if w]
+				warehouses_group = [g.strip() for g in str(row[indexes["check_in_group"]]).split(",") if g != 'None' and g != '']
+				self.validate_warehouse_groups(warehouses_group, is_group=True)
+
+				warehouses = [w.strip() for w in str(row[indexes["request_for"]]).split(",") if w != 'None' and w != '']
+				self.validate_warehouse_groups(warehouses, is_group=False)
+
 				levels = [l.strip() for l in str(row[indexes["reorder_level"]]).split(",") if l]
 				qtys = [q.strip() for q in str(row[indexes["reorder_qty"]]).split(",") if q]
 				mr_types = [t.strip() for t in str(row[indexes["material_request_type"]]).split(",") if t]
 				delete_rows = [d.strip() for d in str(row[indexes["delete_row"]]).split(",") if d]
+				self.validate_delet_rows(delete_rows)
 
+				if not (len(warehouses) == len(levels) == len(qtys) == len(mr_types)):
+					frappe.throw(f"Mismatch in number of entries for 'Request for', 'Re-order Level', 'Re-order Qty' and 'Material Request Type'")
+
+				if len(delete_rows) not in (0, len(warehouses)):
+					frappe.throw(f"Mismatch in number of entries for 'Delete Row' and 'Request for'")
+    
 				item.set("reorder_levels", [])
 				for j, wh in enumerate(warehouses):
 					delete_flag = delete_rows[j] if j < len(delete_rows) else "false"
@@ -121,13 +137,56 @@ class ReorderQtyFromExcel(Document):
 							"warehouse_reorder_qty": flt(qtys[j]) if j < len(qtys) else 0,
 							"material_request_type": mr_types[j] if j < len(mr_types) else ""
 						})
-				item.save(ignore_permissions=True)
+					else:
+						row = frappe.db.exists("Item Reorder Level", {"parent": item.name, "warehouse": wh})
+						if row:
+							frappe.db.delete("Item Reorder Level", {"name": row})
+							frappe.db.commit()
+		
+				items.append(item)
 				frappe.db.commit()
-    
-			except Exception as e:
-				frappe.msgprint(f"Row {i}: {e}")
-				continue
 
+			except Exception as e:
+				frappe.clear_messages()
+				errors.append(f"Row {i}: {str(e)}")
+	
+		if errors:
+			frappe.db.rollback()
+			error_message = "<br>".join(errors)
+			frappe.throw(f"Errors encountered:<br>{error_message}")
+		else:
+			for item in items:
+				try:
+					frappe.flags.in_test = True
+					item.save()
+				except Exception as e:
+					frappe.clear_messages()
+					frappe.db.rollback()
+					frappe.throw(f"Error saving item {item.name}: {str(e)}")
+	 
+	def validate_delet_rows(self, delete_rows):
+		for flag in delete_rows:
+			if str(flag.lower()) not in ["1", "0"]:
+				frappe.throw(f"Invalid value '{flag}' in 'Delete Row' column. Use '1' for True and '0' for False.")
+	 
+	def validate_warehouse_groups(self, warehouse_groups, is_group):
+		if is_group:
+			for group in warehouse_groups:
+				warehouse_group = frappe.db.get_value("Warehouse", group, ["name", "is_group"], as_dict=1)
+				if not warehouse_group:
+					frappe.throw(f"Warehouse Group '{group}' does not exist.")
+				if warehouse_group and warehouse_group.is_group != 1:
+					frappe.throw(f"'{group}' is not a Warehouse Group.")
+		else:
+			for warehouse in warehouse_groups:
+				warehouse_detail = frappe.db.get_value("Warehouse", warehouse, ["name", "is_group"], as_dict=1)
+
+				if not warehouse_detail:
+					frappe.throw(f"Warehouse '{warehouse}' does not exist.")
+				if warehouse_detail and warehouse_detail.is_group == 1:
+					frappe.throw(f"'{warehouse}' is a Warehouse Group, not a Warehouse.")
+						   
+						   
 	def check_mandatory(self, data):
 		header = data[0]
 		indexes = self.get_column_indexes(header).values()
@@ -141,7 +200,7 @@ class ReorderQtyFromExcel(Document):
 				continue
 			
 			for index in indexes:
-				if data[index] == "" or data[index] == None:
+				if (data[index] == "" or data[index] == None) and header[index] not in ["Months to Block Reorder", "Check in (group)", "Delete Row"]:
 					frappe.throw(f"Column <b>{header[index]}</b> is mandatory in row {i+2}")
 
 
