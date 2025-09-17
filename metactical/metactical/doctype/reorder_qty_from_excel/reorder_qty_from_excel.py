@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 import os
-import datetime
+from frappe.utils import flt
 from frappe import _
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
@@ -64,24 +64,18 @@ class ReorderQtyFromExcel(Document):
 	
 	def read_file(self):
 		file_path = self.excel_file
-		extn = os.path.splitext(file_path)[1][1:]
+		extn = os.path.splitext(file_path)[1][1:]  # extension without dot
 
-		file_content = None
+		file_name = frappe.db.get_value("File", {"file_url": file_path}, "name")
+		if not file_name:
+			frappe.throw("Attached file not found.")
 
-		file_name = frappe.db.get_value("File", {"file_url": file_path})
-		if file_name:
-			file = frappe.get_doc("File", file_name)
-			file_content = file.get_content()
+		file = frappe.get_doc("File", file_name)
+		file_content = file.get_content()
 
 		return file_content, extn
 
 	def update_items(self, data):
-		"""
-		Loop through the uploaded rows and update Item master:
-		- months_to_reorder child table
-		- reorder_levels child table
-		- delete row if requested
-		"""
 		header = data[0]
 		indexes = self.get_column_indexes(header)
 
@@ -89,44 +83,50 @@ class ReorderQtyFromExcel(Document):
 			if not any(row):
 				continue
 
-			item_code, retail_sku, message = self.get_item_details(row, indexes)
-			if message:
-				frappe.msgprint(_("Row {0}: {1}").format(i, message))
+			try:
+				if "ERP SKU" == header[0]:
+					item_code = row[0]
+				else:
+					retail_code = row[0]
+					item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": retail_code}, "name")
+
+				if not item_code:
+					frappe.msgprint(f"Row {i}: Item not found")
+					continue
+
+				item = frappe.get_doc("Item", item_code)
+    
+				months_to_reorder = [m.strip() for m in str(row[indexes["months_to_block_reorder"]]).split(",") if m]
+				item.set("months_to_reorder", [])
+				for month in months_to_reorder:
+					item.append("months_to_reorder", {
+						"month": month
+					})
+
+				warehouses_group = [g.strip() for g in str(row[indexes["check_in_group"]]).split(",") if g]
+				warehouses = [w.strip() for w in str(row[indexes["request_for"]]).split(",") if w]
+				levels = [l.strip() for l in str(row[indexes["reorder_level"]]).split(",") if l]
+				qtys = [q.strip() for q in str(row[indexes["reorder_qty"]]).split(",") if q]
+				mr_types = [t.strip() for t in str(row[indexes["material_request_type"]]).split(",") if t]
+				delete_rows = [d.strip() for d in str(row[indexes["delete_row"]]).split(",") if d]
+
+				item.set("reorder_levels", [])
+				for j, wh in enumerate(warehouses):
+					delete_flag = delete_rows[j] if j < len(delete_rows) else "false"
+					if delete_flag.lower() not in ("true", "1", "yes"):
+						item.append("reorder_levels", {
+							"warehouse_group": warehouses_group[j] if j < len(warehouses_group) else "",
+							"warehouse": wh,
+							"warehouse_reorder_level": flt(levels[j]) if j < len(levels) else 0,
+							"warehouse_reorder_qty": flt(qtys[j]) if j < len(qtys) else 0,
+							"material_request_type": mr_types[j] if j < len(mr_types) else ""
+						})
+				item.save(ignore_permissions=True)
+				frappe.db.commit()
+    
+			except Exception as e:
+				frappe.msgprint(f"Row {i}: {e}")
 				continue
-
-			# skip row if user marked delete
-			delete_flag = str(row[indexes["delete_row"]]).strip().lower()
-			if delete_flag in ("true", "1", "yes"):
-				frappe.delete_doc("Item", item_code, ignore_missing=True, force=True)
-				continue
-
-			item = frappe.get_doc("Item", item_code)
-
-			# update months_to_reorder
-			months_to_block = [m.strip() for m in str(row[indexes["months_to_block_reorder"]]).split(",") if m]
-			item.set("months_to_reorder", [])
-			for m in months_to_block:
-				item.append("months_to_reorder", {"month": m})
-
-			# update reorder_levels
-			warehouses_group = [g.strip() for g in str(row[indexes["check_in_group"]]).split(",") if g]
-			warehouses = [w.strip() for w in str(row[indexes["request_for"]]).split(",") if w]
-			levels = [l.strip() for l in str(row[indexes["reorder_level"]]).split(",") if l]
-			qtys = [q.strip() for q in str(row[indexes["reorder_qty"]]).split(",") if q]
-			mr_types = [t.strip() for t in str(row[indexes["material_request_type"]]).split(",") if t]
-
-			item.set("reorder_levels", [])
-			for j in range(len(warehouses)):
-				item.append("reorder_levels", {
-					"warehouse_group": warehouses_group[j] if j < len(warehouses_group) else "",
-					"warehouse": warehouses[j],
-					"warehouse_reorder_level": levels[j] if j < len(levels) else 0,
-					"warehouse_reorder_qty": qtys[j] if j < len(qtys) else 0,
-					"material_request_type": mr_types[j] if j < len(mr_types) else ""
-				})
-
-			item.save()
-		frappe.db.commit()
 
 	def check_mandatory(self, data):
 		header = data[0]
@@ -176,106 +176,33 @@ class ReorderQtyFromExcel(Document):
 		return indexes
 
 
-	def get_item_details(self, row, indexes):
-		"""
-		Return the item code and retail_sku from the given row
-		depending on whether we import based on ERP SKU or Retail SKU.
-		"""
-		if self.import_based_on == "Retail SKU":
-			retail_sku = row[indexes["sku"]]
-			item_code = frappe.db.get_value("Item",
-											{"ifw_retailskusuffix": retail_sku},
-											"name")
-		else:  # ERP SKU
-			item_code = row[indexes["sku"]]
-			retail_sku = frappe.db.get_value("Item",
-											item_code,
-											"ifw_retailskusuffix")
+	# @frappe.whitelist()
+	# def get_preview_from_template(doc):
+	# 	"""
+	# 	Return the first 10 rows of the uploaded excel as preview with column headers.
+	# 	"""
+	# 	doc = frappe.get_doc("Reorder Qty From Excel", doc.name)
 
-		if not item_code:
-			if self.import_based_on == "Retail SKU":
-				return None, None, _("Item with Retail SKU Suffix {0} not found").format(retail_sku)
-			else:
-				return None, None, _("Item with Item Code {0} not found").format(row[indexes["sku"]])
+	# 	if not doc.excel_file:
+	# 		return
 
-		return item_code, retail_sku, ""
+	# 	file_content = doc.check_file()
+	# 	if not file_content:
+	# 		return
 
-	@frappe.whitelist()
-	def get_preview_from_template(doc):
-		"""
-		Return the first 10 rows of the uploaded excel as preview with column headers.
-		"""
-		doc = frappe.get_doc("Reorder Qty From Excel", doc.name)
+	# 	header = file_content[0]
+	# 	data = file_content[1:11]  # first 10 rows only
 
-		if not doc.excel_file:
-			return
+	# 	preview_rows = []
+	# 	for row in data:
+	# 		if any(row):
+	# 			preview_rows.append(row)
 
-		file_content = doc.check_file()
-		if not file_content:
-			return
+	# 	return {
+	# 		"columns": header,
+	# 		"data": preview_rows
+	# 	}
 
-		header = file_content[0]
-		data = file_content[1:11]  # first 10 rows only
-
-		preview_rows = []
-		for row in data:
-			if any(row):
-				preview_rows.append(row)
-
-		return {
-			"columns": header,
-			"data": preview_rows
-		}
-
-	def get_columns(self, columns):
-		headers = columns.keys()
-		doctype = columns["doctype"]
-		doc = frappe.get_meta(columns["doctype"])
-		columns = []
-
-		for i, header in enumerate(headers):
-			column = doc.get_field(header)
-			if not column:
-				continue
-			
-			if column.fieldtype != "Table":
-				columns.append({
-					"index": i,
-					"column_number": i+1,
-					"doctype": doctype,
-					"header_title": column.label,
-					"df": column.as_dict(),
-					"is_child_table_field": None,
-					"child_table_df": None,
-					"skip_import": False,
-				})
-			else:
-				child_table_df = frappe.get_meta(column.options)
-				child_table_fields = child_table_df.fields
-
-				for j, child_table_field in enumerate(child_table_fields):
-					columns.append({
-						"index": i,
-						"column_number": i+1,
-						"doctype": doctype,
-						"header_title": child_table_field.label + " - " + (column.label),
-						"df": column.as_dict(),
-						"is_child_table_field": True,
-						"child_table_df": child_table_field.as_dict(),
-						"skip_import": False,
-					})
-		
-		return columns
-
-	def delete_or_disable_rule(self, rules):
-		for rule in rules:
-			try:
-				frappe.delete_doc("Pricing Rule", rule.name)
-			except Exception:
-				frappe.clear_last_message()
-				frappe.db.set_value("Pricing Rule", rule.name, "disable", 1)
-
-		frappe.db.commit()
 
 @frappe.whitelist()
 def download_template(export_type, import_based_on="ERP SKU"):
