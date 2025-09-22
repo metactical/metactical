@@ -150,14 +150,14 @@ class ReorderQtyFromExcel(Document):
 				item = frappe.get_doc("Item", item_code)
 				
 				months_to_reorder = [m.strip() for m in str(row[indexes["months_to_block_reorder"]]).split(",") if m]
-				if item.reorder_levels == []:
+				if  len(item.reorder_levels) <= 1:
 					months_list_to_delete_exists = frappe.db.exists("Months List", {
 									"parent": item_code,
 									"parenttype": "Item",
 									"parentfield": "months_to_reorder"
 								})
 					if months_list_to_delete_exists:
-						months_list_to_delete = frappe.get_list("Months List", {
+						months_list_to_delete = frappe.get_all("Months List", {
 										"parent": item_code,
 										"parenttype": "Item",
 										"parentfield": "months_to_reorder"
