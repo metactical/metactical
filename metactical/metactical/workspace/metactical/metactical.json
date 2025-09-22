@@ -272,6 +272,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Reorder Qty From Excel",
+   "link_count": 0,
+   "link_to": "Reorder Qty From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report - Stores Restocking V1",
+   "link_count": 0,
+   "link_to": "Sales Report - Stores Restocking V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_count": 12,
    "link_type": "DocType",
@@ -1067,7 +1087,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-09-07 02:24:32.864579",
+ "modified": "2025-09-22 12:18:06.776702",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
