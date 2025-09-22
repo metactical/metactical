@@ -1231,16 +1231,32 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     })
 
 def get_on_order_quantity(item_code, warehouse):
-    po_items = frappe.db.get_all("Purchase Order Item", filters={
-        "item_code": item_code,
-        "warehouse": warehouse,
-        "parenttype": "Purchase Order",
-    }, fields=["sum(qty) as total_qty", "sum(received_qty) as total_received"])
-
-    if po_items and po_items[0].total_qty and po_items[0].total_received is not None:
-        return int(po_items[0].total_qty - po_items[0].total_received)
+    po_items = frappe.db.sql(f"""
+        SELECT sum(qty), sum(received_qty)
+        FROM `tabPurchase Order Item` poi
+        JOIN `tabPurchase Order` po ON poi.parent = po.name
+        WHERE
+            poi.item_code = {frappe.db.escape(item_code)}
+            AND poi.warehouse = {frappe.db.escape(warehouse)}
+            AND po.docstatus = 1
+            AND po.status in ('To Receive and Bill', 'To Receive')
+            AND poi.qty > poi.received_qty
+            AND po.company = 'International Camouflage Ltd'
+        GROUP BY poi.item_code, poi.parent
+    """, as_dict=True)
     
-    return 0
+    pending_quantities = ""
+    for po in po_items:
+        pending_qty = int(po["sum(qty)"] - po["sum(received_qty)"])
+        if pending_qty > 0:
+            if pending_quantities:
+                pending_quantities += ", "
+            pending_quantities += str(pending_qty)
+
+    if pending_quantities:
+        return pending_quantities
+    
+    return ""
 
 @frappe.whitelist()
 def get_item_by_retail_sku_single(retail_sku, branch):
