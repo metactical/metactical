@@ -1,120 +1,147 @@
 function edit_child_table(listview) {
+    let selected_items = listview.get_checked_items();
+    if (selected_items.length === 0) {
+        frappe.msgprint(__("Please select at least one item to update."));
+        return;
+    }
+
     var all_fields = frappe.meta.get_docfields("Item", listview.doctype, true);
 
     let child_table_map = {};
     let child_table_options = [];
+    let all_child_tables = [];
 
     all_fields.forEach((field) => {
-        if (field.fieldtype === "Table" && field.options) {
+        if ((field.fieldtype === "Table" || field.fieldtype === "Table MultiSelect") && field.options) {
             child_table_map[field.fieldname] = field.options;
-            child_table_options.push({
-                label: `${field.label}`,
-                value: field.fieldname,
-            });
+            child_table_options.push(field.options);
+            all_child_tables.push(field);
         }
     });
+
 
     if (Object.keys(child_table_map).length === 0) {
         frappe.msgprint(__("No child tables found in this doctype."));
         return;
     }
 
+    let selected_items_name = selected_items.map(i => i.name)
+
+    frappe.prompt([
+        {
+            label: __("Select Child Table"),
+            fieldname: "child_table",
+            fieldtype: "Select",
+            options: child_table_options,
+            reqd: 1,
+        },
+        {
+            label: __("Update All Selected Items Based On"),
+            fieldname: "update_based_on",
+            fieldtype: "Select",
+            options: selected_items_name.join("\n"),
+        }
+    ], function(values) {
+        let child_fieldname = values.child_table;
+        if (!child_fieldname) return;
+
+        open_main_dialog(selected_items, values, all_child_tables);
+    }, __("Select Child Table"), __("Load"));
+}
+
+function open_main_dialog(selected_items, values, all_child_tables) {
+    let child_table = values.child_table;
+    let selected_based_on = values.update_based_on;
+    let fields = frappe.meta.get_docfields(child_table);
+    let child_table_field = all_child_tables.find(f => f.options === child_table);
+
+    console.log("Opening dialog for", child_table, "based on", selected_based_on);
+    let item = null;
+    frappe.call({
+        method: "frappe.client.get",
+        args: {
+            doctype: "Item",
+            name: selected_based_on,
+        },
+        freeze: true,
+        freeze_message: __("Loading item..."),
+        async: false,
+        callback: function(r) {
+            if (r.message) {
+                item = r.message;
+            } else {
+                frappe.msgprint(__("Could not load the selected item."));
+                return;
+            }
+        }
+    });
+
+    if (child_table === "MT Item Website Specification") {
+        fields = fields.map(f => {
+            if (f.fieldname === "label") {
+                f.onchange = function() {
+                    console.log("Label changed to", this.value);
+                    var grid_row = this.grid_row;
+                    
+                    frappe.call({
+                        method: "metactical.custom_scripts.item.item.get_website_specification_description_options",
+                        args: {
+                            labels: [this.value],
+                        },
+                        callback: function (r) {
+                            var descriptions = r.message.map(row => row.description)                            
+                            let desc_field = grid_row.on_grid_fields_dict.description;
+
+                            desc_field.df.options = descriptions;
+                            desc_field.refresh();
+                        },
+                    })
+                };
+            }
+            return f;
+        });
+    }
+
+
     let dialog = new frappe.ui.Dialog({
-        title: __('Bulk Edit Child Table'),
+        title: __('Edit - {0}', [child_table_field.label]),
+        size: 'extra-large ',
         fields: [
             {
-                label: __("Child Table"),
+                label: __(child_table_field.label),
                 fieldname: "child_table",
-                fieldtype: "Select",
-                options: child_table_options,
-                reqd: 1,
-            },
-            { fieldtype: "Section Break" },
-            {
-                label: __("Child Table Data"),
-                fieldname: "child_table_data",
-                fieldtype: "HTML",
-            },
+                fieldtype: "Table",
+                options: child_table,
+                in_place_edit: true,
+                fields: fields,
+                get_data: function() {
+                    return item[child_table_field.fieldname] || [];
+                }
+            }
         ],
         primary_action_label: __("Save"),
         primary_action(values) {
-            let child_fieldname = values.child_table;
-            if (!dialog.fields_dict._table_control) {
-                frappe.msgprint(__("Please select a child table and load data first."));
-                return;
-            }
-            let updates = dialog.fields_dict._table_control.get_value();
-
-            let selected_items = listview.get_checked_items();
-            if (selected_items.length === 0) {
-                frappe.msgprint(__("Please select at least one item to update."));
-                return;
-            }
-
-            let promises = selected_items.map((item) => {
-                return frappe.call({
-                    method: "frappe.client.set_value",
-                    args: {
-                        doctype: "Item",
-                        name: item.name,
-                        fieldname: child_fieldname,
-                        value: updates,
-                    },
-                });
-            });
-
-            Promise.all(promises).then(() => {
-                frappe.msgprint(__("Child table updated successfully for selected items."));
-                dialog.hide();
-                listview.refresh();
-            });
+            let updates = dialog.fields_dict.child_table.get_value();
+            console.log(selected_items, updates);
+            frappe.call({
+                method: "metactical.custom_scripts.item.item.update_child_table",
+                args: {
+                    item_names: selected_items.map(i => i.name),
+                    child_table: child_table,
+                    child_table_field: child_table_field.fieldname,
+                    updates: updates,
+                    updating: selected_based_on ? true : false,
+                },
+                freeze: true,
+                freeze_message: __("Updating items..."),
+                callback: function(r) {
+                    frappe.msgprint(__("{0} items updated", [r.message]));
+                    dialog.hide();
+                    listview.refresh();
+                }
+            })
         },
     });
-
-    dialog.fields_dict["child_table"].df.onchange = () => {
-        let child_fieldname = dialog.get_value("child_table");
-        if (!child_fieldname) return;
-
-        let child_doctype = child_table_map[child_fieldname];
-        if (!child_doctype) {
-            frappe.msgprint(__("Could not resolve child doctype for " + child_fieldname));
-            return;
-        }
-
-        let first_item = listview.get_checked_items()[0];
-        if (!first_item) {
-            frappe.msgprint(__("Please select at least one item."));
-            return;
-        }
-
-        frappe.call({
-            method: "frappe.client.get",
-            args: { doctype: "Item", name: first_item.name, with_childnames: 1 },
-        }).then(({ message }) => {
-            let data = [];
-            if (message && message[child_fieldname]) {
-                data = message[child_fieldname];
-            }
-
-            dialog.fields_dict.child_table_data.$wrapper.empty();
-            let table_control = frappe.ui.form.make_control({
-                parent: dialog.fields_dict.child_table_data.$wrapper,
-                df: {
-                    fieldtype: "Table",
-                    fieldname: "child_table_data",
-                    label: __(child_doctype),
-                    options: child_doctype,
-                    in_place_edit: true,
-                    get_data: () => data, 
-                },
-                render_input: true,
-            });
-
-            table_control.make();
-            table_control.refresh();
-            dialog.fields_dict._table_control = table_control;
-        });
-    };
 
     dialog.show();
 }
@@ -122,7 +149,7 @@ function edit_child_table(listview) {
 
 frappe.listview_settings['Item'] = {
     refresh: function(listview) {
-        listview.page.add_inner_button("Edit Child Table", function() {
+        listview.page.add_action_item("Child Table Bulk Update", function() {
             edit_child_table(listview); 
         }); 
     }, 
