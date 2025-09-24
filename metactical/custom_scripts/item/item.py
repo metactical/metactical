@@ -197,3 +197,82 @@ def get_sb_tag(label, description):
         return sb_tag[0].sb_tag
     else:
         return None
+    
+@frappe.whitelist()
+def update_child_table(item_names, child_table, child_table_field, updates, updating=False):
+    item_names = json.loads(item_names)
+    updates = json.loads(updates)
+    
+    total_updated_items = 0
+    
+    if updating:
+        # clear the child table for each selected item and then add the updates
+        for item_name in item_names:
+            item = frappe.get_doc("Item", item_name)
+            item.set(child_table_field, [])
+            
+            for update in updates:
+                new_row = item.append(child_table_field, {})
+                for key, value in update.items():
+                    if key in ["name", "idx"]:
+                        continue
+                    
+                    setattr(new_row, key, value)
+                    
+            item.save()
+            item.reload()
+            total_updated_items += 1
+
+    else:
+        if child_table == "MT Item Website Specification":
+            for item_name in item_names:
+                # if the label exists, update the description, else add a new row
+                item = frappe.get_doc("Item", item_name)
+                for update in updates:
+                    found = False
+                    for spec in item.neb_website_specifications:
+                        if spec.label == update['label']:
+                            spec.description = update['description'] if "description" in update else ""
+                            spec.mandatory = update['mandatory'] if "mandatory" in update else 0
+                            found = True
+                            break
+                    
+                    if not found:       
+                        new_spec = item.append("neb_website_specifications", {})
+                        new_spec.label = update['label']
+                        new_spec.mandatory = update['mandatory'] if "mandatory" in update else 0
+                        new_spec.description = update['description'] if "description" in update else ""
+
+                item.save()
+                item.reload()
+                total_updated_items += 1
+                
+        elif child_table == "Months List":
+            for item_name in item_names:
+                # if the month exists, continue, else add a new row
+                item = frappe.get_doc("Item", item_name)
+                exitsing_months = [month.month for month in item.months_to_reorder]
+                for update in updates:
+                    if update['month'] not in exitsing_months:
+                        new_month = item.append("months_to_reorder", {})
+                        new_month.month = update['month']
+                        
+                item.save()
+                item.reload()
+                total_updated_items += 1
+        else:
+            # add a new row with the updates to the child table for each selected item
+            for item_name in item_names:
+                
+                item = frappe.get_doc("Item", item_name)
+                new_row = item.append(child_table_field, {})
+                for key, value in updates[0].items():
+                    if key in ["name", "idx"]:
+                        continue
+                    
+                    setattr(new_row, key, value)
+                item.save()
+                item.reload()
+                total_updated_items += 1
+                
+    return total_updated_items
