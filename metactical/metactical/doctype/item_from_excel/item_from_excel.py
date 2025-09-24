@@ -59,7 +59,7 @@ class ItemFromExcel(Document):
 				if not d[i] and d[0]:
 					frappe.throw(f"Value missing for field {headers[i]} at row {data.index(d) + 1}")
 
-	def create_item(self, data, item_field_map, linked_dcts, is_template):
+	def create_item(self, data, item_field_map, linked_dcts, is_template, templates_with_ai_request={}):
 		self.attributes = ""
 		self.attribute_values = ""
   
@@ -127,7 +127,8 @@ class ItemFromExcel(Document):
                        			self.attributes, 
                           		self.attribute_values, 
                             	data[index][price_list_index], 
-                             	is_last_item_of_template)
+                             	is_last_item_of_template,
+                              	templates_with_ai_request)
     
 				item, item_code, child_table_values, temp_child_table_values, price_list_rows = initialize_item_data()
 
@@ -168,9 +169,10 @@ class ItemFromExcel(Document):
                        		self.attributes, 
                          	self.attribute_values, 
                           	data[-1][price_list_index],
-							is_last_item_of_template)
+							is_last_item_of_template,
+							templates_with_ai_request)
 
-	def save_item(self, item, child_table_values, is_template, price_list_rows, attributes, attribute_values, price_list, is_last_item_of_template):
+	def save_item(self, item, child_table_values, is_template, price_list_rows, attributes, attribute_values, price_list, is_last_item_of_template, templates_with_ai_request):
      
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
@@ -200,7 +202,7 @@ class ItemFromExcel(Document):
 			self.create_item_price(price_list_rows)
    
 		# trigger AI update for the last variant of the template
-		if is_last_item_of_template:
+		if is_last_item_of_template and item.variant_of in templates_with_ai_request:
 			template_item = frappe.get_doc("Item", item.variant_of)
 			template_item.request_ai_suggestion = 1
 			template_item.flags.in_import = False
@@ -328,8 +330,20 @@ class ItemFromExcel(Document):
 		linked_doctypes, item_field_map, required_fields = get_doctype_information()
 
 		try:
+			# create template items
 			self.create_item(file_content[0], item_field_map, linked_doctypes, True)
-			self.create_item(file_content[1], item_field_map, linked_doctypes, False)
+			
+			template_headers = file_content[0][0]
+			request_ai_suggestion_index = template_headers.index("Request AI Suggestion For Slugs and Descriptions") if "Request AI Suggestion For Slugs and Descriptions" in template_headers else -1
+			templates_with_ai_request = {}
+   
+			if request_ai_suggestion_index != -1:
+				for d in file_content[0][1:]:
+					if d and d[0] and d[request_ai_suggestion_index]:
+						templates_with_ai_request[d[0]] = True
+
+			# create variant items
+			self.create_item(file_content[1], item_field_map, linked_doctypes, False, templates_with_ai_request)
 		
 			frappe.db.commit()
 		except Exception as e:
