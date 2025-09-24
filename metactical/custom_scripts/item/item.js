@@ -35,24 +35,40 @@ frappe.ui.form.on("Item", {
             callback: function (r) {
                 if (r.message.length) {
                     var descriptions = {};
-                    frm.clear_table("neb_website_specifications");
+                
+                    // Collect incoming labels
+                    let incoming_labels = r.message.map(spec => spec.label);
+                
+                    // Collect existing labels from the form
+                    let existing_labels = (frm.doc.neb_website_specifications || []).map(
+                        row => row.label
+                    );
+                
+                    // ---- Remove deleted rows ----
+                    frm.doc.neb_website_specifications = 
+                        (frm.doc.neb_website_specifications || []).filter(row => {
+                            return incoming_labels.includes(row.label);
+                        });
+                
+                    // ---- Add new rows ----
                     r.message.forEach((spec) => {
-                        frm.add_child(
-                            "neb_website_specifications",
-                            {
+                        if (!existing_labels.includes(spec.label)) {
+                            frm.add_child("neb_website_specifications", {
                                 label: spec.label,
                                 mandatory: spec.mandatory,
-                            }
-                        );
-
+                            });
+                        }
+                
+                        // Update descriptions map
                         if (!descriptions[spec.label]) {
                             descriptions[spec.label] = [];
                         }
-                       
-                        spec.descriptions.forEach((description) => {
+                        (spec.descriptions || []).forEach((description) => {
                             descriptions[spec.label].push(description);
-                        })
+                        });
                     });
+                
+                    // Refresh field + update descriptions
                     frm.refresh_field("neb_website_specifications");
                     frm.events.update_web_specification_description_options(
                         frm,
