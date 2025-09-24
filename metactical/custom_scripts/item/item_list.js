@@ -55,38 +55,60 @@ function open_main_dialog(selected_items, values, all_child_tables) {
     let fields = frappe.meta.get_docfields(child_table);
     let child_table_field = all_child_tables.find(f => f.options === child_table);
 
-    console.log("Opening dialog for", child_table, "based on", selected_based_on);
-    let item = null;
-    frappe.call({
-        method: "frappe.client.get",
-        args: {
-            doctype: "Item",
-            name: selected_based_on,
-        },
-        freeze: true,
-        freeze_message: __("Loading item..."),
-        async: false,
-        callback: function(r) {
-            if (r.message) {
-                item = r.message;
-            } else {
-                frappe.msgprint(__("Could not load the selected item."));
-                return;
+    let item = {};
+    if (selected_based_on){
+        frappe.call({
+            method: "frappe.client.get",
+            args: {
+                doctype: "Item",
+                name: selected_based_on,
+            },
+            freeze: true,
+            freeze_message: __("Loading item..."),
+            async: false,
+            callback: function(r) {
+                if (r.message) {
+                    item = r.message;
+                } else {
+                    frappe.msgprint(__("Could not load the selected item."));
+                    return;
+                }
             }
-        }
-    });
+        });
+    }
 
     if (child_table === "MT Item Website Specification") {
         fields = fields.map(f => {
             if (f.fieldname === "label") {
-                f.onchange = function() {
-                    console.log("Label changed to", this.value);
+                f.change = function() {
+                    console.log("Label changed to", this.get_value());
                     var grid_row = this.grid_row;
                     
                     frappe.call({
                         method: "metactical.custom_scripts.item.item.get_website_specification_description_options",
                         args: {
-                            labels: [this.value],
+                            labels: [this.get_value()],
+                        },
+                        callback: function (r) {
+                            var descriptions = r.message.map(row => row.description)                            
+                            let desc_field = grid_row.on_grid_fields_dict.description;
+
+                            desc_field.df.options = descriptions;
+                            desc_field.refresh();
+                        },
+                    })
+                };
+            }
+            else if (f.fieldname === "mandatory") {
+                f.read_only_depends_on = 0;
+                f.change = function() {
+                    var grid_row = this.grid_row;
+                    var label = grid_row.doc.label;
+                    
+                    frappe.call({
+                        method: "metactical.custom_scripts.item.item.get_website_specification_description_options",
+                        args: {
+                            labels: [label],
                         },
                         callback: function (r) {
                             var descriptions = r.message.map(row => row.description)                            
@@ -122,7 +144,6 @@ function open_main_dialog(selected_items, values, all_child_tables) {
         primary_action_label: __("Save"),
         primary_action(values) {
             let updates = dialog.fields_dict.child_table.get_value();
-            console.log(selected_items, updates);
             frappe.call({
                 method: "metactical.custom_scripts.item.item.update_child_table",
                 args: {
