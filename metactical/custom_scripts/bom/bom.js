@@ -54,7 +54,7 @@ frappe.ui.form.on("BOM Operation", {
   },
   operation: function (frm, cdt, cdn) {
     var row = locals[cdt][cdn]
-    frappe.db.get_list(
+    frappe.db.get_all(
       "Sub Operation",
       {
         fields:["operation", "time_in_mins", "description", "time_in_secs"],
