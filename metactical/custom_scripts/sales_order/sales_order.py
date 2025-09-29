@@ -51,19 +51,9 @@ class SalesOrderCustom(SalesOrder):
 					'warehouse': row.warehouse}, 'reserved_qty')
 				row.update({'sal_reserved_qty': reserved_qty})
 
-	def update_status(self, status, label):
-			self.check_modified_date()
-			self.set_status(update=True, status=status, label=label)
-			# Upon Sales Order Re-open, check for credit limit.
-			# Limit should be checked after the 'Hold/Closed' status is reset.
-			if status == "Draft" and self.docstatus == 1:
-				self.check_credit_limit()
-			self.update_reserved_qty()
-			self.notify_update()
-			clear_doctype_notifications(self)
-
-	def set_status(self, update=False, status=None, update_modified=True, label=""):
+	def set_status(self, update=False, status=None, update_modified=True):
 		super(SalesOrderCustom, self).set_status(update, status, update_modified)
+		from_ui = frappe.flags.get('from_ui', False)
 
 		# Metactical Customization: Added
 		if self.billing_status == "Fully Billed" and not self.neb_payment_completed_at:
@@ -71,7 +61,7 @@ class SalesOrderCustom(SalesOrder):
 			if all_invoices_paid:
 				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
 
-		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"] and label != "Re-open":
+		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"] and not from_ui:
 			# check if there is return delivery note created in 
 			has_linked_return = False
 			return_delivery_notes = get_return_delivery_note(self.name)
@@ -316,6 +306,7 @@ def submit_order(doc):
 		doc._submit()
   
 @frappe.whitelist()
-def update_status(status, name, label):
+def update_status(status, name):
 	so = frappe.get_doc("Sales Order", name)
-	so.update_status(status, label=label)
+	frappe.flags.from_ui = True
+	so.update_status(status)
