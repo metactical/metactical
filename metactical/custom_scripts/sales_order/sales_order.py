@@ -11,7 +11,6 @@ from erpnext.stock.doctype.item.item import get_item_defaults
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from frappe.model.utils import get_fetch_values
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
-from frappe.desk.notifications import clear_doctype_notifications
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
 from metactical.custom_scripts.utils.metactical_utils import ( 
