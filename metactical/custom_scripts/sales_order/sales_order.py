@@ -50,6 +50,7 @@ class SalesOrderCustom(SalesOrder):
 
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(SalesOrderCustom, self).set_status(update, status, update_modified)
+		from_ui = frappe.flags.get('from_ui', False)
 
 		# Metactical Customization: Added
 		if self.billing_status == "Fully Billed" and not self.neb_payment_completed_at:
@@ -57,7 +58,7 @@ class SalesOrderCustom(SalesOrder):
 			if all_invoices_paid:
 				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
 
-		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"]:
+		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"] and not from_ui:
 			# check if there is return delivery note created in 
 			has_linked_return = False
 			return_delivery_notes = get_return_delivery_note(self.name)
@@ -271,3 +272,9 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 	doclist.set_onload("ignore_price_list", True)
  
 	return doclist
+  
+@frappe.whitelist()
+def update_status(status, name):
+	so = frappe.get_doc("Sales Order", name)
+	frappe.flags.from_ui = True
+	so.update_status(status)
