@@ -11,6 +11,7 @@ from erpnext.stock.doctype.item.item import get_item_defaults
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from frappe.model.utils import get_fetch_values
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
+from frappe.desk.notifications import clear_doctype_notifications
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
 from metactical.custom_scripts.utils.metactical_utils import ( 
@@ -50,7 +51,18 @@ class SalesOrderCustom(SalesOrder):
 					'warehouse': row.warehouse}, 'reserved_qty')
 				row.update({'sal_reserved_qty': reserved_qty})
 
-	def set_status(self, update=False, status=None, update_modified=True):
+	def update_status(self, status, label):
+			self.check_modified_date()
+			self.set_status(update=True, status=status, label=label)
+			# Upon Sales Order Re-open, check for credit limit.
+			# Limit should be checked after the 'Hold/Closed' status is reset.
+			if status == "Draft" and self.docstatus == 1:
+				self.check_credit_limit()
+			self.update_reserved_qty()
+			self.notify_update()
+			clear_doctype_notifications(self)
+
+	def set_status(self, update=False, status=None, update_modified=True, label=""):
 		super(SalesOrderCustom, self).set_status(update, status, update_modified)
 
 		# Metactical Customization: Added
@@ -59,7 +71,7 @@ class SalesOrderCustom(SalesOrder):
 			if all_invoices_paid:
 				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
 
-		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"]:
+		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"] and label != "Re-open":
 			# check if there is return delivery note created in 
 			has_linked_return = False
 			return_delivery_notes = get_return_delivery_note(self.name)
@@ -302,3 +314,8 @@ def submit_order(doc):
 		queue_action(doc, "submit", timeout=2000)
 	else:
 		doc._submit()
+  
+@frappe.whitelist()
+def update_status(status, name, label):
+	so = frappe.get_doc("Sales Order", name)
+	so.update_status(status, label=label)

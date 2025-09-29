@@ -530,6 +530,22 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 			'Close'
 		)
 	}
+
+	update_status(label, status) {
+		var doc = this.frm.doc;
+		var me = this;
+		frappe.ui.form.is_saving = true;
+		frappe.call({
+			method: "metactical.custom_scripts.sales_order.sales_order.update_status",
+			args: {status: status, name: doc.name, label: label},
+			callback: function(r){
+				me.frm.reload_doc();
+			},
+			always: function() {
+				frappe.ui.form.is_saving = false;
+			}
+		});
+	}
 };
 
 extend_cscript(cur_frm.cscript, new erpnext.selling.SalesOrderController({frm: cur_frm}));
