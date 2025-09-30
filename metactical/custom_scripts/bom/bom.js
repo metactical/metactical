@@ -53,6 +53,11 @@ frappe.ui.form.on("BOM Operation", {
     frm.refresh_field("sub_operations")
   },
   operation: function (frm, cdt, cdn) {
+    var is_focused = $(`[data-fieldname="operations"] [data-fieldname='operation']`).is(":focus")
+    if(is_focused){
+      $(`[data-fieldname="operations"] [data-fieldname='operation']`).blur();
+    }
+
     var row = locals[cdt][cdn]
     frappe.call({
       method: "frappe.client.get",
@@ -77,9 +82,7 @@ frappe.ui.form.on("BOM Operation", {
 
           frm.refresh_field("sub_operations")
       }
-    }
-    )
-
+    });
   },
 });
 
