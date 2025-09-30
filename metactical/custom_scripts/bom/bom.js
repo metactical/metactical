@@ -54,33 +54,31 @@ frappe.ui.form.on("BOM Operation", {
   },
   operation: function (frm, cdt, cdn) {
     var row = locals[cdt][cdn]
-    frappe.db.get_all(
-      "Sub Operation",
-      {
-        fields:["operation", "time_in_mins", "description", "time_in_secs"],
-        filters:{
-            parent: row.operation,
-            parenttype: "Operation",
-            parentfield: "sub_operations",
+    frappe.call({
+      method: "frappe.client.get",
+      args: {
+        doctype: "Operation",
+        // fields: ["operation", "time_in_mins", "description", "time_in_secs"],
+        filters: {
+          name: row.operation
         },
-        order_by:"idx asc"
-    }).then(res => {
-        if (res.length){
-
-            $.each(res, (key, so)=> {
-                frm.add_child("sub_operations",{
-                    parent_operation: row.operation,
-                    operation: so.operation,
-                    time_in_mins: so.time_in_mins,
-                    description: so.description,
-                    time_in_secs: so.time_in_secs,
-                    workstation: row.workstation,
-                })
+      },
+      callback: function (res) {
+          $.each(res.message.sub_operations, (key, so) => {
+            frm.add_child("sub_operations", {
+              parent_operation: row.operation,
+              operation: so.operation,
+              time_in_mins: so.time_in_mins,
+              description: so.description,
+              time_in_secs: so.time_in_secs,
+              workstation: row.workstation,
             })
+          })
 
-            frm.refresh_field("sub_operations")
-        }
-    })
+          frm.refresh_field("sub_operations")
+      }
+    }
+    )
 
   },
 });
