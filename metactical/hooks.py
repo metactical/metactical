@@ -845,7 +845,14 @@ fixtures = [{
 			"BOM-no_of_workers",
 			"BOM-sample_details",
 			"BOM-retail_sku",
-			"BOM-sub_operations"
+			"BOM-sub_operations",
+			'Item-item_detail',
+			"Item-request_ai_suggestion",
+			"Item-slugs_and_descriptions",
+			"Item-neb_paypal_restricted",
+			"Item-neb_airship_restricted",
+			"Employee-short_code",
+			"Item-last_pinged_on"
 		]]]
 	},
 	{
