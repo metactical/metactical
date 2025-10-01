@@ -10,6 +10,7 @@
  "field_order": [
   "label",
   "sort_order",
+  "is_a_search_filter",
   "section_break_0mlim",
   "descriptions"
  ],
@@ -32,13 +33,19 @@
    "label": "Sort Order"
   },
   {
+   "default": "0",
+   "fieldname": "is_a_search_filter",
+   "fieldtype": "Check",
+   "label": "Is A Search Filter"
+  },
+  {
    "fieldname": "section_break_0mlim",
    "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-20 11:06:07.804400",
+ "modified": "2025-02-25 07:33:20.678214",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Specification Label",
