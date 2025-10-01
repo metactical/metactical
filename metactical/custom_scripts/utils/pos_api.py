@@ -1088,7 +1088,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     items = frappe.db.sql(f"""
         SELECT
             tabItem.name AS item_code, item_name, ifw_retailskusuffix,
-            variant_of,
+            variant_of, asi_item_class, ifw_location,
             brand, image, is_stock_item, tabItem.has_variants,
             (
                 SELECT GROUP_CONCAT(barcode SEPARATOR ', ')
@@ -1208,6 +1208,8 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "RetailSku": item.ifw_retailskusuffix,
             "Categories": [],
             "Comment": "",
+            "ItemClass": item.asi_item_class or "",
+            "Location": item.ifw_location or "",
             "OnOrderQty": on_order,
             "TemplateId": item.variant_of or "",
             "ImageUrl": item.image or "",
