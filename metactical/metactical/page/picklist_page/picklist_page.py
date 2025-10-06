@@ -82,7 +82,7 @@ def load_summary(warehouse, source, country):
 			WHERE
 				pli.warehouse = '{warehouse}' AND pl.docstatus = 1
 				AND pl.status in ('Open', 'Partially Picked')
-				AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '')
+				AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '' OR pl.ais_picked_by = '{frappe.session.user}')
 				AND sales_order.status <> 'On Hold' {where}""", as_dict=1)
 	print("Pick: ", picklists)
 	
@@ -163,7 +163,8 @@ def get_pick_lists(warehouse, country, filters, source, sort_by, sort_order):
 										pl.docstatus = 1 AND pl.status in ('Open', 'Partially Picked') AND pli.warehouse = '{warehouse}'
 										AND (item.is_stock_item = 1 OR bundle.name IS NOT NULL)
 										AND sales_order.status <> 'On Hold'
-										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '' OR pl.status = 'Partially Picked')
+										AND (pl.ais_picked_by IS NULL OR pl.ais_picked_by = '' OR 
+										pl.ais_picked_by = '{frappe.session.user}' OR pl.status = 'Partially Picked')
 										AND pl.ais_source <> 'Website - GPD'
 										{where}
 									GROUP BY pl.name, pl.customer, pl.is_rush, pli.sales_order
@@ -193,7 +194,7 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 		if len(shipped_items) != i:
 			not_include += ","
 	not_include += ")"
-	if is_being_picked is None or is_being_picked == '':
+	if is_being_picked is None or is_being_picked == '' or is_being_picked == frappe.session.user:
 		items = frappe.db.sql("""SELECT
 										pli.name, pli.parent AS pick_list, pli.item_code, pli.item_name, item.image,
 										pli.ifw_location AS locations, pli.qty, bin.actual_qty,
