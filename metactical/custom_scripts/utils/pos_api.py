@@ -125,12 +125,12 @@ def receive_pos_data(*args, **kwargs):
                 sales_order=sales_order.name
             )
 
-        auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
+        # auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
         frappe.response["Status"] = "200"
         frappe.response["InvoiceId"] = sales_order.name
         frappe.response["Message"] = []
         frappe.response["Total"] = float(sales_order.grand_total)
-        frappe.response["AutoLogout"] = True if auto_logout else False
+        # frappe.response["AutoLogout"] = True if auto_logout else False
             
     except Exception as e:
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
@@ -906,14 +906,14 @@ def create_return(*args, **kwargs):
             frappe.response["Message"] = str(e)
     
     total = round(sales_return.grand_total + total_restock_fee, 2)
-    auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
+    # auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = total
     frappe.response["TotalAfterRestockFee"] = total
-    frappe.response["AutoLogout"] = True if auto_logout else False
+    # frappe.response["AutoLogout"] = True if auto_logout else False
     frappe.db.commit()
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):

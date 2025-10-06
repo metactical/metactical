@@ -11,6 +11,16 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		if self.purchase_order:
 			for d in self.items:
 				d.purchase_order = self.purchase_order
+
+		self.validate_barcodes()
+    
+	def validate_barcodes(self):
+		for item in self.items:
+			if not item.barcode:
+				barcode = frappe.db.get_value("Item Barcode", {"parent": item.item_code}, "barcode")
+				if barcode:	
+					item.barcode = barcode
+     
 	def save(self):
 		if self.docstatus == DocStatus.submitted() and len(self.items) > 100 and \
 			self.ais_queue_status and self.ais_queue_status != "Queued":
