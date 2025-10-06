@@ -20,7 +20,7 @@ def on_sle_update(doc, method):
 			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
 	
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
-
+ 
 def get_all_bins(item_code):
 	all_bins = frappe.get_all(
 		'Bin', 
@@ -187,6 +187,9 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			try:
 				item_inventory_output.save()
 				frappe.db.commit()
+
+				# check and delete any failed inventory output record if exists
+				delete_failed_inventory_output(item_code)
 			except:
 				if item_inventory_output_doc:
 					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
@@ -202,6 +205,12 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
   
+def delete_failed_inventory_output(item_code):
+	failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", {"item_code": item_code})
+	if failed_inventory_output_exists:
+		frappe.db.delete("Failed Inventory Output", failed_inventory_output_exists)
+		frappe.db.commit()
+
 def update_doc(docname, total_available_qty, data, item_code, voucher_type, round=0):
 	try:
 		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
@@ -210,21 +219,18 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 		item_inventory_output.qoh = total_available_qty
 		item_inventory_output.save()
 		frappe.db.commit()
+		
+		# check and delete any failed inventory output record if exists
+		delete_failed_inventory_output(item_code)
 	except Exception as e:
-		if round > 2:
-			frappe.set_user('Administrator')
-			frappe.delete_doc('Item Inventory Output', docname)
-			frappe.set_user(frappe.session.user)
-			item_inventory_output = frappe.new_doc('Item Inventory Output')
-			item_inventory_output.item_code = item_code
-			item_inventory_output.qoh = total_available_qty
-			item_inventory_output.item_inventory_output_list = data
-			item_inventory_output.insert()
+			frappe.db.rollback()
+			delete_failed_inventory_output(item_code)
+			failed_inventory_output = frappe.get_doc({
+				"doctype": "Failed Inventory Output",
+				"item_code": item_code
+			})
+			failed_inventory_output.insert(ignore_permissions=True)
 			frappe.db.commit()
-		else:
-			sys.stdout.flush()
-			time.sleep(2)
-			update_doc(docname, total_available_qty, data, item_code, voucher_type, round+1)
 
 def is_product_bundle_item(item_code):
 	product_bundle_items = frappe.db.sql(f"""

@@ -452,6 +452,7 @@ def create_address(address_detail, customer, address_type):
 		"doctype": "Address",
 		"title": address_detail["first_name"] + " " + address_detail["last_name"],
 		"ifw_first_name": address_detail["first_name"],
+		"ifw_last_name": address_detail["last_name"] if "last_name" in address_detail else "",
 		"email_id": address_detail["email"],
 		"phone": address_detail["phone"],
 		"company": address_detail["company"],

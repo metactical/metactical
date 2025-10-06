@@ -208,6 +208,8 @@ scheduler_events = {
 		"15 * * * *": [
 			"metactical.custom_scripts.frappe.document.clear_queued_docs",
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
+		], "*/1 * * * *": [
+			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
 		]
 	}
 }
