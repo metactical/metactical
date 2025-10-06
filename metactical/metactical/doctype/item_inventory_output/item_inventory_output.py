@@ -7,7 +7,6 @@ import sys, time
 from frappe.model.document import Document
 import time
 from collections import defaultdict
-from frappe.exceptions import QueryTimeoutError
 
 class ItemInventoryOutput(Document):
 	pass
@@ -20,13 +19,7 @@ def on_sle_update(doc, method):
 		if doc.voucher_type != 'Stock Reconciliation':
 			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
 	
-	frappe.enqueue(update_item_inventory_output, job_name=f"update_inventory_{doc.item_code}",
-		item_code=doc.item_code,
-		net_available_bins=net_available_bins,
-		voucher_type=doc.voucher_type,
-		queue='default',
-		now=False
-	)
+	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
  
 def get_all_bins(item_code):
 	all_bins = frappe.get_all(
@@ -194,6 +187,9 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			try:
 				item_inventory_output.save()
 				frappe.db.commit()
+
+				# check and delete any failed inventory output record if exists
+				delete_failed_inventory_output(item_code)
 			except:
 				if item_inventory_output_doc:
 					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
@@ -209,6 +205,12 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
   
+def delete_failed_inventory_output(item_code):
+	failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", {"item_code": item_code})
+	if failed_inventory_output_exists:
+		frappe.db.delete("Failed Inventory Output", failed_inventory_output_exists)
+		frappe.db.commit()
+
 def update_doc(docname, total_available_qty, data, item_code, voucher_type, round=0):
 	try:
 		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
@@ -218,33 +220,17 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 		item_inventory_output.save()
 		frappe.db.commit()
 		
-		failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", 
-									{
-										"item_code": item_code
-									}
-								)
-		if failed_inventory_output_exists:
-			frappe.get_delete("Failed Inventory Output", failed_inventory_output_exists)
-
-	except QueryTimeoutError:
-		if round < 5:
-			frappe.log_error(f"Retry {round+1}: Document locked ({docname})", "Item Inventory Output Update")
-			time.sleep(3)
+		# check and delete any failed inventory output record if exists
+		delete_failed_inventory_output(item_code)
+	except Exception as e:
 			frappe.db.rollback()
-			update_doc(docname, total_available_qty, data, item_code, voucher_type, round + 1)
-		else:
-			frappe.log_error(f"Failed to update after retries: {docname}", "Item Inventory Output Retry Exhausted")
-			frappe.db.rollback()
+			delete_failed_inventory_output(item_code)
 			failed_inventory_output = frappe.get_doc({
 				"doctype": "Failed Inventory Output",
 				"item_code": item_code
 			})
 			failed_inventory_output.insert(ignore_permissions=True)
 			frappe.db.commit()
-   
-	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), f"Item Inventory Output Update Failed ({item_code})")
-		frappe.db.rollback()
 
 def is_product_bundle_item(item_code):
 	product_bundle_items = frappe.db.sql(f"""
