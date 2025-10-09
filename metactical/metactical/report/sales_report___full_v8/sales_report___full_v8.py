@@ -24,7 +24,7 @@ def execute(filters=None):
 	
 	#Get US data
 	us_data = {}
-	# us_data = get_us_data(filters)
+	us_data = get_us_data(filters)
 	
 	# details = get_details(conditions,filters)
 	combo_dict = {}
@@ -205,13 +205,6 @@ def get_column(filters,conditions):
 				"fieldtype": "Data",
 				"width": 150,
 			},
-   
-			{
-				"label": _("Cost"),
-				"fieldname": "item_cost",
-				"fieldtype": "Currency",
-				"width": 100,
-			},
 			{
 				"label": "QtyToOrderd",
 				"fieldname": "qty_to_order",
@@ -346,6 +339,12 @@ def get_column(filters,conditions):
 				"fieldname": "date_last_received",
 				"fieldtype": "DateTime",
 				"width": 200,
+			},
+   			{
+				"label": _("Cost"),
+				"fieldname": "item_cost",
+				"fieldtype": "Currency",
+				"width": 100,
 			},
 			{
 				"label": _("Suplier SKU"),
