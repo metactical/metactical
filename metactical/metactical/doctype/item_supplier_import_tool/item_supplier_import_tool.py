@@ -73,6 +73,15 @@ class ItemSupplierImportTool(Document):
 			updated_qty = row[1]
 			parent = row[2]
 
+			try:
+				updated_qty = str(updated_qty).replace('+', '').strip()
+				updated_qty = int(float(updated_qty))
+				if updated_qty > 50:
+					updated_qty = 50
+			except Exception:
+				frappe.log_error(f"Skipping invalid qty {updated_qty} for SKU {name}")
+				continue
+
 			exists = frappe.db.exists("Item", {"name": parent})
    
 			if exists:
@@ -81,10 +90,11 @@ class ItemSupplierImportTool(Document):
 					supplier_exists = False
 					for supplier in item.supplier_items:
 						if supplier.name == name:
-							supplier.ifw_supplier_qoh = updated_qty
-							supplier.ifw_sqohtimestamp = frappe.utils.now_datetime()
-							item.save()
-							frappe.db.commit()
+							if not (supplier.ifw_supplier_qoh == updated_qty or (supplier.ifw_supplier_qoh > 49 and updated_qty == 50)):
+								supplier.ifw_supplier_qoh = updated_qty
+								supplier.ifw_sqohtimestamp = frappe.utils.now_datetime()
+								item.save()
+								frappe.db.commit()
 							supplier_exists = True
 							break
 					if not supplier_exists:
