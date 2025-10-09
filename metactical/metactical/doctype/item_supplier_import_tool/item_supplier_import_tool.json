@@ -7,7 +7,6 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "import_based_on",
   "excel_file",
   "section_break_i8qkd",
   "section_queus",
@@ -20,12 +19,6 @@
   "amended_from"
  ],
  "fields": [
-  {
-   "fieldname": "import_based_on",
-   "fieldtype": "Select",
-   "label": "Item Supplier Import Based On",
-   "options": "ERP SKU\nRetail SKU"
-  },
   {
    "fieldname": "excel_file",
    "fieldtype": "Attach",
@@ -107,7 +100,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-08 02:32:21.177796",
+ "modified": "2025-10-09 08:55:32.785974",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Supplier Import Tool",
