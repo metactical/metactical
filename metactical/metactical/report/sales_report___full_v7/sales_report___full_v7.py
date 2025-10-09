@@ -617,7 +617,7 @@ def get_open_po_qty(item,supplier):
 @frappe.whitelist()
 def get_item_details(item, list_type="Selling", supplier=None):
 	cond = " and selling = 1"
-	if list_type == "Buying": cond= " and buying = 1"
+	if list_type == "Buying": cond= " and buying = 1 and price_list like 'SUP%'"
 	rate = 0
 	date = frappe.utils.nowdate()
 	r = frappe.db.sql("select price_list_rate from `tabItem Price` where '{}' between valid_from and valid_upto and item_code = '{}' {} limit 1".format(date, item, cond))
