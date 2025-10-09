@@ -24,7 +24,7 @@ def execute(filters=None):
 	
 	#Get US data
 	us_data = {}
-	us_data = get_us_data(filters)
+	# us_data = get_us_data(filters)
 	
 	# details = get_details(conditions,filters)
 	combo_dict = {}
@@ -205,6 +205,13 @@ def get_column(filters,conditions):
 				"fieldtype": "Data",
 				"width": 150,
 			},
+   
+			{
+				"label": _("Cost"),
+				"fieldname": "item_cost",
+				"fieldtype": "Currency",
+				"width": 100,
+			},
 			{
 				"label": "QtyToOrderd",
 				"fieldname": "qty_to_order",
@@ -339,12 +346,6 @@ def get_column(filters,conditions):
 				"fieldname": "date_last_received",
 				"fieldtype": "DateTime",
 				"width": 200,
-			},
-			{
-				"label": _("Cost"),
-				"fieldname": "item_cost",
-				"fieldtype": "Currency",
-				"width": 100,
 			},
 			{
 				"label": _("Suplier SKU"),
@@ -794,7 +795,7 @@ def get_item_details(item, list_type="Selling", supplier=None):
 	if price_list is None or price_list  == "":
 		frappe.throw("Please set a default price list in stock Settings")
 	cond = "and price_list = '{}' and selling = 1".format(price_list)
-	if list_type == "Buying": cond= " and buying = 1"
+	if list_type == "Buying": cond= " and buying = 1 and price_list like 'SUP%'"
 	rate = 0
 	date = frappe.utils.nowdate()
 	r = frappe.db.sql("select price_list_rate from `tabItem Price` \
