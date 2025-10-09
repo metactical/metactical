@@ -356,26 +356,24 @@ class Purolator:
 
 		client = self.create_pwss_soap_client(wsdl_url, docname)
 
+		client.set_default_soapheaders([])
+
 		header = xsd.Element(
-				'{http://purolator.com/pws/datatypes/v1}RequestContext',
-				xsd.ComplexType([
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
-				])
-			)
+			'{http://purolator.com/pws/datatypes/v1}RequestContext',
+			xsd.ComplexType([
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String()),
+			])
+		)
 		header_value = header(Version='1.3', Language='en', GroupID='xxx', RequestReference=docname)
 
 		request_data = {
 			'DocumentCriterium': {
 				'DocumentCriteria': {
-					'PIN': {
-						'Value': pin
-					}, 
-					'DocumentTypes': {
-						'DocumentType': "DomesticBillOfLading"
-					}
+					'PIN': {'Value': pin},
+					'DocumentTypes': {'DocumentType': "DomesticBillOfLading"},
 				}
 			},
 			'OutputType': 'PDF',
@@ -383,6 +381,7 @@ class Purolator:
 		}
 
 		response = client.service.GetDocuments(_soapheaders=[header_value], **request_data)
+		frappe.log_error("Purolator Test", {"Purolator Response": response})
 		documents = response.body.Documents.Document
 		files = []
 		for document in documents:
@@ -477,15 +476,17 @@ class Purolator:
 
 		client = self.create_pwss_soap_client(wsdl_url, manifest_docname)
 
+		# Clear v2 default header and set v1 header
+		client.set_default_soapheaders([])
 		header = xsd.Element(
-				'{http://purolator.com/pws/datatypes/v1}RequestContext',
-				xsd.ComplexType([
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
-				])
-			)
+			'{http://purolator.com/pws/datatypes/v1}RequestContext',
+			xsd.ComplexType([
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
+			])
+		)
 		header_value = header(Version='1.3', Language='en', GroupID='xxx', RequestReference=manifest_docname)
 		request = {
 			'ShipmentManifestDocumentCriterium': {
