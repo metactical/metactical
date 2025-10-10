@@ -8871,13 +8871,13 @@
   "doctype_or_field": "DocField",
   "field_name": "valuation_rate",
   "is_system_generated": 0,
-  "modified": "2025-09-24 02:38:39.830051",
+  "modified": "2025-10-10 02:38:39.830051",
   "module": null,
   "name": "Stock Reconciliation Item-valuation_rate-permlevel",
   "property": "permlevel",
   "property_type": "Int",
   "row_name": null,
-  "value": "3"
+  "value": "0"
  },
  {
   "default_value": null,
