@@ -536,6 +536,7 @@ def get_items(form_data):
         rate = item['Rate']
         qty = item['Qty']
         item_name = item['ItemName'] if 'ItemName' in item else ''
+        sales_person = frappe.db.get_value("User", {"full_name": item['SalesPerson']}, "name") if item['SalesPerson'] != "defaultSalesPersonId" else item['SalesPerson']
         
         item_info = {
             'item_code': item_code,
@@ -545,6 +546,7 @@ def get_items(form_data):
             'discount_percentage': item['Discount'],
             'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
             'restock_fee': item['RestockFee'] if 'RestockFee' in item else 0.0,
+            'sales_person': sales_person,
         }
 
         if item_code == "2":
