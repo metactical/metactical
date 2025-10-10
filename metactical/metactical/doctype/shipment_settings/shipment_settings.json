@@ -14,7 +14,9 @@
   "disable_automatic_print",
   "email_notifications_section",
   "send_email_to_customers",
-  "email_settings"
+  "email_settings",
+  "section_break_nqddh",
+  "store_address"
  ],
  "fields": [
   {
@@ -66,12 +68,22 @@
    "fieldtype": "Table",
    "label": "Email Settings",
    "options": "Shipment Notification Settings"
+  },
+  {
+   "fieldname": "section_break_nqddh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "store_address",
+   "fieldtype": "Table",
+   "label": "Store Addresses",
+   "options": "Store Address"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-07-29 07:33:15.886093",
+ "modified": "2025-10-09 10:55:09.125955",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Shipment Settings",
