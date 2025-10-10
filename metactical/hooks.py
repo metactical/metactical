@@ -852,7 +852,8 @@ fixtures = [{
 			"Item-neb_paypal_restricted",
 			"Item-neb_airship_restricted",
 			"Employee-short_code",
-			"Item-last_pinged_on"
+			"Item-last_pinged_on",
+			"Sales Invoice Item-sales_person"
 		]]]
 	},
 	{
