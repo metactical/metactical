@@ -881,6 +881,7 @@
  },
  {
   "default_value": null,
+<<<<<<< HEAD
   "doc_type": "Material Request",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -897,6 +898,8 @@
  },
  {
   "default_value": null,
+=======
+>>>>>>> b07ec55a (feat: add sales_person field to Sales Invoice Item and update related logic)
   "doc_type": "Pricing Rule",
   "docstatus": 0,
   "doctype": "Property Setter",
