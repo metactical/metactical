@@ -5,6 +5,10 @@ from frappe.core.doctype.communication.email import make
 from frappe.model.document import Document
 from frappe.utils import add_days, getdate, today
 import time, sys
+from frappe.utils import now_datetime
+import random
+
+MAX_RETRIES = 3
 
 # called through hooks to send campaign mails to leads
 def send_email_to_leads_or_contacts():
@@ -103,22 +107,48 @@ def send_mail(entry, email_campaign):
                 sender=sender,
             )
 
-
 def send_email_batch(recipient_list, email_campaign, email_template, sender):
-	comm = None
-	for receipient in recipient_list:
-		context = {"doc": frappe.get_doc(email_campaign.email_campaign_for, email_campaign.recipient), "email": receipient}
+    """Send campaign emails to a batch of recipients safely with commit + retry."""
+    comm = None
 
-		# send mail and link communication to document
-		comm = make(
-			subject=frappe.render_template(email_template.get("subject"), context),
-			content=frappe.render_template(email_template.get("response_html"), context),
-			sender=sender,
-			recipients=[receipient],
-			communication_medium="Email",
-			sent_or_received="Sent",
-			send_email=True,
-			email_template=email_template.name,
-		)
-	return comm
+    # Pre-fetch the main doc once (avoids repeated SELECT locks)
+    try:
+        target_doc = frappe.get_doc(email_campaign.email_campaign_for, email_campaign.recipient)
+    except Exception as e:
+        frappe.log_error(f"Failed to load target doc for {email_campaign.name}: {e}", "Email Campaign Batch")
+        return
 
+    for recipient in recipient_list:
+        context = {"doc": target_doc, "email": recipient}
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                comm = make(
+                    subject=frappe.render_template(email_template.get("subject"), context),
+                    content=frappe.render_template(email_template.get("response_html"), context),
+                    sender=sender,
+                    recipients=[recipient],
+                    communication_medium="Email",
+                    sent_or_received="Sent",
+                    send_email=True,
+                    email_template=email_template.name,
+                )
+
+                frappe.db.commit()
+                break
+
+            except frappe.QueryTimeoutError as e:
+                # rollback and retry after delay
+                frappe.db.rollback()
+                delay = 5 * attempt + random.randint(1, 4)
+                time.sleep(delay)
+
+            except Exception as e:
+                frappe.db.rollback()
+                frappe.log_error(f"Error sending to {recipient}: {e}", "Email Campaign Batch")
+                break  # don't retry for non-lock exceptions
+
+        # short pause to reduce pressure on DB
+        time.sleep(0.2)
+
+    return comm
