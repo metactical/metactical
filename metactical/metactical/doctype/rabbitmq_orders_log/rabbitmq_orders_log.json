@@ -9,7 +9,6 @@
  "field_order": [
   "lead_source",
   "sales_order",
-  "last_commit",
   "payload"
  ],
  "fields": [
@@ -32,16 +31,11 @@
    "in_list_view": 1,
    "label": "Sales Order",
    "options": "Sales Order"
-  },
-  {
-   "fieldname": "last_commit",
-   "fieldtype": "Data",
-   "label": "Last Commit"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-15 07:03:13.521662",
+ "modified": "2025-10-14 07:05:58.415028",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "RabbitMQ Orders Log",
