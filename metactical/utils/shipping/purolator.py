@@ -244,10 +244,10 @@ class Purolator:
 						})
 				elif getattr(resp, 'ResponseInformation', None) and getattr(resp.ResponseInformation, 'Errors', None):
 					# Skip this service but keep others
-					frappe.logger().info(self.render_error(resp.ResponseInformation.Errors))
+					frappe.throw(self.render_error(resp.ResponseInformation.Errors))
 			except Exception as e:
 				# Continue with other services
-				frappe.logger().warning(f"FullEstimate failed for {service_id}: {e}")
+				frappe.log_error("Purolator Get Rate Error", f"FullEstimate failed for {service_id}: {e}")
 
 		# Return single-row structure for UI
 		if items:
