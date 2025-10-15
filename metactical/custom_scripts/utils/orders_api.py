@@ -780,23 +780,11 @@ def update_signify_detail(parsedContent):
   
 def create_rmq_log(parsedContent):
 	try:
-		publisher_site = parsedContent.get("publisher_site", "Unknown")
-		bench_path = get_bench_path()
-		last_commit = "N/A"  # Default value if no commit is found
-		if  bench_path:
-			# Assuming you want the last commit from the 'frappe' app
-			frappe_app_path = os.path.join(bench_path, "apps", "metactical")
-
-			last_commit = subprocess.check_output(
-				["git", "-C", frappe_app_path, "log", "-1", "--pretty=%H %s"],
-				text=True
-			).strip()
-	
+		publisher_site = parsedContent.get("publisher_site", "Unknown")	
 		rmq_log = frappe.get_doc({
 			"doctype": "RabbitMQ Orders Log",
 			"payload": as_unicode(parsedContent),
-			"lead_source": publisher_site,
-			"last_commit": last_commit
+			"lead_source": publisher_site
 		})
   
 		rmq_log.insert()		

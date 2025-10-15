@@ -1,44 +1,36 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2025-07-11 06:03:08.916187",
+ "creation": "2025-10-06 03:18:30.275512",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "lead_source",
-  "sales_order",
-  "payload"
+  "item_code",
+  "status"
  ],
  "fields": [
   {
-   "fieldname": "lead_source",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Lead Source",
-   "read_only": 1
-  },
-  {
-   "fieldname": "payload",
-   "fieldtype": "Code",
-   "label": "Payload",
-   "read_only": 1
-  },
-  {
-   "fieldname": "sales_order",
+   "fieldname": "item_code",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Sales Order",
-   "options": "Sales Order"
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Status"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-14 07:05:58.415028",
+ "modified": "2025-10-06 03:29:09.209907",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "RabbitMQ Orders Log",
+ "name": "Failed Inventory Output",
  "owner": "Administrator",
  "permissions": [
   {
