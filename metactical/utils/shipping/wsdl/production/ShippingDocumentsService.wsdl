@@ -51,18 +51,18 @@
 				<xsd:complexContent mixed="false">
 					<xsd:extension base="tns:RequestContainer">
 						<xsd:sequence>
-							<xsd:element minOccurs="0" maxOccurs="1"  nillable="true" name="OutputType" type="xsd:string">
-								<xsd:annotation>
-									<xsd:appinfo/>
-									<xsd:documentation>OutputType - string</xsd:documentation>
-								</xsd:annotation>
-							</xsd:element>
-							<xsd:element minOccurs="0" maxOccurs="1" nillable="true"  name="Synchronous" type="xsd:boolean">
-								<xsd:annotation>
-									<xsd:appinfo/>
-									<xsd:documentation>Synchronous - boolean</xsd:documentation>
-								</xsd:annotation>
-							</xsd:element>
+              <xsd:element minOccurs="0" maxOccurs="1"  nillable="true" name="OutputType" type="xsd:string">
+                <xsd:annotation>
+                  <xsd:appinfo/>
+                  <xsd:documentation>OutputType - string</xsd:documentation>
+                </xsd:annotation>
+              </xsd:element>
+              <xsd:element minOccurs="0" maxOccurs="1" nillable="true"  name="Synchronous" type="xsd:boolean">
+                <xsd:annotation>
+                  <xsd:appinfo/>
+                  <xsd:documentation>Synchronous - boolean</xsd:documentation>
+                </xsd:annotation>
+              </xsd:element>
 							<xsd:element name="DocumentCriterium" nillable="true" type="tns:ArrayOfDocumentCriteria">
 								<xsd:annotation>
 									<xsd:appinfo/>
@@ -371,13 +371,7 @@
 							<xsd:appinfo/>
 							<xsd:documentation>Data - string</xsd:documentation>
 						</xsd:annotation>
-					</xsd:element>
-					<xsd:element name="Code128" nillable="true" type="tns:ArrayOfDataType">
-						<xsd:annotation>
-							<xsd:appinfo/>
-							<xsd:documentation>Code128 - DataType[]</xsd:documentation>
-						</xsd:annotation>
-					</xsd:element>
+					</xsd:element>					
 				</xsd:sequence>
 			</xsd:complexType>
 			<xsd:element name="DocumentDetail" nillable="true" type="tns:DocumentDetail"/>
@@ -415,33 +409,6 @@
 				</xsd:restriction>
 			</xsd:simpleType>
 			<xsd:element name="DocumentStatus" nillable="true" type="tns:DocumentStatus"/>
-			<xsd:complexType name="ArrayOfDataType">
-				<xsd:sequence>
-					<xsd:element minOccurs="0" maxOccurs="unbounded" name="DataType" nillable="true" type="tns:DataType"/>
-				</xsd:sequence>
-			</xsd:complexType>
-			<xsd:element name="ArrayOfDataType" nillable="true" type="tns:ArrayOfDataType"/>
-			<xsd:complexType name="DataType">
-				<xsd:annotation>
-					<xsd:appinfo/>
-					<xsd:documentation>Document</xsd:documentation>
-				</xsd:annotation>
-				<xsd:sequence>
-					<xsd:element name="PIN" nillable="true" type="xsd:string">
-					<xsd:annotation>
-						<xsd:appinfo/>
-						<xsd:documentation>PIN - string</xsd:documentation>
-					</xsd:annotation>
-					</xsd:element>
-					<xsd:element name="Value" nillable="true" type="xsd:string">
-						<xsd:annotation>
-							<xsd:appinfo/>
-							<xsd:documentation>Value - string</xsd:documentation>
-						</xsd:annotation>
-					</xsd:element>
-				</xsd:sequence>
-			</xsd:complexType>
-			<xsd:element name="DataType" nillable="true" type="tns:DataType"/>
 			<xsd:element name="GetDocumentsResponse" nillable="true" type="tns:GetDocumentsResponseContainer"/>
 			<xsd:complexType name="ResponseContext">
 				<xsd:annotation>
