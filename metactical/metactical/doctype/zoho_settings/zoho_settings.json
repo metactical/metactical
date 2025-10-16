@@ -1,15 +1,22 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:api_name",
- "creation": "2025-10-16 02:10:14.268246",
+ "creation": "2025-10-16 03:46:00.467618",
  "default_view": "List",
- "description": "access_token (Data)\n\nrefresh_token (Data)\n\nexpires_in (Int)",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "api_name",
+  "client_id",
+  "client_secret",
+  "redirect_uri",
+  "auth_url",
+  "column_break_1hfwt",
+  "token_url",
+  "scope",
+  "domain",
+  "organization_id",
+  "response_section",
   "access_token",
   "refresh_token",
   "expires_in"
@@ -31,29 +38,70 @@
    "label": "Expires In"
   },
   {
-   "fieldname": "api_name",
+   "fieldname": "client_id",
    "fieldtype": "Data",
-   "label": "API Name",
-   "unique": 1
+   "label": "Client ID"
+  },
+  {
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Client Secret"
+  },
+  {
+   "fieldname": "redirect_uri",
+   "fieldtype": "Data",
+   "label": "Redirect URI"
+  },
+  {
+   "fieldname": "auth_url",
+   "fieldtype": "Data",
+   "label": "Auth URL"
+  },
+  {
+   "fieldname": "token_url",
+   "fieldtype": "Data",
+   "label": "Token URL"
+  },
+  {
+   "fieldname": "scope",
+   "fieldtype": "Data",
+   "label": "Scope"
+  },
+  {
+   "fieldname": "domain",
+   "fieldtype": "Data",
+   "label": "Domain"
+  },
+  {
+   "fieldname": "organization_id",
+   "fieldtype": "Data",
+   "label": "Organization ID"
+  },
+  {
+   "fieldname": "column_break_1hfwt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "response_section",
+   "fieldtype": "Section Break",
+   "label": "Response"
   }
  ],
  "index_web_pages_for_search": 1,
+ "issingle": 1,
  "links": [],
- "modified": "2025-10-16 02:37:24.057992",
+ "modified": "2025-10-16 04:05:33.608488",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Zoho Settings",
- "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
    "create": 1,
    "delete": 1,
    "email": 1,
-   "export": 1,
    "print": 1,
    "read": 1,
-   "report": 1,
    "role": "System Manager",
    "share": 1,
    "write": 1
