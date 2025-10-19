@@ -39,7 +39,8 @@
    "default": "0",
    "fieldname": "ais_queue_failed",
    "fieldtype": "Check",
-   "label": "Queue Failed"
+   "label": "Queue Failed",
+   "read_only": 1
   },
   {
    "allow_on_submit": 1,
@@ -99,7 +100,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-13 04:42:25.324786",
+ "modified": "2025-10-16 06:56:44.423543",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Supplier Import Tool",
