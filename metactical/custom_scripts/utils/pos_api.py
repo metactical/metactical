@@ -562,7 +562,8 @@ def get_customer(form_data):
 
         if not form_data['Customer']['Name']:
             frappe.set_user("Administrator")
-            return "DefaultPOS"+form_data["POSProfile"]
+            customer = frappe.db.get_value('POS Profile', form_data['POSProfile'] + ' Operators', 'customer')
+            return customer
         
         customer = frappe.db.exists('Customer', form_data['Customer']['id'])
         if customer:
