@@ -855,7 +855,9 @@ fixtures = [{
 			"Item-neb_airship_restricted",
 			"Employee-short_code",
 			"Item-last_pinged_on",
-			"Sales Invoice Item-sales_person"
+			"POS Profile-auto_logout_after_transaction",
+			"Sales Invoice Item-sales_person",
+			"Sales Order Item-sales_person"
 		]]]
 	},
 	{
