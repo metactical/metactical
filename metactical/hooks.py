@@ -857,7 +857,9 @@ fixtures = [{
 			"Item-last_pinged_on",
 			"POS Profile-auto_logout_after_transaction",
 			"Sales Invoice Item-sales_person",
-			"Sales Order Item-sales_person"
+			"Sales Order Item-sales_person",
+			"Item-is_published",
+			"Item Attribute Value-hide_when_out_of_stock"
 		]]]
 	},
 	{
