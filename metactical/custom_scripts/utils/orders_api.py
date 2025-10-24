@@ -67,7 +67,7 @@ def process_rmq_data(parsedContent):
 			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
    
 		continue_to_payment(order, payment_detail)
-		frappe.db.commit()
+		frappe.db.commit() 
   
 		re_sync_rmq_order(parsedContent, order.name)
 	except Exception as e:
@@ -256,7 +256,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"company": company,
 		"shipping_item": shipping_item,
 		"far_distance_shipping_item": far_distance_shipping_item,
-		"signifyd": parsedContent.get("SignifyD", None) if "SignifyD" in parsedContent else None,
+		"signifyd": parsedContent['SignifyD'],
 		"is_cp_verified": is_billing_cp_verified,
 		"ifw_store_pickup": parsedContent["PickInLocation"]
 	}
@@ -387,8 +387,7 @@ def check_existing_customer(billing_address_detail):
 def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
 	logger.error(f"Creating order for customer: {customer}, Order ID: {order_detail['order_id']}")
 	items = process_items(order_detail['items'], order_detail=order_detail)
-
-	order_data = {
+	new_order = frappe.get_doc({
 		"doctype": "Sales Order",
 		"customer": customer,
 		"order_type": "Shopping Cart",
@@ -408,24 +407,19 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"mena_is_cp_verified": order_detail["is_cp_verified"],
 		"shipping_address_name": shipping_address_doc.name,
 		"customer_address": billing_address_doc.name,
+		"ifw_signifyd_sid": order_detail['signifyd']['Sid'],
+		"ifw_signifyd_caseid": order_detail['signifyd']['CaseId'],
+		"ifw_signifyd_casestatus": order_detail['signifyd']['CaseStatus'],
+		"ifw_signifyd_approved": order_detail['signifyd']['IsApproved'],
+		"ifw_signifyd_score": order_detail['signifyd']['Score'],
+		"ifw_signifyd_guaranteedisposition": order_detail['signifyd']['GuarenteedDisposition'],
+		"ifw_signifyd_fulfilled": order_detail['signifyd']['Fullfilled'],
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
-		"is_rush": is_rush(items)
-	}
- 
-	if order_detail.get("signifyd"):
-		order_data.update({
-			"ifw_signifyd_sid": order_detail['signifyd'].get('Sid'),
-			"ifw_signifyd_caseid": order_detail['signifyd'].get('CaseId'),
-			"ifw_signifyd_casestatus": order_detail['signifyd'].get('CaseStatus'),
-			"ifw_signifyd_approved": order_detail['signifyd'].get('IsApproved'),
-			"ifw_signifyd_score": order_detail['signifyd'].get('Score'),
-			"ifw_signifyd_guaranteedisposition": order_detail['signifyd'].get('GuarenteedDisposition'),
-			"ifw_signifyd_fulfilled": order_detail['signifyd'].get('Fullfilled'),
-		})
- 
-	new_order = frappe.get_doc(order_data)
+		"is_rush": is_rush(items),
+		"apply_discount_on": "Net Total"
+	})
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
 	new_order.set_missing_values()	
@@ -459,6 +453,7 @@ def create_address(address_detail, customer, address_type):
 		"doctype": "Address",
 		"title": address_detail["first_name"] + " " + address_detail["last_name"],
 		"ifw_first_name": address_detail["first_name"],
+		"ifw_last_name": address_detail["last_name"] if "last_name" in address_detail else "",
 		"email_id": address_detail["email"],
 		"phone": address_detail["phone"],
 		"company": address_detail["company"],
@@ -703,7 +698,7 @@ def get_taxes_and_charges(province, country, company=None):
 	elif province == "Prince Edward Island":
 		return "Prince Edward Island - ICL"
 	elif province == "Quebec":
-		return "Quebec - GST - ICL"
+		return "Quebec GST and QST - ICL"
 	elif province == "Saskatchewan":
 		return "Saskatchewan - ICL"
 	elif province == "Northwest Territories":
@@ -785,23 +780,11 @@ def update_signify_detail(parsedContent):
   
 def create_rmq_log(parsedContent):
 	try:
-		publisher_site = parsedContent.get("publisher_site", "Unknown")
-		bench_path = get_bench_path()
-		last_commit = "N/A"  # Default value if no commit is found
-		if  bench_path:
-			# Assuming you want the last commit from the 'frappe' app
-			frappe_app_path = os.path.join(bench_path, "apps", "metactical")
-
-			last_commit = subprocess.check_output(
-				["git", "-C", frappe_app_path, "log", "-1", "--pretty=%H %s"],
-				text=True
-			).strip()
-	
+		publisher_site = parsedContent.get("publisher_site", "Unknown")	
 		rmq_log = frappe.get_doc({
 			"doctype": "RabbitMQ Orders Log",
 			"payload": as_unicode(parsedContent),
-			"lead_source": publisher_site,
-			"last_commit": last_commit
+			"lead_source": publisher_site
 		})
   
 		rmq_log.insert()		
@@ -931,6 +914,7 @@ def verify_items(parsedContent, sales_order):
 	items_updated = False
 
 	so_item_row = {}
+	logger.error(f"Verifying items for Sales Order {sales_order.name}. Expected items: {len(items)}, Actual items: {len(sales_order.items)}")
 	for i, item in enumerate(sales_order.items):
 		if item.item_code != items[i].item_code or item.qty != items[i].qty or item.price_list_rate != items[i].price_list_rate:
 			items_updated = True
