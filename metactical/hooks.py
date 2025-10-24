@@ -236,6 +236,7 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
+	"erpnext.selling.doctype.sales_order.sales_order.make_purchase_order": "metactical.custom_scripts.sales_order.sales_order.make_purchase_order"
 }
 #
 # each overriding function accepts a `data` argument;
