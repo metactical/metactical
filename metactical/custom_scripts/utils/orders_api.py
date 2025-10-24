@@ -256,7 +256,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"company": company,
 		"shipping_item": shipping_item,
 		"far_distance_shipping_item": far_distance_shipping_item,
-		"signifyd": parsedContent['SignifyD'] if ["SignifyD"] in parsedContent else {},
+		"signifyd": parsedContent.get("SignifyD", None) if "SignifyD" in parsedContent else None,
 		"is_cp_verified": is_billing_cp_verified,
 		"ifw_store_pickup": parsedContent["PickInLocation"]
 	}
