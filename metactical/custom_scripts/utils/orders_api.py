@@ -251,7 +251,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
 		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
-		"taxes_and_charges": get_taxes_and_charges(province, country, company),
+		"taxes_and_charges": get_taxes_and_charges(province, country, company, parsedContent['publisher_site']),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
@@ -677,14 +677,16 @@ def calculate_delivery_date(order_date):
 
 	return frappe.utils.add_to_date(order_date, days=1)
 
-def get_taxes_and_charges(province, country, company=None):
+def get_taxes_and_charges(province, country, company=None, lead_source=None):
 	company_code = frappe.db.get_value("Company", company, "abbr")
 	if province == "Texas":
 		return f"Texas - {company_code}"
 	elif province == "Alberta":
 		return "Alberta - ICL"
-	elif province == "British Columbia":
+	elif province == "British Columbia" and lead_source != "Website - GPD":
 		return "British Columbia - ICL"
+	elif province == "British Columbia" and lead_source == "Website - GPD":
+		return "British Columbia - British Columbia - GST Only"
 	elif province == "Manitoba":
 		return "Manitoba - ICL"
 	elif province == "New Brunswick":
@@ -697,8 +699,10 @@ def get_taxes_and_charges(province, country, company=None):
 		return "Ontario - ICL"
 	elif province == "Prince Edward Island":
 		return "Prince Edward Island - ICL"
-	elif province == "Quebec":
+	elif province == "Quebec" and lead_source != "Website - GPD":
 		return "Quebec GST and QST - ICL"
+	elif province == "Quebec" and lead_source == "Website - GPD":
+		return "Quebec - GST - ICL"
 	elif province == "Saskatchewan":
 		return "Saskatchewan - ICL"
 	elif province == "Northwest Territories":
