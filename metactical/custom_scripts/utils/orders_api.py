@@ -67,7 +67,7 @@ def process_rmq_data(parsedContent):
 			frappe.db.set_value("RabbitMQ Orders Log", rmq_log, "sales_order", order.name, update_modified=False)
    
 		continue_to_payment(order, payment_detail)
-		frappe.db.commit() 
+		frappe.db.commit()
   
 		re_sync_rmq_order(parsedContent, order.name)
 	except Exception as e:
@@ -256,7 +256,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"company": company,
 		"shipping_item": shipping_item,
 		"far_distance_shipping_item": far_distance_shipping_item,
-		"signifyd": parsedContent['SignifyD'] if "SignifyD" in parsedContent else {},
+		"signifyd": parsedContent.get("SignifyD", None) if "SignifyD" in parsedContent else None,
 		"is_cp_verified": is_billing_cp_verified,
 		"ifw_store_pickup": parsedContent["PickInLocation"]
 	}
@@ -412,7 +412,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
 		"is_rush": is_rush(items),
-		"apply_discount_on": "Net Total",
+		"apply_discount_on": "Net Total"
 	}
  
 	if order_detail.get("signifyd"):
@@ -791,11 +791,23 @@ def update_signify_detail(parsedContent):
   
 def create_rmq_log(parsedContent):
 	try:
-		publisher_site = parsedContent.get("publisher_site", "Unknown")	
+		publisher_site = parsedContent.get("publisher_site", "Unknown")
+		bench_path = get_bench_path()
+		last_commit = "N/A"  # Default value if no commit is found
+		if  bench_path:
+			# Assuming you want the last commit from the 'frappe' app
+			frappe_app_path = os.path.join(bench_path, "apps", "metactical")
+
+			last_commit = subprocess.check_output(
+				["git", "-C", frappe_app_path, "log", "-1", "--pretty=%H %s"],
+				text=True
+			).strip()
+	
 		rmq_log = frappe.get_doc({
 			"doctype": "RabbitMQ Orders Log",
 			"payload": as_unicode(parsedContent),
-			"lead_source": publisher_site
+			"lead_source": publisher_site,
+			"last_commit": last_commit
 		})
   
 		rmq_log.insert()		
@@ -925,7 +937,6 @@ def verify_items(parsedContent, sales_order):
 	items_updated = False
 
 	so_item_row = {}
-	logger.error(f"Verifying items for Sales Order {sales_order.name}. Expected items: {len(items)}, Actual items: {len(sales_order.items)}")
 	for i, item in enumerate(sales_order.items):
 		if item.item_code != items[i].item_code or item.qty != items[i].qty or item.price_list_rate != items[i].price_list_rate:
 			items_updated = True
