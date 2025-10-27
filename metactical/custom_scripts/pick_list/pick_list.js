@@ -1,5 +1,8 @@
 frappe.ui.form.on('Pick List', {
 	refresh: function(frm){
+		// Remove Get Items button
+		frm.remove_custom_button("Get Items"); 
+
 		//Code for custom cancel button that saves cancel reason first
 		if(frm.doc.docstatus == 1){
 			frm.page.clear_secondary_action();
@@ -49,6 +52,29 @@ frappe.ui.form.on('Pick List', {
 		)
 	},
 
+	add_get_items_button: (frm) => {
+		let purpose = frm.doc.purpose;
+		if (purpose != "Delivery" || frm.doc.docstatus !== 0) return;
+		let get_query_filters = {
+			docstatus: 1,
+			per_delivered: ["<", 100],
+			status: ["!=", ""],
+			customer: frm.doc.customer,
+		};
+		frm.get_items_btn = frm.add_custom_button(__("Get Items"), () => {
+			erpnext.utils.map_current_doc({
+				method: "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
+				source_doctype: "Sales Order",
+				target: frm,
+				setters: {
+					company: frm.doc.company,
+					customer: frm.doc.customer,
+				},
+				date_field: "transaction_date",
+				get_query_filters: get_query_filters,
+			});
+		});
+	},
 });
 
 
@@ -89,4 +115,3 @@ frappe.templates["dashboard_pick_list_doctype"] = ' \
     	<span class="text-muted small count"></span> \
     	<span class="open-notification hidden" title="{{ __("Open {0}", [__(doctype)])}}"></span> \
     	</div>';
-

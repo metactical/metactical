@@ -124,11 +124,13 @@ def receive_pos_data(*args, **kwargs):
                 form_data=form_data,
                 sales_order=sales_order.name
             )
-                
+
+        auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
         frappe.response["Status"] = "200"
         frappe.response["InvoiceId"] = sales_order.name
         frappe.response["Message"] = []
         frappe.response["Total"] = float(sales_order.grand_total)
+        frappe.response["AutoLogout"] = True if auto_logout else False
             
     except Exception as e:
         frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
@@ -534,6 +536,7 @@ def get_items(form_data):
         rate = item['Rate']
         qty = item['Qty']
         item_name = item['ItemName'] if 'ItemName' in item else ''
+        sales_person = frappe.db.get_value("User", {"full_name": item['SalesPerson']}, "name") if item['SalesPerson'] != "defaultSalesPersonId" else ""
         
         item_info = {
             'item_code': item_code,
@@ -543,6 +546,7 @@ def get_items(form_data):
             'discount_percentage': item['Discount'],
             'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
             'restock_fee': item['RestockFee'] if 'RestockFee' in item else 0.0,
+            'sales_person': sales_person,
         }
 
         if item_code == "2":
@@ -558,7 +562,8 @@ def get_customer(form_data):
 
         if not form_data['Customer']['Name']:
             frappe.set_user("Administrator")
-            return "DefaultPOS"+form_data["POSProfile"]
+            customer = frappe.db.get_value('POS Profile', form_data['POSProfile'] + ' Operators', 'customer')
+            return customer
         
         customer = frappe.db.exists('Customer', form_data['Customer']['id'])
         if customer:
@@ -903,12 +908,14 @@ def create_return(*args, **kwargs):
             frappe.response["Message"] = str(e)
     
     total = round(sales_return.grand_total + total_restock_fee, 2)
+    auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
     frappe.response["Status"] = 200
     frappe.response["Message"] = ""
     frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
     frappe.response["SalesReturn"] = sales_return.name
     frappe.response["Total"] = total
     frappe.response["TotalAfterRestockFee"] = total
+    frappe.response["AutoLogout"] = True if auto_logout else False
     frappe.db.commit()
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):
@@ -1083,7 +1090,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     items = frappe.db.sql(f"""
         SELECT
             tabItem.name AS item_code, item_name, ifw_retailskusuffix,
-            variant_of,
+            variant_of, asi_item_class, ifw_location,
             brand, image, is_stock_item, tabItem.has_variants,
             (
                 SELECT GROUP_CONCAT(barcode SEPARATOR ', ')
@@ -1180,6 +1187,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
 
     # Structure final response
     item_details = []
+    warehouse = frappe.db.get_value("POS Profile", branch + ' Operators', 'warehouse')
 
     for item in items:
         barcodes = [{"Barcode": code} for code in item.barcodes.split(", ")] if item.barcodes else []
@@ -1194,6 +1202,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
         sort_orders_index = {name: index for index, name in enumerate(sorted_order)}
         branches = item.branches.values()
         item.branches = sorted(branches, key=lambda x:  sort_orders_index.get(x.get("DisplayName"), len(sorted_order)))
+        on_order = get_on_order_quantity(item.item_code, warehouse)
 
         item_details.append({
             "Sku": item.item_code,
@@ -1201,6 +1210,9 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "RetailSku": item.ifw_retailskusuffix,
             "Categories": [],
             "Comment": "",
+            "ItemClass": item.asi_item_class or "",
+            "Location": item.ifw_location or "",
+            "OnOrderQty": on_order,
             "TemplateId": item.variant_of or "",
             "ImageUrl": item.image or "",
             "Brand": item.brand or "",
@@ -1222,6 +1234,33 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
         "Items": item_details
     })
 
+def get_on_order_quantity(item_code, warehouse):
+    po_items = frappe.db.sql(f"""
+        SELECT sum(qty), sum(received_qty)
+        FROM `tabPurchase Order Item` poi
+        JOIN `tabPurchase Order` po ON poi.parent = po.name
+        WHERE
+            poi.item_code = {frappe.db.escape(item_code)}
+            AND poi.warehouse = "W01-WHS-Active Stock - ICL"
+            AND po.docstatus = 1
+            AND po.status in ('To Receive and Bill', 'To Receive')
+            AND poi.qty > poi.received_qty
+            AND po.company = 'International Camouflage Ltd'
+        GROUP BY poi.item_code, poi.parent
+    """, as_dict=True)
+    
+    pending_quantities = ""
+    for po in po_items:
+        pending_qty = int(po["sum(qty)"] - po["sum(received_qty)"])
+        if pending_qty > 0:
+            if pending_quantities:
+                pending_quantities += ", "
+            pending_quantities += str(pending_qty)
+
+    if pending_quantities:
+        return pending_quantities
+    
+    return ""
 
 @frappe.whitelist()
 def get_item_by_retail_sku_single(retail_sku, branch):
@@ -1280,6 +1319,7 @@ def warehouses_display_name_mapping():
         "RM01-Bermondsey-Active - ZE": "BER",
         "RM02-Oshawa-Active - ZE": "OSH",
         "US01-Houston-Active - AOI": "TEX",
+        "R08-Chilliwack-Active Stock - ICL": "CLI"
     }
 
 def get_item_cost(item_code):

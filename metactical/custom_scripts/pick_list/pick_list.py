@@ -43,6 +43,34 @@ class CustomPickList(PickList):
 	def validate(self):
 		super(CustomPickList, self).validate()
 		self.check_for_existing_draft()
+		self.validate_sales_order_shipping_address()
+		self.validate_duplicated_items()
+  
+	def validate_sales_order_shipping_address(self):
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
+		sales_orders = set(sales_orders)
+		for so in sales_orders:
+			so_doc = frappe.get_doc("Sales Order", so)
+			if not so_doc.shipping_address_name:
+				frappe.throw(_("Please set a shipping address in Sales Order {0}").format(so))
+
+
+	def validate_duplicated_items(self):
+		item_list = []
+		duplicated_items = []
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
+		sales_orders = set(sales_orders)
+		for so in sales_orders:
+			sales_order = frappe.get_doc("Sales Order", so)
+			for item in sales_order.items:
+				if item.item_code in item_list:
+					duplicated_items.append(item.item_code)
+				else:
+					item_list.append(item.item_code)
+
+		if duplicated_items:
+			duplicated_items = set(duplicated_items)
+			frappe.throw(_("Sales Order {0} contains duplicate items: {1}. Please remove the duplicates.").format(so, ", ".join(duplicated_items)))
 
 	def update_sales_order_item(self, item, picked_qty, item_code):
 		item_table = "Sales Order Item" if not item.product_bundle_item else "Packed Item"
@@ -314,7 +342,25 @@ class CustomPickList(PickList):
 	def validate_stock_qty(self):
 		from erpnext.stock.doctype.batch.batch import get_batch_qty
 		shipping_items = frappe.db.get_all('Pick List Shipping Item', fields=["item"], pluck='item')
-		
+
+		# Sum qty on all DRAFT Delivery Notes for this item/warehouse/(batch)
+		def get_draft_dn_qty(item_code, warehouse, batch_no=None):
+			conds = ["dn.docstatus = 0", "dni.item_code = %s", "dni.warehouse = %s"]
+			args = [item_code, warehouse]
+			if batch_no:
+				conds.append("IFNULL(dni.batch_no, '') = %s")
+				args.append(batch_no)
+			where = " AND ".join(conds)
+			res = frappe.db.sql(
+				f"""
+				SELECT COALESCE(SUM(dni.qty), 0)
+				FROM `tabDelivery Note Item` dni
+				INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+				WHERE {where}
+				""",
+				args,
+			)
+			return flt(res[0][0]) if res else 0.0
 
 		for row in self.get("locations"):
 			# Metactical Customization: Skip shipping items
@@ -323,44 +369,87 @@ class CustomPickList(PickList):
 
 			# Metactical Customization: If is product budle, validate individual items
 			if is_product_bundle(row.item_code):
-				bundle_items = frappe.get_all('Product Bundle Item', filters={'parent': row.item_code}, fields=['item_code', 'qty'])
-				for bundle_item in bundle_items:
-					bin_qty = frappe.db.get_value(
-						"Bin",
-						{"item_code": bundle_item.item_code, "warehouse": row.warehouse},
-						"actual_qty",
-					)
-					if row.qty > bin_qty:
-						frappe.throw(
-							_(
-								"At Row #{0}: The picked quantity {1} for the product budle item {2} is greater than available stock {3} in the warehouse {4}."
-							).format(row.idx, row.qty, bold(bundle_item.item_code), bin_qty, bold(row.warehouse)),
-						)
-			else:
-				if row.batch_no and not row.qty:
-					batch_qty = get_batch_qty(row.batch_no, row.warehouse, row.item_code)
+				bundle_items = frappe.get_all(
+					'Product Bundle Item',
+					filters={'parent': row.item_code},
+					fields=['item_code', 'qty']
+				)
+				for component in bundle_items:
+					component_required = flt(row.qty) * flt(component.qty or 1)
+					draft_dn_qty = get_draft_dn_qty(component.item_code, row.warehouse)
+					required_qty = component_required + draft_dn_qty
 
-					if row.qty > batch_qty:
+					bin_qty = flt(frappe.db.get_value(
+						"Bin",
+						{"item_code": component.item_code, "warehouse": row.warehouse},
+						"actual_qty",
+					) or 0)
+
+					if required_qty > bin_qty:
 						frappe.throw(
 							_(
-								"At Row #{0}: The picked quantity {1} for the item {2} is greater than available stock {3} for the batch {4} in the warehouse {5}."
-							).format(row.idx, row.item_code, batch_qty, row.batch_no, bold(row.warehouse)),
+								"Not enough stock at Row #{0}: Required Qty (Pick List {1} × Bundle {2} + Draft DN {3}) "
+								"for bundled item {4} exceeds Bin Stock {5} in Warehouse {6}."
+							).format(
+								row.idx,
+								flt(row.qty),
+								flt(component.qty or 1),
+								draft_dn_qty,
+								bold(component.item_code),
+								bin_qty,
+								bold(row.warehouse),
+							),
 							title=_("Insufficient Stock"),
 						)
+			else:
+				current_qty = flt(row.qty or 0)
 
+				# Batch-specific check
+				if getattr(row, "batch_no", None):
+					batch_qty = flt(get_batch_qty(row.batch_no, row.warehouse, row.item_code) or 0)
+					draft_dn_qty = get_draft_dn_qty(row.item_code, row.warehouse, row.batch_no)
+					required_qty = current_qty + draft_dn_qty
+
+					if required_qty > batch_qty:
+						frappe.throw(
+							_(
+								"Not enough stock at Row #{0}: Required Qty (Pick List {1} + Draft Delivery Notes: {2}) exceeds Batch Stock {3} "
+								"for Item {4} in Batch {5} at Warehouse {6}."
+							).format(
+								row.idx,
+								current_qty,
+								draft_dn_qty,
+								batch_qty,
+								bold(row.item_code),
+								bold(row.batch_no),
+								bold(row.warehouse),
+							),
+							title=_("Insufficient Stock"),
+						)
 					continue
 
-				bin_qty = frappe.db.get_value(
+				# Warehouse (Bin) check
+				bin_qty = flt(frappe.db.get_value(
 					"Bin",
 					{"item_code": row.item_code, "warehouse": row.warehouse},
 					"actual_qty",
-				)
+				) or 0)
+				draft_dn_qty = get_draft_dn_qty(row.item_code, row.warehouse)
+				required_qty = current_qty + draft_dn_qty
 
-				if row.qty > bin_qty:
+				if required_qty > bin_qty:
 					frappe.throw(
 						_(
-							"At Row #{0}: The picked quantity {1} for the item {2} is greater than available stock {3} in the warehouse {4}."
-						).format(row.idx, row.qty, bold(row.item_code), bin_qty, bold(row.warehouse)),
+							"Not enough stock at Row #{0}: Required Qty (Pick List: {1} + Draft Delivery Notes: {2}) exceeds Stock Qty: {3} "
+							"for Item {4} at Warehouse {5}."
+						).format(
+							row.idx,
+							current_qty,
+							draft_dn_qty,
+							bin_qty,
+							bold(row.item_code),
+							bold(row.warehouse),
+						),
 						title=_("Insufficient Stock"),
 					)
 		

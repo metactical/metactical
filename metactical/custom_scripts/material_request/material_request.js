@@ -66,7 +66,58 @@ frappe.ui.form.on('Material Request', {
 			}
 		});
 	},
-	
+
+	make_in_transit_stock_entry(frm) {
+		// Find a default "Transit" warehouse from items
+		let default_transit_warehouse = null;
+		if (Array.isArray(frm.doc.items)) {
+			for (const row of frm.doc.items) {
+				if (row && row.warehouse && /transit/i.test(row.warehouse)) {
+					default_transit_warehouse = row.warehouse;
+					break;
+				}
+			}
+		}
+
+		frappe.prompt(
+			[
+				{
+					label: __('In Transit Warehouse'),
+					fieldname: 'in_transit_warehouse',
+					fieldtype: 'Link',
+					options: 'Warehouse',
+					reqd: 1,
+					default: default_transit_warehouse, // prefill if found
+					get_query: () => {
+						return {
+							filters: {
+								'company': frm.doc.company,
+								'is_group': 0,
+								'warehouse_type': 'Transit'
+							}
+						}
+					}
+				}
+			],
+			(values) => {
+				frappe.call({
+					method: "erpnext.stock.doctype.material_request.material_request.make_in_transit_stock_entry",
+					args: {
+						source_name: frm.doc.name,
+						in_transit_warehouse: values.in_transit_warehouse
+					},
+					callback: function(r) {
+						if (r.message) {
+							let doc = frappe.model.sync(r.message);
+							frappe.set_route('Form', doc[0].doctype, doc[0].name);
+						}
+					}
+				})
+			},
+			__('In Transit Transfer'),
+			__('Create Stock Entry')
+		)
+	}
 });
 
 frappe.ui.form.on('Material Request Item', {

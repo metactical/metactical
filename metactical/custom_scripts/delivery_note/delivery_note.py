@@ -23,6 +23,18 @@ class DeliveryNoteCustom(DeliveryNote):
 		else:
 			super().save()
 
+	def before_save(self):		
+		# Metactical Customization: check in store pickups
+		sales_order = self.items[0].against_sales_order if self.items else None
+		if sales_order:
+			store_pickup = frappe.db.get_value("Sales Order", sales_order, "ifw_store_pickup")
+			if store_pickup:
+				shipment_settings = frappe.get_single("Shipment Settings")
+				store_addresses = [addr.address.strip() for addr in shipment_settings.store_address]
+
+				if self.shipping_address_name not in store_addresses:
+					frappe.throw(_("For store pickup orders, the shipping address must be one of the store addresses. Please update the shipping address."))
+
 	def on_update(self):
 		if self.docstatus == 0:
 			create_shipstation_orders(self.name)

@@ -59,9 +59,17 @@ class ItemFromExcel(Document):
 				if not d[i] and d[0]:
 					frappe.throw(f"Value missing for field {headers[i]} at row {data.index(d) + 1}")
 
-	def create_item(self, data, item_field_map, linked_dcts, is_template):
+	def create_item(self, data, item_field_map, linked_dcts, is_template, templates_with_ai_request={}):
 		self.attributes = ""
 		self.attribute_values = ""
+  
+		# collect all the last variants of the template and trigger AI update after the price list is created
+		template_with_last_variant = {}
+		variant_of_header = data[0].index("Variant Of") if "Variant Of" in data[0] else -1
+  
+		for d in data[1:] if not is_template else []:
+			if d and d[0]:
+				template_with_last_variant[d[variant_of_header]] = d[0]
     
 		# Helper function to initialize data structures for a new item
 		def initialize_item_data():
@@ -112,7 +120,16 @@ class ItemFromExcel(Document):
 
 			# If starting a new item, save the current one and reinitialize variables
 			if index > 0 and row_to_check and item_code != row_to_check:
-				self.save_item(item, child_table_values, is_template, price_list_rows, self.attributes, self.attribute_values, data[index][price_list_index])
+				is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
+				self.save_item(item, 
+                   				child_table_values, 
+                   				is_template, price_list_rows, 
+                       			self.attributes, 
+                          		self.attribute_values, 
+                            	data[index][price_list_index], 
+                             	is_last_item_of_template,
+                              	templates_with_ai_request)
+    
 				item, item_code, child_table_values, temp_child_table_values, price_list_rows = initialize_item_data()
 
 			prices = []
@@ -146,9 +163,20 @@ class ItemFromExcel(Document):
 					temp_child_table_values[child_table] = {}
 
 		if item:
-			self.save_item(item, child_table_values, is_template, price_list_rows, self.attributes, self.attribute_values, data[-1][price_list_index])
+			is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
+			
+			# Save the last item after the loop
+			self.save_item(item, 
+                  			child_table_values, 
+                  			is_template, 
+                     		price_list_rows, 
+                       		self.attributes, 
+                         	self.attribute_values, 
+                          	data[-1][price_list_index],
+							is_last_item_of_template,
+							templates_with_ai_request)
 
-	def save_item(self, item, child_table_values, is_template, price_list_rows, attributes, attribute_values, price_list):
+	def save_item(self, item, child_table_values, is_template, price_list_rows, attributes, attribute_values, price_list, is_last_item_of_template, templates_with_ai_request):
      
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
@@ -164,6 +192,8 @@ class ItemFromExcel(Document):
 
 		# set the retail sku suffix from the item code
 		# item.ifw_retailskusuffix = item.item_code
+  
+		frappe.flags.in_import = True
 		item.insert()
 		supplier = item.supplier_items[0].supplier if item.supplier_items else None
 		if supplier:
@@ -175,13 +205,21 @@ class ItemFromExcel(Document):
 		if not is_template:
 			self.create_item_price(price_list_rows)
    
+		# trigger AI update for the last variant of the template
+		if is_last_item_of_template and item.variant_of in templates_with_ai_request:
+			template_item = frappe.get_doc("Item", item.variant_of)
+			template_item.request_ai_suggestion = 1
+			frappe.flags.in_import = False
+			template_item.save()
+   
 	def create_item_defaults(self, item, supplier):
 		frappe.get_doc({
 			"doctype": "Item Default",
 			"parent": item.name,
 			"parenttype": "Item",
 			"parentfield": "item_defaults",
-			"default_supplier": supplier
+			"default_supplier": supplier,
+			"company": frappe.db.get_default("company")
 		}).insert()
 
 	def add_item_details_to_price_list(self, price_list_rows, item, price_list):
@@ -296,8 +334,20 @@ class ItemFromExcel(Document):
 		linked_doctypes, item_field_map, required_fields = get_doctype_information()
 
 		try:
+			# create template items
 			self.create_item(file_content[0], item_field_map, linked_doctypes, True)
-			self.create_item(file_content[1], item_field_map, linked_doctypes, False)
+			
+			template_headers = file_content[0][0]
+			request_ai_suggestion_index = template_headers.index("Request AI Suggestion For Slugs and Descriptions") if "Request AI Suggestion For Slugs and Descriptions" in template_headers else -1
+			templates_with_ai_request = {}
+   
+			if request_ai_suggestion_index != -1:
+				for d in file_content[0][1:]:
+					if d and d[0] and d[request_ai_suggestion_index]:
+						templates_with_ai_request[d[0]] = True
+
+			# create variant items
+			self.create_item(file_content[1], item_field_map, linked_doctypes, False, templates_with_ai_request)
 		
 			frappe.db.commit()
 		except Exception as e:

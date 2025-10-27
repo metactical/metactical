@@ -52,7 +52,9 @@ doctype_js = {
 	"Item": "custom_scripts/item/item.js",
 	"POS Profile": "custom_scripts/pos_profile/pos_profile.js",
  	"Item Group": "custom_scripts/item_group/item_group.js",
-	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js"
+	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js",
+	"BOM" : "custom_scripts/bom/bom.js",
+	"Operation": "custom_scripts/bom_operation/bom_operation.js"
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -61,7 +63,8 @@ doctype_list_js = {
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
 	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
-	"Pick List": "custom_scripts/pick_list/pick_list_list.js"
+	"Pick List": "custom_scripts/pick_list/pick_list_list.js",
+	"Item": "custom_scripts/item/item_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -205,6 +208,8 @@ scheduler_events = {
 		"15 * * * *": [
 			"metactical.custom_scripts.frappe.document.clear_queued_docs",
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
+		], "*/1 * * * *": [
+			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
 		]
 	}
 }
@@ -226,9 +231,12 @@ override_whitelisted_methods = {
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
+	"erpnext.selling.doctype.sales_order.sales_order.update_status": "metactical.custom_scripts.sales_order.sales_order.update_status",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
-	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag"
+	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
+	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
+	"erpnext.selling.doctype.sales_order.sales_order.make_purchase_order": "metactical.custom_scripts.sales_order.sales_order.make_purchase_order"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -833,7 +841,26 @@ fixtures = [{
 			"Purchase Receipt Item-custom_neb_comment",
 			"Sales Invoice-neb_return_document",
 			"Shipment-neb_notification_email_sent",
-			"Shipment Parcel Template-custom_disabled"
+			"Shipment Parcel Template-custom_disabled",
+			"Sub Operation-time_in_secs",
+			"BOM Operation-time_in_secs",
+			"BOM Item-supplier",
+			"BOM-total_operation_time",
+			"BOM-operation_time",
+			"BOM-output_per_day",
+			"BOM-no_of_workers",
+			"BOM-sample_details",
+			"BOM-retail_sku",
+			"BOM-sub_operations",
+			"Item-reorder_months",
+			"Item-months_to_reorder",
+			"Employee-short_code",
+			"Item-last_pinged_on",
+			"POS Profile-auto_logout_after_transaction",
+			"Sales Invoice Item-sales_person",
+			"Sales Order Item-sales_person",
+			"Item-is_published",
+			"Item Attribute Value-hide_when_out_of_stock"
 		]]]
 	},
 	{
@@ -1399,7 +1426,6 @@ jinja = {
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
-		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location"
 	]
 }

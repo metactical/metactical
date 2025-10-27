@@ -10,7 +10,7 @@ from frappe.utils import add_days, cint, cstr, flt, get_link_to_form, getdate, n
 from erpnext.stock.doctype.item.item import get_item_defaults
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from frappe.model.utils import get_fetch_values
-from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
+from erpnext.selling.doctype.sales_order.sales_order import SalesOrder, is_product_bundle, set_delivery_date
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
 from metactical.custom_scripts.utils.metactical_utils import ( 
@@ -52,6 +52,7 @@ class SalesOrderCustom(SalesOrder):
 
 	def set_status(self, update=False, status=None, update_modified=True):
 		super(SalesOrderCustom, self).set_status(update, status, update_modified)
+		from_ui = frappe.flags.get('from_ui', False)
 
 		# Metactical Customization: Added
 		if self.billing_status == "Fully Billed" and not self.neb_payment_completed_at:
@@ -59,7 +60,7 @@ class SalesOrderCustom(SalesOrder):
 			if all_invoices_paid:
 				self.db_set("neb_payment_completed_at", frappe.utils.getdate(frappe.utils.now()), notify=True)
 
-		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"]:
+		if self.status in ["To Deliver", "To Bill", "To Deliver and Bill"] and not from_ui:
 			# check if there is return delivery note created in 
 			has_linked_return = False
 			return_delivery_notes = get_return_delivery_note(self.name)
@@ -110,6 +111,74 @@ class SalesOrderCustom(SalesOrder):
 
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+
+	def update_delivery_status(self):
+		"""Update delivery status from Purchase Order for drop shipping"""
+		tot_qty, delivered_qty = 0.0, 0.0
+
+		for item in self.items:
+			if item.delivered_by_supplier:
+				# Metactical Customization: If this SO item is a product bundle, 
+				# compute delivered qty from its components
+				if self.has_product_bundle(item.item_code):
+					components = frappe.get_all(
+						"Product Bundle Item",
+						filters={"parent": item.item_code},
+						fields=["item_code", "qty"],
+					)
+
+					bundles_possible = []
+					for comp in components:
+						# Sum delivered PO qty for this component, tied to this SO
+						res = frappe.db.sql(
+							"""
+							SELECT COALESCE(SUM(poi.qty), 0)
+							FROM `tabPurchase Order Item` poi
+							INNER JOIN `tabPurchase Order` po ON po.name = poi.parent
+							WHERE po.docstatus = 1
+							  AND po.status = 'Delivered'
+							  AND poi.sales_order = %s
+							  AND poi.item_code = %s
+							  AND (
+									IFNULL(poi.product_bundle, '') = %s
+								 OR IFNULL(poi.sales_order_item, '') = %s
+							  )
+							""",
+							(self.name, comp.item_code, item.item_code, item.name),
+						)
+						delivered_comp_qty = flt(res[0][0]) if res else 0.0
+						per_bundle_qty = flt(comp.qty or 0)
+						# Avoid division by zero; if comp qty is 0, treat as not limiting
+						if per_bundle_qty > 0:
+							bundles_possible.append(delivered_comp_qty / per_bundle_qty)
+
+					# Full bundles delivered is the min across components (floored)
+					full_bundles_delivered = int(min(bundles_possible)) if bundles_possible else 0
+					item.db_set(
+						"delivered_qty",
+						min(flt(item.qty), flt(full_bundles_delivered)),
+						update_modified=False,
+					)
+				else:
+					# Non-bundle: existing drop-ship delivered qty from PO status
+					item_delivered_qty = frappe.db.sql(
+						"""select sum(qty)
+						from `tabPurchase Order Item` poi, `tabPurchase Order` po
+						where poi.sales_order_item = %s
+							and poi.item_code = %s
+							and poi.parent = po.name
+							and po.docstatus = 1
+							and po.status = 'Delivered'""",
+						(item.name, item.item_code),
+					)
+					item_delivered_qty = item_delivered_qty[0][0] if item_delivered_qty else 0
+					item.db_set("delivered_qty", flt(item_delivered_qty), update_modified=False)
+
+			delivered_qty += item.delivered_qty
+			tot_qty += item.qty
+
+		if tot_qty != 0:
+			self.db_set("per_delivered", flt(delivered_qty / tot_qty) * 100, update_modified=False)
    
    
 def get_return_delivery_note(sales_order):
@@ -302,3 +371,138 @@ def submit_order(doc):
 		queue_action(doc, "submit", timeout=2000)
 	else:
 		doc._submit()
+  
+@frappe.whitelist()
+def update_status(status, name):
+	so = frappe.get_doc("Sales Order", name)
+	frappe.flags.from_ui = True
+	so.update_status(status)
+
+@frappe.whitelist()
+def make_purchase_order(source_name, selected_items=None, target_doc=None):
+	if not selected_items:
+		return
+
+	if isinstance(selected_items, str):
+		selected_items = json.loads(selected_items)
+
+	items_to_map = [
+		item.get("item_code") for item in selected_items if item.get("item_code") and item.get("item_code")
+	]
+	items_to_map = list(set(items_to_map))
+
+	def is_drop_ship_order(target):
+		drop_ship = True
+		for item in target.items:
+			if not item.delivered_by_supplier:
+				drop_ship = False
+				break
+
+		return drop_ship
+
+	def set_missing_values(source, target):
+		target.supplier = ""
+		target.apply_discount_on = ""
+		target.additional_discount_percentage = 0.0
+		target.discount_amount = 0.0
+		target.inter_company_order_reference = ""
+		target.shipping_rule = ""
+		target.tc_name = ""
+		target.terms = ""
+		target.payment_terms_template = ""
+		target.payment_schedule = []
+
+		if is_drop_ship_order(target):
+			target.customer = source.customer
+			target.customer_name = source.customer_name
+			target.shipping_address = source.shipping_address_name
+		else:
+			target.customer = target.customer_name = target.shipping_address = None
+
+		target.run_method("set_missing_values")
+		target.run_method("calculate_taxes_and_totals")
+
+	def update_item(source, target, source_parent):
+		target.schedule_date = source.delivery_date
+		target.qty = flt(source.qty) - (flt(source.ordered_qty) / flt(source.conversion_factor))
+		target.stock_qty = flt(source.stock_qty) - flt(source.ordered_qty)
+		target.project = source_parent.project
+
+	def update_item_for_packed_item(source, target, source_parent):
+		target.qty = flt(source.qty) - flt(source.ordered_qty)
+		for item in source_parent.items:
+			if item.item_code == source.parent_item:
+				target.delivered_by_supplier = item.delivered_by_supplier
+				break
+
+	# po = frappe.get_list("Purchase Order", filters={"sales_order":source_name, "supplier":supplier, "docstatus": ("<", "2")})
+	doc = get_mapped_doc(
+		"Sales Order",
+		source_name,
+		{
+			"Sales Order": {
+				"doctype": "Purchase Order",
+				"field_no_map": [
+					"address_display",
+					"contact_display",
+					"contact_mobile",
+					"contact_email",
+					"contact_person",
+					"taxes_and_charges",
+					"shipping_address",
+				],
+				"validation": {"docstatus": ["=", 1]},
+			},
+			"Sales Order Item": {
+				"doctype": "Purchase Order Item",
+				"field_map": [
+					["name", "sales_order_item"],
+					["parent", "sales_order"],
+					["stock_uom", "stock_uom"],
+					["uom", "uom"],
+					["conversion_factor", "conversion_factor"],
+					["delivery_date", "schedule_date"],
+				],
+				"field_no_map": [
+					"rate",
+					"price_list_rate",
+					"item_tax_template",
+					"discount_percentage",
+					"discount_amount",
+					"supplier",
+					"pricing_rules",
+				],
+				"postprocess": update_item,
+				"condition": lambda doc: doc.ordered_qty < doc.stock_qty
+				and doc.item_code in items_to_map
+				and not is_product_bundle(doc.item_code),
+			},
+			"Packed Item": {
+				"doctype": "Purchase Order Item",
+				"field_map": [
+					["name", "sales_order_packed_item"],
+					["parent", "sales_order"],
+					["uom", "uom"],
+					["conversion_factor", "conversion_factor"],
+					["parent_item", "product_bundle"],
+					["rate", "rate"],
+				],
+				"field_no_map": [
+					"price_list_rate",
+					"item_tax_template",
+					"discount_percentage",
+					"discount_amount",
+					"supplier",
+					"pricing_rules",
+				],
+				"postprocess": update_item_for_packed_item,
+				"condition": lambda doc: doc.parent_item in items_to_map,
+			},
+		},
+		target_doc,
+		set_missing_values,
+	)
+
+	set_delivery_date(doc.items, source_name)
+
+	return doc
