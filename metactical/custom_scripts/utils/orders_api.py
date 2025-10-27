@@ -251,7 +251,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
 		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
-		"taxes_and_charges": get_taxes_and_charges(province, country, company),
+		"taxes_and_charges": get_taxes_and_charges(province, country, company, parsedContent['publisher_site']),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
@@ -411,7 +411,8 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
-		"is_rush": is_rush(items)
+		"is_rush": is_rush(items),
+		"apply_discount_on": "Net Total"
 	}
  
 	if order_detail.get("signifyd"):
@@ -683,14 +684,16 @@ def calculate_delivery_date(order_date):
 
 	return frappe.utils.add_to_date(order_date, days=1)
 
-def get_taxes_and_charges(province, country, company=None):
+def get_taxes_and_charges(province, country, company=None, lead_source=None):
 	company_code = frappe.db.get_value("Company", company, "abbr")
 	if province == "Texas":
 		return f"Texas - {company_code}"
 	elif province == "Alberta":
 		return "Alberta - ICL"
-	elif province == "British Columbia":
+	elif province == "British Columbia" and lead_source != "Website - GPD":
 		return "British Columbia - ICL"
+	elif province == "British Columbia" and lead_source == "Website - GPD":
+		return "British Columbia - GST Only - ICL"
 	elif province == "Manitoba":
 		return "Manitoba - ICL"
 	elif province == "New Brunswick":
@@ -703,7 +706,9 @@ def get_taxes_and_charges(province, country, company=None):
 		return "Ontario - ICL"
 	elif province == "Prince Edward Island":
 		return "Prince Edward Island - ICL"
-	elif province == "Quebec":
+	elif province == "Quebec" and lead_source != "Website - GPD":
+		return "Quebec GST and QST - ICL"
+	elif province == "Quebec" and lead_source == "Website - GPD":
 		return "Quebec - GST - ICL"
 	elif province == "Saskatchewan":
 		return "Saskatchewan - ICL"
