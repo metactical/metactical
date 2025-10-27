@@ -251,7 +251,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
 		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
-		"taxes_and_charges": get_taxes_and_charges(province, country, company),
+		"taxes_and_charges": get_taxes_and_charges(province, country, company, parsedContent['publisher_site']),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
