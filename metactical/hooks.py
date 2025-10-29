@@ -860,7 +860,8 @@ fixtures = [{
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
 			"Item-is_published",
-			"Item Attribute Value-hide_when_out_of_stock"
+			"Item Attribute Value-hide_when_out_of_stock",
+			"Pricing Rule-min_qty_to_stop_discount"
 		]]]
 	},
 	{
