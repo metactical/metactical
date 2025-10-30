@@ -251,12 +251,12 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
 		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
-		"taxes_and_charges": get_taxes_and_charges(province, country, company),
+		"taxes_and_charges": get_taxes_and_charges(province, country, company, parsedContent['publisher_site']),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
 		"company": company,
 		"shipping_item": shipping_item,
 		"far_distance_shipping_item": far_distance_shipping_item,
-		"signifyd": parsedContent['SignifyD'],
+		"signifyd": parsedContent.get("SignifyD", None) if "SignifyD" in parsedContent else None,
 		"is_cp_verified": is_billing_cp_verified,
 		"ifw_store_pickup": parsedContent["PickInLocation"]
 	}
@@ -387,7 +387,8 @@ def check_existing_customer(billing_address_detail):
 def create_order(order_detail, customer, shipping_address_doc, billing_address_doc):
 	logger.error(f"Creating order for customer: {customer}, Order ID: {order_detail['order_id']}")
 	items = process_items(order_detail['items'], order_detail=order_detail)
-	new_order = frappe.get_doc({
+
+	order_data = {
 		"doctype": "Sales Order",
 		"customer": customer,
 		"order_type": "Shopping Cart",
@@ -407,18 +408,25 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"mena_is_cp_verified": order_detail["is_cp_verified"],
 		"shipping_address_name": shipping_address_doc.name,
 		"customer_address": billing_address_doc.name,
-		"ifw_signifyd_sid": order_detail['signifyd']['Sid'],
-		"ifw_signifyd_caseid": order_detail['signifyd']['CaseId'],
-		"ifw_signifyd_casestatus": order_detail['signifyd']['CaseStatus'],
-		"ifw_signifyd_approved": order_detail['signifyd']['IsApproved'],
-		"ifw_signifyd_score": order_detail['signifyd']['Score'],
-		"ifw_signifyd_guaranteedisposition": order_detail['signifyd']['GuarenteedDisposition'],
-		"ifw_signifyd_fulfilled": order_detail['signifyd']['Fullfilled'],
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
 		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
-		"is_rush": is_rush(items)
-	})
+		"is_rush": is_rush(items),
+		"apply_discount_on": "Net Total"
+	}
+ 
+	if order_detail.get("signifyd"):
+		order_data.update({
+			"ifw_signifyd_sid": order_detail['signifyd'].get('Sid'),
+			"ifw_signifyd_caseid": order_detail['signifyd'].get('CaseId'),
+			"ifw_signifyd_casestatus": order_detail['signifyd'].get('CaseStatus'),
+			"ifw_signifyd_approved": order_detail['signifyd'].get('IsApproved'),
+			"ifw_signifyd_score": order_detail['signifyd'].get('Score'),
+			"ifw_signifyd_guaranteedisposition": order_detail['signifyd'].get('GuarenteedDisposition'),
+			"ifw_signifyd_fulfilled": order_detail['signifyd'].get('Fullfilled'),
+		})
+ 
+	new_order = frappe.get_doc(order_data)
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
 	new_order.set_missing_values()	
@@ -676,14 +684,16 @@ def calculate_delivery_date(order_date):
 
 	return frappe.utils.add_to_date(order_date, days=1)
 
-def get_taxes_and_charges(province, country, company=None):
+def get_taxes_and_charges(province, country, company=None, lead_source=None):
 	company_code = frappe.db.get_value("Company", company, "abbr")
 	if province == "Texas":
 		return f"Texas - {company_code}"
 	elif province == "Alberta":
 		return "Alberta - ICL"
-	elif province == "British Columbia":
+	elif province == "British Columbia" and lead_source != "Website - GPD":
 		return "British Columbia - ICL"
+	elif province == "British Columbia" and lead_source == "Website - GPD":
+		return "British Columbia - GST Only - ICL"
 	elif province == "Manitoba":
 		return "Manitoba - ICL"
 	elif province == "New Brunswick":
@@ -696,7 +706,9 @@ def get_taxes_and_charges(province, country, company=None):
 		return "Ontario - ICL"
 	elif province == "Prince Edward Island":
 		return "Prince Edward Island - ICL"
-	elif province == "Quebec":
+	elif province == "Quebec" and lead_source != "Website - GPD":
+		return "Quebec GST and QST - ICL"
+	elif province == "Quebec" and lead_source == "Website - GPD":
 		return "Quebec - GST - ICL"
 	elif province == "Saskatchewan":
 		return "Saskatchewan - ICL"
