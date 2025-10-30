@@ -42,7 +42,7 @@ def on_sle_update(doc, method):
 	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
 	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
  
-	update_item_inventory_output(doc.item_code, net_available_bins, doc.voucher_type)
+	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type)
 
 def get_posting_time(doc):
 	posting_time_str = None
