@@ -51,6 +51,9 @@ class ItemMergeImportTool(Document):
 		row_no = 1
 		rows = file_content[1:]
 		for template in rows:
+			if (template[1]) or (not template[0]):
+				continue		
+   
 			item = frappe.db.exists("Item", template)
 			if not item:
 				frappe.throw(f"Item '{template}' does not exist in the system.")
