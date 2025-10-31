@@ -74,7 +74,7 @@ class ItemSupplierImportTool(Document):
 
 	def _edit_item_supplier(self, data):
 		for row in data:
-			if row[0] == "Item Supplier Name":
+			if row[0] == "Item Supplier Table Name":
 				continue
 
 			name = row[0]
