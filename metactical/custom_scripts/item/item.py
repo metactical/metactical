@@ -85,17 +85,7 @@ class CustomItem(Item):
                     elif source.lead_source not in original_deduct_dict.keys():
                         deduct_qty_updated = True
                         break
-
-        # Trigger update if deduct_qty was changed
-        if deduct_qty_updated or removed_lead_sources:
-            is_product_bundle = frappe.db.exists('Product Bundle', self.item_code)
-            if is_product_bundle:
-                all_bins = get_all_bins_for_product_bundle(self.item_code)
-                update_item_inventory_output(item_code=self.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
-            else:
-                frappe.enqueue(update_item_inventory_output, item_code=self.item_code, queue='default')
-                
-        
+                    
         if len(self.custom_neb_website_deduct_qty) and not current_lead_sources:
             current_lead_sources = [source.lead_source for source in self.custom_neb_website_deduct_qty]
 
@@ -107,7 +97,6 @@ class CustomItem(Item):
                 update_item_inventory_output(item_code=self.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
             else:
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, queue='default')
-
                 
 def load_tags(doc):
     """
