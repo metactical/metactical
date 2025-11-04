@@ -21,6 +21,7 @@ def get_bench_path():
   
 def process_rmq_data(parsedContent):
 	try:
+		frappe.set_user("rmqorders@metactical.com")
 		rmq_log = create_rmq_log(parsedContent)
 		
 		logger.error("\n\n")
