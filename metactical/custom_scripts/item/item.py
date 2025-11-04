@@ -2,57 +2,107 @@ import frappe
 import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
+from erpnext.stock.doctype.item.item import Item
 
-def validate(doc, method):
-    load_tags(doc)
 
-def on_update(doc, method):
-    # check website specification values
-    validate_website_specifications(doc)
-    sync_website_specifications(doc)
-    validate_item_group(doc)
+class CustomItem(Item):
+    def before_rename(self, old_item_code, new_item_code, merge=False):
+        super().before_rename(old_item_code, new_item_code, merge)
+        
+        
 
-    # Trigger update for item inventory output if deduct_qty has been updated
-    # Retrieve the document state before the update
-    doc_before_update = doc.get_doc_before_save()
-    original_deduct_qty = doc_before_update.custom_neb_website_deduct_qty if doc_before_update else []
-    original_deduct_dict = {lead.lead_source: lead.qty for lead in original_deduct_qty} if original_deduct_qty else {}
-    current_lead_sources = []
-    removed_lead_sources = []
+        # Fetch the old item document
+        old_item = frappe.get_doc("Item", old_item_code)
+        new_item = frappe.get_doc("Item", new_item_code)
 
-    # Flag to track if deduct_qty has been updated
-    deduct_qty_updated = False
+        # Fields to copy if they don't exist in the new item
+        fields_to_copy = [
+            "ifw_location", "ifw_duty_rate", "customs_tariff_number", "neb_variantavailabilityrule",
+            "brand", "ifw_item_notes", "asi_item_class", "country_of_origin"
+        ]
 
-    # Determine if the deduct_qty field has been updated
-    if original_deduct_qty != doc.custom_neb_website_deduct_qty:
-        if not original_deduct_qty or not doc.custom_neb_website_deduct_qty:
-            deduct_qty_updated = True
-        elif len(original_deduct_qty) != len(doc.custom_neb_website_deduct_qty):
-            deduct_qty_updated = True
-        else:
-            for source in doc.custom_neb_website_deduct_qty:
-                current_lead_sources.append(source.lead_source)
+        for field in fields_to_copy:
+            if not getattr(new_item, field, None):
+                setattr(new_item, field, getattr(old_item, field, None))
 
-                if (source.lead_source in original_deduct_dict.keys() and
-                    original_deduct_dict[source.lead_source] != source.qty):
-                    deduct_qty_updated = True
-                    break
-                elif source.lead_source not in original_deduct_dict.keys():
-                    deduct_qty_updated = True
-                    break
+        # Append barcodes from old item to new item
+        if hasattr(old_item, "barcodes"):
+            existing_barcodes = {barcode.barcode for barcode in new_item.barcodes}
+            for barcode in old_item.barcodes:
+                if barcode.barcode not in existing_barcodes:                
+                    new_item.append("barcodes", barcode)
+                    
+        # Append supplier items from old item to new item if they don't exist
+        if hasattr(old_item, "supplier_items"):
+            existing_suppliers = {item.supplier for item in new_item.supplier_items}
+            for supplier_item in old_item.supplier_items:
+                if supplier_item.supplier not in existing_suppliers:
+                    new_item.append("supplier_items", supplier_item)
 
-    if len(doc.custom_neb_website_deduct_qty) and not current_lead_sources:
-        current_lead_sources = [source.lead_source for source in doc.custom_neb_website_deduct_qty]
+        # Save the updated new item
+        new_item.save()
 
-    # Trigger update if deduct_qty was changed
-    if deduct_qty_updated or removed_lead_sources:
-        is_product_bundle = frappe.db.exists('Product Bundle', doc.item_code)
-        if is_product_bundle:
-            all_bins = get_all_bins_for_product_bundle(doc.item_code)
-            update_item_inventory_output(item_code=doc.item_code, net_available_bins=all_bins, bundle=True, voucher_type=doc.doctype)
-        else:
-            frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
-            
+    def validate(self):
+        load_tags(self)
+
+    def on_update(self):
+        # check website specification values
+        validate_website_specifications(self)
+        sync_website_specifications(self)
+        validate_item_group(self)
+
+        # Trigger update for item inventory output if deduct_qty has been updated
+        # Retrieve the document state before the update
+        doc_before_update = self.get_doc_before_save()
+        original_deduct_qty = doc_before_update.custom_neb_website_deduct_qty if doc_before_update else []
+        original_deduct_dict = {lead.lead_source: lead.qty for lead in original_deduct_qty} if original_deduct_qty else {}
+        current_lead_sources = []
+        removed_lead_sources = []
+
+        # Flag to track if deduct_qty has been updated
+        deduct_qty_updated = False
+
+        # Determine if the deduct_qty field has been updated
+        if original_deduct_qty != self.custom_neb_website_deduct_qty:
+            if not original_deduct_qty or not self.custom_neb_website_deduct_qty:
+                deduct_qty_updated = True
+            elif len(original_deduct_qty) != len(self.custom_neb_website_deduct_qty):
+                deduct_qty_updated = True
+            else:
+                for source in self.custom_neb_website_deduct_qty:
+                    current_lead_sources.append(source.lead_source)
+
+                    if (source.lead_source in original_deduct_dict.keys() and
+                        original_deduct_dict[source.lead_source] != source.qty):
+                        deduct_qty_updated = True
+                        break
+                    elif source.lead_source not in original_deduct_dict.keys():
+                        deduct_qty_updated = True
+                        break
+
+        # Trigger update if deduct_qty was changed
+        if deduct_qty_updated or removed_lead_sources:
+            is_product_bundle = frappe.db.exists('Product Bundle', self.item_code)
+            if is_product_bundle:
+                all_bins = get_all_bins_for_product_bundle(self.item_code)
+                update_item_inventory_output(item_code=self.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
+            else:
+                frappe.enqueue(update_item_inventory_output, item_code=self.item_code, queue='default')
+                
+        
+        if len(self.custom_neb_website_deduct_qty) and not current_lead_sources:
+            current_lead_sources = [source.lead_source for source in self.custom_neb_website_deduct_qty]
+
+        # Trigger update if deduct_qty was changed
+        if deduct_qty_updated or removed_lead_sources:
+            is_product_bundle = frappe.db.exists('Product Bundle', self.item_code)
+            if is_product_bundle:
+                all_bins = get_all_bins_for_product_bundle(self.item_code)
+                update_item_inventory_output(item_code=self.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
+            else:
+                frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+
+                
 def load_tags(doc):
     """
     Load tags for the item based on the website specifications.
