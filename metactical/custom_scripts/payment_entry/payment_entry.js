@@ -19,11 +19,9 @@ frappe.ui.form.on("Payment Entry", {
 		}
 	},
     refresh: function (frm) {
-        // if (!frm.doc.mode_of_payment && frm.doc.references) {
-        //     if (frm.doc.references.length == 1)
-        //         frm.trigger("get_mode_of_payment");
-        // }
-
+        if (frm.doc.__islocal) {
+            frm.events.get_mode_of_payment(frm);
+        }
         frm.trigger("custom_buttons");
     },
 
@@ -40,7 +38,7 @@ frappe.ui.form.on("Payment Entry", {
             },
             callback: function (r) {
                 frm.set_value("mode_of_payment", r.mode_of_payment);
-                frm.set_value("reference_no", r.reference_no);
+                frm.set_value("reference_no", "");
             },
         });
     },
@@ -70,11 +68,11 @@ frappe.ui.form.on("Payment Entry", {
                     frm
                 );
 
-                adjust_payment_button(
-                    roles_allowed_to_adjust_payment,
-                    user_roles,
-                    frm
-                );
+                // adjust_payment_button(
+                //     roles_allowed_to_adjust_payment,
+                //     user_roles,
+                //     frm
+                // );
             },
         });
     },
@@ -195,7 +193,7 @@ var make_payment_button = function (
     ) {
         if (
             frm.doc.payment_type == "Receive" &&
-            frm.doc.party &&
+            frm.doc.party && 
             !frm.doc.reference_no &&
             !frm.doc.__islocal &&
             frm.doc.docstatus < 2
@@ -238,7 +236,12 @@ var refund_payment_button = function (
                     frm.add_custom_button(
                         __("Refund Payment"),
                         function () {
-                            make_refund(frm);
+                            frappe.confirm(
+                                __("Are you sure you want to refund this Payment?"),
+                                function () {
+                                    make_refund(frm);
+                                }
+                            );
                         },
                         "USAePay"
                     );
@@ -325,7 +328,9 @@ var goto_payment_form = function (frm) {
             var tokens = res.tokens;
             var options = [];
             tokens.forEach((token) => {
-                options.push(token.label + " - " + token.cc_number);
+                var card_holder = token.card_holder.trim() ? token.card_holder : "No Name"
+                // options.push(token.cardholder + " - " + token.cc_number);
+                options.push(card_holder + " - " + token.cc_number)
             });
 
             var d = new frappe.ui.Dialog({
@@ -340,7 +345,7 @@ var goto_payment_form = function (frm) {
                     },
                     {
                         fieldtype: "Select",
-                        label: __("Payment Method"),
+                        label: __("Credit Card"),
                         fieldname: "payment_method",
                         options: options,
                         reqd: 1,
@@ -501,7 +506,7 @@ var map_fields_to_address = function (address, address_type) {
 var make_payment = function (frm, values, tokens) {
     var options = [];
     tokens.forEach((token) => {
-        options.push(token.label + " - " + token.cc_number);
+        options.push(token.card_holder + " - " + token.cc_number);
     });
 
     var selected_token = "";
