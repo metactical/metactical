@@ -71,6 +71,7 @@ def execute(filters=None):
 		row["wh_vic"] = get_qty(i.get("item_code"), "R03-Vic-Active Stock - ICL") or 0
 		row["wh_edm"] = get_qty(i.get("item_code"), "R02-Edm-Active Stock - ICL") or 0
 		row["wh_gor"] = get_qty(i.get("item_code"), "R01-Gor-Active Stock - ICL") or 0
+		row["wh_chi"] = get_qty(i.get("item_code"), "R08-Chilliwack-Active Stock - ICL") or 0
 		row["us_qoh"] = us_data.get(i.get("item_code")) or 0
 		
 		row["total_actual_qty"] = 0
@@ -91,6 +92,9 @@ def execute(filters=None):
 			row["total_actual_qty"] += row.get("wh_edm")
 		if row.get("wh_gor") > 0:
 			row["total_actual_qty"] += row.get("wh_gor")
+		if row.get("wh_chi") > 0:
+			row["total_actual_qty"] += row.get("wh_chi")
+   
 		warehouse = None if filters.get('reference_warehouse') == 'Total QOH' else filters.get('reference_warehouse')
 		row["material_request"], row['mr_status'], row['mr_total_qty'] = get_open_material_request(i.get("item_code"), warehouse)
 		row["tag"] = get_tags(i.get("item_code"))
@@ -188,7 +192,8 @@ def get_reference_warehouse(filters):
 		"R04-Mon-Active Stock - ICL": "wh_mon",
 		"R03-Vic-Active Stock - ICL": "wh_vic",
 		"R02-Edm-Active Stock - ICL": "wh_edm",
-		"R01-Gor-Active Stock - ICL": "wh_gor"
+		"R01-Gor-Active Stock - ICL": "wh_gor",
+		"R08-Chilliwack-Active Stock - ICL": "wh_chi"
 	}
 	return warehouse_map.get(warehouse)
 
@@ -335,7 +340,7 @@ def get_column(filters,conditions):
 				"fieldtype": "DateTime",
 				"width": 200,
 			},
-			{
+   			{
 				"label": _("Cost"),
 				"fieldname": "item_cost",
 				"fieldtype": "Currency",
@@ -424,6 +429,12 @@ def get_column(filters,conditions):
 			{
 				"label": _("R01-Gor-Active Stock - ICL"),
 				"fieldname": "wh_gor",
+				"fieldtype": "Int",
+				"width": 200,
+			},
+			{
+				"label": _("R08-Chilliwack-Active Stock - ICL"),
+				"fieldname": "wh_chi",
 				"fieldtype": "Int",
 				"width": 200,
 			}
@@ -783,7 +794,7 @@ def get_item_details(item, list_type="Selling", supplier=None):
 	if price_list is None or price_list  == "":
 		frappe.throw("Please set a default price list in stock Settings")
 	cond = "and price_list = '{}' and selling = 1".format(price_list)
-	if list_type == "Buying": cond= " and buying = 1"
+	if list_type == "Buying": cond= " and buying = 1 and price_list like 'SUP%'"
 	rate = 0
 	date = frappe.utils.nowdate()
 	r = frappe.db.sql("select price_list_rate from `tabItem Price` \

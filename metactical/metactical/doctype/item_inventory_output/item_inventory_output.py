@@ -3,10 +3,12 @@
 
 import sys
 import frappe
-import sys, time
+import sys
 from frappe.model.document import Document
-import time
 from collections import defaultdict
+from erpnext.stock.stock_ledger import get_previous_sle
+from frappe.utils import flt
+from datetime import datetime, timedelta, time
 
 class ItemInventoryOutput(Document):
 	pass
@@ -19,7 +21,52 @@ def on_sle_update(doc, method):
 		if doc.voucher_type != 'Stock Reconciliation':
 			net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
 	
-	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type,  queue='default')
+	if doc.warehouse not in net_available_bins:
+		net_available_bins[doc.warehouse] = doc.actual_qty if doc.actual_qty > 0 else 0
+
+	# subtract 1 second from posting time
+	posting_time = get_posting_time(doc) 
+	last_sle = get_previous_sle(
+		{
+			"item_code": doc.item_code,
+			"warehouse": doc.warehouse,
+			"posting_date": doc.posting_date,
+			"posting_time": posting_time,
+		}
+	)
+	if last_sle:
+		qty = flt(last_sle.get("qty_after_transaction")) + flt(doc.actual_qty)
+	else:
+		qty = flt(doc.actual_qty)
+  
+	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
+	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
+ 
+	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type)
+
+def get_posting_time(doc):
+	posting_time_str = None
+	if isinstance(doc.posting_time, timedelta):
+		new_time = (doc.posting_time - timedelta(seconds=1))
+		# Wrap around midnight if needed (i.e., 00:00:00 → 23:59:59)
+		if new_time < timedelta(0):
+			new_time += timedelta(days=1)
+
+		# Convert to string "HH:MM:SS" if needed
+		posting_time_str = str(new_time)
+		if "." in posting_time_str:  # strip microseconds if present
+			posting_time_str = posting_time_str.split(".")[0]
+	elif isinstance(doc.posting_time, str):
+		# Try to parse with microseconds, fallback if missing
+		try:
+			t = datetime.strptime(doc.posting_time, "%H:%M:%S.%f")
+		except ValueError:
+			t = datetime.strptime(doc.posting_time, "%H:%M:%S")
+
+		new_time = (t - timedelta(seconds=1)).time()
+		posting_time_str = new_time.strftime("%H:%M:%S")
+  
+	return posting_time_str
 
 def get_all_bins(item_code):
 	all_bins = frappe.get_all(
@@ -187,6 +234,9 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			try:
 				item_inventory_output.save()
 				frappe.db.commit()
+
+				# check and delete any failed inventory output record if exists
+				delete_failed_inventory_output(item_code)
 			except:
 				if item_inventory_output_doc:
 					update_doc(item_inventory_output_doc, total_available_qty, data, item_code, voucher_type)
@@ -202,6 +252,12 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
   
+def delete_failed_inventory_output(item_code):
+	failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", {"item_code": item_code})
+	if failed_inventory_output_exists:
+		frappe.db.delete("Failed Inventory Output", failed_inventory_output_exists)
+		frappe.db.commit()
+
 def update_doc(docname, total_available_qty, data, item_code, voucher_type, round=0):
 	try:
 		item_inventory_output = frappe.get_doc('Item Inventory Output', docname)
@@ -210,21 +266,18 @@ def update_doc(docname, total_available_qty, data, item_code, voucher_type, roun
 		item_inventory_output.qoh = total_available_qty
 		item_inventory_output.save()
 		frappe.db.commit()
+		
+		# check and delete any failed inventory output record if exists
+		delete_failed_inventory_output(item_code)
 	except Exception as e:
-		if round > 2:
-			frappe.set_user('Administrator')
-			frappe.delete_doc('Item Inventory Output', docname)
-			frappe.set_user(frappe.session.user)
-			item_inventory_output = frappe.new_doc('Item Inventory Output')
-			item_inventory_output.item_code = item_code
-			item_inventory_output.qoh = total_available_qty
-			item_inventory_output.item_inventory_output_list = data
-			item_inventory_output.insert()
+			frappe.db.rollback()
+			delete_failed_inventory_output(item_code)
+			failed_inventory_output = frappe.get_doc({
+				"doctype": "Failed Inventory Output",
+				"item_code": item_code
+			})
+			failed_inventory_output.insert(ignore_permissions=True)
 			frappe.db.commit()
-		else:
-			sys.stdout.flush()
-			time.sleep(2)
-			update_doc(docname, total_available_qty, data, item_code, voucher_type, round+1)
 
 def is_product_bundle_item(item_code):
 	product_bundle_items = frappe.db.sql(f"""

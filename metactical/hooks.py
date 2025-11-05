@@ -63,7 +63,8 @@ doctype_list_js = {
 	"Task": "custom_scripts/task/task_list.js",
 	"Project": "custom_scripts/project/project_list.js",
 	"Payment Entry": "custom_scripts/payment_entry/payment_entry_list.js",
-	"Pick List": "custom_scripts/pick_list/pick_list_list.js"
+	"Pick List": "custom_scripts/pick_list/pick_list_list.js",
+	"Item": "custom_scripts/item/item_list.js",
 }
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -148,10 +149,6 @@ doc_events = {
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
 	},
-	"Item": {
-		"on_update": "metactical.custom_scripts.item.item.on_update",
-		"validate": "metactical.custom_scripts.item.item.validate",
-	}
 }
 
 # DocType Class
@@ -177,7 +174,8 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
-	"Address": "metactical.custom_scripts.address.address.CustomAddress"
+	"Address": "metactical.custom_scripts.address.address.CustomAddress",
+	"Item": "metactical.custom_scripts.item.item.CustomItem",
 }
 
 # Scheduled Tasks
@@ -207,6 +205,8 @@ scheduler_events = {
 		"15 * * * *": [
 			"metactical.custom_scripts.frappe.document.clear_queued_docs",
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
+		], "*/1 * * * *": [
+			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
 		]
 	}
 }
@@ -228,10 +228,12 @@ override_whitelisted_methods = {
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
 	"erpnext.stock.get_item_details.get_item_details": "metactical.custom_scripts.get_item_details.get_item_details",
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "metactical.custom_scripts.sales_order.sales_order.make_sales_invoice",
+	"erpnext.selling.doctype.sales_order.sales_order.update_status": "metactical.custom_scripts.sales_order.sales_order.update_status",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
+	"erpnext.selling.doctype.sales_order.sales_order.make_purchase_order": "metactical.custom_scripts.sales_order.sales_order.make_purchase_order"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -854,7 +856,10 @@ fixtures = [{
 			"POS Profile-auto_logout_after_transaction",
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
-			"POS Profile User-allow_flat_rate"
+			"POS Profile User-allow_flat_rate",
+			"Item-is_published",
+			"Item Attribute Value-hide_when_out_of_stock",
+			"Pricing Rule-min_qty_to_stop_discount"
 		]]]
 	},
 	{
