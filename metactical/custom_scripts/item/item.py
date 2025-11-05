@@ -8,8 +8,6 @@ from erpnext.stock.doctype.item.item import Item
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
         super().before_rename(old_item_code, new_item_code, merge)
-        
-        
 
         # Fetch the old item document
         old_item = frappe.get_doc("Item", old_item_code)
@@ -100,7 +98,7 @@ class CustomItem(Item):
                 all_bins = get_all_bins_for_product_bundle(self.item_code)
                 update_item_inventory_output(item_code=self.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
             else:
-                frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+                frappe.enqueue(update_item_inventory_output, item_code=self.item_code, queue='default')
 
                 
 def load_tags(doc):
