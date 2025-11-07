@@ -1421,7 +1421,10 @@ fixtures = [{
 			"Purchase Receipt Item-base_amount-permlevel",
 			"Purchase Receipt Item-amount-permlevel",
 			"Purchase Receipt Item-base_price_list_rate-permlevel",
-			"Purchase Receipt Item-price_list_rate-permlevel"
+			"Purchase Receipt Item-price_list_rate-permlevel",
+			"Work Order-wip_warehouse-default",
+			"Work Order-fg_warehouse-default",
+			"Work Order-source_warehouse-default"
 		]]]
 	},
   	{
