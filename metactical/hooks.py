@@ -856,6 +856,7 @@ fixtures = [{
 			"POS Profile-auto_logout_after_transaction",
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
+			"POS Profile User-allow_flat_rate",
 			"Item-is_published",
 			"Item Attribute Value-hide_when_out_of_stock",
 			"Pricing Rule-min_qty_to_stop_discount"
