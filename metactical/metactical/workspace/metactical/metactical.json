@@ -1055,9 +1055,19 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "USAePay Settings",
+   "link_count": 0,
+   "link_to": "USAePay Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-06-25 17:18:09.157213",
+ "modified": "2025-09-07 02:24:32.864579",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",

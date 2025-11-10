@@ -149,7 +149,9 @@ def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None
 	if usaepay_account:
 		return frappe.get_doc("USAePay Accounts", usaepay_account)
 
-	return get_default_usaepay_account()
+	return None
+
+	# return get_default_usaepay_account()
 
 @frappe.whitelist()
 def get_default_usaepay_account():
@@ -175,7 +177,7 @@ def get_customer_payment_information(customer, payment_entry, reference_no=None)
 			break
 
 	if frappe.db.exists("Customer CC", customer):
-		tokens = frappe.get_all("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number"])
+		tokens = frappe.get_all("Customer CC Tokens", {"parent": customer}, ["name", "label", "token", "cc_number", "card_holder"])
 
 	usaepay_settings = get_usaepay_account(reference_no, None, lead_source)
 	payment_form_url = usaepay_settings.payment_form_url
@@ -185,7 +187,7 @@ def get_customer_payment_information(customer, payment_entry, reference_no=None)
 	# form_hash = form_hash[6:] if form_hash else None
 	
 	if not form_hash:
-		frappe.log_error(title="Metactical Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
+		frappe.log_error(title="Usaepay Settings Error", message="Failed to generate form hash. Please add usaepay key and secret")
 		frappe.throw(_("Failed to generate form hash. Please check the MetaTactical settings"))
 
 	frappe.response["tokens"] = tokens

@@ -6,6 +6,7 @@ from frappe.model.document import Document
 import os
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
 from frappe import _, msgprint
+from frappe.utils.file_manager import save_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe.model.docstatus import DocStatus
 
@@ -86,3 +87,43 @@ class ItemClassImportTool(Document):
 		}
 		self.append("error_log", error_entry)
 		self.save(ignore_permissions=True)
+
+@frappe.whitelist(methods=["POST"])
+def import_item_class():
+	uploaded_file = frappe.request.files.get('file')
+	if not uploaded_file:
+		frappe.throw("No file received")
+
+	# Save file to Frappe
+	file_doc = save_file(
+		fname=uploaded_file.filename,
+		content=uploaded_file.read(),
+		dt=None,
+		dn=None,
+		is_private=True
+	)
+
+	item_class_import_tool = frappe.get_doc({
+		"doctype": "Item Class Import Tool",
+		"excel_file": file_doc.file_url
+	})
+
+	item_class_import_tool.check_file()
+
+	# Insert document
+	item_class_import_tool.insert()
+
+	# Link the file to the doc
+	file_doc.reload()
+	file_doc.dt = "Item Class Import Tool"
+	file_doc.dn = item_class_import_tool.name
+	file_doc.save()
+
+	item_class_import_tool.reload()
+	item_class_import_tool.submit()
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"file_url": file_doc.file_url
+	}
