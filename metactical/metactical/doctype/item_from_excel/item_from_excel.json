@@ -10,6 +10,7 @@
   "excel_file",
   "replace_existing",
   "section_break_i8qkd",
+  "all_valid",
   "preview",
   "section_queus",
   "ais_queue_failed",
@@ -113,12 +114,19 @@
    "fieldname": "preview",
    "fieldtype": "HTML",
    "label": "Preview"
+  },
+  {
+   "default": "0",
+   "fieldname": "all_valid",
+   "fieldtype": "Check",
+   "label": "All Valid",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-11-06 07:56:50.644134",
+ "modified": "2025-11-10 11:48:20.075598",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item From Excel",
