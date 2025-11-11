@@ -1262,7 +1262,7 @@ def validate_single_sheet(sheet, required_fields, sheet_name):
 
 def validate_mandatory_fields(template_sheet, variants_sheet):
 	"""Check for missing values in mandatory fields"""
-	required_fields = ["Item Code", "Item Name", "Item Group", "Brand"]
+	required_fields = ["Item Code", "Item Name", "Item Group"]
 	errors = []
 	
 	# Validate template sheet
