@@ -314,7 +314,7 @@ function render_price_list_summary_content(summary) {
 			
 			if (lists.length > 1) {
 				html += `item${count > 1 ? 's' : ''} will be assigned to sites: `;
-				html += lists.map(pl => `<span class="site-badge">${pl.replace("RET -")}</span>`).join(', ');
+				html += lists.map(pl => `<span class="site-badge">${pl.replace("RET -", "")}</span>`).join(', ');
 			} else {
 				html += `item${count > 1 ? 's' : ''} will be assigned to <span class="site-badge">${lists[0]}</span> only`;
 			}
