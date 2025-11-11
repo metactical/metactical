@@ -66,61 +66,6 @@ class ItemFromExcel(Document):
 		if missing_specs:	
 			frappe.throw(f"The following Specification Labels are missing in the ERP: <b>{', '.join(missing_specs)}</b>")
 
-	def prepare_website_specifications_from_data(self, sheet_data):
-		if not sheet_data or len(sheet_data) < 2:
-			frappe.logger().info("No website specifications data provided")
-			return {}
-		
-		# First row is headers
-		headers = sheet_data[0]
-		
-		if not headers or len(headers) < 2:
-			frappe.logger().warning("Invalid specifications data structure")
-			return {}
-		
-		# First column should be Item Code, rest are specification labels
-		spec_labels = []
-		for i, header in enumerate(headers[1:], start=1):
-			if header and str(header).strip():
-				spec_labels.append({
-					"index": i,
-					"label": str(header).strip()
-				})
-		
-		if not spec_labels:
-			frappe.logger().warning("No specification labels found")
-			return {}
-		
-		# Extract specifications for each item
-		item_specifications = {}
-		
-		for row in sheet_data[1:]:  # Skip header row
-			if not row or not row[0]:  # Skip empty rows
-				continue
-			
-			item_code = str(row[0]).strip()
-			specifications = []
-			
-			# Check each specification label column
-			for spec_info in spec_labels:
-				col_idx = spec_info["index"]
-				
-				if len(row) > col_idx and row[col_idx] is not None:
-					description = str(row[col_idx]).strip()
-					
-					if description:  # Only add if description is not empty
-						specifications.append({
-							"label": spec_info["label"],
-							"description": description
-						})
-			
-			# Only add to result if item has specifications
-			if specifications:
-				item_specifications[item_code] = specifications
-		
-		frappe.logger().info(f"Prepared specifications for {len(item_specifications)} items")
-		return item_specifications
-
 
 	def check_mandatory_fields(self, data, mandatory_fields, is_template):
 		headers = data[0]
@@ -252,7 +197,7 @@ class ItemFromExcel(Document):
 							spec_labels
 						)
    
-	def prepare_website_specifications_from_data(sheet_data):
+	def prepare_website_specifications_from_data(self, sheet_data):
 		if not sheet_data or len(sheet_data) < 2:
 			return {}
 		
@@ -521,7 +466,7 @@ class ItemFromExcel(Document):
 
 		try:
 			# create template items
-			self.create_item(file_content[0], item_field_map, linked_doctypes, True)
+			self.create_item(file_content, item_field_map, linked_doctypes, True)
 			
 			template_headers = file_content[0][0]
 			request_ai_suggestion_index = template_headers.index("Request AI Suggestion For Slugs and Descriptions") if "Request AI Suggestion For Slugs and Descriptions" in template_headers else -1
