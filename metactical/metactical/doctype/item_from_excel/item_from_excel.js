@@ -333,7 +333,6 @@ function render_price_list_summary_content(summary) {
 }
 
 function extract_and_validate_excel(frm) {
-	return
 	// Add loading message for website validation
 	const loadingHtml = '<div class="validation-section loading-section"><div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Validating against configured websites...</div></div>';
 	
@@ -682,11 +681,11 @@ function show_multi_pricelist_summary(frm, priceListResults) {
 				});
 			}
 			
-			// if (!has_issues) {
-			// 	if (!frm.doc.all_valid)
-			// 		frm.set_value("all_valid", true);
-			// 	success_count++;
-			// }
+			if (!has_issues) {
+				if (!frm.doc.all_valid)
+					frm.set_value("all_valid", true);
+				success_count++;
+			}
 		}
 	});
 	
