@@ -5,7 +5,6 @@ frappe.ui.form.on('Item From Excel', {
 	refresh: function(frm) {
 		// Trigger validation when form is refreshed
 		if (frm.doc.excel_file && !frm.doc.__islocal && frm.doc.docstatus == 0) {
-			frm.set_value("preview", "");
 			validate_excel_file(frm);
 		}
 		else{
