@@ -5,10 +5,11 @@ frappe.ui.form.on('Item From Excel', {
 	refresh: function(frm) {
 		// Trigger validation when form is refreshed
 		if (frm.doc.excel_file && !frm.doc.__islocal && frm.doc.docstatus == 0) {
+			frm.set_value("preview", "");
 			validate_excel_file(frm);
 		}
 		else{
-			frm.set_df_property('preview', 'options', '');
+			frm.set_value("preview", "");
 		}
 	}
 });
@@ -37,71 +38,13 @@ function validate_excel_file(frm) {
 				
 				// Only continue if file overview is valid
 				if (validationResult.is_valid) {
-					// Sheet Information Section (Collapsible - Hidden by default)
-					if (validationResult.sheet_info) {
-						html += render_collapsible_section(
-							'sheet-info',
-							'Sheet Information',
-							'fa-table',
-							render_sheet_info_content(validationResult.sheet_info),
-							false // collapsed by default
-						);
-					}
-					
-					// Mandatory Field Validation (Collapsible - Hidden by default)
-					if (validationResult.mandatory_validation) {
-						html += render_collapsible_section(
-							'mandatory-validation',
-							'Mandatory Field Validation',
-							'fa-exclamation-circle',
-							render_mandatory_validation_content(validationResult.mandatory_validation),
-							false,
-							validationResult.mandatory_validation.has_errors
-						);
-					}
-					
-					// Variant Relationship Overview (Collapsible - Hidden by default)
-					if (validationResult.variant_relationships) {
-						html += render_collapsible_section(
-							'variant-relationships',
-							'Variant Relationship Overview',
-							'fa-sitemap',
-							render_variant_relationships_content(validationResult.variant_relationships),
-							false,
-							validationResult.variant_relationships.missing_templates && 
-							validationResult.variant_relationships.missing_templates.length > 0
-						);
-					}
-					
-					// Item Summary (Collapsible - Hidden by default)
-					if (validationResult.item_summary) {
-						html += render_collapsible_section(
-							'item-summary',
-							'Item Group, Brand, and Other Lookups Summary',
-							'fa-list',
-							render_item_summary_content(validationResult.item_summary),
-							false
-						);
-					}
-					
-					// Price List Summary (Collapsible - Hidden by default)
-					if (validationResult.price_list_summary) {
-						html += render_collapsible_section(
-							'price-list-summary',
-							'Price List Summary',
-							'fa-money',
-							render_price_list_summary_content(validationResult.price_list_summary),
-							false
-						);
-					}
-					
 					html += '</div>' + get_validation_styles();
 					frm.set_df_property('preview', 'options', html);
 					
-					// Add click handlers for collapsible sections
-					setup_collapsible_handlers(frm);
+					// Store validation result for later use
+					frm.validation_result = validationResult;
 					
-					// Now proceed with website validation
+					// First do website validation (this will be at the top)
 					extract_and_validate_excel(frm);
 				} else {
 					// Validation failed - stop here
@@ -372,7 +315,7 @@ function render_price_list_summary_content(summary) {
 			
 			if (lists.length > 1) {
 				html += `item${count > 1 ? 's' : ''} will be assigned to sites: `;
-				html += lists.map(pl => `<span class="site-badge">${pl}</span>`).join(', ');
+				html += lists.map(pl => `<span class="site-badge">${pl.replace("RET -")}</span>`).join(', ');
 			} else {
 				html += `item${count > 1 ? 's' : ''} will be assigned to <span class="site-badge">${lists[0]}</span> only`;
 			}
@@ -392,9 +335,10 @@ function render_price_list_summary_content(summary) {
 
 function extract_and_validate_excel(frm) {
 	// Add loading message for website validation
-	frm.get_field('preview').$wrapper.find('.validation-container').prepend(
-		'<div class="validation-section loading-section"><div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Validating against configured websites...</div></div>'
-	);
+	const loadingHtml = '<div class="validation-section loading-section"><div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Validating against configured websites...</div></div>';
+	
+	// Insert loading message after file overview
+	frm.get_field('preview').$wrapper.find('.file-overview').after(loadingHtml);
 	
 	// Call existing validation method
 	frappe.call({
@@ -409,8 +353,12 @@ function extract_and_validate_excel(frm) {
 				// Remove loading message
 				frm.get_field('preview').$wrapper.find('.loading-section').remove();
 				
-				// Add website validation section (NOT collapsible, always visible)
-				display_website_validation(frm, priceListResults);
+				// Add website validation section right after file overview (NOT collapsible, always visible)
+				const websiteValidationHtml = get_website_validation_html(priceListResults);
+				frm.get_field('preview').$wrapper.find('.file-overview').after(websiteValidationHtml);
+				
+				// Now add all the collapsible sections
+				add_collapsible_sections(frm);
 				
 				// Show summary
 				show_multi_pricelist_summary(frm, priceListResults);
@@ -421,14 +369,85 @@ function extract_and_validate_excel(frm) {
 		},
 		error: function(r) {
 			frm.get_field('preview').$wrapper.find('.loading-section').remove();
-			frm.get_field('preview').$wrapper.find('.validation-container').append(
+			frm.get_field('preview').$wrapper.find('.file-overview').after(
 				'<div class="alert alert-danger">Error validating with websites. Please try again.</div>'
 			);
 		}
 	});
 }
 
-function display_website_validation(frm, priceListResults) {
+function add_collapsible_sections(frm) {
+	const validationResult = frm.validation_result;
+	if (!validationResult) return;
+	
+	let html = '';
+
+	// Price List Summary (Collapsible - Hidden by default)
+	if (validationResult.price_list_summary) {
+		html += render_collapsible_section(
+			'price-list-summary',
+			'Price List Summary',
+			'fa-money',
+			render_price_list_summary_content(validationResult.price_list_summary),
+			true
+		);
+	}
+	
+	// Sheet Information Section (Collapsible - Hidden by default)
+	if (validationResult.sheet_info) {
+		html += render_collapsible_section(
+			'sheet-info',
+			'Sheet Information',
+			'fa-table',
+			render_sheet_info_content(validationResult.sheet_info),
+			false // collapsed by default
+		);
+	}
+	
+	// Mandatory Field Validation (Collapsible - Hidden by default)
+	if (validationResult.mandatory_validation) {
+		html += render_collapsible_section(
+			'mandatory-validation',
+			'Mandatory Field Validation',
+			'fa-exclamation-circle',
+			render_mandatory_validation_content(validationResult.mandatory_validation),
+			false,
+			validationResult.mandatory_validation.has_errors
+		);
+	}
+	
+	// Variant Relationship Overview (Collapsible - Hidden by default)
+	if (validationResult.variant_relationships) {
+		html += render_collapsible_section(
+			'variant-relationships',
+			'Variant Relationship Overview',
+			'fa-sitemap',
+			render_variant_relationships_content(validationResult.variant_relationships),
+			false,
+			validationResult.variant_relationships.missing_templates && 
+			validationResult.variant_relationships.missing_templates.length > 0
+		);
+	}
+	
+	// Item Summary (Collapsible - Hidden by default)
+	if (validationResult.item_summary) {
+		html += render_collapsible_section(
+			'item-summary',
+			'Item Group, Brand, and Other Lookups Summary',
+			'fa-list',
+			render_item_summary_content(validationResult.item_summary),
+			false
+		);
+	}
+	
+	// Append all collapsible sections to the container
+	frm.get_field('preview').$wrapper.find('.validation-container').append(html);
+	
+	// Add click handlers for collapsible sections
+	setup_collapsible_handlers(frm);
+}
+
+function get_website_validation_html(priceListResults) {
 	// This section is NOT collapsible - always visible
 	let html = '<div class="validation-section website-validation">';
 	html += '<h5><i class="fa fa-globe"></i> Site Specific Validation</h5>';
@@ -489,8 +508,7 @@ function display_website_validation(frm, priceListResults) {
 	
 	html += '</div>';
 	
-	// Append to container
-	frm.get_field('preview').$wrapper.find('.validation-container').append(html);
+	return html;
 }
 
 function render_price_list_section(priceList, result) {
@@ -597,21 +615,21 @@ function get_validation_summary_html(validation, allValid, payload, priceList) {
 		
 		// Categories
 		if (validation.categories.allValid) {
-			matchedItems.push(`<div class="match-detail">• <strong>${payload.CategoriesExternalIds.length}</strong> categor${payload.CategoriesExternalIds.length > 1 ? 'ies' : 'y'} matched on site <strong>${priceList}</strong></div>`);
+			matchedItems.push(`<div class="match-detail">• <strong>${payload.CategoriesExternalIds.length}</strong> categor${payload.CategoriesExternalIds.length > 1 ? 'ies' : 'y'} matched</strong></div>`);
 		} else {
 			notMatchedItems.push(`<strong>Categories not matched:</strong> ${validation.categories.notFound.join(', ')}`);
 		}
 		
 		// Brands
 		if (validation.brands.allValid && payload.BrandsExternalIds.length > 0) {
-			matchedItems.push(`<div class="match-detail">• <strong>${payload.BrandsExternalIds.length}</strong> brand${payload.BrandsExternalIds.length > 1 ? 's' : ''} matched on site <strong>${priceList}</strong></div>`);
+			matchedItems.push(`<div class="match-detail">• <strong>${payload.BrandsExternalIds.length}</strong> brand${payload.BrandsExternalIds.length > 1 ? 's' : ''} matched</strong></div>`);
 		} else if (!validation.brands.allValid) {
 			notMatchedItems.push(`<strong>Brands not matched:</strong> ${validation.brands.notFound.join(', ')}`);
 		}
 		
 		// Specs
 		if (validation.specifications.allValid && payload.SpecsExternalIds.length > 0) {
-			matchedItems.push(`<div class="match-detail">• <strong>${payload.SpecsExternalIds.length}</strong> specification${payload.SpecsExternalIds.length > 1 ? 's' : ''} matched on site <strong>${priceList}</strong></div>`);
+			matchedItems.push(`<div class="match-detail">• <strong>${payload.SpecsExternalIds.length}</strong> specification${payload.SpecsExternalIds.length > 1 ? 's' : ''} matched</strong></div>`);
 		} else if (!validation.specifications.allValid) {
 			notMatchedItems.push(`<strong>Specs not matched:</strong> ${validation.specifications.notFound.join(', ')}`);
 		}
