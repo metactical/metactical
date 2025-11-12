@@ -149,10 +149,6 @@ doc_events = {
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
 	},
-	"Item": {
-		"on_update": "metactical.custom_scripts.item.item.on_update",
-		"validate": "metactical.custom_scripts.item.item.validate",
-	}
 }
 
 # DocType Class
@@ -178,7 +174,8 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
-	"Address": "metactical.custom_scripts.address.address.CustomAddress"
+	"Address": "metactical.custom_scripts.address.address.CustomAddress",
+	"Item": "metactical.custom_scripts.item.item.CustomItem",
 }
 
 # Scheduled Tasks
@@ -859,6 +856,7 @@ fixtures = [{
 			"POS Profile-auto_logout_after_transaction",
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
+			"POS Profile User-allow_flat_rate",
 			"Item-is_published",
 			"Item Attribute Value-hide_when_out_of_stock",
 			"Pricing Rule-min_qty_to_stop_discount"
@@ -1427,7 +1425,8 @@ jinja = {
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
 		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
-		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location"
+		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location",
+		"metactical.barcode_generator.get_qr_for_print_format"
 	]
 }
 

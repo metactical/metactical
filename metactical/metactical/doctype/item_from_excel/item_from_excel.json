@@ -10,7 +10,8 @@
   "excel_file",
   "replace_existing",
   "section_break_i8qkd",
-  "error_log",
+  "all_valid",
+  "preview",
   "section_queus",
   "ais_queue_failed",
   "ais_queue_status",
@@ -40,13 +41,6 @@
   {
    "fieldname": "section_break_i8qkd",
    "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "error_log",
-   "fieldtype": "Table",
-   "label": "Errors",
-   "options": "Item Price From Excel Error",
-   "read_only": 1
   },
   {
    "fieldname": "section_queus",
@@ -115,12 +109,24 @@
    "fieldtype": "Select",
    "label": "Price List Import Based On",
    "options": "ERP SKU\nRetail SKU"
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "HTML",
+   "label": "Preview"
+  },
+  {
+   "default": "0",
+   "fieldname": "all_valid",
+   "fieldtype": "Check",
+   "label": "All Valid",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-07-30 11:11:58.834433",
+ "modified": "2025-11-10 11:48:20.075598",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item From Excel",
@@ -140,5 +146,6 @@
   }
  ],
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "states": []
 }

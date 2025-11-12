@@ -32,7 +32,7 @@ class CanadaPost():
 	def set_default_headers(self):
 		self.sess.headers = {
 			'Accept': 'application/vnd.cpc.shipment-v8+xml',
-			'Content-Type': 'application/vnd.cpc.shipment-v8+xml',
+			'Content-Type': 'application/vnd.cpc.shipment-v8+xml; charset=utf-8',
 			'Accept-language': 'en-CA',
 			'Authorization': _basic_auth_str(self.settings.api_key, self.settings.get_password("api_secret"))
 		}
@@ -128,8 +128,9 @@ class CanadaPost():
 
 			body = frappe.render_template(
 				"metactical/utils/shipping/templates/canada_post/request/get_rate.xml", context)
-			response = self.get_response("/rs/ship/price", body, {'Accept': 'application/vnd.cpc.ship.rate-v4+xml',
-																  'Content-Type': 'application/vnd.cpc.ship.rate-v4+xml'})
+			response = self.get_response("/rs/ship/price", body, 
+							{'Accept': 'application/vnd.cpc.ship.rate-v4+xml',
+							'Content-Type': 'application/vnd.cpc.ship.rate-v4+xml; charset=utf-8'})
 			items = []
 			if response and response['price-quotes'] and response['price-quotes']['price-quote']:
 				for pq in response['price-quotes']['price-quote']:
@@ -221,8 +222,10 @@ class CanadaPost():
 					body = body.replace(char, replacement)
 
 				response = self.get_response(
-					f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", body, {'Accept': 'application/vnd.cpc.shipment-v8+xml',
-																									'Content-Type': 'application/vnd.cpc.shipment-v8+xml'})
+					f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment", 
+								body, 
+								{'Accept': 'application/vnd.cpc.shipment-v8+xml',
+								'Content-Type': 'application/vnd.cpc.shipment-v8+xml; charset=utf-8'})
 				row = doc.append('shipments', {
 					'shipment_id': response['shipment-info']['shipment-id'],
 					'awb_number': response['shipment-info']['tracking-pin'],
@@ -310,7 +313,9 @@ class CanadaPost():
 			"metactical/utils/shipping/templates/canada_post/request/transmit_shipment.xml", context)
 		
 		response = self.get_response(
-				f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 'Content-Type': 'application/vnd.cpc.manifest-v8+xml'})
+				f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest", body, 
+				headers={'Accept': 'application/vnd.cpc.manifest-v8+xml', 
+				'Content-Type': 'application/vnd.cpc.manifest-v8+xml; charset=utf-8'})
 		
 		if response:
 			if isinstance(response['manifests']['link'], dict):
@@ -523,8 +528,14 @@ class CanadaPost():
 
 	def get_response(self, url, body, headers=None, return_request=False, method='POST', retry=False, retry_count=0):
 		if headers:
+			# Double check if charset is set in headers
+			ct = headers.get('Content-Type')
+			if ct and 'charset=' not in ct.lower():
+				headers['Content-Type'] = f'{ct}; charset=utf-8'
 			self.sess.headers.update(headers)
 		try:
+			if isinstance(body, str):
+				body = body.encode('utf-8')
 			r = self.sess.request(
 					method, 
 					url if url.startswith('https://') else f'{self.settings.host}{url}', 
