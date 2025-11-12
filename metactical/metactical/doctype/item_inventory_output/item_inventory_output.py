@@ -256,50 +256,50 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
   
-def get_inventory_by_country(item_code, company=None):    
-	filters = {"item_code": item_code}
-	company_filter = ""
-	
-	allowed_companies = {
-		"International Camouflage Ltd": "Canada",
-		"American One Inc.": "United States"
-	}
-	
-	query = f"""
-		SELECT 
-			company,
-			SUM(bin.actual_qty - bin.reserved_qty) as available_qty
-		FROM 
-			`tabBin` bin
-		INNER JOIN 
-			`tabWarehouse` w ON bin.warehouse = w.name
-		WHERE 
-			bin.item_code = %(item_code)s and w.name LIKE '%active%'
-			{company_filter}
-		GROUP BY 
-			w.company
-		HAVING
-			available_qty > 0
-		ORDER BY 
-			available_qty DESC
-	"""
-	
-	result = frappe.db.sql(query, filters, as_dict=1)
-	
-	inventories_dict = []
-	
-	for row in result:
-		if row['company'] in allowed_companies:
-			row_data = {
-				"doctype": "Inventory Per Country",
-				"country": allowed_companies[row['company']],
-				"qty": row['available_qty']
-			}
-			inventory_doc = frappe.new_doc("Inventory Per Country")
-			inventory_doc.update(row_data)
-			inventories_dict.append(inventory_doc)
-	
-	return inventories_dict
+def get_inventory_by_country(item_code):    
+    filters = {"item_code": item_code}
+    
+    allowed_companies = {
+        "International Camouflage Ltd": "Canada",
+        "American One Inc.": "United States"
+    }
+    
+    # Remove the f-string prefix - use a regular string for parameterized queries
+    query = """
+        SELECT 
+            company,
+            SUM(bin.actual_qty - bin.reserved_qty) as available_qty
+        FROM 
+            `tabBin` bin
+        INNER JOIN 
+            `tabWarehouse` w ON bin.warehouse = w.name
+        WHERE 
+            bin.item_code = %(item_code)s AND w.name LIKE '%%active%%'
+        GROUP BY 
+            w.company
+        HAVING
+            available_qty > 0
+        ORDER BY 
+            available_qty DESC
+    """
+    
+    result = frappe.db.sql(query, filters, as_dict=1)
+    
+    inventories_dict = []
+    
+    for row in result:
+        if row['company'] in allowed_companies:
+            row_data = {
+                "doctype": "Inventory Per Country",
+                "country": allowed_companies[row['company']],
+                "qty": row['available_qty']
+            }
+            
+            inventory_doc = frappe.new_doc("Inventory Per Country")
+            inventory_doc.update(row_data)
+            inventories_dict.append(inventory_doc)
+    
+    return inventories_dict
   
 def delete_failed_inventory_output(item_code):
 	failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", {"item_code": item_code})
