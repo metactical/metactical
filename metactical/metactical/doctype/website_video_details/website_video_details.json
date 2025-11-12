@@ -8,7 +8,8 @@
  "field_order": [
   "key",
   "value",
-  "price_list"
+  "price_list",
+  "is_product"
  ],
  "fields": [
   {
@@ -32,12 +33,18 @@
    "label": "Price List",
    "options": "Price List",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_product",
+   "fieldtype": "Check",
+   "label": "Is Product?"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-07-29 05:51:09.187111",
+ "modified": "2025-11-12 10:45:53.099785",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Video Details",
