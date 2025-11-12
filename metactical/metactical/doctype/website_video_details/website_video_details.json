@@ -38,13 +38,14 @@
    "default": "0",
    "fieldname": "is_product",
    "fieldtype": "Check",
+   "in_list_view": 1,
    "label": "Is Product?"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-11-12 10:45:53.099785",
+ "modified": "2025-11-12 10:47:26.290326",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Video Details",
