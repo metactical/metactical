@@ -48,7 +48,7 @@ def on_update(doc, method):
             all_bins = get_all_bins_for_product_bundle(doc.item_code)
             update_item_inventory_output(item_code=doc.item_code, net_available_bins=all_bins, bundle=True, voucher_type=doc.doctype)
         else:
-            frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, queue='default')
+            frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, voucher_type=doc.doctype)
             
 def load_tags(doc):
     """
