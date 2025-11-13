@@ -524,6 +524,17 @@ class CanadaPost():
 			doc.ais_shipment_status = "Not Shipped"
 
 		doc.save()
+		# Cancel the delivery notes
+		doc.cancel() # First cancel the shipemnt so not toraise an error when canciling Delivery Note
+		delivery_notes = []
+		for row in doc.shipment_delivery_note:
+			if row.delivery_note not in delivery_notes:
+				delivery_notes.append(row.delivery_note)
+
+		for delivery_note in delivery_notes:
+			dn = frappe.get_doc("Delivery Note", delivery_note)
+			if dn.docstatus == 1:
+				dn.cancel()
 		return doc.as_dict()
 
 	def get_response(self, url, body, headers=None, return_request=False, method='POST', retry=False, retry_count=0):
