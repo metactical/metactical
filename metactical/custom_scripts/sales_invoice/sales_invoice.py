@@ -104,6 +104,7 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 		journal_entry = frappe.new_doc("Journal Entry")
 		journal_entry.voucher_type = "Journal Entry"
 		journal_entry.posting_date = frappe.utils.getdate(now())
+		journal_entry.company = self.company
   
 		journal_entry.append("accounts", {
 			"reference_type": "Sales Invoice",
