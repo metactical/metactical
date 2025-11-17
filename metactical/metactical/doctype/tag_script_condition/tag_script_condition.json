@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-12 11:25:50.074092",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "priority",
+  "condition_field",
+  "operator",
+  "value",
+  "value_2",
+  "column_break_1",
+  "tag_to_assign",
+  "tag_color",
+  "remove_other_tags",
+  "section_break_logic",
+  "combine_with_next",
+  "logical_operator"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "default": "1",
+   "description": "Lower number = higher priority. First matching condition wins.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Priority"
+  },
+  {
+   "columns": 2,
+   "description": "Field name from script output",
+   "fieldname": "condition_field",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Condition Field",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "operator",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Operator",
+   "options": "=\n!=\n>\n<\n>=\n<=\nbetween\nin\nnot in\ncontains\nnot contains\nis null\nis not null",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Value"
+  },
+  {
+   "columns": 1,
+   "depends_on": "eval:doc.operator=='between'",
+   "description": "For 'between' operator",
+   "fieldname": "value_2",
+   "fieldtype": "Data",
+   "label": "Value 2"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "tag_to_assign",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Tag to Assign",
+   "options": "Tag",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "description": "Optional color for the tag",
+   "fieldname": "tag_color",
+   "fieldtype": "Color",
+   "label": "Tag Color"
+  },
+  {
+   "columns": 2,
+   "default": "0",
+   "description": "Remove tags with same prefix before applying",
+   "fieldname": "remove_other_tags",
+   "fieldtype": "Check",
+   "label": "Remove Other Tags from This Script"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_logic",
+   "fieldtype": "Section Break",
+   "label": "Advanced Logic (Optional)"
+  },
+  {
+   "default": "0",
+   "description": "Combine this condition with the next one using logical operator",
+   "fieldname": "combine_with_next",
+   "fieldtype": "Check",
+   "label": "Combine with Next Condition"
+  },
+  {
+   "default": "AND",
+   "depends_on": "eval:doc.combine_with_next==1",
+   "description": "How to combine with next condition",
+   "fieldname": "logical_operator",
+   "fieldtype": "Select",
+   "label": "Logical Operator",
+   "options": "AND\nOR"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-11-12 11:31:26.965120",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Tag Script Condition",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
