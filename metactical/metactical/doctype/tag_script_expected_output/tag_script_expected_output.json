@@ -1,0 +1,65 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-12 11:24:03.013513",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "output_key",
+  "output_type",
+  "column_break_1",
+  "description",
+  "is_required"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "output_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Output Key",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "output_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Output Type",
+   "options": "String\nInteger\nFloat\nDate\nDatetime\nBoolean",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 3,
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Description"
+  },
+  {
+   "columns": 1,
+   "default": "1",
+   "fieldname": "is_required",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Required"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-11-12 11:29:36.564243",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Tag Script Expected Output",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
