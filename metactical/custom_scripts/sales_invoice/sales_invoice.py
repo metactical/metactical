@@ -25,6 +25,15 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 			queue_action(self, "submit", timeout=2000)
 		else:
 			super().save()
+   
+	def on_submit(self):
+		super(CustomSalesInvoice, self).on_submit()
+	
+		# Metactical Customization: Create offset journal entry for write-off amount
+		if self.status == "Partly Paid":
+			if self.outstanding_amount <= .25 and self.advances:
+				self.create_offset_journal_entry()		
+
 
 	def on_cancel(self):
 		# Metactical Customization: Relink payment entries to sales orders when sales invoice is cancelled
@@ -90,7 +99,30 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 						frappe.db.set_value("Sales Order", sales_order, "neb_payment_completed_at", frappe.utils.getdate(now()), update_modified=True)
 		elif self.status != "Paid" and self.neb_payment_completed_at:
 			self.db_set("neb_payment_completed_at", None, notify=True)
+   
+	def create_offset_journal_entry(self):
+		journal_entry = frappe.new_doc("Journal Entry")
+		journal_entry.voucher_type = "Journal Entry"
+		journal_entry.posting_date = frappe.utils.getdate(now())
+  
+		journal_entry.append("accounts", {
+			"reference_type": "Sales Invoice",
+			"reference_name": self.name,
+			"account": self.debit_to,
+			"party_type": "Customer",
+			"party": self.customer,
+			"credit_in_account_currency": self.outstanding_amount
+		})
+  
+		journal_entry.append("accounts", {
+			"account": frappe.db.get_value("Account", {"account_name": "Write Off", "company": self.company}, "name"),
+			"debit_in_account_currency": self.outstanding_amount
+		})
 
+		journal_entry.set_missing_values()
+		journal_entry.save()
+		journal_entry.submit()
+  
 def unlink_ref_doc_from_payment_entries(ref_doc):	
 	#Check for sales order
 	multiple_orders = False
