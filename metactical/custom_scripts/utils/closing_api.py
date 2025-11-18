@@ -164,6 +164,7 @@ def create_closing_entry(*args, **kwargs):
         
         # Save the document
         end_of_day_closing.insert()
+        end_of_day_closing.submit()
         frappe.db.commit()
         
         frappe.response["status"] = "success"
