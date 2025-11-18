@@ -39,7 +39,7 @@ def create_shipping(name, provider='Canada Post', carrier_service=None, service_
 		return {"labels": response, "printing_disabled": printing_disabled}
 	elif provider == "Purolator":
 		purolator = Purolator()
-		response = purolator.create_shipment(name, service_name)
+		response = purolator.create_shipment(name, service_name, shipment_amount)
 		if response:
 			update_delivery_notes(name)
 		return {"labels": response, "printing_disabled": printing_disabled}
