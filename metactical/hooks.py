@@ -210,6 +210,9 @@ scheduler_events = {
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		], "*/1 * * * *": [
 			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
+		], "0 0 1 * *": [
+			# Calculate safety stock At 00:00 on day-of-month 1
+			"metactical.custom_scripts.item.item.safety_stock"
 		]
 	}
 }

@@ -2,6 +2,9 @@ import frappe
 import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
+from frappe.utils import add_months, today
+from math import sqrt
+from collections import defaultdict
 
 def validate(doc, method):
     load_tags(doc)
@@ -276,3 +279,209 @@ def update_child_table(item_names, child_table, child_table_field, updates, upda
                 total_updated_items += 1
                 
     return total_updated_items
+
+
+@frappe.whitelist()
+def safety_stock():
+    """
+    Recalculate safety stock for all stock items with asi_item_class set,
+    based on last 24 months of sales.
+    """
+    # 1) Look back 24 months from today
+    start_date = add_months(today(), -24)
+
+    # 2) Get all stock items that have a class defined
+    items = frappe.get_all(
+        "Item",
+        filters={
+            "is_stock_item": 1,
+            "disabled": 0,
+            "asi_item_class": ["is", "set"],
+        },
+        fields=["name", "item_name", "asi_item_class", "safety_stock"],
+    )
+
+    if not items:
+        return {"updated": 0, "message": "No items with asi_item_class found."}
+
+    # 3) Pull monthly sales qty for last 24 months (Sales Invoices)
+    sales_rows = frappe.db.sql(
+        """
+        SELECT
+            sii.item_code,
+            DATE_FORMAT(si.posting_date, '%%Y-%%m-01') AS month_start,
+            SUM(sii.qty) AS qty
+        FROM `tabSales Invoice Item` sii
+        JOIN `tabSales Invoice` si ON si.name = sii.parent
+        WHERE si.docstatus = 1
+          AND si.posting_date >= %s
+        GROUP BY sii.item_code, month_start
+        """,
+        (start_date,),
+        as_dict=True,
+    )
+
+    # 4) Arrange as: monthly_qty[item_code][month] = qty
+    monthly_qty = defaultdict(lambda: defaultdict(float))
+    for row in sales_rows:
+        monthly_qty[row.item_code][row.month_start] += float(row.qty or 0)
+
+    updated = 0
+    
+
+    # 5) For each item: compute stats + safety stock
+    for item in items:
+        # if item.asi_item_class is None or item.asi_item_class == "CY" or item.asi_item_class == "CZ":
+        #     continue
+        item_code = item.name  # in Item, name == item_code
+        item_class = (item.asi_item_class or "").strip().upper()
+
+        months_dict = monthly_qty.get(item_code, {})
+
+        if not months_dict:
+            # No sales history → you can choose to set 0 or skip
+            continue
+
+        # --- WEIGHTED AVERAGE USING 50/30/15/5 MODEL ---
+
+        # Sort months oldest → newest
+        months_sorted = sorted(months_dict.keys())
+        values = [months_dict[m] for m in months_sorted]
+        n = len(values)
+        if n == 0:
+            continue
+
+        # helper to slice safely from the end
+        def last_n(vals, count, offset_from_end=0):
+            """
+            Take `count` values ending at position n - offset_from_end.
+            offset_from_end=0 → last `count`
+            offset_from_end=3 → the `count` before last 3, etc.
+            """
+            if not vals:
+                return []
+            end = max(0, len(vals) - offset_from_end)
+            start = max(0, end - count)
+            return vals[start:end]
+
+        # groups relative to most recent months
+        last3  = last_n(values, 3, offset_from_end=0)   # last 3 months
+        prev3  = last_n(values, 3, offset_from_end=3)   # months -4 to -6
+        prev6  = last_n(values, 6, offset_from_end=6)   # months -7 to -12
+        prev12 = last_n(values, 12, offset_from_end=12) # months -13 to -24
+
+    
+        group_weights = {
+            "last3": 0.50,
+            "prev3": 0.30,
+            "prev6": 0.15,
+            "prev12": 0.05,
+        }
+
+        weighted_sum = 0.0
+        weight_denominator = 0.0
+
+        if last3:
+            weighted_sum += group_weights["last3"] * (sum(last3) / len(last3))
+            weight_denominator += group_weights["last3"]
+
+        if prev3:
+            weighted_sum += group_weights["prev3"] * (sum(prev3) / len(prev3))
+            weight_denominator += group_weights["prev3"]
+
+        if prev6:
+            weighted_sum += group_weights["prev6"] * (sum(prev6) / len(prev6))
+            weight_denominator += group_weights["prev6"]
+
+        if prev12:
+            weighted_sum += group_weights["prev12"] * (sum(prev12) / len(prev12))
+            weight_denominator += group_weights["prev12"]
+
+        # final weighted average (fallback if denominator=0, e.g. very few months)
+        if weight_denominator > 0:
+            avg = weighted_sum / weight_denominator
+        else:
+            avg = sum(values) / float(n)
+            
+
+        # Std dev (using the same avg as reference, unweighted variance)
+        if n > 1:
+            mean = avg
+            variance = sum((x - mean) ** 2 for x in values) / (n - 1)
+            std_dev = sqrt(variance)
+        else:
+            std_dev = 0
+
+        max_demand = max(values)
+
+        
+        new_safety_stock = calculate_safety_stock(
+            item_class=item_class,
+            avg_demand=avg,
+            std_dev=std_dev,
+            max_demand=max_demand,
+        )
+
+        # Update only if different (avoid unnecessary writes)
+        if (item.safety_stock or 0) != new_safety_stock:
+            frappe.db.set_value(
+                "Item",
+                item_code,
+                "safety_stock",
+                new_safety_stock,
+                update_modified=False,
+            )
+            updated += 1
+
+    frappe.db.commit()
+
+    return {"updated": updated}
+
+
+def calculate_safety_stock(item_class, avg_demand, std_dev, max_demand):
+    """
+    item_class: combined ABC-XYZ like 'AX', 'BY', 'CZ' from asi_item_class
+    """
+    if not item_class or not avg_demand or avg_demand <= 0:
+        return 0
+
+    classification = item_class.strip().upper()
+    if len(classification) < 2:
+        return 0
+
+    abc_class = classification[0]   # A / B / C
+
+    # Z-scores by classification (for std dev formulas)
+    z_scores = {
+        'AX': 2.33,  # 99%
+        'AY': 2.00,  # 97.7%
+        'AZ': 1.65,  # 95%
+        'BX': 1.65,  # 95%
+        'BY': 1.65,  # 95%
+        'BZ': 1.28,  # 90%
+        'CX': 1.28,  # 90%
+        # 'CY': 1.04,  # 85%
+        # 'CZ': 0.84,  # 80%
+    }
+
+    z = z_scores.get(classification, 1.65)  # default ~95% if unknown class
+
+    # 1) Std deviation method for AX, AY, BX, BY
+    if classification in ['AX', 'AY', 'BX', 'BY']:
+        safety_stock = z * (std_dev or 0)
+
+    # 2) Max-based method for AZ, BZ
+    elif classification in ['AZ', 'BZ']:
+        if max_demand is None:
+            max_demand = avg_demand
+        factor = 0.75 if abc_class == 'A' else 0.50
+        safety_stock = max(0, (max_demand - avg_demand) * factor)
+
+    # 3) Simple percentage of average for CX, CY, CZ
+    else:
+        # factors = {'CX': 0.20, 'CY': 0.25, 'CZ': 0.30}
+        factors = {'CX': 0.20}
+        factor = factors.get(classification, 0.25)
+        safety_stock = avg_demand * factor
+
+    return round(safety_stock)
