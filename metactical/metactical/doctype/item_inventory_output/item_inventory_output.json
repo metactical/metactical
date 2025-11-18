@@ -14,7 +14,8 @@
   "column_break_linoq",
   "qoh",
   "section_break_1ngjh",
-  "item_inventory_output_list"
+  "item_inventory_output_list",
+  "inventory_per_country"
  ],
  "fields": [
   {
@@ -56,11 +57,17 @@
    "fieldtype": "Link",
    "label": "Item",
    "options": "Item"
+  },
+  {
+   "fieldname": "inventory_per_country",
+   "fieldtype": "Table",
+   "label": "Inventory Per Country",
+   "options": "Inventory Per Country"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-11-14 03:08:05.863135",
+ "modified": "2025-10-30 09:37:35.640674",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Inventory Output",

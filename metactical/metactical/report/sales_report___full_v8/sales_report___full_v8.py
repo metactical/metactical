@@ -340,7 +340,7 @@ def get_column(filters,conditions):
 				"fieldtype": "DateTime",
 				"width": 200,
 			},
-			{
+   			{
 				"label": _("Cost"),
 				"fieldname": "item_cost",
 				"fieldtype": "Currency",
@@ -794,7 +794,7 @@ def get_item_details(item, list_type="Selling", supplier=None):
 	if price_list is None or price_list  == "":
 		frappe.throw("Please set a default price list in stock Settings")
 	cond = "and price_list = '{}' and selling = 1".format(price_list)
-	if list_type == "Buying": cond= " and buying = 1"
+	if list_type == "Buying": cond= " and buying = 1 and price_list like 'SUP%'"
 	rate = 0
 	date = frappe.utils.nowdate()
 	r = frappe.db.sql("select price_list_rate from `tabItem Price` \

@@ -40,11 +40,54 @@ class PicklistPage{
 				}
 			}
 			
+			this.setupPlTextEditHandler(); // make the handler available for all views
+			
 			// Resolve the promise after everything is set up
 			resolve();
 		});
 	}
 	
+	setupPlTextEditHandler() {
+		const me = this;
+		$(document).off('click.metactical', '.edit-pl-text').on('click.metactical', '.edit-pl-text', function (e) {
+			e.preventDefault();
+			const $btn = $(this);
+			const pickList = $btn.data('pickList') || (window.metactical?.pick_list?.current_pick);
+			if (!pickList) {
+				frappe.msgprint(__('Missing Pick List name.'));
+				return;
+			}
+			const $box = $(`#pl-text-container-${pickList}`);
+			const currentText = ($box.text() || $btn.data('currentText') || '').trim();
+
+			const d = new frappe.ui.Dialog({
+				title: __('Add/Edit Note'),
+				fields: [{ fieldtype: 'Small Text', fieldname: 'pl_text', label: __('Note'), default: currentText }],
+				primary_action_label: __('Save'),
+				primary_action(values) {
+					frappe.call({
+						method: "metactical.metactical.page.picklist_page.picklist_page.update_pl_text",
+						freeze: true,
+						args: { pick_list: pickList, pl_text: values.pl_text || "" },
+						callback: function () {
+							const txt = (values.pl_text || "").trim();
+							if (txt) {
+								$box.text(txt).show();
+							} else {
+								$box.text('').hide();
+							}
+							// keep button’s data-current-text in sync
+							$btn.data('currentText', txt);
+							frappe.show_alert({ message: __('Note saved'), indicator: 'green' });
+							d.hide();
+						}
+					});
+				}
+			});
+			d.show();
+		});
+	}
+
 	load_home(){
 		const me = this;
 		this.wrapper.html(frappe.render_template("picklist_page"));

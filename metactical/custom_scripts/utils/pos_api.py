@@ -536,6 +536,7 @@ def get_items(form_data):
         rate = item['Rate']
         qty = item['Qty']
         item_name = item['ItemName'] if 'ItemName' in item else ''
+        sales_person = frappe.db.get_value("User", {"full_name": item['SalesPerson']}, "name") if item['SalesPerson'] != "defaultSalesPersonId" else ""
         
         item_info = {
             'item_code': item_code,
@@ -545,6 +546,7 @@ def get_items(form_data):
             'discount_percentage': item['Discount'],
             'warehouse': item["Warehouse"] if "Warehouse" in item else warehouse,
             'restock_fee': item['RestockFee'] if 'RestockFee' in item else 0.0,
+            'sales_person': sales_person,
         }
 
         if item_code == "2":
@@ -560,7 +562,8 @@ def get_customer(form_data):
 
         if not form_data['Customer']['Name']:
             frappe.set_user("Administrator")
-            return "DefaultPOS"+form_data["POSProfile"]
+            customer = frappe.db.get_value('POS Profile', form_data['POSProfile'] + ' Operators', 'customer')
+            return customer
         
         customer = frappe.db.exists('Customer', form_data['Customer']['id'])
         if customer:
@@ -1238,7 +1241,7 @@ def get_on_order_quantity(item_code, warehouse):
         JOIN `tabPurchase Order` po ON poi.parent = po.name
         WHERE
             poi.item_code = {frappe.db.escape(item_code)}
-            AND poi.warehouse = {frappe.db.escape(warehouse)}
+            AND poi.warehouse = "W01-WHS-Active Stock - ICL"
             AND po.docstatus = 1
             AND po.status in ('To Receive and Bill', 'To Receive')
             AND poi.qty > poi.received_qty

@@ -47,7 +47,7 @@ def create_manifest(manifest, service_provider):
 		return {"po_number": po_number, "shipments": shipments}
 	except ValueError as e:
 		if str(e) == "9122":
-			redownload_manifest(manifest)
+			redownload_manifest(manifest, "Manifest")
 
 @frappe.whitelist()		
 def redownload_manifest(docname, doctype):
@@ -70,10 +70,10 @@ def redownload_cp_manifest(doc):
 	headers={'Accept': 'application/vnd.cpc.manifest-v8+xml'}
 	response = cp.get_response(url, "", headers=headers, method='GET')
 	manifest_links = []
-	if isinstance(response["manifests"]["link"], list):
+	if response["manifests"].get("link") and isinstance(response["manifests"]["link"], list):
 		for manifest in response["manifests"]["link"]:
 			manifest_links.append(cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET"))
-	else:
+	elif response["manifests"].get("link"):
 		manifest = response["manifests"]["link"]
 		manifest_links.append(cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET"))
 	

@@ -2,13 +2,19 @@
 	<div class="col-md-4"><b><a class="list-top-nav-desk alt-color back-to-list" href="#">Back</a></b></div>
 	<div class="col-md-4"><center><h5 id="#order_no">{{pick_list_name}}</h5></center></div>
 	<div class="col-md-4" style="text-align: right;">
+		
 		<b><a class="list-top-nav-desk alt-color submit-items-btn" href="#">Submit</a></b>
 	</div>
-	{% if pl_text != "" %}
-		<div class="col-md-12" style="background-color: #fff; margin-right: 20px; margin-left: 10px; padding: 10px; border-radius: 10px; margin-bottom: 20px;" >
-				{{pl_text}}
+	<div class="col-md-12" style="background-color: #FFF; border-radius: 10px; box-shadow: 0px 0px 4px #CAC7C7; margin-bottom: 20px;;">
+		<div id="pl-text-container-{{ pick_list_name }}"
+			style="background-color: #fff; padding: 10px; width: 88%; float: left;">
+			{{ pl_text }}
 		</div>
-	{% endif %}
+		<div style="width: 10%; text-align: right; float: right;">
+			<b><a class="list-top-nav-desk alt-color edit-pl-text" href="#"
+				data-pick-list="{{ pick_list_name }}">Add/Edit Note</a></b>
+		</div>
+	</div>
 	<div class="col-lg-6 col-md-12 col-sm-12 col-xs-12" id="pick-list-items-div">
 		<h4 class="items-header"><center>Items to Pick</center></h4>
 		<div class="item-barcode"></div>

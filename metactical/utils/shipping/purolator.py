@@ -83,6 +83,32 @@ class Purolator:
 
 		return client
 
+	def _get_quick_estimate_services(self, client, billing_account, sender_postal, receiver_addr, total_weight):
+		# Build minimal request for GetQuickEstimate (v2)
+		req = {
+			'BillingAccountNumber': billing_account,
+			'SenderPostalCode': (sender_postal or '').replace(' ', ''),
+			'ReceiverAddress': {
+				'City': receiver_addr.city,
+				'Province': (receiver_addr.state or '')[:2] if len(receiver_addr.state or '') <= 2 else (get_state_code(receiver_addr.state) or receiver_addr.state),
+				'Country': frappe.db.get_value("Country", receiver_addr.country, "code"),
+				'PostalCode': (receiver_addr.pincode or '').replace(' ', '')
+			},
+			'PackageType': 'CustomerPackaging',
+			'TotalWeight': {
+				'Value': max(float(total_weight or 0), 0.01),  # Purolator rejects 0
+				'WeightUnit': 'kg'
+			}
+		}
+		resp = client.service.GetQuickEstimate(**req)
+		resp = getattr(resp, 'body', resp)
+		services = []
+		if getattr(resp, 'ShipmentEstimates', None) and getattr(resp.ShipmentEstimates, 'ShipmentEstimate', None):
+			for est in resp.ShipmentEstimates.ShipmentEstimate:
+				if getattr(est, 'ServiceID', None):
+					services.append(est.ServiceID)
+		return services
+
 	def get_rate(self, docname):
 		data = []
 		options = {}
@@ -95,66 +121,139 @@ class Purolator:
 		client = self.create_pwss_soap_client(wsdl_url, docname)
 
 		shipment = frappe.get_doc("Shipment", docname)
-		sender_postal_code = frappe.db.get_value("Address", shipment.pickup_address_name, "pincode").replace(" ", "")
-		customer_address = frappe.get_doc("Address", shipment.delivery_address_name)
-		state = customer_address.state
-		if len(state) > 2:
-			state = get_state_code(state)
 
-			if not state:
-				frappe.throw("Error: Incorrect customer's state. Please fix and try again")
+		# Sender/Receiver addresses
+		sender_address = frappe.get_doc("Address", shipment.pickup_address_name)
+		receiver_address = frappe.get_doc("Address", shipment.delivery_address_name)
 
-		receiver_address = {
-			"City": customer_address.city,
-			"Province": state.upper(),
-			"Country": frappe.db.get_value("Country", customer_address.country, "code").upper(),
-			"PostalCode": customer_address.pincode.replace(" ", "")
-		}
+		def split_street(line):
+			parts = (line or "").split(" ")
+			if len(parts) >= 2:
+				return parts[0], " ".join(parts[1:])
+			return "", line or ""
 
-		for row in shipment.shipment_parcel:
-			items = []
-			request = {
-				'SenderPostalCode': sender_postal_code,
-				'ReceiverAddress': receiver_address,
-				'PackageType': 'CustomerPackaging',
-				'TotalWeight': {
-					'Value': row.weight,
-					'WeightUnit': 'kg'
+		sender_street_number, sender_street_name = split_street(sender_address.address_line1)
+		receiver_street_number, receiver_street_name = split_street(receiver_address.address_line1)
+
+		# Province/state codes
+		sender_state = sender_address.state or ""
+		if len(sender_state) > 2:
+			sender_state = get_state_code(sender_state) or sender_state
+		receiver_state = receiver_address.state or ""
+		if len(receiver_state) > 2:
+			receiver_state = get_state_code(receiver_state) or receiver_state
+
+		# Build PiecesInformation for all parcels
+		pieces = []
+		total_weight = 0
+		for piece in shipment.shipment_parcel:
+			total_weight += float(piece.weight or 0)
+			pieces.append({
+				'Weight': {'Value': float(piece.weight or 0), 'WeightUnit': 'kg'},
+				'Length': {'Value': float(piece.length or 0), 'DimensionUnit': 'cm'},
+				'Width':  {'Value': float(piece.width  or 0), 'DimensionUnit': 'cm'},
+				'Height': {'Value': float(piece.height or 0), 'DimensionUnit': 'cm'}
+			})
+
+		# Discover candidate services first (required to satisfy ServiceID)
+		candidate_services = self._get_quick_estimate_services(
+			client=client,
+			billing_account=self.settings['billing_account'],
+			sender_postal=sender_address.pincode,
+			receiver_addr=receiver_address,
+			total_weight=total_weight
+		)
+		# Fallback to a sensible default if none returned
+		if not candidate_services:
+			candidate_services = ['PurolatorGround', 'PurolatorExpress']
+
+		items = []
+		seen = set()
+
+		# Build base shipment request (v2)
+		base_shipment = {
+			'ShipmentDate': shipment.pickup_date,
+			'SenderInformation': {
+				'Address': {
+					'Name': shipment.pickup_company,
+					'Company': shipment.pickup_company,
+					'StreetNumber': sender_street_number,
+					'StreetName': sender_street_name,
+					'StreetType': "Street",
+					'City': sender_address.city,
+					'Province': (sender_state or "").upper(),
+					'Country': frappe.db.get_value("Country", sender_address.country, "code"),
+					'PostalCode': (sender_address.pincode or "").replace(" ", "")
 				}
-			}
+			},
+			'ReceiverInformation': {
+				'Address': {
+					'Name': frappe.db.get_value('Customer', shipment.delivery_customer, 'customer_name'),
+					'Company': receiver_address.company,
+					'StreetNumber': receiver_street_number,
+					'StreetName': receiver_street_name,
+					'StreetType': "Street",
+					'City': receiver_address.city,
+					'Province': (receiver_state or "").upper(),
+					'Country': frappe.db.get_value("Country", receiver_address.country, "code"),
+					'PostalCode': (receiver_address.pincode or "").replace(" ", "")
+				}
+			},
+			'PackageInformation': {
+				'TotalWeight': {'Value': float(total_weight or 0.01), 'WeightUnit': 'kg'},
+				'TotalPieces': len(shipment.shipment_parcel),
+				# ServiceID will be set per candidate
+				'PiecesInformation': {'Piece': pieces}
+			},
+			'PaymentInformation': {
+				'PaymentType': "Sender",
+				'RegisteredAccountNumber': self.settings['billing_account'],
+				'BillingAccountNumber': self.settings['billing_account']
+			},
+			'PickupInformation': {'PickupType': 'PreScheduled'}
+		}
+		if receiver_address.country != "Canada":
+			base_shipment['InternationalInformation'] = {"DocumentsOnlyIndicator": True}
 
-			response = client.service.GetQuickEstimate(**request)
-			response = response.body
+		# Query full estimates per service
+		for service_id in candidate_services:
+			try:
+				req = {
+					'Shipment': dict(base_shipment, PackageInformation=dict(base_shipment['PackageInformation'], ServiceID=service_id)),
+					'ShowAlternativeServicesIndicator': False
+				}
+				resp = client.service.GetFullEstimate(**req)
+				resp = getattr(resp, 'body', resp)
 
-			# Check if the response is valid and contains ShipmentEstimates
-			if response and hasattr(response, 'ShipmentEstimates') and hasattr(response.ShipmentEstimates, 'ShipmentEstimate') \
-				and len(response.ShipmentEstimates.ShipmentEstimate) > 0:
-				for estimate in response.ShipmentEstimates.ShipmentEstimate:
-					options[estimate.ServiceID] = estimate.ServiceID
-					items.append({
-						'carrier_service': estimate.ServiceID,
-						'service_name': estimate.ServiceID,
-						'base': estimate.BasePrice,
-						'shipment_amount': estimate.TotalPrice,
-						'guaranteed_delivery': "Unknown",
-						'expected_transit_time': estimate.EstimatedTransitDays,
-						'expected_delivery_date': estimate.ExpectedDeliveryDate,
-					})
-			elif response and hasattr(response, 'ResponseInformation') and hasattr(response.ResponseInformation, 'Errors') \
-				and len(response.ResponseInformation.Errors) > 0:
-				error = self.render_error(response.ResponseInformation.Errors)
-				frappe.throw(error)
+				if getattr(resp, 'ShipmentEstimates', None) and getattr(resp.ShipmentEstimates, 'ShipmentEstimate', None):
+					for est in resp.ShipmentEstimates.ShipmentEstimate:
+						if not getattr(est, 'ServiceID', None):
+							continue
+						if est.ServiceID in seen:
+							continue
+						seen.add(est.ServiceID)
+						options[est.ServiceID] = est.ServiceID
+						items.append({
+							'carrier_service': est.ServiceID,
+							'service_name': est.ServiceID,
+							'base': est.BasePrice,
+							'shipment_amount': est.TotalPrice,
+							'guaranteed_delivery': "Unknown",
+							'expected_transit_time': getattr(est, 'EstimatedTransitDays', None),
+							'expected_delivery_date': getattr(est, 'ExpectedDeliveryDate', None),
+						})
+				elif getattr(resp, 'ResponseInformation', None) and getattr(resp.ResponseInformation, 'Errors', None):
+					# Skip this service but keep others
+					frappe.throw(self.render_error(resp.ResponseInformation.Errors))
+			except Exception as e:
+				# Continue with other services
+				frappe.log_error("Purolator Get Rate Error", f"FullEstimate failed for {service_id}: {e}")
 
-			if items:
-				data.append({
-					'name': row.name,
-					'idx': row.idx,
-					'count': row.count,
-					'items': items,
-				})
+		# Return single-row structure for UI
+		if items:
+			first_row = shipment.shipment_parcel[0]
+			data.append({'name': first_row.name, 'idx': first_row.idx, 'count': first_row.count, 'items': items})
 
-		# Because with Purilator you can only select a single service even with multiple pieces,
-		# combine the two rates into a single one to remove confusion
 		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()], "supports_multiple": False}
 	
 	def create_shipment(self, docname, selected_service):
@@ -356,26 +455,24 @@ class Purolator:
 
 		client = self.create_pwss_soap_client(wsdl_url, docname)
 
+		client.set_default_soapheaders([])
+
 		header = xsd.Element(
-				'{http://purolator.com/pws/datatypes/v1}RequestContext',
-				xsd.ComplexType([
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
-				])
-			)
+			'{http://purolator.com/pws/datatypes/v1}RequestContext',
+			xsd.ComplexType([
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String()),
+			])
+		)
 		header_value = header(Version='1.3', Language='en', GroupID='xxx', RequestReference=docname)
 
 		request_data = {
 			'DocumentCriterium': {
 				'DocumentCriteria': {
-					'PIN': {
-						'Value': pin
-					}, 
-					'DocumentTypes': {
-						'DocumentType': "DomesticBillOfLading"
-					}
+					'PIN': {'Value': pin},
+					'DocumentTypes': {'DocumentType': "DomesticBillOfLading"},
 				}
 			},
 			'OutputType': 'PDF',
@@ -383,6 +480,7 @@ class Purolator:
 		}
 
 		response = client.service.GetDocuments(_soapheaders=[header_value], **request_data)
+		frappe.log_error("Purolator Test", {"Purolator Response": response})
 		documents = response.body.Documents.Document
 		files = []
 		for document in documents:
@@ -477,15 +575,17 @@ class Purolator:
 
 		client = self.create_pwss_soap_client(wsdl_url, manifest_docname)
 
+		# Clear v2 default header and set v1 header
+		client.set_default_soapheaders([])
 		header = xsd.Element(
-				'{http://purolator.com/pws/datatypes/v1}RequestContext',
-				xsd.ComplexType([
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
-					xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
-				])
-			)
+			'{http://purolator.com/pws/datatypes/v1}RequestContext',
+			xsd.ComplexType([
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Version', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}Language', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}GroupID', xsd.String()),
+				xsd.Element('{http://purolator.com/pws/datatypes/v1}RequestReference', xsd.String())
+			])
+		)
 		header_value = header(Version='1.3', Language='en', GroupID='xxx', RequestReference=manifest_docname)
 		request = {
 			'ShipmentManifestDocumentCriterium': {
@@ -552,15 +652,3 @@ class Purolator:
 						</tr>"""
 		ret += """</table>"""
 		return ret
-	
-def test():
-	# cp = CanadaPost()
-	# ret = cp.get_rate(name="SHIPMENT-00124")
-	# print(ret)
-	purolator = Purolator()
-	ret = purolator.create_shipment("SHIPMENT-00195", '{"d4u1o7u699": "PurolatorExpressU.S."}')
-	#ret = purolator.get_documents('SHIPMENT-00124', '329015010179')
-	#ret = purolator.void_shipment('SHIPMENT-00128', '["bcobed5l9v"]')
-	#ret = purolator.get_rate('SHIPMENT-00142')
-	#ret = purolator.consolidate_shipments('MF-10-17-2023-201952', '2025-01-23')
-	print(ret)
