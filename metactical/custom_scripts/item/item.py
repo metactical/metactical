@@ -43,6 +43,9 @@ class CustomItem(Item):
     def validate(self):
         load_tags(self)
 
+        if not self.description:
+            self.description = self.item_name
+
     def on_update(self):
         # check website specification values
         validate_website_specifications(self)
