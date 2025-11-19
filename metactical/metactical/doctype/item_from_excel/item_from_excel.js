@@ -1,8 +1,11 @@
 // Copyright (c) 2024, Techlift Technologies and contributors
 // For license information, please see license.txt
+var running = false;
 
 frappe.ui.form.on('Item From Excel', {
 	refresh: function(frm) {
+		$('[data-fieldname="preview"]').html("")
+
 		// Trigger validation when form is refreshed
 		if (frm.doc.excel_file && !frm.doc.__islocal && frm.doc.docstatus == 0) {
 			validate_excel_file(frm);
@@ -14,6 +17,11 @@ frappe.ui.form.on('Item From Excel', {
 });
 
 function validate_excel_file(frm) {
+	if (!running) 
+		running = true;
+	else
+		return; // Prevent multiple simultaneous runs
+
 	// Show loading indicator
 	frm.set_df_property('preview', 'options', 
 		'<div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Validating file structure and content...</div>'
@@ -50,6 +58,8 @@ function validate_excel_file(frm) {
 					html += '</div>' + get_validation_styles();
 					frm.set_df_property('preview', 'options', html);
 				}
+
+				running = false;
 			}
 		},
 		error: function(r) {
@@ -347,6 +357,11 @@ function extract_and_validate_excel(frm) {
 		},
 		callback: function(r) {
 			if (r.message) {
+				if (Object.keys(r.message).length === 0 && !frm.doc.all_valid) {
+					frm.set_value("all_valid", true);
+					frm.save()
+				}
+
 				const priceListResults = r.message;
 				
 				// Remove loading message
@@ -685,6 +700,10 @@ function show_multi_pricelist_summary(frm, priceListResults) {
 				if (!frm.doc.all_valid)
 					frm.set_value("all_valid", true);
 				success_count++;
+			}
+			else{
+				if (frm.doc.all_valid == true)
+					frm.set_value("all_valid", false);
 			}
 		}
 	});
