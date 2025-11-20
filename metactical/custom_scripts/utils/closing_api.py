@@ -20,7 +20,7 @@ def create_closing_entry(*args, **kwargs):
         pos_profile = pos_profile + " Operators"
             
         user = form_data.get("User")
-        closing_date = form_data.get("ClosingDate", frappe.utils.nowdate())
+        closing_date = form_data.get("Date", frappe.utils.nowdate())
         
         # Get POS Profile document
         pos_profile_name = pos_profile
@@ -47,7 +47,7 @@ def create_closing_entry(*args, **kwargs):
         end_of_day_closing.user = user
         end_of_day_closing.pos_profile = pos_profile
         end_of_day_closing.closing_date = closing_date
-        end_of_day_closing.closing_time = form_data.get("ClosingTime")
+        end_of_day_closing.closing_time = form_data.get("Time")
         end_of_day_closing.company = pos_profile_doc.company
         end_of_day_closing.cash_float = form_data.get("CashFloat")
         end_of_day_closing.subtracted_float = -form_data.get("CashFloat", 0)
@@ -105,7 +105,7 @@ def create_closing_entry(*args, **kwargs):
         for payment in payments:
             mop = payment.get("ModeOfPayment")
             if mop == "Cash":
-                actual = float(payment.get("Actual", 0))
+                actual = float(payment.get("Amount", 0))
                 expected = expected_payments.get(mop, 0)
                 difference = actual - expected
                 
@@ -124,7 +124,7 @@ def create_closing_entry(*args, **kwargs):
         for payment in payments:
             mop = payment.get("ModeOfPayment")
             if mop != "Cash":
-                actual = float(payment.get("Actual", 0))
+                actual = float(payment.get("Amount", 0))
                 expected = expected_payments.get(mop, 0)
                 difference = actual - expected
                 
@@ -167,6 +167,11 @@ def create_closing_entry(*args, **kwargs):
         end_of_day_closing.submit()
         frappe.db.commit()
         
+        mode_of_payments = [{"mode_of_payment": d.mode_of_payment,
+                             "expected": d.expected,
+                             "actual": d.actual,
+                             "difference": d.difference} for d in end_of_day_closing.eod_payments]
+        
         frappe.response["status"] = "success"
         frappe.response["message"] = ""
         frappe.response["float_amount"] = end_of_day_closing.cash_float
@@ -178,6 +183,7 @@ def create_closing_entry(*args, **kwargs):
         frappe.response["total_expected"] = end_of_day_closing.mop_total_expected
         frappe.response["total_actual"] = end_of_day_closing.mop_total_actual
         frappe.response["total_difference"] = end_of_day_closing.mop_total_difference
+        frappe.response["mode_of_payments"] = mode_of_payments
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="POS - Error creating closing entry")
         frappe.db.rollback()
