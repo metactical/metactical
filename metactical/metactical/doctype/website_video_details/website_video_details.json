@@ -9,7 +9,7 @@
   "key",
   "value",
   "price_list",
-  "is_product"
+  "is_product_level"
  ],
  "fields": [
   {
@@ -36,16 +36,16 @@
   },
   {
    "default": "0",
-   "fieldname": "is_product",
+   "fieldname": "is_product_level",
    "fieldtype": "Check",
    "in_list_view": 1,
-   "label": "Is Product?"
+   "label": "Is Product Level?"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-11-12 10:47:26.290326",
+ "modified": "2025-11-12 10:52:38.373440",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Video Details",
