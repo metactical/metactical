@@ -585,12 +585,12 @@ def add_child_table_values_to_item(item, child_table_values, is_template, attrib
 		if child == "item_detail" and is_template and child_table_values[child]:
 			price_lists = child_table_values[child][0].get("price_list")
 			if price_lists:
-				price_lists = price_lists.split(', ') if "," in price_lists else []
+				price_lists = price_lists.split(',') if len(price_lists) > 1 else []
 				child_table_values[child] = []
 				for pl in price_lists:
 					if validate_link("Price List", pl):
 						child_table_values[child].append({
-							"price_list": pl
+							"price_list": pl.strip()
 						})
      
 		if len(child_table_values[child]):
