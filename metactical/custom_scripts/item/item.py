@@ -41,12 +41,17 @@ class CustomItem(Item):
         new_item.save()
 
     def validate(self):
+        super().validate()
+        if not frappe.flags.get("item_from_excel"):
+            frappe.flags.in_import = False
+
         load_tags(self)
 
         if not self.description:
             self.description = self.item_name
 
     def on_update(self):
+        super().on_update()
         # check website specification values
         validate_website_specifications(self)
         sync_website_specifications(self)
