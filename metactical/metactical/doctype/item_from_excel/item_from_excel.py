@@ -287,6 +287,7 @@ class ItemFromExcel(Document):
 		# item.ifw_retailskusuffix = item.item_code
   
 		frappe.flags.in_import = True
+		frappe.flags.item_from_excel = True
 		item.insert()
 		supplier = item.supplier_items[0].supplier if item.supplier_items else None
 		if supplier:
@@ -304,6 +305,8 @@ class ItemFromExcel(Document):
 			template_item.request_ai_suggestion = 1
 			frappe.flags.in_import = False
 			template_item.save()
+   
+		frappe.flags.item_from_excel = False
    
 	def add_website_specifications_to_item(self, item, item_specifications):
 		"""

@@ -42,7 +42,9 @@ class CustomItem(Item):
 
     def validate(self):
         super().validate()
-        frappe.flags.in_import = False
+        if not frappe.flags.get("item_from_excel"):
+            frappe.flags.in_import = False
+
         load_tags(self)
 
         if not self.description:
