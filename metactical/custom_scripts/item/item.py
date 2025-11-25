@@ -41,12 +41,15 @@ class CustomItem(Item):
         new_item.save()
 
     def validate(self):
+        super().validate()
+        frappe.flags.in_import = False
         load_tags(self)
 
         if not self.description or self.description.strip() == '<div class="ql-editor read-mode"><p><br></p></div>':
             self.description = self.item_name
 
     def on_update(self):
+        super().on_update()
         # check website specification values
         validate_website_specifications(self)
         sync_website_specifications(self)
