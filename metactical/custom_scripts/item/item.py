@@ -64,13 +64,6 @@ class CustomItem(Item):
                     frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
                     frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
 
-        else:
-            try:
-                frappe.db.delete("Item", old_item_code)
-            except Exception as e:
-                frappe.msgprint("Error deleting the old item after merge: {0}".format(str(e)))
-                frappe.log_error(title="Error deleting old item after merge", message=frappe.get_traceback())
-                
         frappe.db.commit()
 
     def validate(self):
