@@ -27,7 +27,7 @@
   },
   {
    "fieldname": "old_item",
-   "fieldtype": "Text",
+   "fieldtype": "JSON",
    "label": "Old Item",
    "read_only": 1
   },
@@ -40,14 +40,14 @@
   },
   {
    "fieldname": "new_item",
-   "fieldtype": "Text",
+   "fieldtype": "JSON",
    "label": "New Item",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-26 04:40:01.959529",
+ "modified": "2025-11-26 06:26:15.910919",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Merge History",

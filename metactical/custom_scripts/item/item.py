@@ -3,7 +3,7 @@ import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
-
+import datetime
 
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
@@ -39,6 +39,20 @@ class CustomItem(Item):
 
         # Save the updated new item
         new_item.save()
+
+    def sanitize(self, obj):
+        """Recursively convert datetime and date objects to string."""
+        
+        if isinstance(obj, (datetime.datetime, datetime.date)):
+            return obj.strftime('%Y-%m-%d %H:%M:%S') if isinstance(obj, datetime.datetime) else obj.strftime('%Y-%m-%d')
+        
+        if isinstance(obj, list):
+            return [self.sanitize(x) for x in obj]
+        
+        if isinstance(obj, dict):
+            return {k: self.sanitize(v) for k, v in obj.items()}
+        
+        return obj
         
     def after_rename(self, old_item_code, new_item_code, merge=False):
         super().after_rename(old_item_code, new_item_code, merge)
@@ -50,8 +64,8 @@ class CustomItem(Item):
         item_merge_history.old_item_code = old_item_code
         item_merge_history.new_item_code = new_item_code
         
-        item_merge_history.old_item = old_item.as_dict()
-        item_merge_history.new_item = new_item.as_dict()
+        item_merge_history.old_item = self.sanitize(old_item.as_dict())
+        item_merge_history.new_item = self.sanitize(new_item.as_dict())
         
         item_merge_history.insert(ignore_permissions=True)
 
