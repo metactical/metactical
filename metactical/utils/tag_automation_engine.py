@@ -56,10 +56,6 @@ class TagAutomationEngine:
             now=False
         )
         
-        self.process_in_batches(
-            script_manager_name, execution_id, filters
-        )
-        
         return execution_id
     
     def process_in_batches(self, script_manager_name: str, execution_id: str, 
@@ -426,7 +422,7 @@ class TagAutomationEngine:
                 
                 tags_to_apply.append({
                     "tag": tag_name,
-                    "remove_others": condition.remove_other_tags,
+                    "remove_others": script_config.remove_other_tags,
                     "color": condition.tag_color
                 })
                 break  # Only apply first matching condition
@@ -439,7 +435,7 @@ class TagAutomationEngine:
             
             tags_to_apply.append({
                 "tag": default_tag,
-                "remove_others": False,
+                "remove_others": script_config.remove_other_tags,
                 "color": None
             })
         
@@ -500,14 +496,30 @@ class TagAutomationEngine:
         # Get existing tags
         existing_tags_str = frappe.db.get_value(doctype, docname, "_user_tags") or ""
         existing_tags = [t.strip() for t in existing_tags_str.split(",") if t.strip()]
+        tags_to_delete = []
         
         # Remove tags with same prefix if needed
         for tag_info in tags_to_apply:
             if tag_info["remove_others"] and script_config.tag_prefix:
+                tags_to_delete = [
+                    t for t in existing_tags 
+                    if t.startswith(script_config.tag_prefix)
+                ]
+                
                 existing_tags = [
                     t for t in existing_tags 
                     if not t.startswith(script_config.tag_prefix)
                 ]
+            
+            if tags_to_delete:
+                # Delete from Tag Link table
+                frappe.db.sql(f"""
+                    DELETE FROM `tabTag Link`
+                    WHERE tag IN ({', '.join(['%s']*len(tags_to_delete))})
+                    AND document_type = %s
+                    AND document_name = %s
+                """, (*tags_to_delete, doctype, docname))
+                frappe.db.commit()
         
         # Add new tags
         new_tags = existing_tags.copy()
