@@ -39,6 +39,39 @@ class CustomItem(Item):
 
         # Save the updated new item
         new_item.save()
+        
+    def after_rename(self, old_item_code, new_item_code, merge=False):
+        super().after_rename(old_item_code, new_item_code, merge)
+
+        old_item = frappe.get_doc("Item", old_item_code)
+        new_item = frappe.get_doc("Item", new_item_code)
+        
+        item_merge_history = frappe.new_doc("Item Merge History")
+        item_merge_history.old_item_code = old_item_code
+        item_merge_history.new_item_code = new_item_code
+        
+        item_merge_history.old_item = old_item.as_dict()
+        item_merge_history.new_item = new_item.as_dict()
+        
+        item_merge_history.insert(ignore_permissions=True)
+
+        if old_item.variant_of:
+            remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", new_item_code]})
+            if remaining_variants == 0 or remaining_variants is None:  
+                try:
+                    frappe.db.delete("Item", old_item.variant_of)
+                except Exception as e:
+                    frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
+                    frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
+
+        else:
+            try:
+                frappe.db.delete("Item", old_item_code)
+            except Exception as e:
+                frappe.msgprint("Error deleting the old item after merge: {0}".format(str(e)))
+                frappe.log_error(title="Error deleting old item after merge", message=frappe.get_traceback())
+                
+        frappe.db.commit()
 
     def validate(self):
         load_tags(self)
