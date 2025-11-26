@@ -1,6 +1,27 @@
 import frappe
 from frappe import _
+import json
 from metactical.utils.tag_automation_engine import TagAutomationEngine
+
+def trigger_tag_automation_for_document(doc, method):
+    tag_scripts = frappe.db.get_all("Tag Script Manager", filters={"target_doctype": doc.doctype, "execution_frequency": "On Save"})
+    
+    for script in tag_scripts:
+        script_config = frappe.get_doc("Tag Script Manager", script.name)
+        
+        # Execute script
+        doc_name = doc.name
+        
+        filters = json.loads(script_config.filter_json) or {}
+        if filters:
+            filters.update({"name": doc_name})
+            matched = frappe.db.exists(script_config.target_doctype, filters)
+            if not matched:
+                continue
+            
+        script_outputs = TagAutomationEngine()._process_single_document(
+            script_config, doc_name
+        )
 
 @frappe.whitelist()
 def execute_tag_script(script_manager_name, filters=None):
