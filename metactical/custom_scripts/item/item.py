@@ -56,7 +56,7 @@ class CustomItem(Item):
         item_merge_history.insert(ignore_permissions=True)
 
         if old_item.variant_of:
-            remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", new_item_code]})
+            remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
             if remaining_variants == 0 or remaining_variants is None:  
                 try:
                     frappe.db.delete("Item", old_item.variant_of)
