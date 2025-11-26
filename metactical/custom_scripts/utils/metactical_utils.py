@@ -613,3 +613,12 @@ def sort_items_by_location(data):
 		items.append(frappe._dict(row))
 	
 	return items
+
+@frappe.whitelist()
+def custom_parse_json(json_string, key=None):
+    """Parse JSON string and optionally return a key"""
+    try:
+        data = json.loads(json_string) if isinstance(json_string, str) else json_string
+        return data.get(key) if key else data
+    except:
+        return None

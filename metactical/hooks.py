@@ -1426,6 +1426,7 @@ jinja = {
 		"metactical.custom_scripts.packing_slip.packing_slip.get_packing_slips_for_print",
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
 		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location",
+		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json",
 		"metactical.barcode_generator.get_qr_for_print_format"
 	]
 }
