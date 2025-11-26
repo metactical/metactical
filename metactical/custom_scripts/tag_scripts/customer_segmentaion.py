@@ -3,7 +3,7 @@
 import frappe
 from frappe.utils import today, add_months, flt
 
-def calculate_customer_segment(customer_doc):
+def calculate_customer_segment(customer_name):
     """
     Segment customers based on RFM (Recency, Frequency, Monetary)
     
@@ -16,7 +16,7 @@ def calculate_customer_segment(customer_doc):
         }
     """
     
-    customer = customer_doc.name
+    customer = frappe.get_doc("Customer", customer_name)
     
     # Get last 12 months data
     twelve_months_ago = add_months(today(), -12)

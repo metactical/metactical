@@ -7,14 +7,16 @@ from datetime import datetime
 from frappe import _
 from frappe.utils import now_datetime, get_datetime, time_diff_in_seconds
 from typing import Dict, List, Any, Optional
+import json
 
 class TagAutomationEngine:
     """
     Main engine for tag automation with batch processing for millions of records
     """
+    def __init__(self):
+        pass
     
-    @staticmethod
-    def execute_script(script_manager_name: str, filters: Optional[Dict] = None, 
+    def execute_script(self, script_manager_name: str, filters: Optional[Dict] = None, 
                       execution_id: Optional[str] = None) -> str:
         """
         Execute a tag script for all matching documents using batch processing
@@ -35,7 +37,7 @@ class TagAutomationEngine:
         # Create or get execution log
         if not execution_id:
             execution_id = str(uuid.uuid4())
-            execution_log = TagAutomationEngine._create_execution_log(
+            execution_log = self._create_execution_log(
                 script_config, execution_id
             )
         else:
@@ -44,7 +46,7 @@ class TagAutomationEngine:
         
         # Enqueue the batch processor
         frappe.enqueue(
-            "tag_automation.tag_automation_engine.TagAutomationEngine.process_in_batches",
+            self.process_in_batches,
             queue='long',
             timeout=36000,  # 10 hours
             script_manager_name=script_manager_name,
@@ -54,143 +56,199 @@ class TagAutomationEngine:
             now=False
         )
         
+        self.process_in_batches(
+            script_manager_name, execution_id, filters
+        )
+        
         return execution_id
     
-    @staticmethod
-    def process_in_batches(script_manager_name: str, execution_id: str, 
-                          filters: Optional[Dict] = None):
-        """
-        Process all documents in batches with progress tracking
-        """
+    def process_in_batches(self, script_manager_name: str, execution_id: str, 
+                       filters: Optional[Dict] = None):
+
+        # helper: safe DB update without version checking
+        def safe_update(doctype, name, values):
+            frappe.db.set_value(doctype, name, values, update_modified=False)
+            frappe.db.commit()
+
+        # --- Load initial docs ---
         script_config = frappe.get_doc("Tag Script Manager", script_manager_name)
         execution_log = frappe.get_doc("Tag Execution Log", 
-                                      {"execution_id": execution_id})
-        
+                                    {"execution_id": execution_id})
+
         try:
-            execution_log.status = "Running"
-            execution_log.start_time = now_datetime()
-            execution_log.save(ignore_permissions=True)
-            frappe.db.commit()
-            
-            # Get total count
-            total_records = TagAutomationEngine._get_total_records(
-                script_config.target_doctype, filters
+            # ---------------------------------------------------------
+            # 1) Mark execution "Running"
+            # ---------------------------------------------------------
+            start_time = now_datetime()
+            safe_update(
+                "Tag Execution Log",
+                execution_log.name,
+                {
+                    "status": "Running",
+                    "start_time": start_time
+                }
             )
-            execution_log.total_records = total_records
-            execution_log.save(ignore_permissions=True)
-            frappe.db.commit()
-            
+            execution_log.reload()
+
+            # ---------------------------------------------------------
+            # 2) Count total records
+            # ---------------------------------------------------------
+            total_records = self._get_total_records(
+                script_config.target_doctype,
+                script_config.filter_json
+            )
+
+            safe_update(
+                "Tag Execution Log",
+                execution_log.name,
+                {"total_records": total_records}
+            )
+            execution_log.reload()
+
+            # ---------------------------------------------------------
+            # 3) Zero records → mark completed and exit
+            # ---------------------------------------------------------
             if total_records == 0:
-                execution_log.status = "Completed"
-                execution_log.end_time = now_datetime()
-                execution_log.save(ignore_permissions=True)
-                frappe.db.commit()
+                safe_update(
+                    "Tag Execution Log",
+                    execution_log.name,
+                    {
+                        "status": "Completed",
+                        "end_time": now_datetime()
+                    }
+                )
                 return
-            
-            # Calculate batches
+
+            # ---------------------------------------------------------
+            # 4) Calculate batches
+            # ---------------------------------------------------------
             batch_size = script_config.batch_size or 1000
             total_batches = (total_records + batch_size - 1) // batch_size
-            execution_log.batch_count = total_batches
-            execution_log.save(ignore_permissions=True)
-            frappe.db.commit()
-            
-            # Process batches
+
+            safe_update(
+                "Tag Execution Log",
+                execution_log.name,
+                {"batch_count": total_batches}
+            )
+            execution_log.reload()
+
+            # ---------------------------------------------------------
+            # 5) Process batches (parallel or sequential)
+            # ---------------------------------------------------------
             parallel_workers = min(script_config.parallel_workers or 1, 10)
-            
+
             if parallel_workers > 1:
-                TagAutomationEngine._process_parallel_batches(
-                    script_config, execution_log, filters, 
+                # IMPORTANT: workers must NEVER update execution_log directly
+                self._process_parallel_batches(
+                    script_config, execution_log, filters,
                     batch_size, total_batches, parallel_workers
                 )
             else:
-                TagAutomationEngine._process_sequential_batches(
-                    script_config, execution_log, filters, 
+                self._process_sequential_batches(
+                    script_config, execution_log, filters,
                     batch_size, total_batches
                 )
-            
-            # Mark as completed
+
+            # ---------------------------------------------------------
+            # 6) Mark execution completed
+            # ---------------------------------------------------------
+            end_time = now_datetime()
+            duration = None
+
+            if start_time:
+                duration_seconds = time_diff_in_seconds(end_time, start_time)
+                duration = f"{duration_seconds:.2f} seconds"
+
+            safe_update(
+                "Tag Execution Log",
+                execution_log.name,
+                {
+                    "status": "Completed",
+                    "end_time": end_time,
+                    "duration": duration
+                }
+            )
             execution_log.reload()
-            execution_log.status = "Completed"
-            execution_log.end_time = now_datetime()
-            
-            if execution_log.start_time:
-                duration = time_diff_in_seconds(execution_log.end_time, 
-                                               execution_log.start_time)
-                execution_log.duration = f"{duration:.2f} seconds"
-            
-            execution_log.save(ignore_permissions=True)
-            frappe.db.commit()
-            
-            # Update script manager
-            script_config.last_execution = now_datetime()
-            script_config.last_execution_status = "Completed"
-            script_config.records_processed = execution_log.records_processed
-            script_config.save(ignore_permissions=True)
-            frappe.db.commit()
-            
+
+            # ---------------------------------------------------------
+            # 7) Update script manager safely (no save())
+            # ---------------------------------------------------------
+            safe_update(
+                "Tag Script Manager",
+                script_config.name,
+                {
+                    "last_execution": now_datetime(),
+                    "last_execution_status": "Completed",
+                    "records_processed": execution_log.records_processed
+                }
+            )
+
+        # -------------------------------------------------------------
+        # ERROR HANDLING
+        # -------------------------------------------------------------
         except Exception as e:
-            execution_log.reload()
-            execution_log.status = "Failed"
-            execution_log.end_time = now_datetime()
-            execution_log.error_log = str(e)
-            execution_log.save(ignore_permissions=True)
-            frappe.db.commit()
-            
+
+            safe_update(
+                "Tag Execution Log",
+                execution_log.name,
+                {
+                    "status": "Failed",
+                    "end_time": now_datetime(),
+                    "error_log": str(e)
+                }
+            )
+
             frappe.log_error(
                 message=frappe.get_traceback(),
                 title=f"Tag Automation Failed: {script_manager_name}"
             )
-            
             raise
+
     
-    @staticmethod
-    def _process_sequential_batches(script_config, execution_log, filters, 
-                                    batch_size, total_batches):
-        """
-        Process batches sequentially
-        """
+    def _process_sequential_batches(self, script_config, execution_log, filters, 
+                                batch_size, total_batches):
+
+        def safe_update(values):
+            frappe.db.set_value("Tag Execution Log", execution_log.name, values, update_modified=False)
+            frappe.db.commit()
+
         records_processed = 0
         records_failed = 0
-        
+            
         for batch_num in range(total_batches):
             try:
                 offset = batch_num * batch_size
-                
-                # Get batch of document names
-                doc_names = TagAutomationEngine._get_batch_records(
-                    script_config.target_doctype, 
-                    filters, 
-                    batch_size, 
+                filters = script_config.filter_json
+
+                doc_names = self._get_batch_records(
+                    script_config.target_doctype,
+                    filters,
+                    batch_size,
                     offset
                 )
-                
-                # Process batch
-                batch_results = TagAutomationEngine._process_batch(
-                    script_config, doc_names
-                )
+                                    
+                batch_results = self._process_batch(script_config, doc_names)
                 
                 records_processed += batch_results['processed']
                 records_failed += batch_results['failed']
                 
-                # Update progress
-                execution_log.reload()
-                execution_log.current_batch = batch_num + 1
-                execution_log.records_processed = records_processed
-                execution_log.records_failed = records_failed
-                execution_log.progress_percent = ((batch_num + 1) / total_batches) * 100
-                execution_log.save(ignore_permissions=True)
-                frappe.db.commit()
+                safe_update({
+                    "current_batch": batch_num + 1,
+                    "records_processed": records_processed,
+                    "records_failed": records_failed,
+                    "progress_percent": ((batch_num + 1) / total_batches) * 100
+                })
                 
             except Exception as e:
                 records_failed += len(doc_names)
-                error_msg = f"Batch {batch_num + 1} failed: {str(e)}\n"
                 execution_log.reload()
-                execution_log.error_log = (execution_log.error_log or "") + error_msg
-                execution_log.save(ignore_permissions=True)
-                frappe.db.commit()
+                error_msg = f"Batch {batch_num + 1} failed: {str(e)}\n"
+                safe_update({
+                    "records_failed": records_failed,
+                    "error_log": (execution_log.error_log or "") + error_msg
+                })    
     
-    @staticmethod
-    def _process_parallel_batches(script_config, execution_log, filters, 
+    def _process_parallel_batches(self, script_config, execution_log, filters, 
                                  batch_size, total_batches, parallel_workers):
         """
         Process batches in parallel using multiple background jobs
@@ -209,8 +267,9 @@ class TagAutomationEngine:
                 break
             
             job = frappe.enqueue(
-                "tag_automation.tag_automation_engine.TagAutomationEngine._process_batch_range",
+                "metactical.utils.tag_automation_engine.self._process_batch_range",
                 queue='long',
+                job_name=script_config.name + f"_worker_{worker_num+1}",
                 timeout=36000,
                 script_manager_name=script_config.name,
                 execution_id=execution_log.execution_id,
@@ -226,8 +285,8 @@ class TagAutomationEngine:
         # Wait for all jobs to complete (in a real scenario, you'd poll the status)
         # For now, the execution log will be updated by each worker
     
-    @staticmethod
-    def _process_batch_range(script_manager_name, execution_id, filters, 
+    
+    def _process_batch_range(self, script_manager_name, execution_id, filters, 
                             batch_size, start_batch, end_batch):
         """
         Process a range of batches (used for parallel processing)
@@ -243,14 +302,14 @@ class TagAutomationEngine:
             try:
                 offset = batch_num * batch_size
                 
-                doc_names = TagAutomationEngine._get_batch_records(
+                doc_names = self._get_batch_records(
                     script_config.target_doctype, 
                     filters, 
                     batch_size, 
                     offset
                 )
                 
-                batch_results = TagAutomationEngine._process_batch(
+                batch_results = self._process_batch(
                     script_config, doc_names
                 )
                 
@@ -276,8 +335,8 @@ class TagAutomationEngine:
                     title=f"Batch {batch_num + 1} failed - {script_manager_name}"
                 )
     
-    @staticmethod
-    def _process_batch(script_config, doc_names: List[str]) -> Dict[str, int]:
+    
+    def _process_batch(self, script_config, doc_names: List[str]) -> Dict[str, int]:
         """
         Process a single batch of documents
         Returns dict with 'processed' and 'failed' counts
@@ -287,7 +346,7 @@ class TagAutomationEngine:
         
         for doc_name in doc_names:
             try:
-                TagAutomationEngine._process_single_document(
+                self._process_single_document(
                     script_config, doc_name
                 )
                 processed += 1
@@ -300,8 +359,8 @@ class TagAutomationEngine:
         
         return {'processed': processed, 'failed': failed}
     
-    @staticmethod
-    def _process_single_document(script_config, doc_name: str):
+    
+    def _process_single_document(self, script_config, doc_name: str):
         """
         Process a single document and assign tags
         """
@@ -309,25 +368,27 @@ class TagAutomationEngine:
         doc = frappe.get_doc(script_config.target_doctype, doc_name)
         
         # Execute custom script
-        script_outputs = TagAutomationEngine._execute_custom_script(
+        script_outputs = self._execute_custom_script(
             script_config.script_path, doc
         )
-        
+                
         # Validate outputs (optional, can be skipped for performance)
-        # TagAutomationEngine._validate_outputs(script_config, script_outputs)
+        # self._validate_outputs(script_config, script_outputs)
+        
         
         # Evaluate conditions
-        tags_to_apply = TagAutomationEngine._evaluate_conditions(
+        # print("script_outputs:", script_outputs)
+        tags_to_apply = self._evaluate_conditions(
             script_config, script_outputs
         )
-        
+                
         # Apply tags using direct DB operations for performance
-        TagAutomationEngine._apply_tags_bulk(
+        self._apply_tags_bulk(
             script_config, doc.doctype, doc.name, tags_to_apply
         )
     
-    @staticmethod
-    def _execute_custom_script(script_path: str, doc) -> Dict[str, Any]:
+    
+    def _execute_custom_script(self, script_path: str, doc) -> Dict[str, Any]:
         """
         Execute the custom script function
         """
@@ -343,21 +404,22 @@ class TagAutomationEngine:
                 script_path, str(e)
             ))
     
-    @staticmethod
-    def _evaluate_conditions(script_config, outputs: Dict[str, Any]) -> List[Dict]:
+    def _evaluate_conditions(self, script_config, outputs):
         """
         Evaluate conditions and return tags to apply
         """
         tags_to_apply = []
+        if outputs is None:
+            return tags_to_apply
         
         # Sort conditions by priority
         conditions = sorted(
             script_config.tag_conditions, 
             key=lambda x: x.priority
         )
-        
+                
         for condition in conditions:
-            if TagAutomationEngine._evaluate_single_condition(condition, outputs):
+            if self._evaluate_single_condition(condition, outputs):
                 tag_name = condition.tag_to_assign
                 if script_config.tag_prefix:
                     tag_name = script_config.tag_prefix + tag_name
@@ -383,8 +445,8 @@ class TagAutomationEngine:
         
         return tags_to_apply
     
-    @staticmethod
-    def _evaluate_single_condition(condition, outputs: Dict[str, Any]) -> bool:
+    
+    def _evaluate_single_condition(self, condition, outputs: Dict[str, Any]) -> bool:
         """
         Evaluate a single condition
         """
@@ -426,8 +488,8 @@ class TagAutomationEngine:
         
         return False
     
-    @staticmethod
-    def _apply_tags_bulk(script_config, doctype: str, docname: str, 
+    
+    def _apply_tags_bulk(self, script_config, doctype: str, docname: str, 
                         tags_to_apply: List[Dict]):
         """
         Apply tags using bulk operations for better performance
@@ -481,25 +543,24 @@ class TagAutomationEngine:
             })
             
             if not link_exists:
-                frappe.db.sql("""
-                    INSERT INTO `tabTag Link` 
-                    (name, creation, modified, modified_by, owner, docstatus, 
-                     tag, document_type, document_name, title)
-                    VALUES (UUID(), NOW(), NOW(), %s, %s, 0, %s, %s, %s, %s)
-                """, (
-                    frappe.session.user, frappe.session.user,
-                    tag, doctype, docname, docname
-                ))
+                frappe.get_doc({
+                    "doctype": "Tag Link",
+                    "tag": tag,
+                    "document_type": doctype,
+                    "document_name": docname,
+                    "title": docname
+                }).insert(ignore_permissions=True)
+                frappe.db.commit()
     
-    @staticmethod
-    def _get_total_records(doctype: str, filters: Optional[Dict] = None) -> int:
+    
+    def _get_total_records(self, doctype: str, filters: Optional[Dict] = None) -> int:
         """
         Get total number of records to process
         """
-        return frappe.db.count(doctype, filters=filters or {})
+        return frappe.db.count(doctype, filters=json.loads(filters) or {})
     
-    @staticmethod
-    def _get_batch_records(doctype: str, filters: Optional[Dict], 
+    
+    def _get_batch_records(self, doctype: str, filters: Optional[Dict], 
                           limit: int, offset: int) -> List[str]:
         """
         Get a batch of record names using memory-efficient query
@@ -513,8 +574,8 @@ class TagAutomationEngine:
             order_by='creation asc'  # Consistent ordering
         )
     
-    @staticmethod
-    def _create_execution_log(script_config, execution_id: str):
+    
+    def _create_execution_log(self, script_config, execution_id: str):
         """
         Create execution log document
         """
@@ -533,7 +594,6 @@ class TagAutomationEngine:
         frappe.db.commit()
         return log
     
-    @staticmethod
     def cancel_execution(execution_id: str):
         """
         Cancel a running execution
