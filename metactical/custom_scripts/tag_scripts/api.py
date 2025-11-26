@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from tag_automation.tag_automation_engine import TagAutomationEngine
+from metactical.utils.tag_automation_engine import TagAutomationEngine
 
 @frappe.whitelist()
 def execute_tag_script(script_manager_name, filters=None):
@@ -18,7 +18,7 @@ def execute_tag_script(script_manager_name, filters=None):
         import json
         filters = json.loads(filters)
     
-    execution_id = TagAutomationEngine.execute_script(
+    execution_id = TagAutomationEngine._process_single_document(
         script_manager_name, filters
     )
     
@@ -57,7 +57,7 @@ def cancel_execution(execution_id):
     TagAutomationEngine.cancel_execution(execution_id)
     return {"success": True, "message": _("Execution cancelled")}
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def run_all_scripts(target_doctype=None):
     """
     Run all enabled scripts
@@ -70,7 +70,8 @@ def run_all_scripts(target_doctype=None):
     
     execution_ids = []
     for script in scripts:
-        execution_id = TagAutomationEngine.execute_script(script)
+        tag_automation_engine = TagAutomationEngine()
+        execution_id = tag_automation_engine.execute_script(script_manager_name=script)
         execution_ids.append({
             "script": script,
             "execution_id": execution_id
@@ -81,7 +82,7 @@ def run_all_scripts(target_doctype=None):
         "executions": execution_ids
     }
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def test_script(script_manager_name, sample_doc_name):
     """
     Test a script on a single document
@@ -90,8 +91,8 @@ def test_script(script_manager_name, sample_doc_name):
     doc = frappe.get_doc(script_config.target_doctype, sample_doc_name)
     
     # Execute script
-    script_outputs = TagAutomationEngine._execute_custom_script(
-        script_config.script_path, doc
+    script_outputs = TagAutomationEngine._process_single_document(
+        script_config, doc
     )
     
     # Evaluate conditions
