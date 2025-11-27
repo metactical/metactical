@@ -1306,6 +1306,98 @@ def get_item_by_retail_sku_single(retail_sku, branch):
         frappe.response["OnSale"] = discount["on_sale"] if discount else False
         frappe.response["DiscountExpiryDate"] = discount["discount_expiry_date"] if discount else None
         frappe.response["DiscountStartDate"] = discount["discount_start_date"] if discount else None
+        
+@frappe.whitelist()
+def get_customer_detail(phone=None, email=None):
+    # At least one parameter must be provided
+    if not phone and not email:
+        frappe.response["Error"] = "Phone number or email address is required."
+        return
+    
+    # Get billing address
+    address, customer = get_addresses(email, phone)
+    if not address:
+        frappe.response["Message"] = "Existing Address Not Found"
+        return
+        
+    billing_address = address.get("Billing") if address else None
+    shipping_address = address.get("Shipping") if address else None
+            
+    frappe.response["Message"] = ""
+    frappe.response["CustomerID"] = customer.name
+    frappe.response["FirstName"] = customer.first_name if billing_address else None
+    frappe.response["LastName"] = customer.last_name if billing_address else None
+    frappe.response["Phone"] = billing_address.phone if billing_address else "stss"
+    frappe.response["Email"] = billing_address.email_id if billing_address else None
+    frappe.response["BillingAddress"] = format_address(billing_address)
+    frappe.response["ShippingAddress"] = format_address(shipping_address)
+
+def get_addresses(email, phone):
+    """Get customer address by type (Billing or Shipping)"""
+    try:
+        condition = ""
+        phone = phone.replace("+", "") if phone else ""
+
+        if email:
+            condition = f"addr.email_id = {frappe.db.escape(email)}"
+
+        if phone:
+            phone_pattern = f"%{phone}%"
+            if condition:
+                condition += f" AND addr.phone like {frappe.db.escape(phone_pattern)}"
+            else:
+                condition = f"addr.phone like {frappe.db.escape(phone_pattern)}"
+
+        addresses = {}
+        customer = None
+        address_links = frappe.db.sql(f"""
+            SELECT dl.parent, link_name
+            FROM `tabDynamic Link` dl
+            JOIN `tabAddress` addr ON dl.parent = addr.name
+            WHERE dl.link_doctype = 'Customer'
+            AND addr.address_type IN ('Billing', 'Shipping')
+            AND {condition}
+            
+            ORDER BY addr.creation DESC
+            """, as_dict=True)
+        
+        if not address_links:
+            return None, None
+                
+        # Get the address with matching type
+        for link in address_links:
+            address = frappe.get_doc("Address", link.parent)
+            if not addresses.get(address.address_type):
+                if address.address_type == "Billing":
+                    customer = link.link_name
+                addresses[address.address_type] = address
+        
+        if customer:
+            customer = frappe.get_doc("Customer", customer)
+                
+        return addresses, customer
+    
+    except Exception as e:
+        frappe.log_error(title='POS - Get Address Error', message=frappe.get_traceback())
+    
+    return None, None
+
+
+def format_address(address_doc):
+    """Format address document to match the C# Address model"""
+    if not address_doc:
+        return None
+    
+    return {
+        "AddressLine1": address_doc.address_line1,
+        "AddressLine2": address_doc.address_line2,
+        "Phone": address_doc.phone,
+        "Email": address_doc.email_id,
+        "City": address_doc.city,
+        "State": address_doc.state,
+        "ZipCode": address_doc.pincode,
+        "Country": address_doc.country
+    }
 
 def warehouses_display_name_mapping():
     return {
