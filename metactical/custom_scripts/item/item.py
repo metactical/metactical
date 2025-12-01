@@ -24,11 +24,15 @@ class CustomItem(Item):
                 setattr(new_item, field, getattr(old_item, field, None))
 
         # Append barcodes from old item to new item
-        if hasattr(old_item, "barcodes"):
-            existing_barcodes = {barcode.barcode for barcode in new_item.barcodes}
-            for barcode in old_item.barcodes:
-                if barcode.barcode not in existing_barcodes:                
-                    new_item.append("barcodes", barcode)
+        # if hasattr(old_item, "barcodes"):
+        #     existing_barcodes = {barcode.barcode for barcode in new_item.barcodes}
+        #     for barcode in old_item.barcodes:
+        #         existing_item_barcode = frappe.db.get_all("Item Barcode", {"barcode": barcode.barcode, "parent": old_item_code }, "name")
+        #         for item_barcode in existing_item_barcode:
+        #             frappe.db.delete("Item Barcode", item_barcode.name)
+                    
+        #         if barcode.barcode not in existing_barcodes:                
+        #             new_item.append("barcodes", barcode)
 
         # Append supplier items from old item to new item if they don't exist
         if hasattr(old_item, "supplier_items"):
