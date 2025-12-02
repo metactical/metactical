@@ -105,7 +105,7 @@ class DeliveryNoteCustom(DeliveryNote):
 						break
 					
 					#check sales order is fully paid
-					if sales_order.grand_total != sales_order.advance_paid:
+					if sales_order.grand_total - sales_order.advance_paid > 0.25:
 						break
 					sales_invoice = frappe.new_doc('Sales Invoice')
 					sales_invoice.update({'ignore_pricing_rule': sales_order.ignore_pricing_rule})
