@@ -60,7 +60,8 @@ class CustomItem(Item):
         
     def after_rename(self, old_item_code, new_item_code, merge=False):
         super().after_rename(old_item_code, new_item_code, merge)
-
+        
+        self.remove_price_lists(old_item_code)
         old_item = frappe.get_doc("Item", old_item_code)
         new_item = frappe.get_doc("Item", new_item_code)
         
@@ -72,6 +73,7 @@ class CustomItem(Item):
         item_merge_history.new_item = self.sanitize(new_item.as_dict())
         
         item_merge_history.insert(ignore_permissions=True)
+        self.copy_barcodes(old_item_code, new_item_code)
 
         if old_item.variant_of:
             remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
@@ -83,6 +85,33 @@ class CustomItem(Item):
                     frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
 
         frappe.db.commit()
+        
+    def copy_barcodes(self, old_item_code, new_item_code):
+        old_barcodes = frappe.get_all("Item Barcode", filters={"parent": old_item_code}, fields=["barcode", "name"])
+        new_barcodes = frappe.get_all("Item Barcode", filters={"parent": new_item_code}, fields=["barcode"])
+        
+        existing_barcodes = {barcode.barcode for barcode in new_barcodes}
+        
+        for barcode in old_barcodes:
+            if barcode.barcode not in existing_barcodes:
+                frappe.db.delete("Item Barcode", barcode.name)
+                new_barcode = frappe.new_doc("Item Barcode")
+                new_barcode.parent = new_item_code
+                new_barcode.parenttype = "Item"
+                new_barcode.parentfield = "barcodes"
+                new_barcode.barcode = barcode.barcode
+                try:
+                    new_barcode.insert(ignore_permissions=True)
+                except Exception as e:
+                    frappe.log_error(title="Error copying barcode during item merge", message=frappe.get_traceback())
+        
+    def remove_price_lists(self, old_item_code):
+        price_lists = frappe.get_all("Item Price", filters={"item_code": old_item_code}, fields=["name"])
+        for price in price_lists:
+            try:
+                frappe.db.delete("Item Price", price.name)
+            except Exception as e:
+                frappe.log_error(title="Error deleting Item Price during item merge", message=frappe.get_traceback())
 
     def validate(self):
         super().validate()

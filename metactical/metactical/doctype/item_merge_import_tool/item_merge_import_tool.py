@@ -97,10 +97,6 @@ class ItemMergeImportTool(Document):
 			if row[0] == "Current SKU":
 				continue
 
-			if i == 1:
-				data.append(row)
-				continue
-
 			current_sku = row[0]
 			new_sku = row[1]
    

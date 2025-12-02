@@ -44,7 +44,6 @@ def start_sync(filters):
   
 	pids = []
 	site = frappe.local.site
-	frappe.log_error(f"Starting background sync for site: {site} with filters: {filters}", "Background Sync Start")
 	try:
 		output = subprocess.check_output(["pgrep", "-f", f"bench --site {site} start-background-sync"]).decode().splitlines()
 		pids = [int(pid) for pid in output]
@@ -105,7 +104,6 @@ def sync_items_to_websites():
 			start = offset,
 			group_by="item_code"
 		)
-		
 		if items:
 			offset += sync_doc.batch_size
 			sync_items(items, sync_doc, offset)
@@ -121,11 +119,13 @@ def sync_items(items_list, sync_doc, offset):
 	try:
 		for item in items_list:
 			if sync_doc.sync_item_detail:
-				item_update_webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "webhook_docevent": "on_update", "enabled": 1})
+				item_update_webhook = frappe.db.exists("Webhook", {"webhook_doctype": "Item", "webhook_docevent": "on_update", "enabled": 1, "condition": "doc.variant_of"})
 				if item_update_webhook:
 					webhook = frappe.get_doc("Webhook", item_update_webhook)
 					item_doc = frappe.get_doc("Item", item.name)
 					enqueue_webhook(item_doc, webhook)
+				else:
+					frappe.log_error(title="Item Update Webhook Not Found", message=f"No webhook found for Item updates with condition 'doc.variant_of'")
 			
 			if sync_doc.sync_item_with_price_lists:
 				item_prices  = frappe.get_all(
@@ -166,7 +166,7 @@ def sync_items(items_list, sync_doc, offset):
 		frappe.db.commit()
 	except Exception as e:
 		frappe.db.set_single_value("MT Background Sync", "last_offset", offset-sync_doc.batch_size, update_modified=False)
-		frappe.log_error(frappe.get_traceback(), "Items Background Sync Error")
+		frappe.log_error(message=frappe.get_traceback(), title="Items Background Sync Error")
 		frappe.response["message"] = f"Error syncing items: {str(e)}"
 	
 def get_item_discount(item, price_list, brand=None):
