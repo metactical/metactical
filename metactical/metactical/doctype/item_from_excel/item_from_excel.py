@@ -272,9 +272,7 @@ class ItemFromExcel(Document):
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
 		item = self.add_website_specifications_to_item(item, spec_labels)
-		frappe.log_error(title="item import", message=item)
-
-		# generate the item code if it is a variant
+		# generate the item code if it is a variantf
 		# if not (item.item_code and is_template):
 		# 	template_item_name = frappe.db.get_value("Item", item.variant_of, "item_name")
 		# 	make_variant_item_code(item.variant_of, template_item_name, item)
@@ -316,10 +314,10 @@ class ItemFromExcel(Document):
 			item: Item document
 			item_specifications: Dict with item specifications
 		"""
-		if not item_specifications or item.item_group not in item_specifications:
+		if not item_specifications or item.item_code not in item_specifications:
 			return item
 		
-		specs = item_specifications[item.item_group]
+		specs = item_specifications[item.item_code]
 		all_specs = []
 		if item.get("item_group"):
 			all_specs = frappe.get_all("MT Item Website Specification", 
@@ -350,14 +348,18 @@ class ItemFromExcel(Document):
 		return item
    
 	def create_item_defaults(self, item, supplier):
-		frappe.get_doc({
-			"doctype": "Item Default",
-			"parent": item.name,
-			"parenttype": "Item",
-			"parentfield": "item_defaults",
-			"default_supplier": supplier,
-			"company": frappe.db.get_default("company")
-		}).insert()
+		item_default_name = frappe.db.exists("Item Default", {"parent": item.name, "company": frappe.db.get_default("company")})		
+		if not item_default_name:
+			frappe.get_doc({
+				"doctype": "Item Default",
+				"parent": item.name,
+				"parenttype": "Item",
+				"parentfield": "item_defaults",
+				"default_supplier": supplier,
+				"company": frappe.db.get_default("company")
+			}).insert()
+		else:
+			frappe.db.set_value("Item Default", item_default_name, "default_supplier", supplier)
 
 	def add_item_details_to_price_list(self, price_list_rows, item, price_list):
   
