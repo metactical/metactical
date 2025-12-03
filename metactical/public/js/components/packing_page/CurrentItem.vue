@@ -2,7 +2,9 @@
     <!-- Current Item -->
     <div>
         <div class="d-flex justify-content-between section-title align-items-center">
-            <h4 class="cur-item-barcode mb-0" v-if="item">{{ item.item_barcode ? item.item_barcode.join(", ") : '' }}</h4>
+            <h4 class="cur-item-barcode mb-0" v-if="item">
+                {{ item.item_barcode ? item.item_barcode.join(", ") : "" }}
+            </h4>
             <span class="fa fa-gear fa-lg cur-item-close cursor-pointer" @click="showSettings"></span>
         </div>
         <div class="current-items-wrap">
@@ -16,13 +18,17 @@
                 </div>
 
                 <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
-                <button class='btn btn-default btn-sm' @click='add_one_item()'>Click to Add</button>
-                <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
-            </h3>
-            <h3 class="current-section-title cur-item-scan-feedback" v-else-if="item.qty > max_qty_to_pack && has_add_permission_when_qty_exceeds">
-                <button class='btn btn-default btn-sm' @click='add_multiple()'>Add Multiple</button>
-            </h3>
-                <template v-if="item.image">
+                    <button class="btn btn-default btn-sm" @click="add_one_item">Click to Add</button>
+                    <button class="btn btn-default btn-sm" @click="add_multiple">Add Multiple</button>
+                </h3>
+                <h3
+                    class="current-section-title cur-item-scan-feedback"
+                    v-else-if="item && item.qty > max_qty_to_pack && has_add_permission_when_qty_exceeds"
+                >
+                    <button class="btn btn-default btn-sm" @click="add_multiple">Add Multiple</button>
+                </h3>
+
+                <template v-if="item && item.image">
                     <img :src="item.image" alt="" class="cur-item-image my-4" />
                 </template>
                 <template v-else>
@@ -33,16 +39,23 @@
     </div>
     <!--/ Current Item -->
 </template>
+
 <script>
 export default {
-    props: ['item'],
+    name: "CurrentItem",
+    props: {
+        item: {
+            type: Object,
+            required: true,
+        },
+    },
     data() {
         return {
             max_qty_to_pack: 0,
             has_add_permission: false,
             ask_shipment_info: false,
-            has_add_permission_when_qty_exceeds: false
-        }
+            has_add_permission_when_qty_exceeds: false,
+        };
     },
     mounted() {
         this.get_max_qty_to_pack();
@@ -50,41 +63,50 @@ export default {
     },
     methods: {
         get_max_qty_to_pack() {
-            var me = this;
-            frappe.db.get_single_value("Packing Settings", "multi_pack_if_qty").then((res) => {
-                me.max_qty_to_pack = res;
-            })
+            const me = this;
+            frappe.db
+                .get_single_value("Packing Settings", "multi_pack_if_qty")
+                .then((res) => {
+                    me.max_qty_to_pack = res;
+                });
         },
         check_has_add_permission() {
-            var me = this;
+            const me = this;
             frappe.call({
                 method: "metactical.metactical.page.packing_page_v4.packing_page_v4.check_to_add_permission",
                 freeze: true,
-                callback: function (ret) {
-                    me.has_add_permission = ret.has_add_permission ? true: false;
-                    me.has_add_permission_when_qty_exceeds = ret.has_add_multiple_permission ? true:false;
-                }
+                callback(ret) {
+                    me.has_add_permission = !!ret.has_add_permission;
+                    me.has_add_permission_when_qty_exceeds = !!ret.has_add_multiple_permission;
+                },
             });
         },
-        add_multiple(){
-            var me = this;
+        add_multiple() {
+            const me = this;
             frappe.prompt(
-                [{"fieldtype": "Int", "fieldname": "amount", "label": "Number of Items to Add", "reqd": 1}],
-                function(values){
-                    if(values.amount > me.item.qty){
+                [
+                    {
+                        fieldtype: "Int",
+                        fieldname: "amount",
+                        label: "Number of Items to Add",
+                        reqd: 1,
+                    },
+                ],
+                function (values) {
+                    if (values.amount > me.item.qty) {
                         frappe.throw("You can only add a maximum of " + me.item.qty + " items");
+                    } else {
+                        me.$emit("itemScanned", me.item.item_barcode[0], values.amount);
                     }
-                    else{
-                        me.$emit('itemScanned', me.item.item_barcode[0], values.amount);
-                    }
-                });
+                }
+            );
         },
-        add_one_item(){
-            this.$emit('itemScanned', this.item.item_barcode[0], 1);
+        add_one_item() {
+            this.$emit("itemScanned", this.item.item_barcode[0], 1);
         },
         showSettings() {
-            var me = this;
-            var d = new frappe.ui.Dialog({
+            const me = this;
+            const d = new frappe.ui.Dialog({
                 title: __("Settings"),
                 fields: [
                     {
@@ -92,17 +114,17 @@ export default {
                         fieldtype: "Check",
                         default: me.ask_shipment_info,
                         label: __("Ask Shipment Information for each item"),
-                    }
+                    },
                 ],
                 primary_action_label: __("Save"),
-                primary_action: (values) => {
+                primary_action(values) {
                     me.ask_shipment_info = values.ask_shipment_info;
                     d.hide();
-                }
+                },
             });
 
             d.show();
         },
-    }
-}
+    },
+};
 </script>

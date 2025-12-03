@@ -1,4 +1,5 @@
-{% include 'erpnext/selling/sales_common.js' %}
+
+erpnext.sales_common.setup_selling_controller();
 var old_tax_template;
 var base_in_words;
 

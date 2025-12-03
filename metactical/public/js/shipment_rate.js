@@ -1,4 +1,6 @@
 import ShipmentRate from "./shipment/shipment_rate.vue"
+import { createApp, h } from "vue";
+
 frappe.provide("metactical.shipment_rate");
 
 metactical.shipment_rate.ShipmentPopUp = class {
@@ -10,13 +12,15 @@ metactical.shipment_rate.ShipmentPopUp = class {
 
 	initVueInstance() {
 		console.log("Body: ", this.body, " Doc: ", this.doc);
-		new Vue({
-			el: this.body,
-			render: (h) => h(ShipmentRate, {
-				props: {
-					doc: this.doc
-				}
-			})
+
+		// Create and mount Vue 3 app
+		const app = createApp({
+			render: () =>
+				h(ShipmentRate, {
+					doc: this.doc,          // props
+				}),
 		});
+
+		app.mount(this.body);
 	}
 };

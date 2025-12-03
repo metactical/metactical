@@ -14,6 +14,7 @@ import "../../frappe_public/js/frappe/ui/link_preview.js";
 
 import "../../frappe_public/js/frappe/request.js";
 import "../../frappe_public/js/frappe/socketio_client.js";
+import "../../frappe_public/js/frappe/broadcast.js";
 import "../../frappe_public/js/frappe/utils/utils.js";
 import "../../frappe_public/js/frappe/event_emitter.js";
 import "../../frappe_public/js/frappe/router.js";
@@ -26,7 +27,6 @@ import "../../frappe_public/js/frappe/microtemplate.js";
 import "../../frappe_public/js/frappe/ui/page.html";
 import "../../frappe_public/js/frappe/ui/page.js";
 import "../../frappe_public/js/frappe/ui/slides.js";
-// import "../../frappe_public/js/frappe/ui/onboarding_dialog.js";
 import "../../frappe_public/js/frappe/ui/find.js";
 import "../../frappe_public/js/frappe/ui/iconbar.js";
 import "../../frappe_public/js/frappe/form/layout.js";
@@ -76,7 +76,6 @@ import "../../frappe_public/js/frappe/views/factory.js";
 import "../../frappe_public/js/frappe/views/pageview.js";
 
 import "../../frappe_public/js/frappe/ui/toolbar/awesome_bar.js";
-// import "../../frappe_public/js/frappe/ui/toolbar/energy_points_notifications.js";
 import "../../frappe_public/js/frappe/ui/notifications/notifications.js";
 import "../../frappe_public/js/frappe/ui/toolbar/search.js";
 import "../../frappe_public/js/frappe/ui/toolbar/tag_utils.js";
@@ -85,7 +84,6 @@ import "../../frappe_public/js/frappe/ui/toolbar/search_utils.js";
 import "../../frappe_public/js/frappe/ui/toolbar/about.js";
 import "../../frappe_public/js/frappe/ui/toolbar/navbar.html";
 import "../../frappe_public/js/frappe/ui/toolbar/toolbar.js";
-// import "../../frappe_public/js/frappe/ui/toolbar/notifications.js";
 import "../../frappe_public/js/frappe/views/communication.js";
 import "../../frappe_public/js/frappe/views/translation_manager.js";
 import "../../frappe_public/js/frappe/views/workspace/workspace.js";
@@ -101,8 +99,6 @@ import "../../frappe_public/js/frappe/ui/workspace_loading_skeleton.html";
 import "../../frappe_public/js/frappe/ui/workspace_sidebar_loading_skeleton.html";
 import "../../frappe_public/js/frappe/desk.js";
 import "../../frappe_public/js/frappe/query_string.js";
-
-// import "../../frappe_public/js/frappe/ui/comment.js";
 
 import "../../frappe_public/js/frappe/utils/energy_point_utils.js";
 import "../../frappe_public/js/frappe/utils/dashboard_utils.js";

@@ -186,14 +186,16 @@ def get_pick_lists(warehouse, country, filters, source, sort_by, sort_order):
 def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock - ICL", user="Administrator", tote="TOTEA03"):
 	is_being_picked = frappe.db.get_value('Pick List', pick_list, 'ais_picked_by')
 	shipped_items = frappe.db.sql("""SELECT item FROM `tabPick List Shipping Item`""", as_dict=1)
-	not_include = "("
-	i = 0
-	for row in shipped_items:
-		i = i+1
-		not_include += f"'{row.item}'"
-		if len(shipped_items) != i:
-			not_include += ","
-	not_include += ")"
+	not_include = ""
+	if shipped_items and len(shipped_items):
+		not_include = " AND pli.item_code not in  ("
+		i = 0
+		for row in shipped_items:
+			i = i+1
+			not_include += f"'{row.item}'"
+			if len(shipped_items) != i:
+				not_include += ","
+		not_include += ") "
 	if is_being_picked is None or is_being_picked == '' or is_being_picked == frappe.session.user:
 		items = frappe.db.sql("""SELECT
 										pli.name, pli.parent AS pick_list, pli.item_code, pli.item_name, item.image,
@@ -212,7 +214,7 @@ def get_items(pick_list="STO-PICK-2024-00101", warehouse="W01-WHS-Active Stock -
 										`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
 									WHERE
 										pli.parent = %(pick_list)s
-										AND pli.item_code not in """ + not_include + """
+										""" + not_include + """
 									ORDER BY pli.ifw_location
 									""", {"warehouse": warehouse, "pick_list": pick_list}, as_dict=1)
 		
@@ -534,14 +536,17 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 	where_pick += ")"
 
 	shipped_items = frappe.db.sql("""SELECT item FROM `tabPick List Shipping Item`""", as_dict=1)
-	not_include = "("
-	i = 0
-	for row in shipped_items:
-		i = i+1
-		not_include += f"'{row.item}'"
-		if len(shipped_items) != i:
-			not_include += ","
-	not_include += ")"
+
+	not_include = ""
+	if shipped_items and len(shipped_items):
+		not_include = "AND pli.item_code NOT IN  ("
+		i = 0
+		for row in shipped_items:
+			i = i+1
+			not_include += f"'{row.item}'"
+			if len(shipped_items) != i:
+				not_include += ","
+		not_include += ") "
 
 	items = frappe.db.sql(f"""SELECT 
 								pli.name, pli.item_code, pli.item_name, item.image,
@@ -556,7 +561,7 @@ def get_tote_items(warehouse, pick_lists, user, totes, assigned_picklists):
 							LEFT JOIN
 								`tabBin` AS bin ON bin.item_code = pli.item_code AND bin.warehouse = %(warehouse)s
 							WHERE
-								pli.parent in {where_pick} AND pli.item_code NOT IN {not_include}
+								pli.parent in {where_pick} {not_include}
 							ORDER BY
 								pli.ifw_location""",
 						{"warehouse": warehouse}, as_dict=1)

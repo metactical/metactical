@@ -81,7 +81,7 @@ export default {
 	props: {
 		doc: {
 			type: Object,
-			Required: true
+			required: true
 		}
 	},
 	mounted() {
@@ -285,13 +285,15 @@ export default {
 			}
 		},
 		updateSelectedService({idx, piece_name, item}) {
-			this.$set(this.selectedServices, idx, {
+			console.log("Called");
+			this.selectedServices[idx] = {
 				piece_name: piece_name,
 				selectedProvider: item.provider,
 				selectedCarrier: item.carrier_service,
 				selectedServiceName: item.service_name,
 				selectedRate: item.shipment_amount
-			});
+			};
+			console.log("idx: ", idx, " piece: ", piece_name, " item: ", item);
 		}
 	}
 }

@@ -11,7 +11,7 @@ import barcode as _barcode
 from barcode.writer import ImageWriter
 from io import BytesIO
 from erpnext.stock.doctype.pick_list.pick_list import (validate_item_locations, set_delivery_note_missing_values, update_delivery_note_item,
-	create_dn_with_so, create_dn_wo_so)
+	create_dn_with_so, create_dn_wo_so, create_dn_for_pick_lists)
 from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note as create_delivery_note_from_sales_order
 import datetime
 from pytz import timezone
@@ -118,16 +118,79 @@ class CustomPickList(PickList):
 		if self.do_not_create_delivery:
 			return
 		
-		pick_list = frappe.get_doc('Pick List', self.name)
-		validate_item_locations(pick_list)
+		# pick_list = frappe.get_doc('Pick List', self.name)
+		# validate_item_locations(pick_list)
 
-		sales_orders = [d.sales_order for d in pick_list.locations if d.sales_order]
+		# sales_orders = [d.sales_order for d in pick_list.locations if d.sales_order]
+		# sales_orders = set(sales_orders)
+
+		# delivery_note = None
+		# for sales_order in sales_orders:
+		# 	delivery_note = create_delivery_note_from_sales_order(sales_order,
+		# 		delivery_note, {"skip_item_mapping": True})
+		# 	delivery_note.update({
+		# 		'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule'),
+		# 		"disable_rounded_total": 1
+		# 	})
+		# 	#Add pick list submitted date in sales order
+		# 	sales_doc = frappe.get_doc("Sales Order", sales_order)
+		# 	sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
+		# 	sales_doc.save()
+
+		# # map rows without sales orders as well
+		# if not delivery_note:
+		# 	delivery_note = frappe.new_doc("Delivery Note")
+
+		# item_table_mapper = {
+		# 	'doctype': 'Delivery Note Item',
+		# 	'field_map': {
+		# 		'rate': 'rate',
+		# 		'name': 'so_detail',
+		# 		'parent': 'against_sales_order',
+		# 	},
+		# 	'condition': lambda doc: abs(doc.delivered_qty) < abs(doc.qty) and doc.delivered_by_supplier!=1
+		# }
+
+		# item_table_mapper_without_so = {
+		# 	'doctype': 'Delivery Note Item',
+		# 	'field_map': {
+		# 		'rate': 'rate',
+		# 		'name': 'name',
+		# 		'parent': '',
+		# 	}
+		# }
+
+		# for location in pick_list.locations:
+		# 	if location.sales_order_item:
+		# 		sales_order_item = frappe.get_cached_doc('Sales Order Item', {'name':location.sales_order_item})
+		# 	else:
+		# 		sales_order_item = None
+
+		# 	source_doc, table_mapper = [sales_order_item, item_table_mapper] if sales_order_item \
+		# 		else [location, item_table_mapper_without_so]
+
+		# 	dn_item = map_child_doc(source_doc, delivery_note, table_mapper)
+
+		# 	if dn_item:
+		# 		dn_item.warehouse = location.warehouse
+		# 		dn_item.qty = location.picked_qty
+		# 		dn_item.batch_no = location.batch_no
+		# 		dn_item.serial_no = location.serial_no
+
+		# 		update_delivery_note_item(source_doc, dn_item, delivery_note)
+
+		# set_delivery_note_missing_values(delivery_note)
+
+		# delivery_note.pick_list = pick_list.name
+		# delivery_note.customer = pick_list.customer if pick_list.customer else None
+		# if pick_list.ais_source:
+		# 	delivery_note.source = pick_list.ais_source
+		# delivery_note.save()
+
+		delivery_note = create_dn_for_pick_lists(self.name)
+		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
 		sales_orders = set(sales_orders)
-
-		delivery_note = None
 		for sales_order in sales_orders:
-			delivery_note = create_delivery_note_from_sales_order(sales_order,
-				delivery_note, skip_item_mapping=True)
 			delivery_note.update({
 				'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule'),
 				"disable_rounded_total": 1
@@ -136,56 +199,9 @@ class CustomPickList(PickList):
 			sales_doc = frappe.get_doc("Sales Order", sales_order)
 			sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
 			sales_doc.save()
-
-		# map rows without sales orders as well
-		if not delivery_note:
-			delivery_note = frappe.new_doc("Delivery Note")
-
-		item_table_mapper = {
-			'doctype': 'Delivery Note Item',
-			'field_map': {
-				'rate': 'rate',
-				'name': 'so_detail',
-				'parent': 'against_sales_order',
-			},
-			'condition': lambda doc: abs(doc.delivered_qty) < abs(doc.qty) and doc.delivered_by_supplier!=1
-		}
-
-		item_table_mapper_without_so = {
-			'doctype': 'Delivery Note Item',
-			'field_map': {
-				'rate': 'rate',
-				'name': 'name',
-				'parent': '',
-			}
-		}
-
-		for location in pick_list.locations:
-			if location.sales_order_item:
-				sales_order_item = frappe.get_cached_doc('Sales Order Item', {'name':location.sales_order_item})
-			else:
-				sales_order_item = None
-
-			source_doc, table_mapper = [sales_order_item, item_table_mapper] if sales_order_item \
-				else [location, item_table_mapper_without_so]
-
-			dn_item = map_child_doc(source_doc, delivery_note, table_mapper)
-
-			if dn_item:
-				dn_item.warehouse = location.warehouse
-				dn_item.qty = location.picked_qty
-				dn_item.batch_no = location.batch_no
-				dn_item.serial_no = location.serial_no
-
-				update_delivery_note_item(source_doc, dn_item, delivery_note)
-
-		set_delivery_note_missing_values(delivery_note)
-
-		delivery_note.pick_list = pick_list.name
-		delivery_note.customer = pick_list.customer if pick_list.customer else None
-		if pick_list.ais_source:
-			delivery_note.source = pick_list.ais_source
 		delivery_note.save()
+		
+
 	
 	
 	def on_cancel(self):

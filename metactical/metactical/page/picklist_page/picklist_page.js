@@ -811,7 +811,7 @@ class PicklistPage{
 		if (metactical.pick_list && metactical.pick_list.selected_source) {
 			selected_source = metactical.pick_list.selected_source;
 		}
-
+		console.log("Got to here");
 		frappe.call({
 			"method": "metactical.metactical.page.picklist_page.picklist_page.get_pick_lists",
 			"args": {
@@ -824,6 +824,7 @@ class PicklistPage{
 			},
 			"freeze": true,
 			"callback": function(ret){
+				console.log("PL: ", ret);
 				let selected_source = 'All';
 				if(metactical.pick_list.selected_source != "All"){
 					selected_source = metactical.pick_list.selected_source;

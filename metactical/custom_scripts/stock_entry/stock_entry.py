@@ -5,7 +5,6 @@ from frappe import _
 from frappe.model.mapper import get_mapped_doc, map_child_doc
 from frappe.utils import flt
 from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
-from erpnext.stock.doctype.serial_no.serial_no import update_serial_nos_after_submit
 import barcode as _barcode
 from barcode.writer import ImageWriter
 from io import BytesIO
