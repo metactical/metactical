@@ -6,7 +6,7 @@ from frappe import _, msgprint
 from frappe.model.document import Document
 from frappe.utils.xlsxutils import read_xlsx_file_from_attached_file, read_xls_file_from_attached_file
 from frappe.model.docstatus import DocStatus
-from frappe.model.rename_doc import update_document_title
+from frappe.model.rename_doc import rename_doc
 from frappe.utils.file_manager import save_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 import os
@@ -93,25 +93,24 @@ class ItemMergeImportTool(Document):
 			start = end
 
 	def _merge_items(self, data):
-		for row in data:
+		for i, row in enumerate(data):
 			if row[0] == "Current SKU":
 				continue
 
 			current_sku = row[0]
 			new_sku = row[1]
    
+			if current_sku == new_sku:
+				continue
+   
 			item_inventory_output = frappe.db.exists("Item Inventory Output", new_sku)
 			if item_inventory_output:
 				frappe.delete_doc("Item Inventory Output", item_inventory_output)
 
-			update_document_title(
+			rename_doc(
 				doctype="Item",
-				docname=current_sku,
-				title=new_sku,
-				name=new_sku,
-				enqueue=True,
-				merge=1,
-				freeze=True,
-				freeze_message="Updating related fields..."
+				old=current_sku,
+				new=new_sku,
+				merge=True,
 			)
 			frappe.db.commit()
