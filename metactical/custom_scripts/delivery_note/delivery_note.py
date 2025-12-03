@@ -116,6 +116,7 @@ class DeliveryNoteCustom(DeliveryNote):
 					
 					#Get payment entry with Sales Order and add it to advance paid
 					sales_invoice.set_advances()
+					sales_invoice.save()
 					sales_invoice.submit()
 					frappe.db.commit()
 
