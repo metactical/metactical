@@ -42,7 +42,7 @@ def on_sle_update(doc, method):
 	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
 	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
  
-	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type)
+	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle)
 
 def get_posting_time(doc):
 	posting_time_str = None
@@ -112,7 +112,7 @@ def get_all_bins_for_product_bundle(parent_item):
 
 	return {"all_bins": warehouse_item_qty, "bundle_items": bundle_items}
 
-def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False):
+def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None):
 	if not voucher_type:
 		voucher_type = 'Sales Order'
 
@@ -123,6 +123,9 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			filters={'item_code': item_code}, 
 			pluck="price_list"
 		)
+  
+		if not price_lists:
+			return
   
 		net_available_bundles = []
 		if not bundle:
@@ -212,8 +215,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 
 		# Save changes to Item Inventory Output
 		total_available_qty = sum(net_available_bins.values()) if not bundle else min(net_available_bundles)
-		inventories_by_country = get_inventory_by_country(item_code)
-    
+		inventories_by_country = get_inventory_by_country(item_code, last_sle, net_available_bins)
+
 		if not item_inventory_output_doc:
 			item_inventory_output = frappe.new_doc('Item Inventory Output')
 			item_inventory_output.item_code = item_code
@@ -256,51 +259,89 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=frappe.get_traceback())
 		frappe.db.rollback()
   
-def get_inventory_by_country(item_code):    
-    filters = {"item_code": item_code}
-    
-    allowed_companies = {
-        "International Camouflage Ltd": "Canada",
-        "American One Inc.": "United States"
-    }
-    
-    # Remove the f-string prefix - use a regular string for parameterized queries
-    query = """
-        SELECT 
-            company,
-            SUM(bin.actual_qty - bin.reserved_qty) as available_qty
-        FROM 
-            `tabBin` bin
-        INNER JOIN 
-            `tabWarehouse` w ON bin.warehouse = w.name
-        WHERE 
-            bin.item_code = %(item_code)s AND w.name LIKE '%%active%%'
-        GROUP BY 
-            w.company
-        HAVING
-            available_qty > 0
-        ORDER BY 
-            available_qty DESC
-    """
-    
-    result = frappe.db.sql(query, filters, as_dict=1)
-    
-    inventories_dict = []
-    
-    for row in result:
-        if row['company'] in allowed_companies:
-            row_data = {
-                "doctype": "Inventory Per Country",
-                "country": allowed_companies[row['company']],
-                "qty": row['available_qty']
-            }
-            
-            inventory_doc = frappe.new_doc("Inventory Per Country")
-            inventory_doc.update(row_data)
-            inventories_dict.append(inventory_doc)
-    
-    return inventories_dict
+def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}):
+	filters = {"item_code": item_code}
+ 	
+	# Fetch all Lead Sources that have a country set
+	lead_sources = frappe.get_all('Lead Source', filters={"neb_country": ["is", "set"]}, pluck='name')
+	warehouses_per_country = {}
+	
+	# Build a mapping: country → list of warehouses
+	for lead_source in lead_sources:
+		lead_source_doc = frappe.get_cached_doc('Lead Source', lead_source)
+		
+		# Extract warehouses from lead source
+		warehouses = [wh.warehouse for wh in lead_source_doc.custom_neb_sb_warehouse_inventory_sync]
+		
+		# Group warehouses under their country
+		if lead_source_doc.neb_country in warehouses_per_country:
+			warehouses_per_country[lead_source_doc.neb_country].extend(warehouses)
+		else:
+			warehouses_per_country[lead_source_doc.neb_country] = warehouses
+   
+	# Remove duplicate warehouses per country
+	for country, warehouses in warehouses_per_country.items():
+		warehouses_per_country[country] = list(set(warehouses))
+
+	all_warehouses = tuple()
+	for country, warehouses in warehouses_per_country.items():	
+		for warehouse in warehouses:
+			all_warehouses += (warehouse,)
+ 
+	# Add to SQL filters
+	filters["all_warehouses"] = all_warehouses
+
+	query = """
+		SELECT 
+			warehouse,
+			SUM(bin.actual_qty - bin.reserved_qty) as available_qty
+		FROM 
+			`tabBin` bin
+		INNER JOIN 
+			`tabWarehouse` w ON bin.warehouse = w.name
+		WHERE 
+			bin.item_code = %(item_code)s AND w.name IN %(all_warehouses)s
+		GROUP BY 
+			warehouse
+		ORDER BY 
+			available_qty DESC
+	"""
+
+	result = frappe.db.sql(query, filters, as_dict=1)
+ 	
+	inventories_dict = []
+	inventories_by_country = {}	
+
+	for row in result:  
+		warehouse = row.warehouse
+		available_qty = row.available_qty
   
+		# If this is the warehouse from last_sle, apply net_available_bins override
+		if last_sle and warehouse == last_sle.get("warehouse"):
+			available_qty = net_available_bins.get(warehouse, available_qty)
+			
+		# Add available quantities into country-level totals
+		for country, warehouses in warehouses_per_country.items():
+			if warehouse in warehouses:
+				if country in inventories_by_country:
+					inventories_by_country[country] += available_qty
+				else:
+					inventories_by_country[country] = available_qty
+	
+	# Convert aggregated country data into Inventory Per Country docs
+	for country, qty in inventories_by_country.items():
+		row_data = {
+			"doctype": "Inventory Per Country",
+			"country": country,
+			"qty":	qty
+		}
+		
+		inventory_doc = frappe.new_doc("Inventory Per Country")
+		inventory_doc.update(row_data)
+		inventories_dict.append(inventory_doc)
+  
+	return inventories_dict
+
 def delete_failed_inventory_output(item_code):
 	failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", {"item_code": item_code})
 	if failed_inventory_output_exists:
