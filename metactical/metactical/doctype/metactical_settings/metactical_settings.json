@@ -12,7 +12,9 @@
   "pos_section",
   "pos_url",
   "background_sync_tab",
-  "max_number_of_items_to_sync"
+  "max_number_of_items_to_sync",
+  "item_from_excel_tab",
+  "validation_apis"
  ],
  "fields": [
   {
@@ -30,6 +32,7 @@
   {
    "fieldname": "store_credit_section",
    "fieldtype": "Tab Break",
+   "hidden": 1,
    "label": "Store Credit"
   },
   {
@@ -52,12 +55,23 @@
    "fieldtype": "Int",
    "label": "Max. number of Items to Sync",
    "permlevel": 1
+  },
+  {
+   "fieldname": "item_from_excel_tab",
+   "fieldtype": "Tab Break",
+   "label": "Item From Excel"
+  },
+  {
+   "fieldname": "validation_apis",
+   "fieldtype": "Table",
+   "label": "Item Import Validation APIs",
+   "options": "Item Import Validation"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-08-28 11:29:30.618869",
+ "modified": "2025-11-07 07:18:26.150147",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical Settings",
