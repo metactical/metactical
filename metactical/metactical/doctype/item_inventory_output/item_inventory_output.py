@@ -32,23 +32,15 @@ def on_sle_update(doc, method):
 			"posting_date": doc.posting_date,
 			"posting_time": posting_time,
 		}
-	)
-	print(f"last_sle: {last_sle.get('name', '')} | qty_after_transaction: {last_sle.get('qty_after_transaction')}")
- 
+	) 
 	if last_sle and doc.voucher_type != 'Stock Reconciliation':
-		print("Using last SLE qty_after_transaction", last_sle.get("qty_after_transaction"))
 		qty = flt(last_sle.get("qty_after_transaction")) + flt(doc.actual_qty)
 	else:
-		print("Using current SLE qty_after_transaction", doc.as_dict())
 		qty = flt(doc.actual_qty)
-  
-	print(f"qty: {qty}")
-		
+  		
 	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
 	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
-	print(f"net available {net_available_bins}")
-	update_item_inventory_output(doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
-	# frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
+	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
 
 def get_posting_time(doc):
 	posting_time_str = None
@@ -119,8 +111,6 @@ def get_all_bins_for_product_bundle(parent_item):
 	return {"all_bins": warehouse_item_qty, "bundle_items": bundle_items}
 
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None, doc=None):
-
-	frappe.log_error(title=f"Inventory Update ({voucher_type}) - {item_code}", message=f"net_available_bins: {net_available_bins}, \nbundle: {bundle}, last_sle: {last_sle}")
 	try:
 		# get price lists from the item price list
 		price_lists = frappe.get_all(
@@ -128,10 +118,6 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			filters={'item_code': item_code}, 
 			pluck="price_list"
 		)
-  
-		if not price_lists or not net_available_bins:
-			return
-  
 		net_available_bundles = []
 		if not bundle:
 			maintain_stock = frappe.db.get_value('Item', item_code, 'is_stock_item')
@@ -142,6 +128,9 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			all_bins = get_all_bins(item_code)
 			net_available_bins = frappe._dict({x.warehouse: x.actual_qty - x.reserved_qty for x in all_bins})
 
+		if not price_lists or not net_available_bins:
+			return
+  
 		# Fetch lead sources and map website deduct quantities by lead source
 		website_deduct_qty = frappe.get_all(
 			'Website Deduct Qty', 
