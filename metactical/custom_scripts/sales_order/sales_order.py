@@ -77,14 +77,14 @@ class SalesOrderCustom(SalesOrder):
 
 		# Metactical Customization: Added
 		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type="Sales Order", queue='default')
 
 	def on_cancel(self):
 		super(SalesOrderCustom, self).on_cancel()
 
 		# Metactical Customization: Added
 		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type="Sales Order", queue='default')
 
 	def on_update_after_submit(self):
 		super().on_update_after_submit()
