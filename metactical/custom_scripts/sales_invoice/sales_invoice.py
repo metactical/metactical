@@ -25,15 +25,6 @@ class CustomSalesInvoice(SalesInvoice, SellingController, StockController, Accou
 			queue_action(self, "submit", timeout=2000)
 		else:
 			super().save()
-   
-	# def on_submit(self):
-	# 	super(CustomSalesInvoice, self).on_submit()
-	
-	# 	# Metactical Customization: Create offset journal entry for write-off amount
-	# 	# if self.status == "Partly Paid":
-	# 	# 	if self.outstanding_amount <= .25 and self.advances:
-	# 	# 		self.create_offset_journal_entry()		
-
 
 	def on_cancel(self):
 		# Metactical Customization: Relink payment entries to sales orders when sales invoice is cancelled
