@@ -15,32 +15,10 @@ class ItemInventoryOutput(Document):
 
 def on_sle_update(doc, method):
 	# Fetch bins and calculate net available quantities per warehouse
-	all_bins = get_all_bins(doc.item_code)
-	net_available_bins = {}
-	for bin in all_bins:
-		net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
-	
-	if doc.warehouse not in net_available_bins:
-		net_available_bins[doc.warehouse] = doc.actual_qty if doc.actual_qty > 0 else 0
-
-	# subtract 1 second from posting time
-	posting_time = get_posting_time(doc) 
-	last_sle = get_previous_sle(
-		{
-			"item_code": doc.item_code,
-			"warehouse": doc.warehouse,
-			"posting_date": doc.posting_date,
-			"posting_time": posting_time,
-		}
-	) 
-	if last_sle and doc.voucher_type != 'Stock Reconciliation':
-		qty = flt(last_sle.get("qty_after_transaction")) + flt(doc.actual_qty)
-	else:
-		qty = flt(doc.actual_qty)
-  		
-	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
-	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
-	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
+	net_available_bins, last_sle = get_inventory_quantity(doc)
+ 
+	update_item_inventory_output(doc.item_code, net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
+ 	# frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
 
 def get_posting_time(doc):
 	posting_time_str = None
@@ -65,6 +43,35 @@ def get_posting_time(doc):
 		posting_time_str = new_time.strftime("%H:%M:%S")
   
 	return posting_time_str
+
+def get_inventory_quantity(doc):
+	all_bins = get_all_bins(doc.item_code)
+	net_available_bins = {}
+	for bin in all_bins:
+		net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
+	
+	if doc.warehouse not in net_available_bins:
+		net_available_bins[doc.warehouse] = doc.actual_qty if doc.actual_qty > 0 else 0
+
+	# subtract 1 second from posting time
+	posting_time = get_posting_time(doc) 
+	last_sle = get_previous_sle(
+		{
+			"item_code": doc.item_code,
+			"warehouse": doc.warehouse,
+			"posting_date": doc.posting_date,
+			"posting_time": posting_time,
+		}
+	) 
+	if last_sle and doc.voucher_type != 'Stock Reconciliation':
+		qty = flt(last_sle.get("qty_after_transaction")) + flt(doc.actual_qty)
+	else:
+		qty = flt(doc.qty_after_transaction)
+    		
+	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
+	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
+ 
+	return net_available_bins, last_sle
 
 def get_all_bins(item_code):
 	all_bins = frappe.get_all(
@@ -111,7 +118,10 @@ def get_all_bins_for_product_bundle(parent_item):
 	return {"all_bins": warehouse_item_qty, "bundle_items": bundle_items}
 
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None, doc=None):
-	try:
+	try:	
+		if voucher_type is None:
+			return
+
 		# get price lists from the item price list
 		price_lists = frappe.get_all(
 			'Item Price', 
@@ -125,10 +135,13 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 				return
 
 		if not net_available_bins and not bundle:
-			all_bins = get_all_bins(item_code)
-			net_available_bins = frappe._dict({x.warehouse: x.actual_qty - x.reserved_qty for x in all_bins})
+			if voucher_type in ["Item", "Sales Order"]:
+				all_bins = get_all_bins(item_code)
+				net_available_bins = frappe._dict({x.warehouse: x.actual_qty - x.reserved_qty for x in all_bins})
+			else:
+				net_available_bins, last_sle = get_inventory_quantity(doc)
 
-		if not price_lists or not net_available_bins:
+		if not net_available_bins:
 			return
   
 		# Fetch lead sources and map website deduct quantities by lead source
@@ -311,20 +324,14 @@ def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, do
 		available_qty = row.available_qty
   
 		# If this is the warehouse from last_sle, apply net_available_bins override
-		print(f"Checking warehouse {warehouse} against last_sle warehouse {last_sle.get('warehouse') if last_sle else 'N/A'}")
 		if last_sle and warehouse == last_sle.get("warehouse"):
-			print(f"Overriding available_qty for warehouse {warehouse} with net_available_bins value")
 			available_qty = net_available_bins.get(warehouse, available_qty)
 		elif doc:
 			if doc.warehouse == warehouse:
-				print(f"Overriding available_qty for warehouse {warehouse} with net_available_bins value from doc")
 				reserved_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": warehouse}, "reserved_qty") or 0
 				qty = doc.actual_qty if doc.voucher_type != 'Stock Reconciliation' else doc.qty_after_transaction
-				available_qty = doc.actual_qty - reserved_qty
-				print(f"Calculated available_qty from doc: {available_qty}")
+				available_qty = qty - reserved_qty
 				available_qty = max(0, available_qty)
-		
-		print(f"Warehouse: {warehouse} | Available Qty: {available_qty}")
 			
 		# Add available quantities into country-level totals
 		for country, warehouses in warehouses_per_country.items():
