@@ -44,14 +44,6 @@ def get_posting_time(doc):
 	return posting_time_str
 
 def get_inventory_quantity(doc):
-	all_bins = get_all_bins(doc.item_code)
-	net_available_bins = {}
-	for bin in all_bins:
-		net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
-	
-	if doc.warehouse not in net_available_bins:
-		net_available_bins[doc.warehouse] = doc.actual_qty if doc.actual_qty > 0 else 0
-
 	# subtract 1 second from posting time
 	posting_time = get_posting_time(doc) 
 	last_sle = get_previous_sle(
@@ -62,15 +54,25 @@ def get_inventory_quantity(doc):
 			"posting_time": posting_time,
 		}
 	) 
+ 
+	all_bins = get_all_bins(doc.item_code)
+	net_available_bins = {}
+	for bin in all_bins:
+		net_available_bins[bin.warehouse] = bin.actual_qty - bin.reserved_qty
+	
+	if doc.warehouse not in net_available_bins:
+		net_available_bins[doc.warehouse] = doc.actual_qty if doc.actual_qty > 0 else 0
+
 	if last_sle and doc.voucher_type != 'Stock Reconciliation':
 		qty = flt(last_sle.get("qty_after_transaction")) + flt(doc.actual_qty)
 	elif not last_sle and doc:
+     
 		qty = max(doc.actual_qty if doc.actual_qty else 0, doc.qty_after_transaction if doc.qty_after_transaction else 0)
 	else:
 		qty = flt(doc.qty_after_transaction)
 			
 	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
-	net_available_bins[doc.warehouse] = qty-reserved_qty if (qty - reserved_qty) > 0 else 0
+	net_available_bins[doc.warehouse] = qty-reserved_qty
  
 	return net_available_bins, last_sle
 
@@ -91,7 +93,7 @@ def get_all_bins(item_code):
 
 	return all_bins
 
-def get_all_bins_for_product_bundle(parent_item):
+def get_all_bins_for_product_bundle(parent_item, net_available_bins = {}):
 	bundle = frappe.get_doc('Product Bundle', parent_item)
 	bundle_items = {x.item_code: x.qty for x in bundle.items}  # Store item qty per bundle unit
 
@@ -115,6 +117,12 @@ def get_all_bins_for_product_bundle(parent_item):
 		warehouse = bin_entry["warehouse"]
 
 		warehouse_item_qty[item_code][warehouse] = bin_entry["actual_qty"] - bin_entry["reserved_qty"]
+  
+	for item in warehouse_item_qty:
+
+		for wh in warehouse_item_qty[item]:
+			if net_available_bins.get(wh) is not None and warehouse_item_qty[item][wh] != net_available_bins.get(wh):
+				warehouse_item_qty[item][wh] = net_available_bins.get(wh)
 
 	return {"all_bins": warehouse_item_qty, "bundle_items": bundle_items}
 
@@ -264,7 +272,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			product_bundle_parents = is_product_bundle_item(item_code)
 			if product_bundle_parents:
 				for parent_item in product_bundle_parents:
-					all_bins = get_all_bins_for_product_bundle(parent_item)
+					all_bins = get_all_bins_for_product_bundle(parent_item, net_available_bins)
 					update_item_inventory_output(parent_item, all_bins, voucher_type, bundle=True, doc=doc)
 		
 	except Exception as e:
@@ -274,7 +282,17 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, doc=None):
 	filters = {"item_code": item_code}
 
-	if doc:
+	# Check if this is a bundle (has nested structure)
+	is_bundle = isinstance(net_available_bins, dict) and "all_bins" in net_available_bins and "bundle_items" in net_available_bins
+	
+	# Convert bundle structure to warehouse quantities
+	if is_bundle:
+		warehouse_bundle_qty = calculate_bundle_qty_per_warehouse(
+			net_available_bins["all_bins"],
+			net_available_bins["bundle_items"]
+		)
+		net_available_bins = warehouse_bundle_qty
+	elif doc and not net_available_bins:
 		net_available_bins, last_sle = get_inventory_quantity(doc)
 
 	# Fetch Lead Sources that have a country set
@@ -304,47 +322,74 @@ def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, do
 	all_warehouses = tuple(
 		w for ws in warehouses_per_country.values() for w in ws
 	)
+	
+	if not all_warehouses:
+		frappe.log_error(
+			title=f"No warehouses found for country mapping - {item_code}",
+			message="No warehouses configured in Lead Sources with country set"
+		)
+		return []
+	
 	filters["all_warehouses"] = all_warehouses
 
-	query = """
-		SELECT 
-			warehouse,
-			SUM(bin.actual_qty - bin.reserved_qty) AS available_qty
-		FROM `tabBin` bin
-		WHERE bin.item_code = %(item_code)s 
-			AND bin.warehouse IN %(all_warehouses)s
-		GROUP BY warehouse
-		ORDER BY available_qty DESC
-	"""
-
-	result = frappe.db.sql(query, filters, as_dict=1)
-
-	# If SQL returned no rows, fill from net_available_bins
-	if not result:
+	# For bundles, skip SQL query and use calculated bundle quantities
+	if is_bundle:
 		result = [
 			frappe._dict({
 				"warehouse": wh,
 				"available_qty": qty
 			})
 			for wh, qty in net_available_bins.items()
+			if wh in all_warehouses  # Only include warehouses in country mapping
 		]
+	else:
+		# Regular items: query from Bin
+		query = """
+			SELECT 
+				warehouse,
+				SUM(bin.actual_qty - bin.reserved_qty) AS available_qty
+			FROM `tabBin` bin
+			WHERE bin.item_code = %(item_code)s 
+				AND bin.warehouse IN %(all_warehouses)s
+			GROUP BY warehouse
+			ORDER BY available_qty DESC
+		"""
+		result = frappe.db.sql(query, filters, as_dict=1)
+
+		# If SQL returned no rows, fill from net_available_bins
+		if not result:
+			result = [
+				frappe._dict({
+					"warehouse": wh,
+					"available_qty": qty
+				})
+				for wh, qty in net_available_bins.items()
+			]
 
 	inventories_by_country = {}
  
-	# check if the warehouse in net_available_bins are missing or have less than value than result
+	# Check if warehouses in net_available_bins are missing or have different values than result
 	for wh in net_available_bins:
 		found = False
 
 		for row in result:
 			if row.warehouse == wh:
 				found = True
-
-				# Override SQL qty if net_available_bins has a higher value
-				if row.available_qty < net_available_bins[wh]:
+				
+				# For bundles, always use net_available_bins (calculated bundle qty)
+				# For regular items, use the higher value
+				if is_bundle:
 					row.available_qty = net_available_bins[wh]
+				else:
+					sql_qty = float(row.available_qty) if row.available_qty else 0
+					net_qty = float(net_available_bins[wh]) if net_available_bins[wh] else 0
+					
+					# Use the higher value
+					if sql_qty < net_qty:
+						row.available_qty = net_qty
 
-		# If the warehouse was not in SQL result → add it
-		if not found:
+		# If the warehouse was not in result → add it (if in country mapping)
+		if not found and wh in all_warehouses:
 			result.append(
 				frappe._dict({
 					"warehouse": wh,
@@ -356,7 +401,7 @@ def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, do
 		warehouse = row.warehouse
 
 		# Corrected qty using net_available_bins always takes priority
-		corrected_qty = net_available_bins.get(warehouse, row.available_qty)
+		corrected_qty = float(net_available_bins.get(warehouse, row.available_qty) or 0)
 
 		# Sum warehouse qty into its country
 		for country, wh_list in warehouses_per_country.items():
@@ -371,7 +416,7 @@ def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, do
 		row_data = {
 			"doctype": "Inventory Per Country",
 			"country": country,
-			"qty": qty,
+			"qty": max(0, qty),
 		}
 
 		inv_doc = frappe.new_doc("Inventory Per Country")
@@ -379,6 +424,46 @@ def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, do
 		inventories_dict.append(inv_doc)
 
 	return inventories_dict
+
+def calculate_bundle_qty_per_warehouse(all_bins, bundle_items):
+	"""
+	Calculate how many complete bundles can be made per warehouse.
+	
+	Args:
+		all_bins: dict of {item_code: {warehouse: qty}}
+		bundle_items: dict of {item_code: qty_per_bundle}
+		
+	Returns:
+		dict of {warehouse: bundle_qty}
+	"""
+	warehouse_bundle_qty = {}
+	
+	# Get all unique warehouses across all items
+	all_warehouses = set()
+	for item_warehouses in all_bins.values():
+		all_warehouses.update(item_warehouses.keys())
+	
+	# For each warehouse, calculate how many bundles can be made
+	for warehouse in all_warehouses:
+		bundle_qty_per_item = []
+		
+		# For each item in the bundle
+		for item_code, qty_per_bundle in bundle_items.items():
+			# Get available qty for this item in this warehouse
+			available_qty = all_bins.get(item_code, {}).get(warehouse, 0)
+			
+			# Calculate how many bundles this item can make
+			if qty_per_bundle > 0:
+				bundles_from_this_item = available_qty // qty_per_bundle
+			else:
+				bundles_from_this_item = 0
+			
+			bundle_qty_per_item.append(bundles_from_this_item)
+		
+		# The warehouse can make as many bundles as the limiting item allows
+		warehouse_bundle_qty[warehouse] = min(bundle_qty_per_item) if bundle_qty_per_item else 0
+	
+	return warehouse_bundle_qty
 
 def delete_failed_inventory_output(item_code):
 	failed_inventory_output_exists = frappe.db.exists("Failed Inventory Output", {"item_code": item_code})
