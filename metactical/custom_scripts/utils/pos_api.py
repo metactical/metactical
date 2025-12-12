@@ -10,6 +10,92 @@ import json
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
     form_data = dict(frappe.form_dict)
+    
+    if "isManualOrder" in form_data and form_data["isManualOrder"]:
+        create_manual_order(form_data)
+    else:
+        process_order(form_data)
+        
+def create_manual_order(form_data):
+    log = create_log(form_data, "Manual Order")
+    try:
+        customer = get_customer(form_data)
+        if not customer:
+            frappe.response["Status"] = "500"
+            frappe.response["Message"] = ["Unable to create/find Customer"]
+            frappe.response["InvoiceId"] = None
+            frappe.response["Total"] = 0.0
+            frappe.db.set_value('POS API Log', log, 'error', "Unable to create/find Customer")
+            frappe.db.commit()
+            return
+        
+        sales_order = create_sales_order(form_data, customer)
+        if not sales_order["success"] and not sales_order["sales_order"]:
+            frappe.response["Status"] = "500"
+            frappe.response["Message"] = [sales_order["error"]]
+            frappe.response["InvoiceId"] = None
+            frappe.response["Total"] = 0.0
+            frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
+            frappe.db.commit()
+            return
+                
+        # submit the sales order
+        if not sales_order["success"] and not sales_order["sales_order"]:
+            frappe.response["Status"] = "500"
+            frappe.response["Message"] = [sales_order["error"]]
+            frappe.response["InvoiceId"] = None
+            frappe.response["Total"] = 0.0
+            frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
+            frappe.db.commit()
+            return
+        
+        if not sales_order["success"]:
+            url = "/app/{0}/{1}".format(sales_order["sales_order"].doctype.lower().replace(" ", "-"), sales_order["sales_order"].name)
+            message = "Branch: *{0}* \n Sales Order created by POS has an error: `{1}`. \nPlease update the document and resubmit. [{2}]({3})".format(
+                form_data['POSProfile'], sales_order["error"], get_url(url), get_url(url))
+            
+            frappe.enqueue(
+                post_to_rocket_chat,
+                queue="default", # one of short, default, long
+                doc=sales_order["sales_order"],
+                msg=message,
+                pos=True
+            )
+            
+            comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
+            comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
+            create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
+            
+        # submit sales order
+        has_no_error = sales_order["success"] if 'success' in sales_order else True
+        sales_order = sales_order["sales_order"]
+        
+        # if sales_order and has_no_error:
+        #     frappe.enqueue(
+        #         submit_sales_order,
+        #         queue="default", # one of short, default, long
+        #         at_front=True,
+        #         form_data=form_data,
+        #         sales_order=sales_order.name,
+        #         log=log
+        #     )
+            
+        frappe.response["Status"] = "200"
+        frappe.response["InvoiceId"] = sales_order.name
+        frappe.response["Message"] = []
+        
+        frappe.response["Total"] = float(sales_order.grand_total)
+    except Exception as e:
+        frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
+        frappe.clear_last_message()
+        frappe.response["Status"] = "500"
+        frappe.response["Message"] = [str(e)]
+        frappe.response["InvoiceId"] = None
+        frappe.response["Total"] = 0.0
+    
+def process_order(form_data):
     order_type = "New Order" if not form_data["InvoiceId"] else "Manual Order"
     log = create_log(form_data, order_type)
 
@@ -144,6 +230,7 @@ def receive_pos_data(*args, **kwargs):
         
 def validate_users(form_data):
     # Check if SalesPerson exists
+    print(form_data)
     if "SalesPerson" not in form_data:
         return {"error": "SalesPerson is required", "success": False}
     else:
@@ -559,10 +646,11 @@ def get_items(form_data):
 def get_customer(form_data):
     frappe.set_user(form_data['SalesPerson'])
     try:
-
-        if not form_data['Customer']['Name']:
+        if not form_data['Customer']['FirstName']:
+            print("No First Name")
             frappe.set_user("Administrator")
             customer = frappe.db.get_value('POS Profile', form_data['POSProfile'] + ' Operators', 'customer')
+            print("Customer:", customer)
             return customer
         
         customer = frappe.db.exists('Customer', form_data['Customer']['id'])
@@ -572,12 +660,11 @@ def get_customer(form_data):
         
         customer = frappe.get_doc({
             'doctype': 'Customer',
-            'customer_name': form_data['Customer']['Name'],
+            'customer_name': form_data['Customer']['FirstName'] + ' ' + form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
             'customer_group': 'Retail',
             'territory': 'All Territories',
-            'first_name': form_data['Customer']['Name'].split(' ')[0],
-            'last_name': form_data['Customer']['Name'].split(' ')[1] if len(form_data['Customer']['Name'].split(' ')) > 1 else '',
-            'customer_name': form_data['Customer']['Name'],
+            'first_name': form_data['Customer']['FirstName'],
+            'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
             'territory': 'All Territories',
             'default_price_list': form_data['PriceList'] if "PriceList" in form_data else "",
             'default_currency': frappe.db.get_value("Price List", form_data['PriceList'], 'currency') if "PriceList" in form_data else "",
@@ -586,6 +673,7 @@ def get_customer(form_data):
         
         customer.save(ignore_permissions=True)
         contact = create_contact(form_data, customer)
+        address = create_address(form_data, customer)
         
         frappe.db.set_value('Customer', customer.name, 'customer_primary_contact', contact)
         frappe.db.commit()
@@ -596,6 +684,35 @@ def get_customer(form_data):
         frappe.set_user("Administrator")
         frappe.log_error(title='Create Customer Error', message=frappe.get_traceback())
         return None
+    
+def create_address(form_data, customer):
+    frappe.set_user(form_data['SalesPerson'])
+    try:
+        phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
+        address_info = {
+            'doctype': 'Address',
+            'address_title': form_data['Customer']['FirstName'] + ' ' + form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
+            'address_line1': form_data['Customer']['AddressLine1'] if form_data['Customer']['AddressLine1'] else '',
+            'address_line2': form_data['Customer']['AddressLine2'] if form_data['Customer']['AddressLine2'] else '',
+            'city': form_data['Customer']['City'] if form_data['Customer']['City'] else '',
+            'state': form_data['Customer']['State'] if form_data['Customer']['State'] else '',
+            'pincode': form_data['Customer']['ZipCode'] if form_data['Customer']['ZipCode'] else '',
+            'country': form_data['Customer']['Country'] if form_data['Customer']['Country'] else '',
+            'phone': phone,
+            'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
+        }
+        
+        address_info.update({'links': [{'link_doctype': 'Customer', 'link_name': customer.name}]})
+
+        address = frappe.get_doc(address_info)
+        address.save(ignore_permissions=True)
+        frappe.db.commit()
+        frappe.set_user("Administrator")
+        return address.name
+    except Exception as e:
+        frappe.set_user("Administrator")
+        frappe.log_error(title='Create Address Error', message=frappe.get_traceback())
+        return None
 
 def create_contact(form_data, customer):
     frappe.set_user(form_data['SalesPerson'])
@@ -603,8 +720,8 @@ def create_contact(form_data, customer):
         phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
         contact_info = {
             'doctype': 'Contact',
-            'first_name': form_data['Customer']['Name'].split(' ')[0],
-            'last_name': form_data['Customer']['Name'].split(' ')[1] if len(form_data['Customer']['Name'].split(' ')) > 1 else '',
+            'first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
+            'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
             'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
             'phone': phone,
             'mobile_no': phone
@@ -687,8 +804,8 @@ def get_so_comment(sales_order, form_data, error=None):
         
     comment += "<br><br><b>Branch</b>: {0}".format(form_data['POSProfile'])
     # add customer info to the comment
-    if form_data['Customer'] and form_data['Customer']['Name']:
-        comment += "<br><b>Customer:</b> {0} ({1}) - {2}".format(form_data['Customer']['Name'], form_data['Customer']['Phone'], form_data['Customer']['Email'])
+    if form_data['Customer'] and form_data['Customer']['FirstName']:
+        comment += "<br><b>Customer:</b> {0} ({1}) - {2}".format(form_data['Customer']['FirstName'], form_data['Customer']['Phone'], form_data['Customer']['Email'])
     else:
         comment += "<br>*No Customer*"
         
