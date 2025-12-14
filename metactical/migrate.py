@@ -48,3 +48,4 @@ def reset_po_naming_series():
 def set_app_logo():
 	# Set the logo for metactical/storebuilder
 	frappe.db.set_single_value("Navbar Settings", "app_logo", "/assets/metactical/images/storebuilder-logo.png")
+	frappe.db.set_single_value("System Settings", "app_name", "Storebuilder Commerce")

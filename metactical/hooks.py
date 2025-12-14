@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 from . import __version__ as _app_version
 
 app_name = "metactical"
-app_title = "Metactical"
+app_title = "Storebuilder Commerce"
 app_publisher = "Storebuilder Commerce Inc"
 app_description = "Storebuilder Commerce Inc ERPNext App"
 app_icon = "octicon octicon-file-directory"
@@ -113,6 +113,7 @@ home_page = "login"
 # notification_config = "metactical.notifications.get_notification_config"
 
 website_context = {
+	"favicon": "/assets/metactical/images/favicon.ico",
 	"splash_image": "/assets/metactical/images/storebuilder.svg",
 }
 
