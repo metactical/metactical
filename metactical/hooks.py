@@ -4,12 +4,23 @@ from . import __version__ as _app_version
 
 app_name = "metactical"
 app_title = "Metactical"
-app_publisher = "Techlift Technologies"
-app_description = "Metactical Custom ERPNext App"
+app_publisher = "Storebuilder Commerce Inc"
+app_description = "Storebuilder Commerce Inc ERPNext App"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
-app_email = "palash@techlift.in"
+app_email = ""
 app_license = "MIT"
+app_logo_url =  "/assets/metactical/images/storebuilder-logo.png"
+
+add_to_apps_screen = [
+	{
+		"name": "storebuilder-commerce",
+		"logo": "/assets/metactical/images/storebuilder-logo.png",
+		"title": "Storebuilder Commerce Inc",
+		"route": "/app/home",
+		"has_permission": "metactical.check_app_permission",
+	}
+]
 
 # Includes in <head>
 # ------------------
@@ -100,6 +111,10 @@ home_page = "login"
 # See frappe.core.notifications.get_notification_config
 
 # notification_config = "metactical.notifications.get_notification_config"
+
+website_context = {
+	"splash_image": "/assets/metactical/images/storebuilder.svg",
+}
 
 # Permissions
 # -----------

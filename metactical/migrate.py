@@ -3,6 +3,7 @@ import frappe
 def after_migrate():
 	reset_po_naming_series()
 	reset_customer_naming_series()
+	set_app_logo()
 
 def reset_customer_naming_series():
 	exists = frappe.db.exists('Property Setter', {'doctype_or_field': 'DocField', 'doc_type': 'Customer',
@@ -43,3 +44,7 @@ def reset_po_naming_series():
 		'value': value
 	})
 	doc.insert()
+
+def set_app_logo():
+	# Set the logo for metactical/storebuilder
+	frappe.db.set_single_value("Navbar Settings", "app_logo", "/assets/metactical/images/storebuilder-logo.png")
