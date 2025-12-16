@@ -812,7 +812,6 @@ fixtures = [{
 			'Pick List-ais_picked_by',
 			'POS Profile User-column_break_vcps1',
 			'POS Profile User-neb_pin',
-			'POS Profile-neb_taxes_and_charges',
 			'Item-custom_ais_related_sku',
 			'Shipment-custom_ais_require_signature',
 			'Shipment-custom_ais_do_not_safe_drop',
@@ -862,7 +861,9 @@ fixtures = [{
 			"POS Profile User-allow_flat_rate",
 			"Item-is_published",
 			"Item Attribute Value-hide_when_out_of_stock",
-			"Pricing Rule-min_qty_to_stop_discount"
+			"Pricing Rule-min_qty_to_stop_discount",
+			"POS Profile-neb_manual_orders_tag",
+			"Lead Source-neb_country"
 		]]]
 	},
 	{
