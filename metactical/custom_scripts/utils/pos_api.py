@@ -154,8 +154,10 @@ def create_payment_entry(order, payment):
 		new_payment.paid_amount = payment["Amount"]
 		new_payment.reference_no = ""
 		new_payment.reference_date = frappe.utils.nowdate()
-  
-		new_payment.allocate_amount_to_references(payment["Amount"], True, True)
+
+		for ref in new_payment.references:
+			ref.allocated_amount = payment["Amount"]
+
 		new_payment.save()
 
 		return new_payment
