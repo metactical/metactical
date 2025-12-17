@@ -12,4 +12,8 @@ class FailedInventoryOutput(Document):
 def process_failed_inventory_outputs():
 	failed_inventory_outputs = frappe.db.get_all("Failed Inventory Output", fields=["name", "item_code"])
 	for failed_inventory_output in failed_inventory_outputs:
-		frappe.enqueue(update_item_inventory_output, item_code=failed_inventory_output.item_code, queue='default')
+		try:
+			frappe.enqueue(update_item_inventory_output, item_code=failed_inventory_output.item_code, queue='default')	
+			frappe.db.delete("Failed Inventory Output", {"name": failed_inventory_output.name})
+		except Exception as e:
+			frappe.log_error(title="Failed to reprocess inventory output for item", message=frappe.get_traceback())
