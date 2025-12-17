@@ -237,6 +237,7 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
+	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title"
 }
 #
 # each overriding function accepts a `data` argument;
