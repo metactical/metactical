@@ -1,0 +1,154 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "OPEN.####",
+ "creation": "2025-11-20 10:19:18.996287",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "user_name",
+  "pos_profile",
+  "lead_source",
+  "amended_from",
+  "column_break_hfwdm",
+  "opening_date",
+  "opening_time",
+  "section_break_eqkfn",
+  "cash_float",
+  "opening_cash",
+  "bills_total",
+  "coins_total",
+  "total_cash"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "user.full_name",
+   "fieldname": "user_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "User's Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "pos_profile.ifw_default_lead_source",
+   "fieldname": "lead_source",
+   "fieldtype": "Link",
+   "label": "Lead Source",
+   "options": "Lead Source",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "End of Day Closing",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hfwdm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "opening_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "opening_time",
+   "fieldtype": "Time",
+   "label": "Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_eqkfn",
+   "fieldtype": "Section Break",
+   "label": "Cash Totals"
+  },
+  {
+   "default": "0",
+   "fieldname": "cash_float",
+   "fieldtype": "Currency",
+   "label": "Cash Float From End Of Day Closing",
+   "reqd": 1
+  },
+  {
+   "fieldname": "opening_cash",
+   "fieldtype": "Table",
+   "options": "EOD Cash"
+  },
+  {
+   "default": "0",
+   "fieldname": "bills_total",
+   "fieldtype": "Currency",
+   "label": "Bills Total",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "coins_total",
+   "fieldtype": "Currency",
+   "label": "Coins Total",
+   "read_only": 1
+  },
+  {
+   "bold": 1,
+   "default": "0",
+   "fieldname": "total_cash",
+   "fieldtype": "Currency",
+   "label": "Total Cash",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-11-24 00:58:12.577039",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "POS Opening",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

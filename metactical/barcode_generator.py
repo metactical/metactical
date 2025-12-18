@@ -14,6 +14,10 @@ from io import BytesIO
 from barcode.writer import ImageWriter
 import base64
 
+try:
+	import png  # needed by pyqrcode to write PNGs
+except ImportError:
+	png = None
 
 def generate(self, method):
 	site = cstr(frappe.local.site)
@@ -71,3 +75,25 @@ def get_barcode_for_print_format(name, height=9, module_width=0.23, write_text=T
 	base64_image = base64.b64encode(rv).decode('utf-8')
 	
 	return base64_image
+
+@frappe.whitelist()
+def get_qr_for_print_format(data, scale=4, error='M'):
+	"""
+	Generate a QR code PNG (base64) for use inside print formats.
+	Args:
+		data (str): text to encode
+		scale (int): pixel scaling factor
+		error (str): error correction level ('L','M','Q','H')
+	Returns:
+		str: base64-encoded PNG image
+	"""
+	if not data:
+		return ""
+	# Create QR
+	qr = pyqrcode.create(str(data), error=error, mode='binary')
+	buffer = BytesIO()
+	# write PNG (requires pypng)
+	qr.png(buffer, scale=scale, quiet_zone=1)
+	img_bytes = buffer.getvalue()
+	buffer.close()
+	return base64.b64encode(img_bytes).decode('utf-8')

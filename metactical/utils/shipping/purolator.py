@@ -256,7 +256,7 @@ class Purolator:
 
 		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()], "supports_multiple": False}
 	
-	def create_shipment(self, docname, selected_service):
+	def create_shipment(self, docname, selected_service, shipment_amount):
 
 		if isinstance(selected_service, string_types) and selected_service.startswith('{'):
 			selected_service = ast.literal_eval(selected_service)
@@ -428,6 +428,7 @@ class Purolator:
 				shipment.ais_shipment_status = "Shipped"
 				shipment.save()
 				frappe.db.set_value("Shipment", shipment.name, "service_provider", "Purolator")
+				frappe.db.set_value("Shipment", shipment.name, "shipment_amount", shipment_amount)
 				self.update_delivery_notes(shipment, shipment_pin)
 				return labels
 			else:

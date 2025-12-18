@@ -232,7 +232,9 @@ def receive_customer_data(response=None, docname=None):
 
 def get_usaepay_order_detail(transaction, order, logger):
 	usaepay_account = get_usaepay_account(lead_source=order.source)
-	logger.error(f"USAePay account: {usaepay_account.lead_source}, authorizeTransactionId: {transaction.get('authorizeTransactionId')}")
+	if logger:
+		logger.error(f"USAePay account: {usaepay_account.lead_source}, authorizeTransactionId: {transaction.get('authorizeTransactionId')}")
+	
 	if not usaepay_account:
 		frappe.throw(_("USAePay account not found for the lead source {0}").format(order.source))
 		
@@ -244,10 +246,11 @@ def get_usaepay_order_detail(transaction, order, logger):
 		return 
 
 	transaction = get_transaction_from_usaepay(transaction["authorizeTransactionId"], headers, usaepay_account.get("merchant_id"))
-	if transaction:
-		logger.error(f"Transaction details fetched from USAePay")
-	else:
-		logger.error(f"Transaction details not found in USAePay for transaction key: {transaction['authorizeTransactionId']}")
+	if logger:
+		if transaction:
+			logger.error(f"Transaction details fetched from USAePay")
+		else:
+			logger.error(f"Transaction details not found in USAePay for transaction key: {transaction['authorizeTransactionId']}")
 
 	event_body = {}
 	event_body["object"] = frappe._dict(transaction)
@@ -972,6 +975,7 @@ def process_missed_usaepay_transactions():
 				frappe.enqueue(get_usaepay_order_detail, 
 							   transaction=so_transaction, 
 							   order=order, 
+							   logger=None,
 							   queue='long', 
 							   timeout=600, 
 							   event='get_usaepay_order_detail')

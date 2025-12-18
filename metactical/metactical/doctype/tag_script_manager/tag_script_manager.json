@@ -1,0 +1,219 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-12 11:09:10.458613",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "basic_section",
+  "script_name",
+  "enabled",
+  "target_doctype",
+  "column_break_basic",
+  "script_path",
+  "description",
+  "execution_section",
+  "execution_frequency",
+  "batch_size",
+  "parallel_workers",
+  "column_break_execution",
+  "last_execution",
+  "last_execution_status",
+  "records_processed",
+  "filter_section",
+  "use_filters",
+  "filter_json",
+  "output_section",
+  "expected_outputs",
+  "condition_section",
+  "default_tag",
+  "tag_prefix",
+  "remove_other_tags",
+  "tag_conditions"
+ ],
+ "fields": [
+  {
+   "fieldname": "basic_section",
+   "fieldtype": "Section Break",
+   "label": "Basic Configuration"
+  },
+  {
+   "fieldname": "script_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Script Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "target_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target DocType",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "e.g., myapp.scripts.inventory.calculate_metrics",
+   "fieldname": "script_path",
+   "fieldtype": "Data",
+   "label": "Script Path",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "execution_section",
+   "fieldtype": "Section Break",
+   "label": "Execution Settings"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "execution_frequency",
+   "fieldtype": "Select",
+   "label": "Execution Frequency",
+   "options": "\nManual\nOn Save\nHourly\nDaily\nWeekly\nMonthly"
+  },
+  {
+   "default": "1000",
+   "description": "Number of records to process in each batch",
+   "fieldname": "batch_size",
+   "fieldtype": "Int",
+   "label": "Batch Size"
+  },
+  {
+   "default": "1",
+   "description": "Number of parallel background jobs (1-10)",
+   "fieldname": "parallel_workers",
+   "fieldtype": "Int",
+   "label": "Parallel Workers"
+  },
+  {
+   "fieldname": "column_break_execution",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_execution",
+   "fieldtype": "Datetime",
+   "label": "Last Execution",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_execution_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Last Execution Status",
+   "options": "\nQueued\nRunning\nCompleted\nFailed\nPartially Completed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "records_processed",
+   "fieldtype": "Int",
+   "label": "Records Processed (Last Run)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "filter_section",
+   "fieldtype": "Section Break",
+   "label": "Filters (Optional)"
+  },
+  {
+   "default": "0",
+   "description": "Apply filters to target doctype",
+   "fieldname": "use_filters",
+   "fieldtype": "Check",
+   "label": "Use Filters"
+  },
+  {
+   "depends_on": "eval:doc.use_filters==1",
+   "description": "e.g., {\"disabled\": 0, \"item_group\": \"Products\"}",
+   "fieldname": "filter_json",
+   "fieldtype": "Code",
+   "label": "Filter JSON",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "output_section",
+   "fieldtype": "Section Break",
+   "label": "Expected Outputs"
+  },
+  {
+   "description": "Define what your script returns",
+   "fieldname": "expected_outputs",
+   "fieldtype": "Table",
+   "label": "Expected Outputs",
+   "options": "Tag Script Expected Output"
+  },
+  {
+   "fieldname": "condition_section",
+   "fieldtype": "Section Break",
+   "label": "Tag Assignment Rules"
+  },
+  {
+   "description": "Tag to assign if no conditions match",
+   "fieldname": "default_tag",
+   "fieldtype": "Data",
+   "label": "Default Tag"
+  },
+  {
+   "description": "Prefix for all tags from this script (e.g., 'INV-')",
+   "fieldname": "tag_prefix",
+   "fieldtype": "Data",
+   "label": "Tag Prefix"
+  },
+  {
+   "description": "Conditions are evaluated in priority order (lowest number first)",
+   "fieldname": "tag_conditions",
+   "fieldtype": "Table",
+   "label": "Tag Conditions",
+   "options": "Tag Script Condition"
+  },
+  {
+   "default": "0",
+   "description": "Remove all tags with this prefix before applying new tags",
+   "fieldname": "remove_other_tags",
+   "fieldtype": "Check",
+   "label": "Remove All Tags from This Script Before Assignment"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-11-26 10:58:58.171570",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Tag Script Manager",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
