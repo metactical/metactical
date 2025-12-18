@@ -488,14 +488,16 @@ class CanadaPost():
 		return self.create_file_doc(file_name, file_path, doc, len(res.content), field_name)
 
 	def create_file_doc(self, file_name, file_path, doc, file_size=0, field_name=None):
+		attached_to_doctype = getattr(doc, 'parenttype', doc.doctype)
+		attached_to_name = getattr(doc, 'parent', doc.name)
 		file_doc = frappe.new_doc('File')
 		file_doc.update({
 			'file_name': f"{file_name}",
 			'file_url': file_path.replace(frappe.get_site_path(), ''),
 			'is_private': 1,
 			'folder': 'Home/Attachments',
-			'attached_to_doctype': doc.parenttype,
-			'attached_to_name': doc.parent,
+			'attached_to_doctype': attached_to_doctype,
+			'attached_to_name': attached_to_name,
 			'attached_to_field': field_name,
 			'file_size': file_size,
 		})
