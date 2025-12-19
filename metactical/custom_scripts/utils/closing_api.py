@@ -20,7 +20,7 @@ def create_closing_entry(*args, **kwargs):
         pos_profile = pos_profile + " Operators"
             
         user = form_data.get("User")
-        closing_date = form_data.get("ClosingDate", frappe.utils.nowdate())
+        closing_date = form_data.get("Date", frappe.utils.nowdate())
         
         # Get POS Profile document
         pos_profile_name = pos_profile
@@ -47,12 +47,13 @@ def create_closing_entry(*args, **kwargs):
         end_of_day_closing.user = user
         end_of_day_closing.pos_profile = pos_profile
         end_of_day_closing.closing_date = closing_date
-        end_of_day_closing.closing_time = form_data.get("ClosingTime")
+        end_of_day_closing.closing_time = form_data.get("Time")
         end_of_day_closing.company = pos_profile_doc.company
         end_of_day_closing.cash_float = form_data.get("CashFloat")
         end_of_day_closing.subtracted_float = -form_data.get("CashFloat", 0)
         end_of_day_closing.closing_notes = form_data.get("ClosingNotes")
         end_of_day_closing.expected_cash = expected_data.get("expected_cash", 0)
+        end_of_day_closing.opening_entry = form_data.get("OpeningEntry")
         
         # Process EOD Cash with validations
         cash_denominations = [100, 50, 20, 10, 5, 2, 1, 0.25, 0.10, 0.05, 0.01]
@@ -105,7 +106,7 @@ def create_closing_entry(*args, **kwargs):
         for payment in payments:
             mop = payment.get("ModeOfPayment")
             if mop == "Cash":
-                actual = float(payment.get("Actual", 0))
+                actual = float(payment.get("Amount", 0))
                 expected = expected_payments.get(mop, 0)
                 difference = actual - expected
                 
@@ -124,7 +125,7 @@ def create_closing_entry(*args, **kwargs):
         for payment in payments:
             mop = payment.get("ModeOfPayment")
             if mop != "Cash":
-                actual = float(payment.get("Actual", 0))
+                actual = float(payment.get("Amount", 0))
                 expected = expected_payments.get(mop, 0)
                 difference = actual - expected
                 
@@ -167,6 +168,11 @@ def create_closing_entry(*args, **kwargs):
         end_of_day_closing.submit()
         frappe.db.commit()
         
+        mode_of_payments = [{"mode_of_payment": d.mode_of_payment,
+                             "expected": d.expected,
+                             "actual": d.actual,
+                             "difference": d.difference} for d in end_of_day_closing.eod_payments]
+        
         frappe.response["status"] = "success"
         frappe.response["message"] = ""
         frappe.response["float_amount"] = end_of_day_closing.cash_float
@@ -178,6 +184,7 @@ def create_closing_entry(*args, **kwargs):
         frappe.response["total_expected"] = end_of_day_closing.mop_total_expected
         frappe.response["total_actual"] = end_of_day_closing.mop_total_actual
         frappe.response["total_difference"] = end_of_day_closing.mop_total_difference
+        frappe.response["mode_of_payments"] = mode_of_payments
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="POS - Error creating closing entry")
         frappe.db.rollback()
@@ -206,3 +213,58 @@ def create_pos_api_log(form_data):
         log.insert(ignore_permissions=True)
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="POS - Error creating API log")
+
+@frappe.whitelist()
+def get_last_opening_or_closing(pos_profile):
+    """
+    Check if the last opening in the POS profile is closed using End of Day Closing.
+    If closed, return the End of Day Closing document; otherwise, return the POS Opening document.
+    """
+    try:
+        pos_profile = pos_profile + " Operators"
+        
+        # Get the last POS Opening document for the given profile
+        last_opening = frappe.db.get_all(
+            "POS Opening",
+            filters={"pos_profile": pos_profile},
+            fields=["name", "opening_date", "opening_time"],
+            order_by="creation desc",
+            limit=1
+        )
+        
+        if not last_opening:
+            return {"Status": "error", "Message": f"No POS Opening found for profile '{pos_profile}'"}
+        
+        last_opening_doc = last_opening[0]
+        
+        # Check if there is a corresponding End of Day Closing for the last opening
+        closing_exists = frappe.db.exists(
+            "End of Day Closing",
+            {"pos_profile": pos_profile, "opening_entry": last_opening_doc["name"]}
+        )
+        
+        if closing_exists:
+            # Fetch the End of Day Closing document
+            closing_doc = frappe.get_doc("End of Day Closing", closing_exists)
+            full_name = frappe.db.get_value("User", closing_doc.user, "full_name")
+
+            frappe.response["Status"] = "closed"
+            frappe.response["Message"] = ""
+            frappe.response["Docname"] = closing_doc.name
+            frappe.response["CashFloat"] = closing_doc.cash_float
+            frappe.response["Date"] = closing_doc.closing_date
+            frappe.response["CreatedBy"] = full_name
+        else:
+            # Return the POS Opening document
+            opening_doc = frappe.get_doc("POS Opening", last_opening_doc["name"])
+            full_name = frappe.db.get_value("User", opening_doc.user, "full_name")
+
+            frappe.response["Status"] = "open"
+            frappe.response["Message"] = ""
+            frappe.response["Docname"] = opening_doc.name
+            frappe.response["CashFloat"] = opening_doc.total_cash
+            frappe.response["Date"] = opening_doc.opening_date
+            frappe.response["CreatedBy"] = full_name
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title="POS - Error fetching last opening or closing")
+        return {"Status": "error", "Message": str(e)}
