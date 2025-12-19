@@ -15,7 +15,7 @@ from frappe.desk.doctype.tag.tag import add_tag
 def receive_pos_data(*args, **kwargs):
 	form_data = dict(frappe.form_dict)
 	
-	if "isManualOrder" in form_data and form_data["isManualOrder"]:	
+	if "IsManualOrder" in form_data and form_data["IsManualOrder"]:	
 		if form_data.get("Payment"):
 			process_order(form_data)
 		else:
