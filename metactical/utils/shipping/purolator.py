@@ -537,11 +537,25 @@ class Purolator:
 				}
 			}
 			response = client.service.VoidShipment(**request_data)
-			if response.body.ShipmentVoided:
+
+			if getattr(response.body, "ShipmentVoided", False):
+				to_be_removed.append(shipment)
+				continue
+
+			errors = getattr(getattr(response.body, "ResponseInformation", None), "Errors", None)
+
+			# Check if ALL errors are 1100524 (already voided)
+			is_already_voided = True
+			for err in errors.Error:
+				if str(getattr(err, "Code", "")).strip() != "1100524":
+					is_already_voided = False
+					break
+
+			if is_already_voided:
 				to_be_removed.append(shipment)
 			else:
-				errors = self.render_error(response.body.ResponseInformation.Errors)
-				frappe.throw(errors)
+				# Different error, stop and show full error table
+				frappe.throw(self.render_error(errors))
 
 		for shipment in to_be_removed:
 			doc.remove(shipment)
@@ -550,6 +564,17 @@ class Purolator:
 			doc.ais_shipment_status = "Not Shipped"
 		
 		doc.save()
+		# Cancel the delivery notes
+		doc.cancel()  # First cancel the shipment so not to raise an error when cancelling Delivery Note
+		delivery_notes = []
+		for row in doc.shipment_delivery_note:
+			if row.delivery_note not in delivery_notes:
+				delivery_notes.append(row.delivery_note)
+
+		for delivery_note in delivery_notes:
+			dn = frappe.get_doc("Delivery Note", delivery_note)
+			if dn.docstatus == 1:
+				dn.cancel()
 		return doc.as_dict()
 	
 	def consolidate_shipments(self, manifest_doc):
