@@ -15,7 +15,7 @@ from frappe.desk.doctype.tag.tag import add_tag
 def receive_pos_data(*args, **kwargs):
 	form_data = dict(frappe.form_dict)
 	
-	if "isManualOrder" in form_data and form_data["isManualOrder"]:	
+	if "IsManualOrder" in form_data and form_data["IsManualOrder"]:	
 		if form_data.get("Payment"):
 			process_order(form_data)
 		else:
@@ -564,7 +564,7 @@ def update_sales_order(sales_order, form_data):
         for item in items:
             found = False
             for sales_item in sales_order.items:
-                if (item['item_code'] == 2 and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != 2):
+                if (item['item_code'] == "2" and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != "2"):
                     item["name"] = sales_item.name
                     item["docname"] = sales_item.name
                     item["idx"] = i + 1
