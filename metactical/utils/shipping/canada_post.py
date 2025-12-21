@@ -515,10 +515,35 @@ class CanadaPost():
 		to_be_remove = []
 		for shipment in doc.get('shipments', {'name': ('in', shipments_name or [])}):
 			url = self.xml_to_json(shipment.tracking_url)
-			res = self.get_response(url['link']['@href'], None, {
-									'Accept': url['link']['@media-type'], 'Content-Type': url['link']['@media-type']}, True, 'DELETE')
-			if res.status_code == 204:
-				to_be_remove.append(shipment)
+			try:
+				res = self.get_response(
+					url['link']['@href'],
+					None,
+					{
+						'Accept': url['link']['@media-type'],
+						'Content-Type': url['link']['@media-type']
+					},
+					True,
+					'DELETE'
+				)
+
+				# If we get a real Response object back
+				if hasattr(res, "status_code") and res.status_code == 204:
+					to_be_remove.append(shipment)
+
+			except requests.exceptions.HTTPError as e:
+				# If the shipment is already gone on Canada Post (404),
+				# treat it as voided locally and continue cleanup.
+				if getattr(e, "response", None) and e.response.status_code == 404:
+					frappe.logger().info(
+						f"Canada Post void: shipment {shipment.name} not found remotely (404). "
+						"Proceeding to remove locally."
+					)
+					to_be_remove.append(shipment)
+				else:
+					# Re‑raise for any other HTTP error
+					raise
+
 		for row in to_be_remove:
 			doc.remove(row)
 
@@ -526,8 +551,7 @@ class CanadaPost():
 			doc.ais_shipment_status = "Not Shipped"
 
 		doc.save()
-		# Cancel the delivery notes
-		doc.cancel() # First cancel the shipemnt so not toraise an error when canciling Delivery Note
+		doc.cancel()
 		delivery_notes = []
 		for row in doc.shipment_delivery_note:
 			if row.delivery_note not in delivery_notes:
@@ -554,11 +578,21 @@ class CanadaPost():
 					url if url.startswith('https://') else f'{self.settings.host}{url}', 
 					data=body,
 					timeout=30)
+			# Explicitly handle 404 so caller can decide what to do
+			if r.status_code == 404:
+				if return_request:
+					# still return the raw response if caller asked for it
+					return r
+				# raise a clear exception for 404
+				raise requests.exceptions.HTTPError("404 Not Found", response=r)
+
 			r.raise_for_status()
+
 			if return_request:
 				return r
 			if r.status_code == 200:
 				return self.xml_to_json(r.content)
+
 		except (requests.exceptions.SSLError, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
 			# Handle both SSL and timeout errors with retry logic
 			if not retry and retry_count < 3:  # Max 3 retries
@@ -576,6 +610,11 @@ class CanadaPost():
 				)
 				raise
 		except Exception as e:
+			# If this is an HTTPError with a 404, re‑raise so caller
+			# can handle it specially, instead of building XML error messages.
+			if isinstance(e, requests.exceptions.HTTPError) and getattr(e, "response", None) and e.response.status_code == 404:
+				raise
+
 			if 'r' not in locals():
 				frappe.throw(frappe.get_traceback())
 			res = r.content

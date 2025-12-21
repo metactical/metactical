@@ -61,7 +61,7 @@ export default {
 			selectedService: '',
 			creatingShipments: false,
 			loadingMessage: '',
-			loadingDetails: [],   // <─ NEW: per‑provider messages
+			loadingDetails: [],
 			enabledProviders: [],
 			rates: {},
 			minimumRate: {},
