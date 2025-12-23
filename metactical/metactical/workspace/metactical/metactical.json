@@ -153,125 +153,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Stock Management",
-   "link_count": 11,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Cycle Count",
-   "link_count": 0,
-   "link_to": "Cycle Count",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Cycle Count V2",
-   "link_count": 0,
-   "link_to": "Cycle Count V2",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Entry User Permissions",
-   "link_count": 0,
-   "link_to": "Stock Entry User Permissions",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "STE Packing Slip",
-   "link_count": 0,
-   "link_to": "STE Packing Slip",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Report - Stock Reconciliation Report",
-   "link_count": 0,
-   "link_to": "Stock Reconciliation Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Report - Stock Summary With STE Info",
-   "link_count": 0,
-   "link_to": "Stock Summary With STE Info",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Reprot - STE Draft Report",
-   "link_count": 0,
-   "link_to": "STE Draft Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Report - Stock Balance With Purchase Rates",
-   "link_count": 0,
-   "link_to": "Stock Balance With Purchase Rates",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Report - Dead Stock Report V2",
-   "link_count": 0,
-   "link_to": "Dead Stock Report V2",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Report - Unreconciled Stock Report",
-   "link_count": 0,
-   "link_to": "Warehouse Stock Report",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Report - Stock Balance Totals - Purchase Rates",
-   "link_count": 0,
-   "link_to": "Stock Balance Totals - Purchase Rates",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Reorder Qty From Excel",
    "link_count": 0,
    "link_to": "Reorder Qty From Excel",
@@ -1095,9 +976,138 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Management",
+   "link_count": 12,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cycle Count",
+   "link_count": 0,
+   "link_to": "Cycle Count",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Cycle Count V2",
+   "link_count": 0,
+   "link_to": "Cycle Count V2",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Entry User Permissions",
+   "link_count": 0,
+   "link_to": "Stock Entry User Permissions",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "STE Packing Slip",
+   "link_count": 0,
+   "link_to": "STE Packing Slip",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Report - Stock Reconciliation Report",
+   "link_count": 0,
+   "link_to": "Stock Reconciliation Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Report - Stock Summary With STE Info",
+   "link_count": 0,
+   "link_to": "Stock Summary With STE Info",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Reprot - STE Draft Report",
+   "link_count": 0,
+   "link_to": "STE Draft Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Report - Stock Balance With Purchase Rates",
+   "link_count": 0,
+   "link_to": "Stock Balance With Purchase Rates",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Report - Dead Stock Report V2",
+   "link_count": 0,
+   "link_to": "Dead Stock Report V2",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Report - Unreconciled Stock Report",
+   "link_count": 0,
+   "link_to": "Warehouse Stock Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report - Stock Balance Totals - Purchase Rates",
+   "link_count": 0,
+   "link_to": "Stock Balance Totals - Purchase Rates",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Reorder Qty From Excel",
+   "link_count": 0,
+   "link_to": "Reorder Qty From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-12-23 07:22:31.420449",
+ "modified": "2025-12-23 07:26:36.708218",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
