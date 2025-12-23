@@ -272,6 +272,26 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Reorder Qty From Excel",
+   "link_count": 0,
+   "link_to": "Reorder Qty From Excel",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Report - Stores Restocking V1",
+   "link_count": 0,
+   "link_to": "Sales Report - Stores Restocking V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Pick Lists and Packing",
    "link_count": 12,
    "link_type": "DocType",
@@ -962,35 +982,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Warehouse",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Report - Sales Report by Location",
-   "link_count": 0,
-   "link_to": "Sales Report by Location",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Report - Item Locations",
-   "link_count": 0,
-   "link_to": "Item Locations",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Accounting",
    "link_count": 3,
    "link_type": "DocType",
@@ -1065,9 +1056,48 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Warehouse",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report - Sales Report by Location",
+   "link_count": 0,
+   "link_to": "Sales Report by Location",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report - Item Locations",
+   "link_count": 0,
+   "link_to": "Item Locations",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report -  Stores Restocking V1",
+   "link_count": 0,
+   "link_to": "Sales Report - Stores Restocking V1",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-09-07 02:24:32.864579",
+ "modified": "2025-12-23 07:22:31.420449",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
