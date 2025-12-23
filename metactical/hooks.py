@@ -864,7 +864,8 @@ fixtures = [{
 			"Item Attribute Value-hide_when_out_of_stock",
 			"Pricing Rule-min_qty_to_stop_discount",
 			"POS Profile-neb_manual_orders_tag",
-			"Lead Source-neb_country"
+			"Lead Source-neb_country",
+			"Item-display_weight"
 		]]]
 	},
 	{
