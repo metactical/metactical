@@ -100,6 +100,20 @@ class ItemFromExcel(Document):
 		def update_item_field(item, field, value):
 			if field in item_field_map and value is not None:
 				item.set(item_field_map[field], value)
+    
+		def validate_mandatory_specs(item, spec_labels):
+			item_group = frappe.get_cached_doc("Item Group", item.item_group)
+			website_specifications = item_group.get("neb_website_specifications") if item_group else []
+   
+			mandatory_specs = [spec.label for spec in website_specifications if spec.mandatory]
+			item_codes_with_spec = spec_labels.keys()
+   
+			# check if there are mandatory specs for the item's item group
+			if mandatory_specs and item.item_code in item_codes_with_spec:
+				item_specs = spec_labels[item.item_code]
+				for ms in mandatory_specs:
+					if ms not in item_specs:
+						frappe.throw(f"Mandatory specification <b>'{ms}'</b> missing for item <b>'{item.item_code}'</b>")				
 
 		# Helper function to process linked doctypes and update temporary child table values
 		def process_linked_doctypes(fields, row):
@@ -142,6 +156,7 @@ class ItemFromExcel(Document):
 			# If starting a new item, save the current one and reinitialize variables
 			if index > 0 and row_to_check and item_code != row_to_check:
 				is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
+				validate_mandatory_specs(item, spec_labels)
 				self.save_item(item, 
                    				child_table_values, 
                    				is_template, price_list_rows, 
@@ -183,7 +198,7 @@ class ItemFromExcel(Document):
 
 		if item:
 			is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
-			
+			validate_mandatory_specs(item, spec_labels)
 			# Save the last item after the loop
 			self.save_item(item, 
                   			child_table_values, 
@@ -268,7 +283,8 @@ class ItemFromExcel(Document):
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
 		item = self.add_website_specifications_to_item(item, spec_labels)
-		# generate the item code if it is a variantf
+
+		# generate the item code if it is a variant
 		# if not (item.item_code and is_template):
 		# 	template_item_name = frappe.db.get_value("Item", item.variant_of, "item_name")
 		# 	make_variant_item_code(item.variant_of, template_item_name, item)
