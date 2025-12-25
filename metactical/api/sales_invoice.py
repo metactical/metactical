@@ -37,9 +37,9 @@ def get_sales_invoice(sales_order):
         and is_return = 0 
         and si.docstatus = 1
         and si.status in ("Paid", "Credit Note Issued")
-        and (si.source like "Store%" or is_pos = 1)
+        and (si.source like "Store%%" or is_pos = 1)
         order by si.posting_date asc
-        """, (sales_order), as_dict=True)
+        """, (sales_order,), as_dict=True)
         
     invoice = sales_invoices[0] if sales_invoices else None
     return invoice
