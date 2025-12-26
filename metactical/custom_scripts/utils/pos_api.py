@@ -74,7 +74,6 @@ def create_manual_order(*args, **kwargs):
 		sales_order = sales_order["sales_order"]
 		
   
-		print(pos_profile)
 		# add tag
 		if sales_order and pos_profile.neb_manual_orders_tag:
 			add_tag(pos_profile.neb_manual_orders_tag, "Sales Order", sales_order.name)
@@ -104,6 +103,7 @@ def create_manual_order(*args, **kwargs):
 		frappe.response["InvoiceId"] = None
 		frappe.response["Total"] = 0.0
 		
+
 def submit_sales_manual_order(sales_order, form_data, log):
 	frappe.set_user(form_data["SalesPerson"])
 	try:
@@ -151,12 +151,12 @@ def create_payment_entry(order, payment):
 
 		account = get_bank_cash_account(company=order.company, mode_of_payment=payment["ModeOfPayment"])
 		new_payment.paid_to = account["account"]
-		new_payment.paid_amount = payment["Amount"]
+		new_payment.paid_amount = payment["Amount"] - payment.get("Change", 0.0)
 		new_payment.reference_no = ""
 		new_payment.reference_date = frappe.utils.nowdate()
 
 		for ref in new_payment.references:
-			ref.allocated_amount = payment["Amount"]
+			ref.allocated_amount = payment["Amount"] - payment.get("Change", 0.0)
 
 		new_payment.save()
 
@@ -714,10 +714,10 @@ def create_comment(comment, commentor, sales_order, doctype="Sales Order"):
         }).save(ignore_permissions=True)
         frappe.db.commit()
     
-def create_invoice(sales_order, form_data):
+def create_invoice(sales_order, form_data, update_stock=1):
     sales_invoice = make_sales_invoice(sales_order.name)
     sales_invoice.is_pos = 1
-    sales_invoice.update_stock = 1
+    sales_invoice.update_stock = update_stock
     sales_invoice.write_off_outstanding_amount_automatically = 0
     sales_invoice.pos_profile = form_data['POSProfile'] + ' Operators'
     frappe.set_user(form_data['SalesPerson'])
@@ -736,7 +736,6 @@ def create_invoice(sales_order, form_data):
             
             if write_off_limit and difference <= write_off_limit:
                 sales_invoice.write_off_amount = difference
-                sales_invoice.change_amount = .10
                 sales_invoice.save()
                 frappe.db.commit()
 
@@ -1151,6 +1150,11 @@ def create_return(*args, **kwargs):
             "mode_of_payment": form_data["ModeOfReturn"],
             "amount": -1 * form_data["Total"] + difference
         }]})
+        
+        sales_return.advances = []
+        sales_return.update_outstanding_for_self = False
+        sales_return.is_pos = 1
+        sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
                 
         sales_return.save()
         sales_return.submit()
