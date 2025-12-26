@@ -404,16 +404,3 @@ def export_to_excel(date):
 
 	sub_headers = ["Stores", "Online", "USA"]
 	export_query(data, sub_headers)
- 
- 
- 
-	if "IsManualOrder" in form_data and form_data["IsManualOrder"]:	
-		if form_data.get("Payment"):
-			print("Processing Manual Order with Payment")
-			process_order(form_data)
-		else:
-			print("Processing Manual Order without Payment")
-			process_manual_order(form_data)
-	else:
-		print("Processing New Order")
-		process_order(form_data)
