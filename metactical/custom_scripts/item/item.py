@@ -9,40 +9,32 @@ class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
         super().before_rename(old_item_code, new_item_code, merge)
 
-        # Fetch the old item document
-        old_item = frappe.get_doc("Item", old_item_code)
-        new_item = frappe.get_doc("Item", new_item_code)
+        if merge:
+            self.remove_price_lists(old_item_code)
 
-        # Fields to copy if they don't exist in the new item
-        fields_to_copy = [
-            "ifw_location", "ifw_duty_rate", "customs_tariff_number", "neb_variantavailabilityrule",
-            "brand", "ifw_item_notes", "asi_item_class", "country_of_origin"
-        ]
+            # Fetch the old item document
+            old_item = frappe.get_doc("Item", old_item_code)
+            new_item = frappe.get_doc("Item", new_item_code)
 
-        for field in fields_to_copy:
-            if not getattr(new_item, field, None):
-                setattr(new_item, field, getattr(old_item, field, None))
+            # Fields to copy if they don't exist in the new item
+            fields_to_copy = [
+                "ifw_location", "ifw_duty_rate", "customs_tariff_number", "neb_variantavailabilityrule",
+                "brand", "ifw_item_notes", "asi_item_class", "country_of_origin"
+            ]
 
-        # Append barcodes from old item to new item
-        # if hasattr(old_item, "barcodes"):
-        #     existing_barcodes = {barcode.barcode for barcode in new_item.barcodes}
-        #     for barcode in old_item.barcodes:
-        #         existing_item_barcode = frappe.db.get_all("Item Barcode", {"barcode": barcode.barcode, "parent": old_item_code }, "name")
-        #         for item_barcode in existing_item_barcode:
-        #             frappe.db.delete("Item Barcode", item_barcode.name)
-                    
-        #         if barcode.barcode not in existing_barcodes:                
-        #             new_item.append("barcodes", barcode)
+            for field in fields_to_copy:
+                if not getattr(new_item, field, None):
+                    setattr(new_item, field, getattr(old_item, field, None))
 
-        # Append supplier items from old item to new item if they don't exist
-        if hasattr(old_item, "supplier_items"):
-            existing_suppliers = {item.supplier for item in new_item.supplier_items}
-            for supplier_item in old_item.supplier_items:
-                if supplier_item.supplier not in existing_suppliers:
-                    new_item.append("supplier_items", supplier_item)
+            # Append supplier items from old item to new item if they don't exist
+            if hasattr(old_item, "supplier_items"):
+                existing_suppliers = {item.supplier for item in new_item.supplier_items}
+                for supplier_item in old_item.supplier_items:
+                    if supplier_item.supplier not in existing_suppliers:
+                        new_item.append("supplier_items", supplier_item)
 
-        # Save the updated new item
-        new_item.save()
+            # Save the updated new item
+            new_item.save()
 
     def sanitize(self, obj):
         """Recursively convert datetime and date objects to string."""
@@ -60,10 +52,13 @@ class CustomItem(Item):
         
     def after_rename(self, old_item_code, new_item_code, merge=False):
         super().after_rename(old_item_code, new_item_code, merge)
-        
-        self.remove_price_lists(old_item_code)
-        old_item = frappe.get_doc("Item", old_item_code)
         new_item = frappe.get_doc("Item", new_item_code)
+        if merge:
+            self.remove_price_lists(old_item_code)
+            old_item = frappe.get_doc("Item", old_item_code)
+        else:
+            old_item = new_item
+            old_item.item_code = old_item_code
         
         item_merge_history = frappe.new_doc("Item Merge History")
         item_merge_history.old_item_code = old_item_code
@@ -73,16 +68,18 @@ class CustomItem(Item):
         item_merge_history.new_item = self.sanitize(new_item.as_dict())
         
         item_merge_history.insert(ignore_permissions=True)
-        self.copy_barcodes(old_item_code, new_item_code)
+        
+        if merge:
+            self.copy_barcodes(old_item_code, new_item_code)
 
-        if old_item.variant_of:
-            remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
-            if remaining_variants == 0 or remaining_variants is None:  
-                try:
-                    frappe.db.delete("Item", old_item.variant_of)
-                except Exception as e:
-                    frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
-                    frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
+            if old_item.variant_of:
+                remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
+                if remaining_variants == 0 or remaining_variants is None:  
+                    try:
+                        frappe.db.delete("Item", old_item.variant_of)
+                    except Exception as e:
+                        frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
+                        frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
 
         frappe.db.commit()
         
@@ -110,6 +107,7 @@ class CustomItem(Item):
         for price in price_lists:
             try:
                 frappe.db.delete("Item Price", price.name)
+                frappe.db.commit()
             except Exception as e:
                 frappe.log_error(title="Error deleting Item Price during item merge", message=frappe.get_traceback())
 
