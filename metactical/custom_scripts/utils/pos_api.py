@@ -10,7 +10,6 @@ import json
 from metactical.custom_scripts.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from frappe.desk.doctype.tag.tag import add_tag
-from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
@@ -114,13 +113,18 @@ def submit_sales_manual_order(sales_order, form_data, log):
 		if sales_order.docstatus == 0:
 			sales_order.submit()
 			frappe.db.commit()
-
-			sales_invoice = create_invoice(sales_order, form_data, update_stock=0)
-			frappe.db.set_value('POS API Log', log, 'sales_invoice', sales_invoice.name)
-			frappe.db.commit()
 			
-			sales_invoice.submit()
-			frappe.db.commit()
+			# Create payment entry
+			if form_data.get("Payment"):
+				for payment in form_data["Payment"]:
+					frappe.set_user("Administrator")
+					payment_entry = create_payment_entry(sales_order, payment)
+					if payment_entry:
+						payment_entry.submit()
+					else:
+						comment = {"comment_by": form_data['SalesPerson'], "comment": f"<b>Failed to Create Payment Entry:</b><br>Mode of Payment: {payment['ModeOfPayment']}<br>Amount: {payment['Amount']}"}
+						create_comment(comment, form_data['SalesPerson'], sales_order.name)
+						raise Exception("Unable to create Payment Entry for Sales Order {0}".format(sales_order.name))	
 
 	except Exception as e:
 		frappe.set_user("Administrator")
@@ -138,7 +142,7 @@ def submit_sales_manual_order(sales_order, form_data, log):
 		message = "Branch: *{0}* \n Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
 		post_to_rocket_chat(sales_order, message, pos=True)
 		
-		return
+		return    
 	
 def create_payment_entry(order, payment):
 	try:
@@ -147,12 +151,12 @@ def create_payment_entry(order, payment):
 
 		account = get_bank_cash_account(company=order.company, mode_of_payment=payment["ModeOfPayment"])
 		new_payment.paid_to = account["account"]
-		new_payment.paid_amount = payment["Amount"]
+		new_payment.paid_amount = payment["Amount"] - payment.get("Change", 0.0)
 		new_payment.reference_no = ""
 		new_payment.reference_date = frappe.utils.nowdate()
 
 		for ref in new_payment.references:
-			ref.allocated_amount = payment["Amount"]
+			ref.allocated_amount = payment["Amount"] - payment.get("Change", 0.0)
 
 		new_payment.save()
 
@@ -319,8 +323,8 @@ def process_manual_order(form_data):
 			frappe.db.set_value('POS API Log', log, 'error', "Sales Order {0} is not submitted".format(order_id))
 			frappe.db.commit()
 			return
-		print("Sales Order Status: ", sales_order.status)
-		if sales_order.status != "To Deliver":
+		
+		if sales_order.status != "To Deliver and Bill":
 			frappe.response["Status"] = "500"
 			frappe.response["Message"] = ["Unable to process Sales Order {0}. The status is {1}".format(order_id, sales_order.status)]
 			frappe.response["InvoiceId"] = None
@@ -333,14 +337,17 @@ def process_manual_order(form_data):
 		pos_profile_doc = frappe.db.get_value("POS Profile", pos_profile, ['company_address', "warehouse"], as_dict=True)
 		
 		# create invoice from sales order
-		sales_invoice = make_delivery_note(sales_order.name)
+		sales_invoice = make_sales_invoice(sales_order.name)
 		sales_invoice.company_address = pos_profile_doc.company_address
 		sales_invoice.shipping_address_name = pos_profile_doc.company_address
+		sales_invoice.update_stock = 1
   
 		for item in sales_invoice.items:
 			item.warehouse = pos_profile_doc.warehouse
   
 		sales_invoice.ignore_pricing_rule = 1
+		sales_invoice.set_missing_values()
+		sales_invoice.set_advances()
 		sales_invoice.insert()
 		sales_invoice.submit()
 		frappe.db.commit()
@@ -1143,6 +1150,11 @@ def create_return(*args, **kwargs):
             "mode_of_payment": form_data["ModeOfReturn"],
             "amount": -1 * form_data["Total"] + difference
         }]})
+        
+        sales_return.advances = []
+        sales_return.update_outstanding_for_self = False
+        sales_return.is_pos = 1
+        sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
                 
         sales_return.save()
         sales_return.submit()
