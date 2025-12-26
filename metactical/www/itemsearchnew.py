@@ -279,3 +279,5 @@ def get_conditions(item_code, barcode):
 	return "ifw_retailskusuffix like {0}".format(
 		frappe.db.escape("%" + item_code + "%")
 	)
+
+
