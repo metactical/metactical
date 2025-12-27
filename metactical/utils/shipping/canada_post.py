@@ -532,8 +532,6 @@ class CanadaPost():
 					to_be_remove.append(shipment)
 
 			except requests.exceptions.HTTPError as e:
-				# If the shipment is already gone on Canada Post (404),
-				# treat it as voided locally and continue cleanup.
 				if getattr(e, "response", None) and e.response.status_code == 404:
 					frappe.logger().info(
 						f"Canada Post void: shipment {shipment.name} not found remotely (404). "
@@ -541,7 +539,6 @@ class CanadaPost():
 					)
 					to_be_remove.append(shipment)
 				else:
-					# Re‑raise for any other HTTP error
 					raise
 
 		for row in to_be_remove:
@@ -551,7 +548,12 @@ class CanadaPost():
 			doc.ais_shipment_status = "Not Shipped"
 
 		doc.save()
+
+		# Set a transient flag so before_cancel knows this came from avoid_shpment
+		doc._cancel_from_avoid_shipment = True
 		doc.cancel()
+		doc._cancel_from_avoid_shipment = False
+
 		delivery_notes = []
 		for row in doc.shipment_delivery_note:
 			if row.delivery_note not in delivery_notes:
