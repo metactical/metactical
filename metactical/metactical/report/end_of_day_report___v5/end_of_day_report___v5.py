@@ -289,7 +289,7 @@ def get_website_stores_data(filters, location, sources):
 				if end_of_day_closing is not None:
 					row.update({
 						"difference": end_of_day_closing.mop_total_difference,
-						"notes": end_of_day_closing.closing_notes
+						"notes": end_of_day_closing.closing_notes,
 						"eod_link": "<a href='/app/end-of-day-closing/{0}' target='_blank'>{1}</a>".format(end_of_day_closing.name, row.get("location"))
 					})
 
