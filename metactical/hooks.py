@@ -253,6 +253,7 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
+	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -871,7 +872,8 @@ fixtures = [{
 			"POS Profile-auto_logout_after_transaction",
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
-			"POS Profile User-allow_flat_rate"
+			"POS Profile User-allow_flat_rate",
+			"Pricing Rule-min_qty_to_stop_discount"
 		]]]
 	},
 	{
@@ -1467,9 +1469,9 @@ jinja = {
 		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.metactical.doctype.ste_packing_slip.ste_packing_slip.get_item_details_for_print",
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
-		"metactical.barcode_generator.get_barcode_for_print_format",
 		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location",
-		"metactical.barcode_generator.get_qr_for_print_format"
+		"metactical.barcode_generator.get_qr_for_print_format",
+		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json"
 	]
 }
 

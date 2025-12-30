@@ -68,8 +68,10 @@ class SalesOrderCustom(SalesOrder):
 					has_linked_return = True
 			else:
 				has_linked_return = True
-    
-			if has_linked_return:
+
+
+			has_draft_dn = get_draft_dns(self.name)
+			if has_linked_return and len(has_draft_dn) == 0:
 				self.db_set("status", "Closed", notify=True)	
    
 	def on_submit(self):
@@ -77,14 +79,14 @@ class SalesOrderCustom(SalesOrder):
 
 		# Metactical Customization: Added
 		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type="Sales Order", queue='default')
 
 	def on_cancel(self):
 		super(SalesOrderCustom, self).on_cancel()
 
 		# Metactical Customization: Added
 		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+			update_item_inventory_output(item_code=item.item_code, voucher_type="Sales Order")
 
 	def on_update_after_submit(self):
 		super().on_update_after_submit()
@@ -92,7 +94,21 @@ class SalesOrderCustom(SalesOrder):
 		for item in self.items:
 			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
    
-   
+def get_draft_dns(sales_order):
+	draft_dn = frappe.db.sql("""
+		SELECT DISTINCT
+			dn.name AS delivery_note, dn.status
+		FROM `tabDelivery Note` dn
+		JOIN `tabDelivery Note Item` dni
+		ON dni.parent = dn.name
+		WHERE  dni.against_sales_order = %(sales_order)s
+		AND dn.docstatus = 1
+		AND dn.status = 'To Bill'
+		AND dn.is_return = 0
+	""", {"sales_order": sales_order}, as_dict=True)	
+ 
+	return draft_dn
+
 def get_return_delivery_note(sales_order):
 	rows = frappe.db.sql("""
 				SELECT DISTINCT
