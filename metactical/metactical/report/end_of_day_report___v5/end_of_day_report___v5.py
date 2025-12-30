@@ -22,6 +22,10 @@ def execute(filters=None):
 		data.append({"Location": "USA"})
 		data.extend(us_data)
 		
+	for row in data:
+		if row.get("eod_link"):
+			row["location"] = row.get("eod_link")
+  
 	return columns, data
 	
 def get_columns(filters):
@@ -49,6 +53,13 @@ def get_columns(filters):
 			"fieldname": "difference",
 			"fieldtype": "Currency",
 			"label": "Difference",
+			"width": 120,
+			"options": "Currency",
+		},
+		{
+			"fieldname": "notes",
+			"fieldtype": "Data",
+			"label": "Note",
 			"width": 120,
 			"options": "Currency",
 		},
@@ -274,11 +285,13 @@ def get_website_stores_data(filters, location, sources):
 					"cash_sales": cash_sales
 				})
 	
-				end_of_day_difference = frappe.db.get_value("End of Day Closing", {"lead_source": source.name, "closing_date": filters.date}, "mop_total_difference")		
-				if end_of_day_difference is not None:
+				end_of_day_closing = frappe.db.get_value("End of Day Closing", {"lead_source": source.name, "closing_date": filters.date}, ["mop_total_difference", "closing_notes", "name"], as_dict=1, order_by="creation desc")	
+				if end_of_day_closing is not None:
 					row.update({
-						"difference": end_of_day_difference
-					})		
+						"difference": end_of_day_closing.mop_total_difference,
+						"notes": end_of_day_closing.closing_notes,
+						"eod_link": "<a href='/app/end-of-day-closing/{0}' target='_blank'>{1}</a>".format(end_of_day_closing.name, row.get("location"))
+					})
 
 
 			#Add row to data
