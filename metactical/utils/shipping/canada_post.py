@@ -575,11 +575,26 @@ class CanadaPost():
 		try:
 			if isinstance(body, str):
 				body = body.encode('utf-8')
+
 			r = self.sess.request(
-					method, 
-					url if url.startswith('https://') else f'{self.settings.host}{url}', 
-					data=body,
-					timeout=30)
+				method,
+				url if url.startswith('https://') else f'{self.settings.host}{url}',
+				data=body,
+				timeout=30
+			)
+
+			# Friendly handling for Canada Post outages
+			if r.status_code == 503:
+				# If caller wants the raw response, return it
+				if return_request:
+					return r
+
+				# Show a user-friendly message and stop further parsing
+				frappe.throw(
+					_("Canada Post is temporarily unavailable. Please wait and try again in a moment."),
+					title=_("Canada Post Unavailable")
+				)
+
 			# Explicitly handle 404 so caller can decide what to do
 			if r.status_code == 404:
 				if return_request:
@@ -603,11 +618,10 @@ class CanadaPost():
 				error_type = "SSL" if isinstance(e, requests.exceptions.SSLError) else "Timeout"
 				frappe.logger().info(f"{error_type} Error, retrying in {delay} seconds...")
 				time.sleep(delay)
-				return self.get_response(url, body, headers,
-								  return_request, method, True, retry_count + 1)
+				return self.get_response(url, body, headers, return_request, method, True, retry_count + 1)
 			else:
 				frappe.log_error(
-					f"Max retries reached for {url}. Error: {str(e)}", 
+					f"Max retries reached for {url}. Error: {str(e)}",
 					"Canada Post API Error"
 				)
 				raise
