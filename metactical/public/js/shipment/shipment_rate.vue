@@ -145,7 +145,7 @@ export default {
 						const setStatus = (prov, fields) => {
 							const idx = me.loadingDetails.findIndex(d => d.provider === prov);
 							if (idx !== -1) {
-								me.$set(me.loadingDetails, idx, Object.assign({}, me.loadingDetails[idx], fields));
+								me.loadingDetails[idx] = { ...me.loadingDetails[idx], ...fields };
 							}
 						};
 
