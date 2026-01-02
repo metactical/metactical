@@ -160,9 +160,10 @@ export default {
 							callback: function(ret) {
 								completedProviders += 1;
 
+								// If backend returned something unexpected, treat as error but don't block others
 								if (!ret.message) {
 									setStatus(provider, {
-										status: __('No response / error'),
+										status: __('Failed to load rates'),
 										done: true,
 										error: true
 									});
@@ -245,6 +246,48 @@ export default {
 										};
 									});
 								});
+
+								if (completedProviders >= expectedProviders) {
+									me.ratesLoaded = true;
+								}
+							},
+							error: function(err) {
+								completedProviders += 1;
+
+								// Try to extract a meaningful message (often backend already displayed it)
+								let msg = (err && err.message) || '';
+
+								// Frappe sometimes sends server messages as JSON string array
+								const server_messages = err && err.responseJSON && err.responseJSON._server_messages;
+								if (!msg && server_messages) {
+									try {
+										const parsed = JSON.parse(server_messages);
+										if (Array.isArray(parsed) && parsed.length) {
+											// entries can be JSON strings
+											const first = parsed[0];
+											msg = typeof first === 'string' ? first : JSON.stringify(first);
+										}
+									} catch (e) {
+										// ignore parsing errors
+										msg = '';
+									}
+								}
+
+								setStatus(provider, {
+									status: __('Error loading rates'),
+									done: true,
+									error: msg || true
+								});
+
+								// Only show a popup if we actually have a message.
+								// If backend already handled display, this prevents duplicates/noise.
+								if (msg) {
+									frappe.msgprint({
+										title: __('Rate Error: {0}', [provider]),
+										message: msg,
+										indicator: 'red'
+									});
+								}
 
 								if (completedProviders >= expectedProviders) {
 									me.ratesLoaded = true;
