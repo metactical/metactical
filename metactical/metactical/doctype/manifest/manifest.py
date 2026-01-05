@@ -42,8 +42,8 @@ def create_manifest(manifest, service_provider):
 						"shipment_id": shipment,
 						"status": "Transmitted"
 					})
-		doc.status = "Completed"
-		doc.save()
+			doc.status = "Completed"
+			doc.save()
 		return {"po_number": po_number, "shipments": shipments}
 	except ValueError as e:
 		if str(e) == "9122":
@@ -154,7 +154,7 @@ def get_shipments(pickup_date, warehouse, service_provider):
 					LEFT JOIN
 						`tabShipment` AS shipment ON shipment.name = cps.parent
 					WHERE
-						(shipment.po_number IS NULL OR shipment.po_number = "") AND shipment.pickup_date <= %(pickup_date)s
+						(shipment.po_number IS NULL OR shipment.po_number = "") AND shipment.pickup_date = %(pickup_date)s
 						AND warehouse = %(warehouse)s AND shipment.service_provider = %(service_provider)s
 				""", {"pickup_date": pickup_date, "warehouse": warehouse, 
 		  			"service_provider": service_provider}, as_dict=1)
