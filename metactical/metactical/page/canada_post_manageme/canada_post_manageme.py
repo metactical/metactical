@@ -132,9 +132,6 @@ def get_untransmitted_shipments(warehouse=None):
 		# Get available groups from Canada Post API
 		available_groups = cp.get_available_groups()
 		
-		# TESTING: Only use specific group - REMOVE AFTER TESTING
-		available_groups = [g for g in available_groups if g == "Stores-20251128"]
-		
 		untransmitted = []
 		
 		# Process each group to get shipments
