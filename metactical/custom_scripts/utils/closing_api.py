@@ -47,7 +47,7 @@ def create_closing_entry(*args, **kwargs):
         end_of_day_closing.user = user
         end_of_day_closing.pos_profile = pos_profile
         end_of_day_closing.closing_date = closing_date
-        end_of_day_closing.closing_time = form_data.get("Time")
+        end_of_day_closing.closing_time = frappe.utils.nowtime()
         end_of_day_closing.company = pos_profile_doc.company
         end_of_day_closing.cash_float = form_data.get("CashFloat")
         end_of_day_closing.subtracted_float = -form_data.get("CashFloat", 0)
