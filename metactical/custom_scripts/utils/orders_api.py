@@ -939,7 +939,7 @@ def verify_items(parsedContent, sales_order):
 
 	so_item_row = {}
 	for i, item in enumerate(sales_order.items):
-		if item.item_code != items[i].item_code or item.qty != items[i].qty or item.price_list_rate != items[i].price_list_rate:
+		if item.item_code != items[i].item_code or item.qty != items[i].qty or item.price_list_rate != round(items[i].price_list_rate, 2):
 			items_updated = True
 
 		so_item_row[item.item_code] = item
