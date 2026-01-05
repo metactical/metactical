@@ -44,7 +44,7 @@ def create_opening_entry(*args, **kwargs):
         opening.user = user
         opening.pos_profile = pos_profile
         opening.opening_date = opening_date
-        opening.opening_time = form_data.get("Time")
+        opening.opening_time = frappe.utils.nowtime()
         opening.company = pos_profile_doc.company
         opening.cash_float = form_data.get("CashFloat")
         
