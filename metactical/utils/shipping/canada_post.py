@@ -383,6 +383,92 @@ class CanadaPost():
 		
 		return available_groups
 
+	def get_group_shipments(self, group_id):
+		"""
+		Get all shipments for a specific group ID
+		Returns shipment details including references (ERP Shipment names)
+		"""
+		url = f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/group/{group_id}"
+		headers = {'Accept': 'application/vnd.cpc.shipment-v8+xml'}
+		
+		try:
+			response = self.get_response(url, None, headers=headers, method='GET')
+		except Exception as e:
+			# If group has no shipments or other error, return empty list
+			frappe.log_error(
+				title=f"Canada Post - Get Group Shipments Error for {group_id}",
+				message=f"Error: {str(e)}\n{frappe.get_traceback()}"
+			)
+			return []
+		
+		if not response or 'group' not in response:
+			return []
+		
+		shipments_data = []
+		
+		# Get the links to individual shipments
+		group_data = response['group']
+		if 'links' in group_data and 'link' in group_data['links']:
+			links = group_data['links']['link']
+			
+			# Ensure links is a list
+			if isinstance(links, dict):
+				links = [links]
+			
+			for link in links:
+				if link.get('@rel') == 'self':
+					# This is the group link, skip it
+					continue
+				
+				try:
+					# Get individual shipment details
+					shipment_response = self.get_response(
+						link['@href'], 
+						None, 
+						headers={'Accept': link['@media-type']}, 
+						method='GET'
+					)
+					
+					if shipment_response and 'shipment-info' in shipment_response:
+						shipment_info = shipment_response['shipment-info']
+						
+						# Extract the data we need
+						shipment_data = {
+							'shipment_id': shipment_info.get('shipment-id'),
+							'tracking_pin': shipment_info.get('tracking-pin'),
+							'shipment_status': shipment_info.get('shipment-status'),
+							'group_id': group_id,
+							'references': {}
+						}
+						
+						# Get customer references (this contains the ERP Shipment name)
+						if 'customer-references' in shipment_info:
+							refs = shipment_info['customer-references']
+							if 'customer-ref-1' in refs:
+								shipment_data['references']['ref_1'] = refs['customer-ref-1']
+							if 'customer-ref-2' in refs:
+								shipment_data['references']['ref_2'] = refs['customer-ref-2']
+						
+						# Get delivery address
+						if 'delivery-spec' in shipment_info and 'destination' in shipment_info['delivery-spec']:
+							dest = shipment_info['delivery-spec']['destination']
+							shipment_data['delivery_customer'] = dest.get('name', '')
+						
+						# Get service information
+						if 'delivery-spec' in shipment_info and 'service-code' in shipment_info['delivery-spec']:
+							shipment_data['service_code'] = shipment_info['delivery-spec']['service-code']
+						
+						shipments_data.append(shipment_data)
+				except Exception as e:
+					# Log error but continue with other shipments
+					frappe.log_error(
+						title=f"Canada Post - Get Shipment Details Error",
+						message=f"Error getting shipment from {link.get('@href', 'unknown')}: {str(e)}"
+					)
+					continue
+		
+		return shipments_data
+
 	def get_shipment_manifest(self, shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
 		start_date = datetime.strftime(doc.creation, "%Y%m%d")
@@ -608,6 +694,9 @@ class CanadaPost():
 			if return_request:
 				return r
 			if r.status_code == 200:
+				# Check if content is empty before trying to parse XML
+				if not r.content or len(r.content.strip()) == 0:
+					return None
 				return self.xml_to_json(r.content)
 
 		except (requests.exceptions.SSLError, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
