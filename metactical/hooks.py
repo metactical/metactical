@@ -236,7 +236,8 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
-	"erpnext.selling.doctype.sales_order.sales_order.make_purchase_order": "metactical.custom_scripts.sales_order.sales_order.make_purchase_order"
+	"erpnext.selling.doctype.sales_order.sales_order.make_purchase_order": "metactical.custom_scripts.sales_order.sales_order.make_purchase_order",
+	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -812,7 +813,6 @@ fixtures = [{
 			'Pick List-ais_picked_by',
 			'POS Profile User-column_break_vcps1',
 			'POS Profile User-neb_pin',
-			'POS Profile-neb_taxes_and_charges',
 			'Item-custom_ais_related_sku',
 			'Shipment-custom_ais_require_signature',
 			'Shipment-custom_ais_do_not_safe_drop',
@@ -862,7 +862,10 @@ fixtures = [{
 			"POS Profile User-allow_flat_rate",
 			"Item-is_published",
 			"Item Attribute Value-hide_when_out_of_stock",
-			"Pricing Rule-min_qty_to_stop_discount"
+			"Pricing Rule-min_qty_to_stop_discount",
+			"POS Profile-neb_manual_orders_tag",
+			"Lead Source-neb_country",
+			"Item-display_weight"
 		]]]
 	},
 	{

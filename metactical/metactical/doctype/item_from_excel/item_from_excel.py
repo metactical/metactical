@@ -100,6 +100,20 @@ class ItemFromExcel(Document):
 		def update_item_field(item, field, value):
 			if field in item_field_map and value is not None:
 				item.set(item_field_map[field], value)
+    
+		def validate_mandatory_specs(item, spec_labels):
+			item_group = frappe.get_cached_doc("Item Group", item.item_group)
+			website_specifications = item_group.get("neb_website_specifications") if item_group else []
+   
+			mandatory_specs = [spec.label for spec in website_specifications if spec.mandatory]
+			item_codes_with_spec = spec_labels.keys()
+   
+			# check if there are mandatory specs for the item's item group
+			if mandatory_specs and item.item_code in item_codes_with_spec:
+				item_specs = spec_labels[item.item_code]
+				for ms in mandatory_specs:
+					if ms not in item_specs:
+						frappe.throw(f"Mandatory specification <b>'{ms}'</b> missing for item <b>'{item.item_code}'</b>")				
 
 		# Helper function to process linked doctypes and update temporary child table values
 		def process_linked_doctypes(fields, row):
@@ -142,6 +156,7 @@ class ItemFromExcel(Document):
 			# If starting a new item, save the current one and reinitialize variables
 			if index > 0 and row_to_check and item_code != row_to_check:
 				is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
+				validate_mandatory_specs(item, spec_labels)
 				self.save_item(item, 
                    				child_table_values, 
                    				is_template, price_list_rows, 
@@ -187,7 +202,7 @@ class ItemFromExcel(Document):
 
 		if item:
 			is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
-			
+			validate_mandatory_specs(item, spec_labels)
 			# Save the last item after the loop
 			self.save_item(item, 
                   			child_table_values, 
@@ -272,7 +287,6 @@ class ItemFromExcel(Document):
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
 		item = self.add_website_specifications_to_item(item, spec_labels)
-		frappe.log_error(title="item import", message=item)
 
 		# generate the item code if it is a variant
 		# if not (item.item_code and is_template):
@@ -316,10 +330,10 @@ class ItemFromExcel(Document):
 			item: Item document
 			item_specifications: Dict with item specifications
 		"""
-		if not item_specifications or item.item_group not in item_specifications:
+		if not item_specifications or item.item_code not in item_specifications:
 			return item
 		
-		specs = item_specifications[item.item_group]
+		specs = item_specifications[item.item_code]
 		all_specs = []
 		if item.get("item_group"):
 			all_specs = frappe.get_all("MT Item Website Specification", 
@@ -350,14 +364,18 @@ class ItemFromExcel(Document):
 		return item
    
 	def create_item_defaults(self, item, supplier):
-		frappe.get_doc({
-			"doctype": "Item Default",
-			"parent": item.name,
-			"parenttype": "Item",
-			"parentfield": "item_defaults",
-			"default_supplier": supplier,
-			"company": frappe.db.get_default("company")
-		}).insert()
+		item_default_name = frappe.db.exists("Item Default", {"parent": item.name, "company": frappe.db.get_default("company")})		
+		if not item_default_name:
+			frappe.get_doc({
+				"doctype": "Item Default",
+				"parent": item.name,
+				"parenttype": "Item",
+				"parentfield": "item_defaults",
+				"default_supplier": supplier,
+				"company": frappe.db.get_default("company")
+			}).insert()
+		else:
+			frappe.db.set_value("Item Default", item_default_name, "default_supplier", supplier)
 
 	def add_item_details_to_price_list(self, price_list_rows, item, price_list):
   
