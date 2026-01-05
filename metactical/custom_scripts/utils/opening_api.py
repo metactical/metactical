@@ -105,10 +105,10 @@ def create_opening_entry(*args, **kwargs):
         frappe.response["coins_total"] = opening.coins_total
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="POS - Error creating opening entry")
-        frappe.db.rollback()
         frappe.response["status"] = "error"
-        frappe.response["message"] = str(e)
-        
+        frappe.response["message"] = f"User {user} has no permission to create opening entry" if not str(e) else str(e)
+        frappe.db.rollback()
+
 def create_pos_api_log(form_data):
     """
     Create a log entry for the POS API call.
