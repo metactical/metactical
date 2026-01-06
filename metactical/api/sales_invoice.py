@@ -37,9 +37,9 @@ def get_sales_invoice(sales_order):
         and is_return = 0 
         and si.docstatus = 1
         and si.status in ("Paid", "Credit Note Issued")
-        and si.is_pos = 1
+        and (si.source like "Store%%" or is_pos = 1)
         order by si.posting_date asc
-        """, (sales_order), as_dict=True)
+        """, (sales_order,), as_dict=True)
         
     invoice = sales_invoices[0] if sales_invoices else None
     return invoice
@@ -74,16 +74,11 @@ def load_si_pos(sales_invoice):
     taxes = []
     payments = []
     
-    customer = { "id": invoice.customer, "Name":invoice.customer_name }
-    customer_contact = get_customer_detail(invoice.customer)
-    if customer_contact:
-        customer["Email"] = customer.get("Email")
-        customer["Phone"] = customer.get("Phone") or customer.get("Mobile")
-        customer["Note"] = ""
-    else:
-        customer["Email"] = ""
-        customer["Phone"] = ""
-        customer["Note"] = ""
+    customer = get_address_detail(invoice)
+    customer["id"] = invoice.customer
+    customer_name = frappe.db.get_value("Customer", invoice.customer, ["first_name", "last_name"], as_dict=True)
+    customer["FirstName"] = customer_name.get("first_name") if customer_name else ""
+    customer["LastName"] = customer_name.get("last_name") if customer_name else ""
         
     invoice_details = {}
 
@@ -175,10 +170,11 @@ def load_so_pos(sales_order):
     order_details["Items"] = []
     order_details["Taxes"] = []
     order_details["Payment"] = []
-    order_details["Customer"] = {"id": sales_order.customer, "Name": sales_order.customer_name}
+    order_details["Customer"] = {"id": sales_order.customer, "FirstName": sales_order.customer_name}
     order_details["Status"] = sales_order.status
     order_details["HasInvoice"] = so_has_invoice(sales_order.name)
     
+    # Get Items and Taxes 
     for item in sales_order.items:
         reatil_sku = item.ifw_retailskusuffix if item.ifw_retailskusuffix else frappe.get_value("Item", item.item_code, "ifw_retailskusuffix")
         order_details["Items"].append({
@@ -200,16 +196,37 @@ def load_so_pos(sales_order):
             "Amount": tax.rate
         })
         
-    customer = get_customer_detail(sales_order.customer)
-    if customer:
-        order_details["Customer"]["Email"] = customer.get("Email")
-        order_details["Customer"]["Phone"] = customer.get("Phone") or customer.get("Mobile")
-        order_details["Customer"]["Note"] = ""
-    else:
-        order_details["Customer"]["Email"] = ""
-        order_details["Customer"]["Phone"] = ""
-        order_details["Customer"]["Note"] = ""
+    # Get Payments
+    payment_entries = frappe.db.sql("""
+                                    SELECT pe.mode_of_payment,
+                                        pe.paid_amount
+                                        FROM 
+                                        `tabPayment Entry` pe
+                                        INNER JOIN 
+                                        `tabPayment Entry Reference` per 
+                                        ON per.parent = pe.name
+                                        WHERE 
+                                        per.reference_doctype = 'Sales Order'
+                                        AND per.reference_name = %s
+                                        AND pe.docstatus = 1
+                                    """, (sales_order.name), as_dict=True)
+    
+    for payment in payment_entries:
+        order_details["Payment"].append({
+            "ModeOfPayment": payment.mode_of_payment,
+            "Amount": payment.paid_amount
+        })
         
+    address = get_address_detail(sales_order)
+    customer = frappe.db.get_value("Customer", sales_order.customer, ["first_name", "last_name"], as_dict=True)
+    
+    if customer:
+        order_details["Customer"]["FirstName"] = customer.get("first_name")
+        order_details["Customer"]["LastName"] = customer.get("last_name")
+    
+    if address:
+        order_details["Customer"].update(address)
+    
     frappe.response["Invoice"] = order_details
     frappe.response["Status"] = 200
     frappe.response["Message"] = "Success"
@@ -227,24 +244,29 @@ def so_has_invoice(sales_order):
         
     return True if sales_invoices else False
     
-def get_customer_detail(customer):
-    customer = frappe.db.exists("Customer", customer)
+def get_address_detail(sales_order):
+    
+    customer = frappe.db.exists("Customer", sales_order.customer)
     if not customer:
         return {}
     
-    contact_info = frappe.db.sql("""
-        SELECT email_id, phone, mobile_no FROM `tabContact` 
-        JOIN `tabDynamic Link` ON `tabDynamic Link`.parent = `tabContact`.name
-        WHERE link_name = %s AND link_doctype = 'Customer'
-        """, (customer), as_dict=True)
+    customer = {}
+    if sales_order.shipping_address_name:
+        address = frappe.get_doc("Address", sales_order.shipping_address_name, ["email_id", "phone", "mobile_no"], as_dict=True)
+    else:
+        return {}
     
-    contact_details = {}
-    if contact_info:
-        contact_info = contact_info[0]
-        contact_details = {
-            "Email": contact_info.email_id,
-            "Phone": contact_info.phone,
-            "Mobile": contact_info.mobile_no
-        }
-        
-    return contact_details
+    if not address:
+        return {}
+    
+    customer_contact = address
+    customer["Email"] = customer_contact.get("email_id")
+    customer["Phone"] = customer_contact.get("phone") or customer_contact.get("mobile_no")
+    customer["AddressLine1"] = customer_contact.get("address_line1")
+    customer["AddressLine2"] = customer_contact.get("address_line2")
+    customer["City"] = customer_contact.get("city")
+    customer["State"] = customer_contact.get("state")
+    customer["ZipCode"] = customer_contact.get("pincode")
+    customer["Country"] = customer_contact.get("country")
+    
+    return customer
