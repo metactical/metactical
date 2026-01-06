@@ -132,6 +132,12 @@ def get_untransmitted_shipments(warehouse=None):
 		# Get available groups from Canada Post API
 		available_groups = cp.get_available_groups()
 		
+		# Get unique group IDs to prevent processing the same group multiple times
+		available_groups = list(set(available_groups))
+		
+		# For testing purposes, only use groups with "Stores" in it
+		# available_groups = [g for g in available_groups if "Stores" in g]
+		
 		untransmitted = []
 		
 		# Process each group to get shipments
@@ -144,13 +150,27 @@ def get_untransmitted_shipments(warehouse=None):
 				
 				if group_warehouse_prefix != filter_warehouse_prefix:
 					continue
-			
+
 			# Get all shipments in this group from Canada Post
-			group_shipments = cp.get_group_shipments(group_id)
+			group_shipments = cp.get_group_shipments(group_id=group_id)
 			
 			for cp_shipment in group_shipments:
 				# Get the ERP Shipment name from customer-ref-1
 				erp_shipment_name = cp_shipment['references'].get('ref_1')
+				
+				# If no reference is provided, try to find the shipment by shipment_id
+				if not erp_shipment_name:
+					shipment_id = cp_shipment.get('shipment_id')
+					if shipment_id:
+						# Search for shipment in ERPNext by shipment_id in child table
+						shipment_records = frappe.get_all(
+							'Canada Post Shipment',
+							filters={'shipment_id': shipment_id},
+							fields=['parent'],
+							limit=1
+						)
+						if shipment_records:
+							erp_shipment_name = shipment_records[0].get('parent')
 				
 				if not erp_shipment_name:
 					continue
