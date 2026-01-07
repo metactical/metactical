@@ -379,8 +379,6 @@ fixtures = [{
 			'Pick List-track_print_user',
 			'Lead Source-ifw_website_id',
 			'Mode of Payment-ifw_mapping_values',
-			'Customer-first_name',
-			'Customer-last_name',
 			'Customer-mobile',
 			'Customer-email',
 			'Item-ifw_item_notes2',
