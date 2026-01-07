@@ -493,6 +493,107 @@ class CanadaPost():
 		
 		return shipments_data
 
+	def get_manifests_by_date_range(self, from_date, to_date):
+		"""
+		Get all manifests within a date range from Canada Post API.
+		
+		Args:
+			from_date: Start date in YYYY-MM-DD format
+			to_date: End date in YYYY-MM-DD format
+		
+		Returns:
+			list: List of manifest data with links
+		"""
+		# Convert dates to the format Canada Post expects (YYYYMMDD)
+		if isinstance(from_date, str):
+			from_date_obj = datetime.strptime(from_date, "%Y-%m-%d")
+		else:
+			from_date_obj = from_date
+		
+		if isinstance(to_date, str):
+			to_date_obj = datetime.strptime(to_date, "%Y-%m-%d")
+		else:
+			to_date_obj = to_date
+		
+		# Validate date range (max 90 days)
+		date_diff = (to_date_obj - from_date_obj).days
+		if date_diff > 90:
+			frappe.throw(_("Date range cannot exceed 90 days"))
+		
+		if date_diff < 0:
+			frappe.throw(_("'To Date' must be after 'From Date'"))
+		
+		start_date_str = from_date_obj.strftime("%Y%m%d")
+		end_date_str = to_date_obj.strftime("%Y%m%d")
+		
+		# Query Canada Post API for manifests
+		url = f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest?start={start_date_str}&end={end_date_str}"
+		headers = {'Accept': 'application/vnd.cpc.manifest-v8+xml'}
+		
+		try:
+			response = self.get_response(url, None, headers=headers, method='GET')
+		except Exception as e:
+			frappe.log_error(
+				title="Canada Post - Get Manifests Error",
+				message=f"Error fetching manifests from {start_date_str} to {end_date_str}: {str(e)}\n{frappe.get_traceback()}"
+			)
+			return []
+		
+		if not response or 'manifests' not in response:
+			return []
+		
+		# Ensure manifest links is a list
+		manifest_links = response['manifests'].get('link', [])
+		if isinstance(manifest_links, dict):
+			manifest_links = [manifest_links]
+		
+		manifests_data = []
+		
+		for manifest_link in manifest_links:
+			try:
+				# Get detailed manifest info
+				manifest_response = self.get_response(
+					manifest_link['@href'], 
+					None, 
+					headers={'Accept': manifest_link['@media-type']}, 
+					method='GET'
+				)
+				
+				if manifest_response and 'manifest' in manifest_response:
+					manifest_info = manifest_response['manifest']
+					
+					# Extract manifest data
+					manifest_data = {
+						'po_number': manifest_info.get('po-number'),
+						'manifest_date': manifest_info.get('manifest-date'),
+						'links': {}
+					}
+					
+					# Store links for artifacts and shipments
+					if 'links' in manifest_info and 'link' in manifest_info['links']:
+						links = manifest_info['links']['link']
+						if isinstance(links, dict):
+							links = [links]
+						
+						for link in links:
+							rel = link.get('@rel')
+							if rel in ['artifact', 'manifestShipments']:
+								manifest_data['links'][rel] = {
+									'href': link['@href'],
+									'media_type': link['@media-type']
+								}
+					
+					manifests_data.append(manifest_data)
+					
+			except Exception as e:
+				frappe.log_error(
+					title="Canada Post - Get Manifest Details Error",
+					message=f"Error getting manifest from {manifest_link.get('@href', 'unknown')}: {str(e)}"
+				)
+				continue
+		
+		return manifests_data
+
 	def get_shipment_manifest(self, shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
 		start_date = datetime.strftime(doc.creation, "%Y%m%d")
