@@ -268,8 +268,8 @@
 							</tr>
 						</thead>
 						<tbody>
-							<template v-for="manifest in manifests" :key="manifest.po_number">
-								<tr>
+							<template v-for="manifest in manifests">
+								<tr :key="'manifest-' + manifest.po_number">
 									<td>
 										<button 
 											class="btn btn-sm btn-link p-0"
@@ -304,7 +304,7 @@
 										</button>
 									</td>
 								</tr>
-								<tr v-if="expandedManifests[manifest.po_number]">
+								<tr v-if="expandedManifests[manifest.po_number]" :key="'manifest-exp-' + manifest.po_number">
 									<td colspan="4" class="p-0">
 										<div class="p-3" style="background-color: #f8f9fa;">
 											<div v-if="loadingManifestShipments[manifest.po_number]" class="text-center py-3">
