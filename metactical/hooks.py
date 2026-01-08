@@ -341,7 +341,6 @@ fixtures = [{
 			'Purchase Order-column_break_33',
 			'Purchase Order-carrier_used',
 			'Purchase Order-tracking_id',
-			'Pick List Item-actual_qty',
 			'Purchase Invoice Item-ifw_location',
 			'Material Request Item-default_supplier',
 			'Purchase Order Item-ifw_retailskusuffix',
