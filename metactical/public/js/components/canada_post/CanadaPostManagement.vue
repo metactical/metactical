@@ -106,7 +106,7 @@
 		<!-- Manifests Summary Card -->
 		<div class="row mb-3" v-if="hasLoadedData && filters.load_type === 'past_manifests'">
 			<div class="col-md-12">
-				<div class="card text-white bg-primary">
+				<div class="card">
 					<div class="card-body">
 						<h5 class="card-title">Past Manifests Found</h5>
 						<h2>{{ manifests.length }}</h2>
@@ -151,14 +151,21 @@
 		<!-- Loading State -->
 		<div v-if="loading" class="text-center py-5">
 			<i class="fa fa-spinner fa-spin fa-3x text-muted"></i>
-			<p class="text-muted mt-3">Loading shipments...</p>
+			<p class="text-muted mt-3">{{ filters.load_type === 'past_manifests' ? 'Loading manifests...' : 'Loading shipments...' }}</p>
 		</div>
 
 		<!-- No Data State -->
 		<div v-else-if="!loading && hasLoaded && !hasLoadedData" class="text-center py-5">
 			<i class="fa fa-inbox fa-3x text-muted"></i>
-			<p class="text-muted mt-3">No untransmitted shipments found</p>
-			<p class="text-muted">All shipments have been transmitted or no shipments match the criteria</p>
+			<p class="text-muted mt-3">
+				{{ filters.load_type === 'past_manifests' ? 'No manifests found' : 'No untransmitted shipments found' }}
+			</p>
+			<p class="text-muted" v-if="filters.load_type !== 'past_manifests'">
+				All shipments have been transmitted or no shipments match the criteria
+			</p>
+			<p class="text-muted" v-else>
+				No manifests found for the selected date range
+			</p>
 		</div>
 
 		<!-- Shipments Table -->
@@ -575,7 +582,7 @@ export default {
 		async toggleManifestExpand(poNumber) {
 			// Toggle expanded state
 			if (this.expandedManifests[poNumber]) {
-				this.$set(this.expandedManifests, poNumber, false);
+				this.expandedManifests[poNumber] = false;
 				return;
 			}
 
@@ -585,7 +592,7 @@ export default {
 			}
 
 			// Expand the row
-			this.$set(this.expandedManifests, poNumber, true);
+			this.expandedManifests[poNumber] = true;
 		},
 
 		async fetchManifestShipments(poNumber) {
@@ -601,7 +608,7 @@ export default {
 			}
 
 			// Set loading state
-			this.$set(this.loadingManifestShipments, poNumber, true);
+			this.loadingManifestShipments[poNumber] = true;
 
 			try {
 				const response = await frappe.call({
@@ -614,7 +621,7 @@ export default {
 
 				if (response.message) {
 					console.log(`Shipments for manifest ${poNumber}: `, response.message);
-					this.$set(this.manifestShipmentsCache, poNumber, response.message.shipments || []);
+					this.manifestShipmentsCache[poNumber] = response.message.shipments || [];
 				}
 			} catch (error) {
 				console.error(`Error fetching manifest shipments for ${poNumber}:`, error);
@@ -624,7 +631,7 @@ export default {
 					indicator: "red",
 				});
 			} finally {
-				this.$set(this.loadingManifestShipments, poNumber, false);
+				this.loadingManifestShipments[poNumber] = false;
 			}
 		},
 
@@ -638,8 +645,47 @@ export default {
 				return;
 			}
 
-			// Open the PDF URL in a new tab
-			window.open(manifest.links.artifact.href, "_blank");
+			// Show loading indicator
+			frappe.show_alert({
+				message: __('Fetching manifest PDF...'),
+				indicator: 'blue'
+			}, 3);
+
+			// Fetch the PDF through backend with authentication
+			frappe.call({
+				method: "metactical.metactical.page.canada_post_management.canada_post_management.get_manifest_pdf",
+				args: {
+					artifact_url: manifest.links.artifact.href,
+					media_type: manifest.links.artifact.media_type,
+				},
+				callback: (response) => {
+					if (response.message && response.message.pdf_data) {
+						// Convert base64 to blob and open in new tab
+						const byteCharacters = atob(response.message.pdf_data);
+						const byteNumbers = new Array(byteCharacters.length);
+						for (let i = 0; i < byteCharacters.length; i++) {
+							byteNumbers[i] = byteCharacters.charCodeAt(i);
+						}
+						const byteArray = new Uint8Array(byteNumbers);
+						const blob = new Blob([byteArray], { type: 'application/pdf' });
+						const blobUrl = URL.createObjectURL(blob);
+						
+						// Open in new tab
+						window.open(blobUrl, '_blank');
+						
+						// Clean up the blob URL after a delay
+						setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+					}
+				},
+				error: (error) => {
+					console.error("Error fetching manifest PDF:", error);
+					frappe.msgprint({
+						title: "Error",
+						message: error.message || "Failed to fetch manifest PDF",
+						indicator: "red",
+					});
+				}
+			});
 		},
 	},
 };
