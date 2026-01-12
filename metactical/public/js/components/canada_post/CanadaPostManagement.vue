@@ -582,7 +582,7 @@ export default {
 		async toggleManifestExpand(poNumber) {
 			// Toggle expanded state
 			if (this.expandedManifests[poNumber]) {
-				this.expandedManifests[poNumber] = false;
+				this.$set(this.expandedManifests, poNumber, false);
 				return;
 			}
 
@@ -592,7 +592,7 @@ export default {
 			}
 
 			// Expand the row
-			this.expandedManifests[poNumber] = true;
+			this.$set(this.expandedManifests, poNumber, true);
 		},
 
 		async fetchManifestShipments(poNumber) {
@@ -608,7 +608,7 @@ export default {
 			}
 
 			// Set loading state
-			this.loadingManifestShipments[poNumber] = true;
+			this.$set(this.loadingManifestShipments, poNumber, true);
 
 			try {
 				const response = await frappe.call({
@@ -621,7 +621,7 @@ export default {
 
 				if (response.message) {
 					console.log(`Shipments for manifest ${poNumber}: `, response.message);
-					this.manifestShipmentsCache[poNumber] = response.message.shipments || [];
+					this.$set(this.manifestShipmentsCache, poNumber, response.message.shipments || []);
 				}
 			} catch (error) {
 				console.error(`Error fetching manifest shipments for ${poNumber}:`, error);
@@ -631,7 +631,7 @@ export default {
 					indicator: "red",
 				});
 			} finally {
-				this.loadingManifestShipments[poNumber] = false;
+				this.$set(this.loadingManifestShipments, poNumber, false);
 			}
 		},
 
