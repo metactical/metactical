@@ -136,7 +136,7 @@ def get_untransmitted_shipments(warehouse=None):
 		available_groups = list(set(available_groups))
 		
 		# For testing purposes, only use groups with "Stores" in it
-		available_groups = [g for g in available_groups if "Stores" in g]
+		#available_groups = [g for g in available_groups if "Stores" in g]
 		
 		untransmitted = []
 		
@@ -376,4 +376,56 @@ def get_manifest_shipments(manifest_shipments_url, media_type):
 			message=frappe.get_traceback()
 		)
 		frappe.throw(_("Error fetching manifest shipments: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_manifest_pdf(artifact_url, media_type):
+	"""
+	Fetch manifest PDF from Canada Post API and return as base64.
+	
+	Args:
+		artifact_url: The URL to fetch the manifest PDF
+		media_type: The media type for the request
+	
+	Returns:
+		dict: {
+			'pdf_data': Base64 encoded PDF data,
+			'filename': Suggested filename
+		}
+	"""
+	try:
+		import base64
+		
+		# Initialize Canada Post API
+		cp = CanadaPost()
+		
+		# Fetch the PDF
+		response = cp.get_response(
+			artifact_url,
+			None,
+			headers={'Accept': media_type},
+			return_request=True,
+			method='GET'
+		)
+		
+		if response.status_code != 200:
+			frappe.throw(_("Failed to fetch manifest PDF"))
+		
+		# Convert to base64
+		pdf_base64 = base64.b64encode(response.content).decode('utf-8')
+		
+		# Extract PO number from URL if possible for filename
+		filename = "manifest.pdf"
+		
+		return {
+			'pdf_data': pdf_base64,
+			'filename': filename
+		}
+	
+	except Exception as e:
+		frappe.log_error(
+			title="Canada Post - Get Manifest PDF Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error fetching manifest PDF: {0}").format(str(e)))
 
