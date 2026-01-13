@@ -12,7 +12,8 @@
   "section_break_leysh",
   "password",
   "can_disable_auto_logout",
-  "can_see_item_cost"
+  "can_see_item_cost",
+  "can_create_embedded_codes"
  ],
  "fields": [
   {
@@ -45,6 +46,12 @@
    "fieldname": "can_see_item_cost",
    "fieldtype": "Check",
    "label": "Can See Item Cost"
+  },
+  {
+   "default": "0",
+   "fieldname": "can_create_embedded_codes",
+   "fieldtype": "Check",
+   "label": " Can Create Embedded Codes"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -54,7 +61,7 @@
    "link_fieldname": "user"
   }
  ],
- "modified": "2025-07-07 05:27:56.465222",
+ "modified": "2026-01-13 05:04:53.478584",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS User Settings",

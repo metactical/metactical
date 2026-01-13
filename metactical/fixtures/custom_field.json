@@ -11519,8 +11519,13 @@
   "dt": "Item",
   "fetch_from": null,
   "fetch_if_empty": 0,
+<<<<<<< HEAD
   "fieldname": "request_ai_suggestion",
   "fieldtype": "Check",
+=======
+  "fieldname": "display_weight",
+  "fieldtype": "Int",
+>>>>>>> 9db72284 (feat: Add 'Display Weight' custom field and 'Can Create Embedded Codes' permission to POS User Settings)
   "hidden": 0,
   "hide_border": 0,
   "hide_days": 0,
@@ -11531,6 +11536,7 @@
   "in_list_view": 0,
   "in_preview": 0,
   "in_standard_filter": 0,
+<<<<<<< HEAD
   "insert_after": "is_fixed_asset",
   "is_system_generated": 0,
   "is_virtual": 0,
@@ -11540,6 +11546,17 @@
   "modified": "2025-07-08 06:04:13.261492",
   "module": "Metactical",
   "name": "Item-request_ai_suggestion",
+=======
+  "insert_after": "request_ai_suggestion",
+  "is_system_generated": 0,
+  "is_virtual": 0,
+  "label": "Display Weight",
+  "length": 0,
+  "mandatory_depends_on": null,
+  "modified": "2025-12-23 05:37:32.185194",
+  "module": null,
+  "name": "Item-display_weight",
+>>>>>>> 9db72284 (feat: Add 'Display Weight' custom field and 'Can Create Embedded Codes' permission to POS User Settings)
   "no_copy": 0,
   "non_negative": 0,
   "options": null,
