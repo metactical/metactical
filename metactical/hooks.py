@@ -341,7 +341,6 @@ fixtures = [{
 			'Purchase Order-column_break_33',
 			'Purchase Order-carrier_used',
 			'Purchase Order-tracking_id',
-			'Pick List Item-actual_qty',
 			'Purchase Invoice Item-ifw_location',
 			'Material Request Item-default_supplier',
 			'Purchase Order Item-ifw_retailskusuffix',
@@ -379,8 +378,6 @@ fixtures = [{
 			'Pick List-track_print_user',
 			'Lead Source-ifw_website_id',
 			'Mode of Payment-ifw_mapping_values',
-			'Customer-first_name',
-			'Customer-last_name',
 			'Customer-mobile',
 			'Customer-email',
 			'Item-ifw_item_notes2',
@@ -814,10 +811,6 @@ fixtures = [{
 			'Task-total_expense_claim',
 			'Timesheet-salary_slip',
 			'Terms and Conditions-hr',
-			'Loan-repay_from_salary',
-			'Loan Repayment-repay_from_salary',
-			'Loan Repayment-payroll_payable_account',
-			'Loan Repayment-process_payroll_accounting_entry_based_on_employee',
 			'Lead Source-custom_neb_price_list',
 			'Item-neb_website_specifications',
 			'Item Group-neb_website_specifications',
@@ -878,7 +871,8 @@ fixtures = [{
 			"Pricing Rule-min_qty_to_stop_discount",
 			"POS Profile-neb_manual_orders_tag",
 			"Lead Source-neb_country",
-			"Item-display_weight"
+			"Item-display_weight",
+			"Stock Entry Detail-custom_ais_active_qoh"
 		]]]
 	},
 	{
