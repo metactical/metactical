@@ -355,6 +355,7 @@ class CanadaPost():
 							for shipment in shipment_links:
 								shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
 								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
+			frappe.log_error(title=f"Manifest for {manifest}", message=response)
 		return shipment_ids, po_number
 							
 	def get_shipments_groups(self, manifest_doc):

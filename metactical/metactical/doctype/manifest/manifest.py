@@ -42,8 +42,8 @@ def create_manifest(manifest, service_provider):
 						"shipment_id": shipment,
 						"status": "Transmitted"
 					})
-			doc.status = "Completed"
-			doc.save()
+		doc.status = "Completed"
+		doc.save()
 		return {"po_number": po_number, "shipments": shipments}
 	except ValueError as e:
 		if str(e) == "9122":
