@@ -1342,11 +1342,12 @@ def get_addresses(email, phone):
             condition = f"addr.email_id = {frappe.db.escape(email)}"
 
         if phone:
-            phone_pattern = f"%{phone}%"
+            phone_pattern = f"{phone}"
+            phone_pattern2 = f"1{phone}"
             if condition:
-                condition += f" AND addr.phone like {frappe.db.escape(phone_pattern)}"
+                condition += f" AND (addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern)} or addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern2)})"
             else:
-                condition = f"addr.phone like {frappe.db.escape(phone_pattern)}"
+                condition = f"(addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern)} or addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern2)})"
 
         addresses = {}
         customer = None
