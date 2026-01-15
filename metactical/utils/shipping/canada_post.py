@@ -325,6 +325,7 @@ class CanadaPost():
 			for link in links:
 				res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
 															  'Content-Type': link['@media-type']}, method='GET')
+				frappe.log_error(title=f"Getting Manifest Troubleshooting: {manifest}", message=res)
 				if res and res['manifest']['po-number']:
 					po_number = res['manifest']['po-number']
 					for mlink in res['manifest']['links']['link']:
