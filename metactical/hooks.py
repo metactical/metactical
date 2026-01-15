@@ -857,7 +857,15 @@ fixtures = [{
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
 			"POS Profile User-allow_flat_rate",
-			"Pricing Rule-min_qty_to_stop_discount"
+			"Item-is_published",
+			"Item Attribute Value-hide_when_out_of_stock",
+			"Pricing Rule-min_qty_to_stop_discount",
+			"POS Profile-neb_manual_orders_tag",
+			"Lead Source-neb_country",
+			"Item-display_weight",
+			"Stock Entry Detail-custom_ais_active_qoh",
+			"POS Profile-custom_neb_allow_manual_order",
+			"Address-neb_mobile_not_formatted"
 		]]]
 	},
 	{

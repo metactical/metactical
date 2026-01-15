@@ -1358,7 +1358,7 @@ def get_addresses(email, phone):
             AND addr.address_type IN ('Billing', 'Shipping')
             AND {condition}
             
-            ORDER BY addr.creation DESC
+            ORDER BY addr.modified DESC
             """, as_dict=True)
         
         if not address_links:
