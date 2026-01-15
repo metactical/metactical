@@ -1,0 +1,106 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-13 09:58:03.469371",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "product",
+  "item_name",
+  "status",
+  "price_list",
+  "column_break_sd5na",
+  "deleted",
+  "created",
+  "section_break_qnhhm",
+  "deletion_response",
+  "creation_response"
+ ],
+ "fields": [
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Issued\nRe-Created"
+  },
+  {
+   "fieldname": "deletion_response",
+   "fieldtype": "Text",
+   "label": "Deletion Response"
+  },
+  {
+   "fieldname": "creation_response",
+   "fieldtype": "Text",
+   "label": "Creation Response"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name"
+  },
+  {
+   "fieldname": "price_list",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Price List"
+  },
+  {
+   "fieldname": "product",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Product"
+  },
+  {
+   "fieldname": "column_break_sd5na",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "deleted",
+   "fieldtype": "Check",
+   "label": "Deleted",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "created",
+   "fieldtype": "Check",
+   "label": "Created",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_qnhhm",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-15 04:18:20.946886",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Drop and Create Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
