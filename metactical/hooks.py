@@ -128,9 +128,6 @@ doc_events = {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save",
 		"on_submit": "metactical.custom_scripts.material_request.material_request.on_submit",
 	},
-	"Address": {
-		"validate": "metactical.custom_scripts.address.address.validate"
-	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},

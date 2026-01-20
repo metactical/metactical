@@ -13,6 +13,7 @@ def receive_pos_data(*args, **kwargs):
     order_type = "New Order" if not form_data["InvoiceId"] else "Manual Order"
     log = create_log(form_data, order_type)
 
+<<<<<<< HEAD
     user_validation = validate_users(form_data)
     if not user_validation["success"]:
         frappe.response["Status"] = "500"
@@ -124,6 +125,356 @@ def receive_pos_data(*args, **kwargs):
                 form_data=form_data,
                 sales_order=sales_order.name
             )
+=======
+	log = create_log(form_data, "Manual Order - Create")
+	try:
+		customer = get_customer(form_data)
+		if not customer['success']:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = [customer["error"]]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', "Unable to create/find Customer")
+			frappe.db.commit()
+			return
+		
+
+		pos_profile = get_pos_profile_detail(form_data)
+		sales_order = create_sales_order(form_data, customer, pos_profile)  
+  
+		customer_form_data = form_data.get("Customer", {})
+		if customer_form_data:
+			if "Note" in customer_form_data and customer_form_data["Note"]:
+				frappe.set_user(form_data['SalesPerson'])
+				note = customer_form_data["Note"]
+				comment = {"comment_by": form_data['SalesPerson'], "comment": note}
+				create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
+
+		if not sales_order["success"] and not sales_order["sales_order"]:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = [sales_order["error"]]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
+			frappe.db.commit()
+			return
+				
+		if not sales_order["success"]:
+			url = "/app/{0}/{1}".format(sales_order["sales_order"].doctype.lower().replace(" ", "-"), sales_order["sales_order"].name)
+			message = "Branch: *{0}* \n Sales Order created by POS has an error: `{1}`. \nPlease update the document and resubmit. [{2}]({3})".format(
+				form_data['POSProfile'], sales_order["error"], get_url(url), get_url(url))
+			
+			frappe.enqueue(
+				post_to_rocket_chat,
+				queue="default", # one of short, default, long
+				doc=sales_order["sales_order"],
+				msg=message,
+				pos=True
+			)
+			
+			comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
+			comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
+			create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
+			
+		# submit sales order
+		has_no_error = sales_order["success"] if 'success' in sales_order else True
+		sales_order = sales_order["sales_order"]
+		
+  
+		# add tag
+		if sales_order and pos_profile.neb_manual_orders_tag:
+			add_tag(pos_profile.neb_manual_orders_tag, "Sales Order", sales_order.name)
+  
+		if sales_order and has_no_error:
+			frappe.enqueue(
+				submit_sales_manual_order,
+				queue="default", # one of short, default, long
+				at_front=True,
+				form_data=form_data,
+				sales_order=sales_order.name,
+				log=log
+			)
+			
+		frappe.response["Status"] = "200"
+		frappe.response["InvoiceId"] = sales_order.name
+		frappe.response["Message"] = []
+		
+		frappe.response["Total"] = float(sales_order.grand_total)
+	except Exception as e:
+		frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
+		frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+		
+		frappe.clear_last_message()
+		frappe.response["Status"] = "500"
+		frappe.response["Message"] = [str(e)]
+		frappe.response["InvoiceId"] = None
+		frappe.response["Total"] = 0.0
+		
+
+def submit_sales_manual_order(sales_order, form_data, log):
+	frappe.set_user(form_data["SalesPerson"])
+	try:
+		frappe.db.set_value('POS API Log', log, 'sales_order', sales_order, update_modified=False)
+		sales_order = frappe.get_doc('Sales Order', sales_order)
+		
+		if sales_order.docstatus == 0:
+			sales_order.submit()
+			frappe.db.commit()
+			
+			# Create payment entry
+			if form_data.get("Payment"):
+				for payment in form_data["Payment"]:
+					frappe.set_user("Administrator")
+					payment_entry = create_payment_entry(sales_order, payment)
+					if payment_entry:
+						payment_entry.submit()
+					else:
+						comment = {"comment_by": form_data['SalesPerson'], "comment": f"<b>Failed to Create Payment Entry:</b><br>Mode of Payment: {payment['ModeOfPayment']}<br>Amount: {payment['Amount']}"}
+						create_comment(comment, form_data['SalesPerson'], sales_order.name)
+						raise Exception("Unable to create Payment Entry for Sales Order {0}".format(sales_order.name))	
+
+	except Exception as e:
+		frappe.set_user("Administrator")
+		frappe.log_error(title='Submit Sales Order Error', message=frappe.get_traceback())
+		frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+		
+		if type(sales_order) == str:
+			sales_order = frappe.get_doc('Sales Order', sales_order)
+		
+		# add comment to sales order
+		comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}    
+		create_comment(comment, form_data['SalesPerson'], sales_order.name)
+		
+		url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
+		message = "Branch: *{0}* \n Unable to submit Sales Order created by POS. Please check the document and resubmit. \n[{1}]({2})".format(form_data['POSProfile'], get_url(url), get_url(url))
+		post_to_rocket_chat(sales_order, message, pos=True)
+		
+		return    
+	
+def create_payment_entry(order, payment):
+	try:
+		new_payment = get_payment_entry(order.doctype, order.name)
+		new_payment.mode_of_payment = payment["ModeOfPayment"]
+
+		account = get_bank_cash_account(company=order.company, mode_of_payment=payment["ModeOfPayment"])
+		new_payment.paid_to = account["account"]
+		new_payment.paid_amount = payment["Amount"] - payment.get("Change", 0.0)
+		new_payment.reference_no = ""
+		new_payment.reference_date = frappe.utils.nowdate()
+
+		for ref in new_payment.references:
+			ref.allocated_amount = payment["Amount"] - payment.get("Change", 0.0)
+
+		new_payment.save()
+
+		return new_payment
+
+	except Exception as e:
+		frappe.log_error(title='Create Payment Entry Error', message=frappe.get_traceback())
+		return None
+	
+def process_order(form_data):
+	order_type = "New Order" if not form_data["InvoiceId"] else "Manual Order - Process"
+	log = create_log(form_data, order_type)
+
+	user_validation = validate_users(form_data)
+	if not user_validation["success"]:
+		frappe.response["Status"] = "500"
+		frappe.response["Message"] = [user_validation["error"]]
+		frappe.response["InvoiceId"] = None
+		frappe.response["Total"] = 0.0
+		frappe.db.set_value('POS API Log', log, 'error', user_validation["error"])
+		frappe.db.commit()
+		return
+		
+	try:        
+		customer = get_customer(form_data)
+		if not customer:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = ["Unable to create/find Customer"]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', "Unable to create/find Customer")
+			frappe.db.commit()
+			return
+			
+		if form_data["InvoiceId"]:
+			sales_order = frappe.get_doc('Sales Order', form_data["InvoiceId"])
+			if sales_order.docstatus != 1:
+				frappe.response["Status"] = "500"
+				frappe.response["Message"] = ["Sales Order {0} is not submitted".format(form_data["InvoiceId"])]
+				frappe.response["InvoiceId"] = None
+				frappe.response["Total"] = 0.0
+				frappe.db.set_value('POS API Log', log, 'error', "Sales Order {0} is not submitted".format(form_data["InvoiceId"]))
+				frappe.db.commit()
+				return
+			
+			if sales_order.status != "To Deliver and Bill":
+				frappe.response["Status"] = "500"
+				frappe.response["Message"] = ["Unable to update Sales Order {0}. The status is {1}".format(form_data["InvoiceId"], sales_order.status)]
+				frappe.response["InvoiceId"] = None
+				frappe.response["Total"] = 0.0
+				frappe.db.set_value('POS API Log', log, 'error', "Unable to update Sales Order {0}. The status is {1}".format(form_data["InvoiceId"], sales_order.status))
+				frappe.db.commit()
+				return
+			
+			# update the sales order with the new data
+			update_details = update_sales_order(sales_order, form_data)
+			if not update_details["success"]:
+				frappe.response["Status"] = "500"
+				frappe.response["Message"] = [update_details["error"]]
+				frappe.response["InvoiceId"] = None
+				frappe.response["Total"] = 0.0
+				frappe.db.set_value('POS API Log', log, 'error', update_details["error"], update_modified=False)
+				frappe.db.commit()
+				return
+			
+			sales_order = frappe.get_doc('Sales Order', form_data["InvoiceId"])
+			sales_order = {"sales_order": sales_order}
+		else:
+			pos_profile = get_pos_profile_detail(form_data)
+			sales_order = create_sales_order(form_data, customer, pos_profile)
+			if not sales_order["success"] and not sales_order["sales_order"]:
+				frappe.response["Status"] = "500"
+				frappe.response["Message"] = [sales_order["error"]]
+				frappe.response["InvoiceId"] = None
+				frappe.response["Total"] = 0.0
+				frappe.db.set_value('POS API Log', log, 'error', sales_order["error"], update_modified=False)
+				frappe.db.commit()
+				return
+						
+			if not sales_order["success"]:
+				url = "/app/{0}/{1}".format(sales_order["sales_order"].doctype.lower().replace(" ", "-"), sales_order["sales_order"].name)
+				message = "Branch: *{0}* \n Sales Order created by POS has an error: `{1}`. \nPlease update the document and resubmit. [{2}]({3})".format(
+					form_data['POSProfile'], sales_order["error"], get_url(url), get_url(url))
+				
+				frappe.enqueue(
+					post_to_rocket_chat,
+					queue="default", # one of short, default, long
+					doc=sales_order["sales_order"],
+					msg=message,
+					pos=True
+				)
+				
+				comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
+				comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
+				create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
+				
+		has_no_error = sales_order["success"] if 'success' in sales_order else True   
+		sales_order = sales_order["sales_order"] 
+		
+		if sales_order and has_no_error:
+			if len(form_data["Payment"]):
+				has_intrac_payment = False
+				for payment in form_data["Payment"]:
+					if payment["ModeOfPayment"] == "Interac Etransfer":
+						has_intrac_payment = True
+						break
+					
+				if not has_intrac_payment:
+					frappe.enqueue(
+						submit_sales_order,
+						queue="default", # one of short, default, long
+						at_front=True,
+						form_data=form_data,
+						sales_order=sales_order.name,
+						log=log
+					)
+				else:
+					add_payment_info_to_sales_order(sales_order, form_data)
+									
+			frappe.enqueue(
+				create_comments,
+				queue="default", # one of short, default, long
+				form_data=form_data,
+				sales_order=sales_order.name
+			)
+
+		auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
+		frappe.response["Status"] = "200"
+		frappe.response["InvoiceId"] = sales_order.name
+		frappe.response["Message"] = []
+		frappe.response["Total"] = float(sales_order.grand_total)
+		frappe.response["AutoLogout"] = True if auto_logout else False
+			
+	except Exception as e:
+		frappe.log_error(title='Receive POS Data Error', message=frappe.get_traceback())
+		frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+		
+		frappe.clear_last_message()
+		frappe.response["Status"] = "500"
+		frappe.response["Message"] = [str(e)]
+		frappe.response["InvoiceId"] = None
+		frappe.response["Total"] = 0.0
+
+def process_manual_order(form_data):
+	order_id = form_data.get("InvoiceId")
+ 
+	log = create_log(form_data, "Manual Order - Process")
+	try:
+		if not order_id:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = ["Order ID is required to process Manual Order"]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', "Order ID is required to process Manual Order")
+			frappe.db.commit()
+			return
+			
+		sales_order = frappe.get_doc('Sales Order', order_id)
+		if sales_order.docstatus != 1:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = ["Sales Order {0} is not submitted".format(order_id)]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', "Sales Order {0} is not submitted".format(order_id))
+			frappe.db.commit()
+			return
+		
+		if sales_order.status != "To Deliver and Bill":
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = ["Unable to process Sales Order {0}. The status is {1}".format(order_id, sales_order.status)]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', "Unable to process Sales Order {0}. The status is {1}".format(order_id, sales_order.status))
+			frappe.db.commit()
+			return
+
+		pos_profile = form_data["POSProfile"] + ' Operators'
+		pos_profile_doc = frappe.db.get_value("POS Profile", pos_profile, ['company_address', "warehouse"], as_dict=True)
+		
+		# create invoice from sales order
+		sales_invoice = make_sales_invoice(sales_order.name)
+		sales_invoice.company_address = pos_profile_doc.company_address
+		sales_invoice.shipping_address_name = pos_profile_doc.company_address
+		sales_invoice.update_stock = 1
+  
+		for item in sales_invoice.items:
+			item.warehouse = pos_profile_doc.warehouse
+  
+		sales_invoice.ignore_pricing_rule = 1
+		sales_invoice.set_missing_values()
+		sales_invoice.set_advances()
+		sales_invoice.insert()
+		sales_invoice.submit()
+		frappe.db.commit()
+	
+		frappe.response["Status"] = "200"
+		frappe.response["InvoiceId"] = sales_invoice.name
+		frappe.response["Message"] = []
+		frappe.response["Total"] = float(sales_order.grand_total)
+	except Exception as e:
+		frappe.log_error(title='Process Manual Order Error', message=frappe.get_traceback())
+		frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+		
+		frappe.clear_last_message()
+		frappe.response["Status"] = "500"
+		frappe.response["Message"] = [str(e)]
+		frappe.response["InvoiceId"] = None
+		frappe.response["Total"] = 0.0
+
+	
+>>>>>>> 59858023 (feat: implement address validation in sales order and enhance shipping address retrieval)
 
         # auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
         frappe.response["Status"] = "200"
@@ -275,9 +626,132 @@ def create_sales_order(form_data, customer):
             
         return {"success": False, "error": str(e), "sales_order": sales_order}
 
+<<<<<<< HEAD
     frappe.set_user("Administrator")
     frappe.db.commit()    
     return {"success": True, "sales_order": sales_order, "error": ""}
+=======
+	return pos_profile
+       
+def create_sales_order(form_data, customer, company=None):
+	frappe.set_user(form_data['SalesPerson'])
+	items = form_data['Items']
+	taxes = form_data['Taxes']
+ 	
+	if not company:
+		return {"success": False, "error": "Company Address not found for {0}".format(form_data['POSProfile'] + ' Operators'), "status": 500}
+	
+	so_data = {
+		'doctype': 'Sales Order',
+		'customer': customer['customer'],
+		'taxes_and_charges': form_data['TaxesAndChargesTemplate'],
+		'delivery_date': frappe.utils.today(),
+		"company": company.company,
+		'company_address': company.company_address,
+		'source': form_data['LeadSource'],
+		'ignore_pricing_rule': 1,
+		'contact_person': "",
+		'additional_discount_percentage': form_data['OverallDiscount'],
+		"owner": form_data['SalesPerson'],
+		"ifw_store_pickup": 1 if form_data.get('Location') else 0,
+	}
+ 
+	if form_data.get("Location"):
+		so_data.update({'shipping_address_name': company.company_address})
+	else:
+		shipping_address = get_shipping_address(form_data, customer)
+		if shipping_address:
+			so_data.update({'shipping_address_name': shipping_address})
+  
+	items = get_items(form_data)
+	so_data.update({'items': items})
+	
+	taxes = get_taxes(form_data, company.company)
+	so_data.update({'taxes': taxes})
+		
+	frappe.set_user(form_data['SalesPerson'])
+	sales_order = frappe.get_doc(so_data)
+	
+	check_coupon_code(sales_order, form_data)
+  
+	try:
+		sales_order.insert(ignore_permissions=True)
+	except Exception as e:
+		
+		so_data['items'] = [{
+			'item_code': 2,
+			'qty': 1,
+			'rate': form_data['Total'], 
+		}]
+		
+		so_data['taxes'] = []
+		so_data["coupon_code"] = sales_order.coupon_code if hasattr(sales_order, 'coupon_code') else None
+		sales_order = frappe.get_doc(so_data)
+		
+		sales_order.insert(ignore_permissions=True)
+		frappe.set_user("Administrator")
+		frappe.db.commit()
+		
+		if sales_order.items:
+			item = sales_order.items[0].name
+			frappe.delete_doc('Sales Order Item', item)
+			
+		return {"success": False, "error": str(e), "sales_order": sales_order}
+
+	frappe.set_user("Administrator")
+	frappe.db.commit()    
+	return {"success": True, "sales_order": sales_order, "error": ""}
+>>>>>>> 59858023 (feat: implement address validation in sales order and enhance shipping address retrieval)
+
+def get_shipping_address(form_data, customer):
+	customer_data = form_data.get("Customer", {})
+ 
+	phone = customer_data.get("Phone", "")
+	email = customer_data.get("Email", "")
+	
+	if not phone and not email:
+		return None
+	
+	postal_code = customer_data.get("ZipCode", "")
+	address_line1 = customer_data.get("AddressLine1", "")
+	state = customer_data.get("State", "")
+
+	address = frappe.get_list("Address",
+							  filters={
+								"phone": phone,
+								"email_id": email,
+								"address_line1": address_line1,
+		  						"pincode": postal_code,
+								"state": state,
+								"address_type": "Shipping",
+							  }
+							)
+	
+	if address:
+		return address[0].name
+
+	addr = frappe.get_doc({
+		"doctype": "Address",
+		"address_title": customer_data.get("Name"),
+		"address_type": "Shipping",
+		"address_line1": address_line1,
+		"ifw_first_name": customer_data.get("FirstName", ""),
+		"ifw_last_name": customer_data.get("LastName", ""),
+		"address_line2": customer_data.get("AddressLine2", ""),
+		"city": customer_data.get("City", ""),
+		"state": customer_data.get("State", ""),
+		"country": customer_data.get("Country", ""),
+		"pincode": postal_code,
+		"phone": phone,
+		"email_id": email,
+		"links": [{
+			"link_doctype": "Customer",
+			"link_name": customer["customer"]
+		}]
+	})
+ 
+	addr.insert(ignore_permissions=True)
+	return addr.name
 
 def check_coupon_code(sales_order, form_data):
     total_restock_fee = 0.0
