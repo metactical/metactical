@@ -12,6 +12,8 @@ __version__ = '0.0.1'
 
 AccountsController.validate_party_address = validate_party_address
 
+AccountsController.validate_party_address = validate_party_address
+
 def check_app_permission():
 	if frappe.session.user == "Administrator":
 		return True
