@@ -872,7 +872,8 @@ fixtures = [{
 			"POS Profile-neb_manual_orders_tag",
 			"Lead Source-neb_country",
 			"Item-display_weight",
-			"Stock Entry Detail-custom_ais_active_qoh"
+			"Stock Entry Detail-custom_ais_active_qoh",
+			"Item-drop_and_create_in_websites"
 		]]]
 	},
 	{
