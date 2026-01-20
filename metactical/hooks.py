@@ -128,9 +128,6 @@ doc_events = {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save",
 		"on_submit": "metactical.custom_scripts.material_request.material_request.on_submit",
 	},
-	"Address": {
-		"validate": "metactical.custom_scripts.address.address.validate"
-	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
@@ -179,7 +176,8 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
-	"Item": "metactical.custom_scripts.item.item.CustomItem"
+	"Item": "metactical.custom_scripts.item.item.CustomItem",
+	"Address": "metactical.custom_scripts.address.address.CustomAddress"
 }
 
 # Scheduled Tasks
@@ -857,7 +855,15 @@ fixtures = [{
 			"Sales Invoice Item-sales_person",
 			"Sales Order Item-sales_person",
 			"POS Profile User-allow_flat_rate",
-			"Pricing Rule-min_qty_to_stop_discount"
+			"Item-is_published",
+			"Item Attribute Value-hide_when_out_of_stock",
+			"Pricing Rule-min_qty_to_stop_discount",
+			"POS Profile-neb_manual_orders_tag",
+			"Lead Source-neb_country",
+			"Item-display_weight",
+			"Stock Entry Detail-custom_ais_active_qoh",
+			"POS Profile-neb_allow_manual_order",
+			"Address-neb_mobile_not_formatted"
 		]]]
 	},
 	{
