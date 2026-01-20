@@ -123,10 +123,14 @@ class CustomItem(Item):
 
     def on_update(self):
         super().on_update()
+        
         # check website specification values
         validate_website_specifications(self)
         sync_website_specifications(self)
         validate_item_group(self)
+        
+        if self.drop_and_create_in_websites:
+            self.create_item_deletion_log()
 
         # Trigger update for item inventory output if deduct_qty has been updated
         # Retrieve the document state before the update
@@ -169,6 +173,17 @@ class CustomItem(Item):
             else:
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
+    def create_item_deletion_log(self):
+        for source in self.item_detail:
+            item_deletion_log = frappe.new_doc("Item Drop and Create Log")
+            item_deletion_log.product = self.item_code
+            item_deletion_log.item_name = self.item_name
+            item_deletion_log.price_list = source.price_list
+            item_deletion_log.status = "Issued"
+            item_deletion_log.insert(ignore_permissions=True)
+            
+        frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0, update_modified=False)
+    
 def load_tags(doc):
     """
     Load tags for the item based on the website specifications.
