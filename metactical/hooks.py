@@ -144,9 +144,6 @@ doc_events = {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save",
 		"on_submit": "metactical.custom_scripts.material_request.material_request.on_submit",
 	},
-	"Address": {
-		"validate": "metactical.custom_scripts.address.address.validate"
-	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
@@ -873,7 +870,9 @@ fixtures = [{
 			"Lead Source-neb_country",
 			"Item-display_weight",
 			"Stock Entry Detail-custom_ais_active_qoh",
-			"Item-drop_and_create_in_websites"
+			"Item-drop_and_create_in_websites",
+			"POS Profile-neb_allow_manual_order",
+			"Address-neb_mobile_not_formatted"
 		]]]
 	},
 	{

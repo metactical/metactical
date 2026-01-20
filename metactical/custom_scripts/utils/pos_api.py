@@ -42,6 +42,14 @@ def create_manual_order(*args, **kwargs):
 
 		pos_profile = get_pos_profile_detail(form_data)
 		sales_order = create_sales_order(form_data, customer, pos_profile)  
+  
+		customer_form_data = form_data.get("Customer", {})
+		if customer_form_data:
+			if "Note" in customer_form_data and customer_form_data["Note"]:
+				frappe.set_user(form_data['SalesPerson'])
+				note = customer_form_data["Note"]
+				comment = {"comment_by": form_data['SalesPerson'], "comment": note}
+				create_comment(comment, form_data['SalesPerson'], sales_order["sales_order"].name)
 
 		if not sales_order["success"] and not sales_order["sales_order"]:
 			frappe.response["Status"] = "500"
@@ -471,11 +479,15 @@ def create_sales_order(form_data, customer, company=None):
 		'contact_person': "",
 		'additional_discount_percentage': form_data['OverallDiscount'],
 		"owner": form_data['SalesPerson'],
-		"ifw_store_pickup": 1 if form_data.get('Location') else 0
+		"ifw_store_pickup": 1 if form_data.get('Location') else 0,
 	}
-  
+ 
 	if form_data.get("Location"):
 		so_data.update({'shipping_address_name': company.company_address})
+	else:
+		shipping_address = get_shipping_address(form_data, customer)
+		if shipping_address:
+			so_data.update({'shipping_address_name': shipping_address})
   
 	items = get_items(form_data)
 	so_data.update({'items': items})
@@ -515,6 +527,56 @@ def create_sales_order(form_data, customer, company=None):
 	frappe.set_user("Administrator")
 	frappe.db.commit()    
 	return {"success": True, "sales_order": sales_order, "error": ""}
+
+def get_shipping_address(form_data, customer):
+	customer_data = form_data.get("Customer", {})
+ 
+	phone = customer_data.get("Phone", "")
+	email = customer_data.get("Email", "")
+	
+	if not phone and not email:
+		return None
+	
+	postal_code = customer_data.get("ZipCode", "")
+	address_line1 = customer_data.get("AddressLine1", "")
+	state = customer_data.get("State", "")
+
+	address = frappe.get_list("Address",
+							  filters={
+								"phone": phone,
+								"email_id": email,
+								"address_line1": address_line1,
+		  						"pincode": postal_code,
+								"state": state,
+								"address_type": "Shipping",
+							  }
+							)
+	
+	if address:
+		return address[0].name
+
+	addr = frappe.get_doc({
+		"doctype": "Address",
+		"address_title": customer_data.get("Name"),
+		"address_type": "Shipping",
+		"address_line1": address_line1,
+		"ifw_first_name": customer_data.get("FirstName", ""),
+		"ifw_last_name": customer_data.get("LastName", ""),
+		"address_line2": customer_data.get("AddressLine2", ""),
+		"city": customer_data.get("City", ""),
+		"state": customer_data.get("State", ""),
+		"country": customer_data.get("Country", ""),
+		"pincode": postal_code,
+		"phone": phone,
+		"email_id": email,
+		"links": [{
+			"link_doctype": "Customer",
+			"link_name": customer["customer"]
+		}]
+	})
+ 
+	addr.insert(ignore_permissions=True)
+	return addr.name
 
 def check_coupon_code(sales_order, form_data):
     total_restock_fee = 0.0
@@ -1622,11 +1684,12 @@ def get_addresses(email, phone):
             condition = f"addr.email_id = {frappe.db.escape(email)}"
 
         if phone:
-            phone_pattern = f"%{phone}%"
+            phone_pattern = f"{phone}"
+            phone_pattern2 = f"1{phone}"
             if condition:
-                condition += f" AND addr.phone like {frappe.db.escape(phone_pattern)}"
+                condition += f" AND (addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern)} or addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern2)})"
             else:
-                condition = f"addr.phone like {frappe.db.escape(phone_pattern)}"
+                condition = f"(addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern)} or addr.neb_mobile_not_formatted = {frappe.db.escape(phone_pattern2)})"
 
         addresses = {}
         customer = None
@@ -1638,7 +1701,7 @@ def get_addresses(email, phone):
             AND addr.address_type IN ('Billing', 'Shipping')
             AND {condition}
             
-            ORDER BY addr.creation DESC
+            ORDER BY addr.modified DESC
             """, as_dict=True)
         
         if not address_links:

@@ -19,6 +19,27 @@ from frappe.model.workflow import get_workflow_name, is_transition_condition_sat
 from erpnext.buying.utils import update_last_purchase_rate
 from frappe import _
 
+def validate_party_address(self, party, party_type, billing_address, shipping_address=None):
+	if self.doctype == "Sales Invoice":
+		return
+
+	if self.doctype == "Sales Order" and self.ifw_store_pickup:
+		return
+	
+	if billing_address or shipping_address:
+		party_address = frappe.get_all(
+			"Dynamic Link",
+			{"link_doctype": party_type, "link_name": party, "parenttype": "Address"},
+			pluck="parent",
+		)
+		if billing_address and billing_address not in party_address:
+			frappe.throw(_("Billing Address does not belong to the {0}").format(party))
+		elif shipping_address and shipping_address not in party_address:
+			frappe.throw(_("Shipping Address does not belong to the {0}").format(party))
+
+def validate_company_linked_addresses(self):
+    return
+
 def set_order_defaults(
 	parent_doctype, parent_doctype_name, child_doctype, child_docname, trans_item
 ):
@@ -26,7 +47,9 @@ def set_order_defaults(
 	Returns a Sales/Purchase Order Item child item containing the default values
 	"""
 	p_doc = frappe.get_doc(parent_doctype, parent_doctype_name)
-	child_item = frappe.new_doc(child_doctype, p_doc, child_docname)
+	# child_item = frappe.new_doc(child_doctype, p_doc, child_docname)
+	child_item = frappe.new_doc(child_doctype, parent_doc=p_doc, parentfield=child_docname)
+
 	item = frappe.get_doc("Item", trans_item.get("item_code"))
 
 	for field in ("item_code", "item_name", "description", "item_group"):
