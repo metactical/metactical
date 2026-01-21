@@ -192,7 +192,8 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
-	"Item": "metactical.custom_scripts.item.item.CustomItem"
+	"Item": "metactical.custom_scripts.item.item.CustomItem",
+	"Address": "metactical.custom_scripts.address.address.CustomAddress"
 }
 
 # Scheduled Tasks
@@ -872,7 +873,8 @@ fixtures = [{
 			"Stock Entry Detail-custom_ais_active_qoh",
 			"Item-drop_and_create_in_websites",
 			"POS Profile-neb_allow_manual_order",
-			"Address-neb_mobile_not_formatted"
+			"Address-neb_mobile_not_formatted",
+			"POS Profile-custom_cash_float"
 		]]]
 	},
 	{
