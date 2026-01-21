@@ -120,6 +120,9 @@ class CustomItem(Item):
 
         if not self.description or self.description.strip() == '<div class="ql-editor read-mode"><p><br></p></div>':
             self.description = self.item_name
+            
+        if self.request_ai_suggestion and self.drop_and_create_in_websites:
+            frappe.throw("You cannot 'Drop and Create in Websites' while requesting AI Suggestion. Please uncheck one of these options or wait until the AI Suggestion is completed.")
 
     def on_update(self):
         super().on_update()
@@ -179,6 +182,7 @@ class CustomItem(Item):
             item_deletion_log.product = self.item_code
             item_deletion_log.item_name = self.item_name
             item_deletion_log.price_list = source.price_list
+            item_deletion_log.slug = source.slug
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
             
