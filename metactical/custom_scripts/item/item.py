@@ -179,6 +179,7 @@ class CustomItem(Item):
             item_deletion_log.product = self.item_code
             item_deletion_log.item_name = self.item_name
             item_deletion_log.price_list = source.price_list
+            item_deletion_log.slug = source.slug
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
             

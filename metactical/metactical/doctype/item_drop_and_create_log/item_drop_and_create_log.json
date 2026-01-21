@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "product",
+  "slug",
   "item_name",
   "status",
   "price_list",
@@ -77,11 +78,16 @@
   {
    "fieldname": "section_break_qnhhm",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Slug"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-15 04:18:20.946886",
+ "modified": "2026-01-21 08:21:21.099064",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Drop and Create Log",
@@ -100,6 +106,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
