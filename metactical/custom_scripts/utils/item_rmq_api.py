@@ -4,6 +4,11 @@ from metactical.custom_scripts.utils.deletion_message import parsed_content
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
     lead_source = parsedContent.get("publisher_site")
+    frappe.log_error(
+        title="SB-Item Deletion Message Received",
+        message=f"Received deletion message for lead source: {lead_source}"
+    )
+    
     
     price_list = frappe.db.get_value(
         "Lead Source",
@@ -12,7 +17,14 @@ def receive_deletion_message(parsedContent):
     )
     slug = parsedContent.get("Entity").get("urlSlug") if parsedContent.get("Entity") else None
     
-    item_deletion_log = frappe.db.get_value("Item Drop and Create Log", {"slug": slug, "status": "Issued", "deleted": 1, "price_list": price_list}, ["product", "owner"], as_dict=True)
+    item_deletion_log = frappe.db.get_value("Item Drop and Create Log", {"slug": slug, "status": "Issued", "deleted": 0, "price_list": price_list}, ["product", "owner", "name"], as_dict=True)
+    if not item_deletion_log:
+        frappe.log_error(
+            title="SB-Item Deletion Log Not Found",
+            message=f"No matching Item Drop and Create Log found for slug: {slug} and price_list: {price_list}"
+        )
+        return False
+
 
     item_code = item_deletion_log.product
     user = item_deletion_log.owner
@@ -63,3 +75,6 @@ def receive_deletion_message(parsedContent):
             for variant in variants:
                 item = frappe.get_doc("Item", variant)
                 item.save()
+                
+            frappe.db.set_value("Item Drop and Create Log", item_deletion_log.name, "created", 1)
+            frappe.db.commit()
