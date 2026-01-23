@@ -136,7 +136,7 @@ def get_untransmitted_shipments(warehouse=None):
 		available_groups = list(set(available_groups))
 		
 		# For testing purposes, only use groups with "Stores" in it
-		available_groups = [g for g in available_groups if "Stores" in g]
+		#available_groups = [g for g in available_groups if "Stores" in g]
 		
 		untransmitted = []
 		
