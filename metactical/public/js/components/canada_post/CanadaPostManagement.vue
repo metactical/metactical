@@ -604,18 +604,18 @@ export default {
 		},
 		availableWarehouses() {
 			const warehouses = new Set();
-			this.groupDetails.forEach(group => {
-				if (group.warehouse_name) {
-					warehouses.add(group.warehouse_name);
+			this.canadaPostShipments.forEach(shipment => {
+				if (shipment.warehouse) {
+					warehouses.add(shipment.warehouse);
 				}
 			});
 			return Array.from(warehouses).sort();
 		},
 		availablePickupDates() {
 			const dates = new Set();
-			this.groupDetails.forEach(group => {
-				if (group.pickup_date) {
-					dates.add(group.pickup_date);
+			this.canadaPostShipments.forEach(shipment => {
+				if (shipment.pickup_date) {
+					dates.add(shipment.pickup_date);
 				}
 			});
 			return Array.from(dates).sort((a, b) => {
@@ -984,15 +984,15 @@ export default {
 		},
 
 		async onWarehouseOrDateChange() {
-			// Find the matching group from groupDetails
+			// Find the matching group_id from loaded Canada Post shipments
 			if (this.manifestForm.warehouse && this.manifestForm.pickup_date) {
-				const matchingGroup = this.groupDetails.find(group => 
-					group.warehouse_name === this.manifestForm.warehouse && 
-					group.pickup_date === this.manifestForm.pickup_date
+				const matchingShipment = this.canadaPostShipments.find(shipment => 
+					shipment.warehouse === this.manifestForm.warehouse && 
+					shipment.pickup_date === this.manifestForm.pickup_date
 				);
 				
-				if (matchingGroup) {
-					this.manifestForm.group_id = matchingGroup.group_id;
+				if (matchingShipment && matchingShipment.group_id) {
+					this.manifestForm.group_id = matchingShipment.group_id;
 					console.log('Loading warehouse details for:', this.manifestForm.warehouse);
 					// Load warehouse details
 					await this.loadWarehouseDetails();
