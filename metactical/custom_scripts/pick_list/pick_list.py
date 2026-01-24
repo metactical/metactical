@@ -338,7 +338,7 @@ class CustomPickList(PickList):
 
 		for row in self.get("locations"):
 			# Metactical Customization: Skip shipping items
-			if row.item_code in shipping_items:
+			if row.item_code in shipping_items or row.item_code == "2":
 				continue
 
 			# Metactical Customization: If is product budle, validate individual items
