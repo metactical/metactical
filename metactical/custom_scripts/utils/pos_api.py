@@ -473,6 +473,8 @@ def create_sales_order(form_data, customer, company=None):
 		'taxes_and_charges': form_data['TaxesAndChargesTemplate'],
 		'delivery_date': frappe.utils.today(),
 		"company": company.company,
+        "currency": frappe.db.get_value("Company", company.company, "default_currency"),
+        "selling_price_list": form_data['PriceList'] if "PriceList" in form_data else "",
 		'company_address': company.company_address,
 		'source': form_data['LeadSource'],
 		'ignore_pricing_rule': 1,
