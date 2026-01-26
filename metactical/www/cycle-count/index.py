@@ -1,6 +1,11 @@
 import frappe
 from metactical.metactical.doctype.cycle_count.cycle_count import get_expected_qty
 
+def get_context(context):
+	context.dev_server = 1 if frappe.conf.get('developer_mode') else 0
+	context.show_language_picker = 0
+	return context
+
 @frappe.whitelist()
 def get_barcodes():
 	query = """SELECT 
