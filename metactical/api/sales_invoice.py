@@ -108,6 +108,14 @@ def load_si_pos(sales_invoice):
             "Amount": payment.amount,
             "Change": invoice.change_amount if payment.mode_of_payment == "Cash" else 0,
         })
+        
+    for payment in invoice.advances:
+        payment_entry = frappe.db.get_value("Payment Entry", payment.reference_name, ["mode_of_payment", "paid_amount"], as_dict=True)
+        payments.append({
+            "ModeOfPayment": payment_entry.get("mode_of_payment"),
+            "Amount": payment_entry.get("paid_amount"),
+            "Change": 0,
+        })
 
     pos_profile = ""
     if invoice.pos_profile:
