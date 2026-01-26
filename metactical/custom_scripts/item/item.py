@@ -177,7 +177,7 @@ class CustomItem(Item):
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
     def create_item_deletion_log(self):
-        existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued", "deleted": 0}, pluck="name")
+        existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
         for log in existing_active_logs:
             try:
                 frappe.db.delete("Item Drop and Create Log", log)
