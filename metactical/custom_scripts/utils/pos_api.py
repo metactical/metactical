@@ -1238,7 +1238,6 @@ def create_return(*args, **kwargs):
         # frappe.response["AutoLogout"] = True if auto_logout else False
         frappe.db.commit()
     except Exception as e:
-        frappe.db.rollback()
         frappe.clear_last_message()
         frappe.set_user("Administrator")
         
