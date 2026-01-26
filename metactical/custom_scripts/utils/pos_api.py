@@ -1171,7 +1171,7 @@ def create_return(*args, **kwargs):
                 return
                 
         invoiceId = form_data["InvoiceId"]
-        sales_return = create_return_invoice(form_data, invoiceId)
+        sales_return, total_restock_fee = create_return_invoice(form_data, invoiceId)
         frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
         
         if total_restock_fee > 0:
@@ -1227,15 +1227,29 @@ def create_return(*args, **kwargs):
     
     total = round(sales_return.grand_total + total_restock_fee, 2)
     # auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
-    frappe.response["Status"] = 200
-    frappe.response["Message"] = ""
-    frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
-    frappe.response["SalesReturn"] = sales_return.name
-    frappe.response["Total"] = total
-    frappe.response["TotalAfterRestockFee"] = total
-    # frappe.response["AutoLogout"] = True if auto_logout else False
-    frappe.db.commit()
     
+    try:
+        frappe.response["Status"] = 200
+        frappe.response["Message"] = ""
+        frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
+        frappe.response["SalesReturn"] = sales_return.name
+        frappe.response["Total"] = total
+        frappe.response["TotalAfterRestockFee"] = total
+        # frappe.response["AutoLogout"] = True if auto_logout else False
+        frappe.db.commit()
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        
+        frappe.log_error(title='Create Return Response Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = str(e)
+        frappe.response["CouponCode"] = None
+        return
+        
 def create_return_invoice(form_data, invoiceId):
     sales_return = make_sales_return(invoiceId)
     pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
@@ -1313,7 +1327,7 @@ def create_return_invoice(form_data, invoiceId):
     sales_return.save()
     
     sales_return.submit()
-    return sales_return
+    return sales_return, total_restock_fee
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):
     frappe.set_user(form_data['SalesPerson'])
