@@ -4,11 +4,10 @@ import frappe
 def receive_deletion_message(parsedContent):
     try:
         lead_source = parsedContent.get("publisher_site")
-        frappe.log_error(
-            title="SB-Item Deletion Message Received",
-            message=f"Received deletion message for lead source: {lead_source} \nContent: {parsedContent}"
-        )
-        
+        # frappe.log_error(
+        #     title="SB-Item Deletion Message Received",
+        #     message=f"Received deletion message for lead source: {lead_source} \nContent: {parsedContent}"
+        # )
         
         price_list = frappe.db.get_value(
             "Lead Source",
@@ -75,10 +74,18 @@ def receive_deletion_message(parsedContent):
                 for variant in variants:
                     item = frappe.get_doc("Item", variant)
                     item.save()
-                    
-                # frappe.db.set_value("Item Drop and Create Log", item_deletion_log.name, "created", 1)
-                frappe.db.set_value("Item Drop and Create Log", item_deletion_log.name, "status", "Re-Created")
-                frappe.db.commit()
+                                    
+                all_logs = frappe.get_all(
+                    "Item Drop and Create Log",
+                    filters={"product": item_code, "status": "Issued", "deleted": 1},
+                    order_by="creation asc",
+                    fields=["name"]
+                )
+
+                for log in all_logs:
+                    frappe.db.set_value("Item Drop and Create Log", log.name, "status", "Re-Created")
+                    frappe.db.commit()
+
     except Exception as e:
         frappe.log_error(
             title="SB-Item Deletion Message Processing Error",
