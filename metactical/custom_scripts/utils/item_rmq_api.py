@@ -76,7 +76,7 @@ def receive_deletion_message(parsedContent):
                     item = frappe.get_doc("Item", variant)
                     item.save()
                     
-                frappe.db.set_value("Item Drop and Create Log", item_deletion_log.name, "created", 1)
+                # frappe.db.set_value("Item Drop and Create Log", item_deletion_log.name, "created", 1)
                 frappe.db.set_value("Item Drop and Create Log", item_deletion_log.name, "status", "Re-Created")
                 frappe.db.commit()
     except Exception as e:
