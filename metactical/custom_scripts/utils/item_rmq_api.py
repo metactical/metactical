@@ -1,12 +1,11 @@
 import frappe
-from metactical.custom_scripts.utils.deletion_message import parsed_content
 
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
     lead_source = parsedContent.get("publisher_site")
     frappe.log_error(
         title="SB-Item Deletion Message Received",
-        message=f"Received deletion message for lead source: {lead_source}"
+        message=f"Received deletion message for lead source: {lead_source} \nContent: {parsedContent}"
     )
     
     
