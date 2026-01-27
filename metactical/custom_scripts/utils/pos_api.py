@@ -1327,6 +1327,7 @@ def create_return_invoice(form_data, invoiceId):
         frappe.clear_last_message()
         frappe.set_user("Administrator")
         
+        frappe.log_error(title='Create Sales Return Error', message=frappe.get_traceback())
         raise e
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):
