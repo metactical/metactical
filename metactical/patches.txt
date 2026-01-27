@@ -19,6 +19,7 @@ metactical.patches.remove_web_specs_for_airsoft_items
 metactical.patches.update_images_url
 metactical.patches.update_images_link
 metactical.patches.update_images_link1
+metactical.patches.update_item_availability
 
 [post_model_sync]
 execute:frappe.db.sql("UPDATE `tabPick List` SET status = 'Picked' WHERE status='Open' AND docstatus='1'")

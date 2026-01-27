@@ -163,9 +163,7 @@ def process_batch_background(batch, batch_num, total_batches):
         f"Skipped: {skipped}\n"
         f"Total in batch: {len(batch)}"
     )
-    
-    print(summary)
-    
+        
     # Create completion log
     log_batch_completion(batch_num, total_batches, processed, failed, skipped, len(batch))
     
