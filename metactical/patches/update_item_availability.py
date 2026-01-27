@@ -7,7 +7,7 @@ def execute():
     """
     Main patch execution:
     1. Read CSV file
-    2. Split into batches of 5000
+    2. Split into batches of 2000
     3. Queue each batch as background task
     """
     print("Starting Item Variant Availability Rule update patch")
@@ -186,7 +186,7 @@ Item Variant Update Patch Started
 Started: {frappe.utils.now()}
 Total Records: {total_records}
 Total Batches: {total_batches}
-Batch Size: 5000
+Batch Size: 2000
 Status: Processing in Background
 
 Monitor progress in Background Jobs list.
