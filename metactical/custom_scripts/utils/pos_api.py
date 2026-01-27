@@ -1250,83 +1250,85 @@ def create_return(*args, **kwargs):
         return
         
 def create_return_invoice(form_data, invoiceId):
-    sales_return = make_sales_return(invoiceId)
-    pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
-    formatted_items = get_items(form_data)
-    items = sales_return.items.copy()
-    filtered_items = []
-    sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
-    total_restock_fee = 0.0
-    
-    for item in items:
-        for updated_item in formatted_items:
-            if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
-                (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
-                item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
-                item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
-                item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
-                item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
-                item.margin_type = ""
-                item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
-                item.rate = item.price_list_rate - item.discount_amount
-                filtered_items.append(item)
-
-
-    for items in form_data["Items"]:
-        total_restock_fee += items["RestockFee"] if "RestockFee" in items else 0.0
-    
-    form_data["Total"] += total_restock_fee
-    sales_return.items = filtered_items
-    sales_return.calculate_taxes_and_totals()
-
-    sales_return.payments = []
-    invoice_total = sales_return.rounded_total or sales_return.grand_total
-    difference = 0.0
-    
-    if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
-        difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)    
-    
-    # payment can be done to only one mode of payment or multiple mode of payments
-    if "Payment" in form_data and form_data["Payment"]:
-        for payment in form_data["Payment"]:
-            new_doc = frappe.new_doc("Sales Invoice Payment")
-            new_doc.mode_of_payment = payment["ModeOfPayment"]
-            new_doc.amount = -1 * payment["Amount"]
-            
-            sales_return.append("payments", new_doc)
-    else:
-        sales_return.update({"payments":[{
-            "mode_of_payment": form_data["ModeOfReturn"],
-            "amount": -1 * form_data["Total"] + difference
-        }]})      
-
-    write_off_limit = pos_profile.write_off_limit
-    if write_off_limit and abs(difference) > write_off_limit:
-        frappe.response["Status"] = 500
-        frappe.response["Message"] = "Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit)
-        frappe.response["CouponCode"] = None
-        return
-    
-    # check if the payment passed is greater than the total amount
-    total_payment = 0.0
-    for payment in form_data["Payment"]:
-        total_payment += payment["Amount"]
+    try:
+        sales_return = make_sales_return(invoiceId)
+        pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
+        formatted_items = get_items(form_data)
+        items = sales_return.items.copy()
+        filtered_items = []
+        sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
+        total_restock_fee = 0.0
         
-    if total_payment > abs(sales_return.grand_total + sales_return.write_off_amount):
-        frappe.response["Status"] = 500
-        frappe.response["Message"] = "Total payment amount cannot be greater than the total return amount"
-        frappe.response["CouponCode"] = None
-        return
-    
-    sales_return.advances = []
-    sales_return.update_outstanding_for_self = False
-    sales_return.is_pos = 1
-    sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
-    sales_return.set_missing_values()
-    sales_return.save()
-    
-    sales_return.submit()
-    return sales_return, total_restock_fee
+        for item in items:
+            for updated_item in formatted_items:
+                if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
+                    (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
+                    item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                    item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
+                    item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
+                    item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                    item.margin_type = ""
+                    item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
+                    item.rate = item.price_list_rate - item.discount_amount
+                    filtered_items.append(item)
+
+
+        for items in form_data["Items"]:
+            total_restock_fee += items["RestockFee"] if "RestockFee" in items else 0.0
+        
+        form_data["Total"] += total_restock_fee
+        sales_return.items = filtered_items
+        sales_return.calculate_taxes_and_totals()
+
+        sales_return.payments = []
+        invoice_total = sales_return.rounded_total or sales_return.grand_total
+        difference = 0.0
+        
+        if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
+            difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)    
+        
+        # payment can be done to only one mode of payment or multiple mode of payments
+        if "Payment" in form_data and form_data["Payment"]:
+            for payment in form_data["Payment"]:
+                new_doc = frappe.new_doc("Sales Invoice Payment")
+                new_doc.mode_of_payment = payment["ModeOfPayment"]
+                new_doc.amount = -1 * payment["Amount"]
+                
+                sales_return.append("payments", new_doc)
+        else:
+            sales_return.update({"payments":[{
+                "mode_of_payment": form_data["ModeOfReturn"],
+                "amount": -1 * form_data["Total"] + difference
+            }]})      
+
+        write_off_limit = pos_profile.write_off_limit
+        if write_off_limit and abs(difference) > write_off_limit:
+            frappe.throw("Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit))
+        
+        # check if the payment passed is greater than the total amount
+        total_payment = 0.0
+        for payment in form_data["Payment"]:
+            total_payment += payment["Amount"]
+            
+        if total_payment > abs(sales_return.grand_total + sales_return.write_off_amount):
+            frappe.throw("Total payment amount cannot be greater than the total return amount")
+        
+        sales_return.advances = []
+        sales_return.update_outstanding_for_self = False
+        sales_return.is_pos = 1
+        sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
+        sales_return.set_missing_values()
+        sales_return.save()
+        
+        sales_return.submit()
+        return sales_return, total_restock_fee
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        
+        frappe.log_error(title='Create Sales Return Error', message=frappe.get_traceback())
+        raise e
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):
     frappe.set_user(form_data['SalesPerson'])
