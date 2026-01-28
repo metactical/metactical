@@ -269,34 +269,6 @@ def sync_website_specifications(doc):
         if not found:
             added_website_specifications.append(current_label)
 
-    # recreate the website specifications in the "Website Item" doctype if there is a change in the Item form
-    if added_website_specifications or removed_website_specifications:
-        website_items = frappe.get_all("Website Item", filters={"item_code": doc.item_code}, fields=["name"])
-        if website_items:
-            for item in website_items:
-                website_item = frappe.get_doc("Website Item", item.name)
-                website_item.neb_website_specifications = []
-                website_item.website_specifications = []
-                website_item.save()
-
-                for spec in doc.neb_website_specifications:
-                    website_spec = frappe.new_doc("MT Item Website Specification")
-                    website_spec.label = spec.label
-                    website_spec.description = spec.description
-                    website_spec.mandatory = spec.mandatory
-                    website_spec.parent = website_item.name
-                    website_spec.parenttype = website_item.doctype
-                    website_spec.parentfield = "neb_website_specifications"
-                    website_spec.save()
-
-                    main_website_spec = frappe.new_doc("Item Website Specification")
-                    main_website_spec.label = spec.label
-                    main_website_spec.description = spec.description
-                    main_website_spec.parent = website_item.name
-                    main_website_spec.parenttype = website_item.doctype
-                    main_website_spec.parentfield = "website_specifications"
-                    main_website_spec.save()
-
 def validate_item_group(doc):
     if doc.item_group:
         is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
