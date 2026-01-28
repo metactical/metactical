@@ -43,6 +43,8 @@ def execute():
         print("delaying for 5 seconds to avoid overload")
         time.sleep(5)
         
+    frappe.log_error(message=f"Completed processing {total_records} records in {total_batches} batches",title="Item Variant Patch")
+        
 def read_csv_file(csv_file_path):
     """
     Step 1: Read CSV file with comma separator
