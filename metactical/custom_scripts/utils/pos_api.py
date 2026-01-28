@@ -1725,28 +1725,93 @@ def get_item_by_retail_sku_single(retail_sku, branch):
         
 @frappe.whitelist()
 def get_customer_detail(phone=None, email=None):
-    # At least one parameter must be provided
-    if not phone and not email:
-        frappe.response["Error"] = "Phone number or email address is required."
-        return
-    
-    # Get billing address
-    address, customer = get_addresses(email, phone)
-    if not address:
-        frappe.response["Message"] = "Existing Address Not Found"
-        return
-        
-    billing_address = address.get("Billing") if address else None
-    shipping_address = address.get("Shipping") if address else None
-            
-    frappe.response["Message"] = ""
-    frappe.response["CustomerID"] = customer.name if customer else None
-    frappe.response["FirstName"] = customer.first_name if customer else None
-    frappe.response["LastName"] = customer.last_name if customer else None
-    frappe.response["Phone"] = billing_address.phone if billing_address else "stss"
-    frappe.response["Email"] = billing_address.email_id if billing_address else None
-    frappe.response["BillingAddress"] = format_address(billing_address)
-    frappe.response["ShippingAddress"] = format_address(shipping_address)
+	# At least one parameter must be provided
+	if not phone and not email:
+		frappe.response["Error"] = "Phone number or email address is required."
+		return
+	
+	# Get billing address
+	address, customer = get_addresses(email, phone)
+	contact = None
+	if not address:
+		contact, customer = get_contacts(email, phone)
+		if not contact:
+			frappe.response["Message"] = "Existing Address Not Found"
+			return
+		
+	billing_address = address.get("Billing") if address else None
+	shipping_address = address.get("Shipping") if address else None
+
+	if not billing_address and shipping_address:
+		billing_address = shipping_address
+		
+	frappe.response["Message"] = ""
+	frappe.response["CustomerID"] = customer.name if customer else None
+	frappe.response["FirstName"] = customer.first_name if customer else None
+	frappe.response["LastName"] = customer.last_name if customer else None
+	
+	if address:
+		frappe.response["Phone"] = billing_address.phone if billing_address else None
+		frappe.response["Email"] = billing_address.email_id if billing_address else None
+	elif contact:
+		frappe.response["Phone"] = contact.phone if contact else None
+		frappe.response["Email"] = contact.email_id if contact else None
+  
+		billing_address = frappe._dict({
+			"email_id": contact.email_id,
+			"phone": contact.phone
+		})
+     
+	frappe.response["BillingAddress"] = format_address(billing_address)
+	frappe.response["ShippingAddress"] = format_address(shipping_address)
+
+def get_contacts(email, phone):
+	"""Get customer address from contact by type (Billing or Shipping)"""
+	try:
+		condition = ""
+		phone = phone.replace("+", "") if phone else ""
+
+		if email:
+			condition = f"cont.email_id = {frappe.db.escape(email)}"
+
+		if phone:
+			phone_pattern = f"+1{phone}"
+			phone_pattern2 = f"1{phone}"
+			if condition:
+				condition += f" AND (cont.phone = {frappe.db.escape(phone_pattern)} or cont.phone = {frappe.db.escape(phone_pattern2)})"
+			else:
+				condition = f"(cont.phone = {frappe.db.escape(phone_pattern)} or cont.phone = {frappe.db.escape(phone_pattern2)})"
+
+		customer = None
+		address_links = frappe.db.sql(f"""
+			SELECT dl.parent, link_name
+			FROM `tabDynamic Link` dl
+			JOIN `tabContact` cont ON dl.parent = cont.name
+			WHERE dl.link_doctype = 'Customer'
+			AND {condition}
+
+			ORDER BY cont.modified DESC
+			limit 1
+			""", as_dict=True)
+
+		if not address_links:
+			return None, None
+
+		# Get the address with matching type
+		for link in address_links:
+			contact = frappe.get_doc("Contact", link.parent)
+			customer = link.link_name
+			break
+
+		if customer:
+			customer = frappe.get_doc("Customer", customer)
+
+		return contact, customer
+
+	except Exception as e:
+		frappe.log_error(title='POS - Get Contact Error', message=frappe.get_traceback())
+
+	return None, None
 
 def get_addresses(email, phone):
 	"""Get customer address by type (Billing or Shipping)"""
