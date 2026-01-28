@@ -11,7 +11,7 @@ def execute():
     2. Split into batches of 2000
     3. Queue each batch as background task
     """
-    print("Starting Item Variant Availability Rule update patch")
+    print("Starting Item Variant Availability Rule update")
     
     csv_file_path = os.path.join(
         frappe.get_app_path('metactical'), 
@@ -32,7 +32,7 @@ def execute():
     batch_size = 2000
     total_batches = (total_records // batch_size) + (1 if total_records % batch_size else 0)
     
-    print(f"Creating {total_batches} batches of {batch_size} records each")
+    print(f"Processing {batch_size} records per batch, total batches: {total_batches}")
     
     # Step 3: Queue each batch as background task
     for i in range(0, total_records, batch_size):
