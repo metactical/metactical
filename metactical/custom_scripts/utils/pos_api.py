@@ -949,6 +949,9 @@ def create_contact(form_data, customer):
 			'doctype': 'Contact',
 			'first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
 			'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
+   			'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
+			'phone': phone,
+			'mobile_no': phone
 		}
 
 		if phone:
