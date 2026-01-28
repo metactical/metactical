@@ -487,10 +487,7 @@ def create_sales_order(form_data, customer, company=None):
 		so_data.update({'shipping_address_name': company.company_address})
 	else:
 		customer = form_data.get("Customer", {})
-		print(customer)
-		if customer.get("Phone") and not customer.get("AddressLine1"):
-			print("No Address Line 1")
-		elif customer.get("AddressLine1") and customer.get("City"):
+		if customer.get("AddressLine1") and customer.get("City"):
 			shipping_address = get_shipping_address(form_data, customer)
 			if shipping_address:
 				so_data.update({'shipping_address_name': shipping_address})
@@ -554,7 +551,8 @@ def get_shipping_address(form_data, customer):
 								"email_id": email,
 								"address_line1": address_line1,
 		  						"pincode": postal_code,
-								"state": state
+								"state": state,
+                                "address_type": "Shipping",
 							  }
 							)
 	
