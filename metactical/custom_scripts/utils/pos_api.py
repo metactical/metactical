@@ -41,7 +41,7 @@ def create_manual_order(*args, **kwargs):
 		
 
 		pos_profile = get_pos_profile_detail(form_data)
-		sales_order = create_sales_order(form_data, customer, pos_profile)  
+		sales_order = create_sales_order(form_data, customer, pos_profile)
   
 		customer_form_data = form_data.get("Customer", {})
 		if customer_form_data:
@@ -81,7 +81,6 @@ def create_manual_order(*args, **kwargs):
 		has_no_error = sales_order["success"] if 'success' in sales_order else True
 		sales_order = sales_order["sales_order"]
 		
-  
 		# add tag
 		if sales_order and pos_profile.neb_manual_orders_tag:
 			add_tag(pos_profile.neb_manual_orders_tag, "Sales Order", sales_order.name)
@@ -487,10 +486,13 @@ def create_sales_order(form_data, customer, company=None):
 	if form_data.get("Location"):
 		so_data.update({'shipping_address_name': company.company_address})
 	else:
-		shipping_address = get_shipping_address(form_data, customer)
-		if shipping_address:
-			so_data.update({'shipping_address_name': shipping_address})
-  
+		customer = form_data.get("Customer", {})
+		if customer.get("AddressLine1") and customer.get("City"):
+			shipping_address = get_shipping_address(form_data, customer)
+			if shipping_address:
+				so_data.update({'shipping_address_name': shipping_address})
+	
+
 	items = get_items(form_data)
 	so_data.update({'items': items})
 	
@@ -550,7 +552,7 @@ def get_shipping_address(form_data, customer):
 								"address_line1": address_line1,
 		  						"pincode": postal_code,
 								"state": state,
-								"address_type": "Shipping",
+                                "address_type": "Shipping",
 							  }
 							)
 	
@@ -888,13 +890,15 @@ def get_customer(form_data):
 		
 		customer.save(ignore_permissions=True)
 		contact = create_contact(form_data, customer)
-		address = create_address(form_data, customer)
+		customer_form_data = form_data['Customer']
+		if not customer_form_data.get('Location') and customer_form_data.get('AddressLine1'):
+			address = create_address(form_data, customer)
 
-		if address['success']:
-			frappe.db.set_value('Customer', customer.name, 'customer_primary_address', address['address'])
-		else:
-			return {"error": address['message'], "success": False, "customer": None}
-		
+			if address['success']:
+				frappe.db.set_value('Customer', customer.name, 'customer_primary_address', address['address'])
+			else:
+				return {"error": address['message'], "success": False, "customer": None}
+			
 		frappe.db.set_value('Customer', customer.name, 'customer_primary_contact', contact)
 		frappe.db.commit()
 		
@@ -938,34 +942,44 @@ def create_address(form_data, customer):
 		return {"address": None, "success": False, "message": str(e)}
 
 def create_contact(form_data, customer):
-    frappe.set_user(form_data['SalesPerson'])
-    try:
-        phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
-        contact_info = {
-            'doctype': 'Contact',
-            'first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
-            'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
-            'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
-            'phone': phone,
-            'mobile_no': phone
-        }
-        
-        contact_info.update({'links': [{'link_doctype': 'Customer', 'link_name': customer.name}]})
-        if phone:
-            contact_info.update({'phone_nos': [{'phone': phone, 'is_primary_phone': 1, 'is_primary_mobile_no': 1}]})
+	frappe.set_user(form_data['SalesPerson'])
+	try:
+		existin_doc = frappe.db.exists("Contact", [
+			['email_id', '=', form_data['Customer']['Email']],
+			['phone', '=', form_data['Customer']['Phone']],
+			["Dynamic Link", "link_doctype", "=", "Customer"],
+			["Dynamic Link", "link_name", "=", customer.name]
+		])
+  										
+		if existin_doc:
+			return existin_doc
 
-        if form_data['Customer']['Email']:
-            contact_info.update({'email_ids': [{'email_id': form_data['Customer']['Email'], 'is_primary': 1}]})
-        
-        contact = frappe.get_doc(contact_info)
-        contact.save(ignore_permissions=True)
-        frappe.db.commit()
-        frappe.set_user("Administrator")
-        return contact.name
-    except Exception as e:
-        frappe.set_user("Administrator")
-        frappe.log_error(title='Create Contact Error', message=frappe.get_traceback())
-        return None
+		phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
+		contact_info = {
+			'doctype': 'Contact',
+			'first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
+			'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
+			'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
+			'phone': phone,
+			'mobile_no': phone
+		}
+
+		contact_info.update({'links': [{'link_doctype': 'Customer', 'link_name': customer.name}]})
+		if phone:
+			contact_info.update({'phone_nos': [{'phone': phone, 'is_primary_phone': 1, 'is_primary_mobile_no': 1}]})
+
+		if form_data['Customer']['Email']:
+			contact_info.update({'email_ids': [{'email_id': form_data['Customer']['Email'], 'is_primary': 1}]})
+
+		contact = frappe.get_doc(contact_info)
+		contact.save(ignore_permissions=True)
+		frappe.db.commit()
+		frappe.set_user("Administrator")
+		return contact.name
+	except Exception as e:
+		frappe.set_user("Administrator")
+		frappe.log_error(title='Create Contact Error', message=frappe.get_traceback())
+		return None
 
 def get_payments(form_data):
     payments = []
@@ -1142,7 +1156,7 @@ def get_item_discount(item, price_list, item_price, company):
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
     total_restock_fee = 0.0
-    if "ModeOfReturn" not in form_data or not form_data["Payment"]:
+    if "ModeOfReturn" not in form_data and not form_data["Payment"]:
         frappe.response["Message"] = "Mode of Return is required"
         frappe.response["Status"] = 500
         frappe.response["CouponCode"] = None
