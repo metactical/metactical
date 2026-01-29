@@ -58,7 +58,7 @@ class ItemSupplierImportTool(Document):
 		return file_content
 	
 	def check_headers(self, file_content):
-		expected_headers = ["Item Supplier Table Name", "Supplier Part Number", "UPC/EAN", "Quantity To Update", "Item Code"]
+		expected_headers = ["Item Supplier Table Name", "Supplier Part Number", "UPC/EAN", "Quantity To Update", "Item Code", "Wholesale Price"]
 
 		for header in file_content[0]:
 			if header not in expected_headers:
