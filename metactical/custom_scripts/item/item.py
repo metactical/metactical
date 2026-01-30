@@ -120,13 +120,20 @@ class CustomItem(Item):
 
         if not self.description or self.description.strip() == '<div class="ql-editor read-mode"><p><br></p></div>':
             self.description = self.item_name
+            
+        if self.request_ai_suggestion and self.drop_and_create_in_websites:
+            frappe.throw("You cannot 'Drop and Create in Websites' while requesting AI Suggestion. Please uncheck one of these options or wait until the AI Suggestion is completed.")
 
     def on_update(self):
         super().on_update()
+        
         # check website specification values
         validate_website_specifications(self)
         sync_website_specifications(self)
         validate_item_group(self)
+        
+        if self.drop_and_create_in_websites:
+            self.create_item_deletion_log()
 
         # Trigger update for item inventory output if deduct_qty has been updated
         # Retrieve the document state before the update
@@ -169,6 +176,26 @@ class CustomItem(Item):
             else:
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
+    def create_item_deletion_log(self):
+        existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
+        for log in existing_active_logs:
+            try:
+                frappe.db.delete("Item Drop and Create Log", log)
+            except Exception as e:
+                frappe.log_error(title="Error deleting existing Item Drop and Create Log", message=frappe.get_traceback())
+        
+        for source in self.item_detail:
+            item_deletion_log = frappe.new_doc("Item Drop and Create Log")
+            item_deletion_log.product = self.item_code
+            item_deletion_log.item_name = self.item_name
+            item_deletion_log.price_list = source.price_list
+            item_deletion_log.slug = source.slug.rstrip("\r\n")
+            item_deletion_log.status = "Issued"
+            item_deletion_log.insert(ignore_permissions=True)
+            
+        frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
+        self.reload()
+    
 def load_tags(doc):
     """
     Load tags for the item based on the website specifications.
