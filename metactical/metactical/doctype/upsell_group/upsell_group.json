@@ -1,37 +1,37 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "prompt",
- "creation": "2025-04-04 02:56:32.333231",
+ "autoname": "field:group_name",
+ "creation": "2025-07-29 06:18:50.192367",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "hide_in_filters",
-  "description"
+  "group_name",
+  "items"
  ],
  "fields": [
   {
-   "fieldname": "description",
-   "fieldtype": "Text",
-   "label": "Description"
+   "fieldname": "group_name",
+   "fieldtype": "Data",
+   "label": "Group Name",
+   "unique": 1
   },
   {
-   "default": "0",
-   "fieldname": "hide_in_filters",
-   "fieldtype": "Check",
-   "label": "Hide In Filters"
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "UpSell Group Items"
   }
  ],
- "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-29 09:32:22.488412",
+ "modified": "2025-07-29 06:23:21.466647",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "SB Tag",
- "naming_rule": "Set by user",
+ "name": "UpSell Group",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -47,8 +47,6 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
- "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
