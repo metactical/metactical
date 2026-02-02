@@ -1443,7 +1443,10 @@ fixtures = [{
 			"Purchase Receipt Item-price_list_rate-permlevel",
 			"Work Order-wip_warehouse-default",
 			"Work Order-fg_warehouse-default",
-			"Work Order-source_warehouse-default"
+			"Work Order-source_warehouse-default",
+			"Sales Order-shipping_address_name-allow_on_submit",
+			"Sales Order-customer_address-allow_on_submit",
+			"Sales Order-dispatch_address_name-allow_on_submit"
 		]]]
 	},
   	{
