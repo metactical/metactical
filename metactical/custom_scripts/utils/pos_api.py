@@ -41,7 +41,7 @@ def create_manual_order(*args, **kwargs):
 		
 
 		pos_profile = get_pos_profile_detail(form_data)
-		sales_order = create_sales_order(form_data, customer, pos_profile)  
+		sales_order = create_sales_order(form_data, customer, pos_profile)
   
 		customer_form_data = form_data.get("Customer", {})
 		if customer_form_data:
@@ -81,7 +81,6 @@ def create_manual_order(*args, **kwargs):
 		has_no_error = sales_order["success"] if 'success' in sales_order else True
 		sales_order = sales_order["sales_order"]
 		
-  
 		# add tag
 		if sales_order and pos_profile.neb_manual_orders_tag:
 			add_tag(pos_profile.neb_manual_orders_tag, "Sales Order", sales_order.name)
@@ -487,10 +486,13 @@ def create_sales_order(form_data, customer, company=None):
 	if form_data.get("Location"):
 		so_data.update({'shipping_address_name': company.company_address})
 	else:
-		shipping_address = get_shipping_address(form_data, customer)
-		if shipping_address:
-			so_data.update({'shipping_address_name': shipping_address})
-  
+		customer_data = form_data.get("Customer", {})
+		if customer_data.get("AddressLine1") and customer_data.get("City"):
+			shipping_address = get_shipping_address(form_data, customer)
+			if shipping_address:
+				so_data.update({'shipping_address_name': shipping_address})
+	
+
 	items = get_items(form_data)
 	so_data.update({'items': items})
 	
@@ -550,7 +552,7 @@ def get_shipping_address(form_data, customer):
 								"address_line1": address_line1,
 		  						"pincode": postal_code,
 								"state": state,
-								"address_type": "Shipping",
+                                "address_type": "Shipping",
 							  }
 							)
 	
@@ -888,13 +890,15 @@ def get_customer(form_data):
 		
 		customer.save(ignore_permissions=True)
 		contact = create_contact(form_data, customer)
-		address = create_address(form_data, customer)
+		customer_form_data = form_data['Customer']
+		if not customer_form_data.get('Location') and customer_form_data.get('AddressLine1'):
+			address = create_address(form_data, customer)
 
-		if address['success']:
-			frappe.db.set_value('Customer', customer.name, 'customer_primary_address', address['address'])
-		else:
-			return {"error": address['message'], "success": False, "customer": None}
-		
+			if address['success']:
+				frappe.db.set_value('Customer', customer.name, 'customer_primary_address', address['address'])
+			else:
+				return {"error": address['message'], "success": False, "customer": None}
+			
 		frappe.db.set_value('Customer', customer.name, 'customer_primary_contact', contact)
 		frappe.db.commit()
 		
@@ -938,34 +942,34 @@ def create_address(form_data, customer):
 		return {"address": None, "success": False, "message": str(e)}
 
 def create_contact(form_data, customer):
-    frappe.set_user(form_data['SalesPerson'])
-    try:
-        phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
-        contact_info = {
-            'doctype': 'Contact',
-            'first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
-            'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
-            'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
-            'phone': phone,
-            'mobile_no': phone
-        }
-        
-        contact_info.update({'links': [{'link_doctype': 'Customer', 'link_name': customer.name}]})
-        if phone:
-            contact_info.update({'phone_nos': [{'phone': phone, 'is_primary_phone': 1, 'is_primary_mobile_no': 1}]})
+	frappe.set_user(form_data['SalesPerson'])
+	try:
+		phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
+		contact_info = frappe.get_doc("Contact", customer.customer_primary_contact) if customer.customer_primary_contact else {
+			'doctype': 'Contact',
+			'first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
+			'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
+   			'email_id': form_data['Customer']['Email'] if form_data['Customer']['Email'] else '',
+			'phone': phone,
+			'mobile_no': phone
+		}
 
-        if form_data['Customer']['Email']:
-            contact_info.update({'email_ids': [{'email_id': form_data['Customer']['Email'], 'is_primary': 1}]})
-        
-        contact = frappe.get_doc(contact_info)
-        contact.save(ignore_permissions=True)
-        frappe.db.commit()
-        frappe.set_user("Administrator")
-        return contact.name
-    except Exception as e:
-        frappe.set_user("Administrator")
-        frappe.log_error(title='Create Contact Error', message=frappe.get_traceback())
-        return None
+		if phone:
+			contact_info.update({'phone_nos': [{'phone': phone, 'is_primary_phone': 1, 'is_primary_mobile_no': 1}]})
+
+		if form_data['Customer']['Email']:
+			contact_info.update({'email_ids': [{'email_id': form_data['Customer']['Email'], 'is_primary': 1}]})
+
+		contact_info.save(ignore_permissions=True)
+
+		frappe.db.commit()
+		frappe.set_user("Administrator")
+  
+		return contact_info.name
+	except Exception as e:
+		frappe.set_user("Administrator")
+		frappe.log_error(title='Create Contact Error', message=frappe.get_traceback())
+		return None
 
 def get_payments(form_data):
     payments = []
@@ -1142,11 +1146,16 @@ def get_item_discount(item, price_list, item_price, company):
 def create_return(*args, **kwargs):
     form_data = dict(frappe.form_dict)
     total_restock_fee = 0.0
-    if "ModeOfReturn" not in form_data:
+    if "ModeOfReturn" not in form_data and not form_data["Payment"]:
         frappe.response["Message"] = "Mode of Return is required"
         frappe.response["Status"] = 500
         frappe.response["CouponCode"] = None
         return
+    
+    if form_data["Payment"] and len(form_data["Payment"]) > 0:
+        payment = form_data["Payment"][0]
+        if payment["ModeOfPayment"] == "Unknown":
+            form_data["Payment"] = []
     
     try:
         frappe.set_user(form_data['SalesPerson'])
@@ -1166,6 +1175,86 @@ def create_return(*args, **kwargs):
                 return
                 
         invoiceId = form_data["InvoiceId"]
+        sales_return, total_restock_fee = create_return_invoice(form_data, invoiceId)
+        frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
+        
+        if total_restock_fee > 0:
+           create_restock_invoice(total_restock_fee, sales_return, form_data)
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        
+        frappe.log_error(title='Submit Sales Return Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = str(e)
+        frappe.response["CouponCode"] = None
+        return
+    
+    gift_card = None
+    
+    coupon_code_data = {}
+    if "Payment" in form_data and form_data["Payment"]:
+        for payment in form_data["Payment"]:
+            if payment["ModeOfPayment"] == "Gift Card" and payment["CouponCode"]:
+                coupon_code_data = {
+                    "InvoiceId": invoiceId,
+                    "Customer": sales_return.customer,
+                    "Total": -1 * payment["Amount"],
+                    "SalesPerson": form_data["SalesPerson"],
+                    "POSProfile": form_data["POSProfile"],
+                }
+    elif "ModeOfReturn" in form_data and form_data["ModeOfReturn"] == "Gift Card":
+        coupon_code_data = {
+            "InvoiceId": invoiceId,
+            "Customer": sales_return.customer,
+            "Total": -1 * form_data["Total"],
+            "SalesPerson": form_data["SalesPerson"],
+            "POSProfile": form_data["POSProfile"],
+        }
+    
+    if coupon_code_data:
+        try:
+            gift_card = create_gift_card(sales_return, coupon_code_data, total_restock_fee)
+            frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
+        except Exception as e:
+            frappe.clear_last_message()
+            frappe.set_user("Administrator")
+            
+            frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
+            frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+            
+            frappe.response["Status"] = 500
+            frappe.response["Message"] = str(e)
+    
+    total = round(sales_return.grand_total + total_restock_fee, 2)
+    # auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
+    
+    try:
+        frappe.response["Status"] = 200
+        frappe.response["Message"] = ""
+        frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
+        frappe.response["SalesReturn"] = sales_return.name
+        frappe.response["Total"] = total
+        frappe.response["TotalAfterRestockFee"] = total
+        # frappe.response["AutoLogout"] = True if auto_logout else False
+        frappe.db.commit()
+    except Exception as e:
+        frappe.clear_last_message()
+        frappe.set_user("Administrator")
+        
+        frappe.log_error(title='Create Return Response Error', message=frappe.get_traceback())
+        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+        
+        frappe.response["Status"] = 500
+        frappe.response["Message"] = str(e)
+        frappe.response["CouponCode"] = None
+        return
+        
+def create_return_invoice(form_data, invoiceId):
+    try:
         sales_return = make_sales_return(invoiceId)
         pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
         formatted_items = get_items(form_data)
@@ -1198,70 +1287,52 @@ def create_return(*args, **kwargs):
         sales_return.payments = []
         invoice_total = sales_return.rounded_total or sales_return.grand_total
         difference = 0.0
-        if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
-            difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)
         
+        if float(form_data["Total"]) + float(sales_return.write_off_amount) != float(invoice_total):
+            difference = round(float(invoice_total) - (-1 * float(form_data["Total"])) + float(sales_return.write_off_amount), 2)    
+        
+        # payment can be done to only one mode of payment or multiple mode of payments
+        if "Payment" in form_data and form_data["Payment"]:
+            for payment in form_data["Payment"]:
+                new_doc = frappe.new_doc("Sales Invoice Payment")
+                new_doc.mode_of_payment = payment["ModeOfPayment"]
+                new_doc.amount = -1 * payment["Amount"]
+                
+                sales_return.append("payments", new_doc)
+        else:
+            sales_return.update({"payments":[{
+                "mode_of_payment": form_data["ModeOfReturn"],
+                "amount": -1 * form_data["Total"] + difference
+            }]})      
+
         write_off_limit = pos_profile.write_off_limit
         if write_off_limit and abs(difference) > write_off_limit:
-            frappe.response["Status"] = 500
-            frappe.response["Message"] = "Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit)
-            frappe.response["CouponCode"] = None
-            return
+            frappe.throw("Write off amount cannot be greater than the write off limit of {0}".format(write_off_limit))
         
-        sales_return.update({"payments":[{
-            "mode_of_payment": form_data["ModeOfReturn"],
-            "amount": -1 * form_data["Total"] + difference
-        }]})
+        # check if the payment passed is greater than the total amount
+        total_payment = 0.0
+        for payment in form_data["Payment"]:
+            total_payment += payment["Amount"]
+            
+        if total_payment > abs(sales_return.grand_total + sales_return.write_off_amount):
+            frappe.throw("Total payment amount cannot be greater than the total return amount")
         
         sales_return.advances = []
         sales_return.update_outstanding_for_self = False
         sales_return.is_pos = 1
         sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
-                
+        sales_return.set_missing_values()
         sales_return.save()
-        sales_return.submit()
-        frappe.db.set_value('POS API Log', log, 'sales_return', sales_return.name, update_modified=False)
         
-        if total_restock_fee > 0:
-           create_restock_invoice(total_restock_fee, sales_return, form_data)
+        sales_return.submit()
+        return sales_return, total_restock_fee
     except Exception as e:
         frappe.db.rollback()
         frappe.clear_last_message()
         frappe.set_user("Administrator")
         
-        frappe.log_error(title='Submit Sales Return Error', message=frappe.get_traceback())
-        frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
-        
-        frappe.response["Status"] = 500
-        frappe.response["Message"] = str(e)
-        frappe.response["CouponCode"] = None
-        return
-    
-    gift_card = None
-    if "ModeOfReturn" in form_data and form_data["ModeOfReturn"] == "Gift Card":
-        try:
-            gift_card = create_gift_card(sales_return, form_data, total_restock_fee)
-            frappe.db.set_value('POS API Log', log, 'coupon_code', gift_card.coupon_code, update_modified=False)
-        except Exception as e:
-            frappe.clear_last_message()
-            frappe.set_user("Administrator")
-            
-            frappe.log_error(title='Create Gift Card Error', message=frappe.get_traceback())
-            frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
-            
-            frappe.response["Status"] = 500
-            frappe.response["Message"] = str(e)
-    
-    total = round(sales_return.grand_total + total_restock_fee, 2)
-    # auto_logout = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', "auto_logout_after_transaction")
-    frappe.response["Status"] = 200
-    frappe.response["Message"] = ""
-    frappe.response["CouponCode"] = gift_card.coupon_code if gift_card else None
-    frappe.response["SalesReturn"] = sales_return.name
-    frappe.response["Total"] = total
-    frappe.response["TotalAfterRestockFee"] = total
-    # frappe.response["AutoLogout"] = True if auto_logout else False
-    frappe.db.commit()
+        frappe.log_error(title='Create Sales Return Error', message=frappe.get_traceback())
+        raise e
     
 def create_restock_invoice(total_restock_fee, sales_return, form_data):
     frappe.set_user(form_data['SalesPerson'])
@@ -1333,6 +1404,9 @@ def create_gift_card(doc, form_data, total_restock_fee, coupon_code=None):
         frappe.throw("Unable to create Gift Card: {0}".format(str(e)))
 
 def get_or_create_pricing_rule(doc, form_data, total_restock_fee):
+    if form_data["Total"] < 0:
+        form_data["Total"] = -1 * form_data["Total"]
+        
     pricing_rule = frappe.get_doc({
             "title": "GC-{0}".format(doc.customer),
             "doctype": "Pricing Rule",
@@ -1349,8 +1423,6 @@ def get_or_create_pricing_rule(doc, form_data, total_restock_fee):
     frappe.db.commit()
     return pricing_rule.name
     
-    return pricing_rule    
-
 def create_log(form_data, request_type):
     try:
         log = frappe.get_doc({
@@ -1653,28 +1725,93 @@ def get_item_by_retail_sku_single(retail_sku, branch):
         
 @frappe.whitelist()
 def get_customer_detail(phone=None, email=None):
-    # At least one parameter must be provided
-    if not phone and not email:
-        frappe.response["Error"] = "Phone number or email address is required."
-        return
-    
-    # Get billing address
-    address, customer = get_addresses(email, phone)
-    if not address:
-        frappe.response["Message"] = "Existing Address Not Found"
-        return
-        
-    billing_address = address.get("Billing") if address else None
-    shipping_address = address.get("Shipping") if address else None
-            
-    frappe.response["Message"] = ""
-    frappe.response["CustomerID"] = customer.name if customer else None
-    frappe.response["FirstName"] = customer.first_name if customer else None
-    frappe.response["LastName"] = customer.last_name if customer else None
-    frappe.response["Phone"] = billing_address.phone if billing_address else "stss"
-    frappe.response["Email"] = billing_address.email_id if billing_address else None
-    frappe.response["BillingAddress"] = format_address(billing_address)
-    frappe.response["ShippingAddress"] = format_address(shipping_address)
+	# At least one parameter must be provided
+	if not phone and not email:
+		frappe.response["Error"] = "Phone number or email address is required."
+		return
+	
+	# Get billing address
+	address, customer = get_addresses(email, phone)
+	contact = None
+	if not address:
+		contact, customer = get_contacts(email, phone)
+		if not contact:
+			frappe.response["Message"] = "Existing Address Not Found"
+			return
+		
+	billing_address = address.get("Billing") if address else None
+	shipping_address = address.get("Shipping") if address else None
+
+	if not billing_address and shipping_address:
+		billing_address = shipping_address
+		
+	frappe.response["Message"] = ""
+	frappe.response["CustomerID"] = customer.name if customer else None
+	frappe.response["FirstName"] = customer.first_name if customer else None
+	frappe.response["LastName"] = customer.last_name if customer else None
+	
+	if address:
+		frappe.response["Phone"] = billing_address.phone if billing_address else None
+		frappe.response["Email"] = billing_address.email_id if billing_address else None
+	elif contact:
+		frappe.response["Phone"] = contact.phone if contact else None
+		frappe.response["Email"] = contact.email_id if contact else None
+  
+		billing_address = frappe._dict({
+			"email_id": contact.email_id,
+			"phone": contact.phone
+		})
+     
+	frappe.response["BillingAddress"] = format_address(billing_address)
+	frappe.response["ShippingAddress"] = format_address(shipping_address)
+
+def get_contacts(email, phone):
+	"""Get customer address from contact by type (Billing or Shipping)"""
+	try:
+		condition = ""
+		phone = phone.replace("+", "") if phone else ""
+
+		if email:
+			condition = f"cont.email_id = {frappe.db.escape(email)}"
+
+		if phone:
+			phone_pattern = f"+1{phone}"
+			phone_pattern2 = f"1{phone}"
+			if condition:
+				condition += f" AND (cont.phone = {frappe.db.escape(phone_pattern)} or cont.phone = {frappe.db.escape(phone_pattern2)})"
+			else:
+				condition = f"(cont.phone = {frappe.db.escape(phone_pattern)} or cont.phone = {frappe.db.escape(phone_pattern2)})"
+
+		customer = None
+		address_links = frappe.db.sql(f"""
+			SELECT dl.parent, link_name
+			FROM `tabDynamic Link` dl
+			JOIN `tabContact` cont ON dl.parent = cont.name
+			WHERE dl.link_doctype = 'Customer'
+			AND {condition}
+
+			ORDER BY cont.modified DESC
+			limit 1
+			""", as_dict=True)
+
+		if not address_links:
+			return None, None
+
+		# Get the address with matching type
+		for link in address_links:
+			contact = frappe.get_doc("Contact", link.parent)
+			customer = link.link_name
+			break
+
+		if customer:
+			customer = frappe.get_doc("Customer", customer)
+
+		return contact, customer
+
+	except Exception as e:
+		frappe.log_error(title='POS - Get Contact Error', message=frappe.get_traceback())
+
+	return None, None
 
 def get_addresses(email, phone):
 	"""Get customer address by type (Billing or Shipping)"""

@@ -64,7 +64,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-29 05:23:01.102683",
+ "modified": "2026-02-02 04:28:21.480351",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS API Log",
@@ -83,6 +83,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
