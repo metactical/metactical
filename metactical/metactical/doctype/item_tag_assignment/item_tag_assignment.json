@@ -1,22 +1,28 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "format:{rule_name}",
  "creation": "2026-02-02 03:38:10.423782",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "rule_name",
+  "column_break_ykyz",
+  "tag",
   "section_break_whiv",
   "conditions",
   "column_break_hzgd",
+  "filters",
   "section_break_ezbx",
-  "tag"
+  "filters_detail"
  ],
  "fields": [
   {
    "fieldname": "rule_name",
    "fieldtype": "Data",
-   "label": "Rule Name"
+   "in_list_view": 1,
+   "label": "Rule Name",
+   "reqd": 1
   },
   {
    "fieldname": "conditions",
@@ -25,8 +31,11 @@
   },
   {
    "fieldname": "tag",
-   "fieldtype": "Data",
-   "label": "Tag"
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Tag",
+   "options": "Tag",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_hzgd",
@@ -38,16 +47,32 @@
   },
   {
    "fieldname": "section_break_whiv",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Filters"
+  },
+  {
+   "fieldname": "filters_detail",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "filters",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ykyz",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-02 03:48:34.839480",
+ "modified": "2026-02-02 11:03:25.572933",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Tag Assignment",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
