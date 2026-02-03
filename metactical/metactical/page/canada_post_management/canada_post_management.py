@@ -136,7 +136,7 @@ def get_untransmitted_shipments(warehouse=None):
 		available_groups = list(set(available_groups))
 		
 		# For testing purposes, only use groups with "Stores" in it
-		available_groups = [g for g in available_groups if "Stores" in g]
+		#available_groups = [g for g in available_groups if "Stores" in g]
 		
 		untransmitted = []
 		
@@ -326,6 +326,10 @@ def get_manifest_shipments(manifest_shipments_url, media_type):
 					if 'customer-references' in shipment_info:
 						refs = shipment_info['customer-references']
 						erp_shipment_name = refs.get('customer-ref-1')
+					else:
+						shipment_exists = frappe.db.exists("Canada Post Shipment", {"shipment_id": shipment_info.get('shipment-id')})
+						if shipment_exists:
+							erp_shipment_name = frappe.db.get_value('Canada Post Shipment', shipment_exists, "parent")
 					
 					# Try to get additional data from ERP if shipment exists
 					warehouse = None
