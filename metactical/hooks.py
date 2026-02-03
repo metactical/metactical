@@ -874,7 +874,9 @@ fixtures = [{
 			"Item-drop_and_create_in_websites",
 			"POS Profile-neb_allow_manual_order",
 			"Address-neb_mobile_not_formatted",
-			"POS Profile-custom_cash_float"
+			"POS Profile-custom_cash_float",
+			"Item-neb_life_cycle_recommended_action",
+			"Item-neb_life_cycle_status"
 		]]]
 	},
 	{

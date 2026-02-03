@@ -65,6 +65,8 @@ class ItemClassImportTool(Document):
 			start = end
 
 	def _edit_item_class(self, data):
+		updated_items = 0
+		errors = 0
 		for row in data:
 			if row[0] == "Item Code":
 				continue
@@ -74,12 +76,27 @@ class ItemClassImportTool(Document):
 
 			if exists:
 				try:
-					frappe.db.set_value("Item", exists, "asi_item_class", row[1])
-					frappe.db.commit()
+					updated_items += 1
+					frappe.db.set_value("Item", exists, {
+						"asi_item_class": row[1],
+						"neb_life_cycle_status": row[2],
+						"neb_life_cycle_recommended_action": row[3],
+					}, update_modified=False)
+					
 				except Exception as e:
-					self.log_error(item_code, frappe.get_traceback())
+					errors += 1
+     
+					if errors > 10:
+						break
+  
+					frappe.log_error(title="Error inserting item class", message=frappe.get_traceback())
 					frappe.publish_realtime("msgprint", "Error inserting item class : " + str(e), user=frappe.session.user)
 
+				if updated_items and updated_items % 100 == 0:
+					frappe.db.commit()
+
+		frappe.db.commit()
+   
 	def log_error(self, item_code, error):
 		error_entry = {
 			"item_code": item_code,
