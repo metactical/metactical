@@ -166,7 +166,7 @@ class CustomItem(Item):
                 if row.label and row.description
             }
             
-            if tag_specs and tag_specs.issubset(item_specs):
+            if tag_specs and item_specs.issubset(tag_specs):
                 if tag_doc.name not in manual_tags:
                     self.append("sb_tags", {
                         "sb_tag": tag_doc.name
