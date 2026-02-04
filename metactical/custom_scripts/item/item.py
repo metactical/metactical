@@ -9,32 +9,36 @@ class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
         super().before_rename(old_item_code, new_item_code, merge)
 
-        if merge:
-            self.remove_price_lists(old_item_code)
+        try:
+            if merge:
+                self.remove_price_lists(old_item_code)
 
-            # Fetch the old item document
-            old_item = frappe.get_doc("Item", old_item_code)
-            new_item = frappe.get_doc("Item", new_item_code)
+                # Fetch the old item document
+                old_item = frappe.get_doc("Item", old_item_code)
+                new_item = frappe.get_doc("Item", new_item_code)
 
-            # Fields to copy if they don't exist in the new item
-            fields_to_copy = [
-                "ifw_location", "ifw_duty_rate", "customs_tariff_number", "neb_variantavailabilityrule",
-                "brand", "ifw_item_notes", "asi_item_class", "country_of_origin"
-            ]
+                # Fields to copy if they don't exist in the new item
+                fields_to_copy = [
+                    "ifw_location", "ifw_duty_rate", "customs_tariff_number", "neb_variantavailabilityrule",
+                    "brand", "ifw_item_notes", "asi_item_class", "country_of_origin"
+                ]
 
-            for field in fields_to_copy:
-                if not getattr(new_item, field, None):
-                    setattr(new_item, field, getattr(old_item, field, None))
+                for field in fields_to_copy:
+                    if not getattr(new_item, field, None):
+                        setattr(new_item, field, getattr(old_item, field, None))
 
-            # Append supplier items from old item to new item if they don't exist
-            if hasattr(old_item, "supplier_items"):
-                existing_suppliers = {item.supplier for item in new_item.supplier_items}
-                for supplier_item in old_item.supplier_items:
-                    if supplier_item.supplier not in existing_suppliers:
-                        new_item.append("supplier_items", supplier_item)
+                # Append supplier items from old item to new item if they don't exist
+                if hasattr(old_item, "supplier_items"):
+                    existing_suppliers = {item.supplier for item in new_item.supplier_items}
+                    for supplier_item in old_item.supplier_items:
+                        if supplier_item.supplier not in existing_suppliers:
+                            new_item.append("supplier_items", supplier_item)
 
-            # Save the updated new item
-            new_item.save()
+                # Save the updated new item
+                new_item.save()
+                
+        except Exception as e:
+            frappe.log_error(title="Error in before_rename of Item", message=frappe.get_traceback())
 
     def sanitize(self, obj):
         """Recursively convert datetime and date objects to string."""
@@ -52,36 +56,39 @@ class CustomItem(Item):
         
     def after_rename(self, old_item_code, new_item_code, merge=False):
         super().after_rename(old_item_code, new_item_code, merge)
-        new_item = frappe.get_doc("Item", new_item_code)
-        if merge:
-            self.remove_price_lists(old_item_code)
-            old_item = frappe.get_doc("Item", old_item_code)
-        else:
-            old_item = new_item
-            old_item.item_code = old_item_code
-        
-        item_merge_history = frappe.new_doc("Item Merge History")
-        item_merge_history.old_item_code = old_item_code
-        item_merge_history.new_item_code = new_item_code
-        
-        item_merge_history.old_item = self.sanitize(old_item.as_dict())
-        item_merge_history.new_item = self.sanitize(new_item.as_dict())
-        
-        item_merge_history.insert(ignore_permissions=True)
-        
-        if merge:
-            self.copy_barcodes(old_item_code, new_item_code)
+        try:
+            new_item = frappe.get_doc("Item", new_item_code)
+            if merge:
+                self.remove_price_lists(old_item_code)
+                old_item = frappe.get_doc("Item", old_item_code)
+            else:
+                old_item = new_item
+                old_item.item_code = old_item_code
+            
+            item_merge_history = frappe.new_doc("Item Merge History")
+            item_merge_history.old_item_code = old_item_code
+            item_merge_history.new_item_code = new_item_code
+            
+            item_merge_history.old_item = self.sanitize(old_item.as_dict())
+            item_merge_history.new_item = self.sanitize(new_item.as_dict())
+            
+            item_merge_history.insert(ignore_permissions=True)
+            
+            if merge:
+                self.copy_barcodes(old_item_code, new_item_code)
 
-            if old_item.variant_of:
-                remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
-                if remaining_variants == 0 or remaining_variants is None:  
-                    try:
-                        frappe.db.delete("Item", old_item.variant_of)
-                    except Exception as e:
-                        frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
-                        frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
+                if old_item.variant_of:
+                    remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
+                    if remaining_variants == 0 or remaining_variants is None:  
+                        try:
+                            frappe.db.delete("Item", old_item.variant_of)
+                        except Exception as e:
+                            frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
+                            frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
 
-        frappe.db.commit()
+            frappe.db.commit()
+        except Exception as e:
+            frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
         
     def copy_barcodes(self, old_item_code, new_item_code):
         old_barcodes = frappe.get_all("Item Barcode", filters={"parent": old_item_code}, fields=["barcode", "name"])
@@ -116,8 +123,6 @@ class CustomItem(Item):
         if not frappe.flags.get("item_from_excel"):
             frappe.flags.in_import = False
 
-        load_tags(self)
-
         if not self.description or self.description.strip() == '<div class="ql-editor read-mode"><p><br></p></div>':
             self.description = self.item_name
             
@@ -129,12 +134,52 @@ class CustomItem(Item):
         
         # check website specification values
         validate_website_specifications(self)
-        sync_website_specifications(self)
         validate_item_group(self)
+        self.update_item_inventory_output()
+        self.update_sb_tags()
         
         if self.drop_and_create_in_websites:
             self.create_item_deletion_log()
+            
+    def update_sb_tags(self):
+        if not self.neb_website_specifications:
+            return
 
+        item_specs = {
+            (row.label, row.description)
+            for row in self.neb_website_specifications
+            if row.label and row.description
+        }
+
+        # ------------------------------------------------
+        # Get all SB Tags
+        # ------------------------------------------------
+        sb_tags = frappe.get_all(
+            "SB Tag",
+            fields=["name"]
+        )
+
+        # Clear existing tags with manual_selection = 0
+        self.set("sb_tags", [tag for tag in self.sb_tags if tag.manual_selection])
+        manual_tags = {tag.sb_tag for tag in self.sb_tags if tag.manual_selection}
+
+        for tag in sb_tags:
+            tag_doc = frappe.get_doc("SB Tag", tag.name)
+
+            # Convert tag table into set
+            tag_specs = {
+                (row.label, row.description)
+                for row in tag_doc.neb_website_specifications
+                if row.label and row.description
+            }
+            
+            if tag_specs and tag_specs.issubset(item_specs):
+                if tag_doc.name not in manual_tags:
+                    self.append("sb_tags", {
+                        "sb_tag": tag_doc.name
+                    })
+
+    def update_item_inventory_output(self):
         # Trigger update for item inventory output if deduct_qty has been updated
         # Retrieve the document state before the update
         doc_before_update = self.get_doc_before_save()
@@ -195,36 +240,7 @@ class CustomItem(Item):
             
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
         self.reload()
-    
-def load_tags(doc):
-    """
-    Load tags for the item based on the website specifications.
-    """
-    
-    tags = doc.sb_tags
-    doc.sb_tags = []
-    tags_list = []
-    
-    for tag in tags:
-        if not tag.label and not tag.description:
-            if tag.sb_tag not in tags_list:
-                doc.append("sb_tags", {
-                    "sb_tag": tag.sb_tag,
-                    "label": tag.label,
-                    "description": tag.description,
-                })
-                tags_list.append(tag.sb_tag)
 
-    for spec in doc.neb_website_specifications:
-        if spec.label and spec.description:
-            tag = get_sb_tag(spec.label, spec.description)
-            if tag and tag not in tags_list:
-                doc.append("sb_tags", {
-                    "sb_tag": tag,
-                    "label": spec.label,
-                    "description": spec.description,
-                })
-    
 def validate_website_specifications(doc):
     for spec in doc.neb_website_specifications:
         if not spec.label:
@@ -232,43 +248,6 @@ def validate_website_specifications(doc):
         if spec.mandatory and not spec.description:
             frappe.throw("<b>Description</b> is required for Website Specification at row <b>{0}</b>".format(spec.idx))
     
-def sync_website_specifications(doc):
-    doc_before_update = doc.get_doc_before_save()
-    if not doc_before_update:
-        original_website_specifications = []
-    else:
-        original_website_specifications = doc_before_update.neb_website_specifications
-
-    if not original_website_specifications and not doc.neb_website_specifications:
-        return
-
-    original_website_specifications_dict = {spec.label: {"description": spec.description} for spec in original_website_specifications} if original_website_specifications else {}
-    current_website_specifications = {spec.label: {"description": spec.description} for spec in doc.neb_website_specifications} if doc.neb_website_specifications else {}
-
-    # Check for removed/updated website specifications
-    removed_website_specifications = []
-    for old_label, old_description in original_website_specifications_dict.items():
-        found = False
-        for current_label, current_description in current_website_specifications.items():
-            if old_label == current_label and old_description["description"] == current_description["description"]:
-                found = True
-                break
-
-        if not found:
-            removed_website_specifications.append(old_label)
-
-    # Check for added website specifications
-    added_website_specifications = []
-    for current_label, current_description in current_website_specifications.items():
-        found = False
-        for old_label, old_description in original_website_specifications_dict.items():
-            if old_label == current_label and old_description["description"] == current_description["description"]:
-                found = True
-                break
-
-        if not found:
-            added_website_specifications.append(current_label)
-
 def validate_item_group(doc):
     if doc.item_group:
         is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
