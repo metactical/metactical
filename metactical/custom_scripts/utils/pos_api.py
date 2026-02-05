@@ -1293,10 +1293,10 @@ def create_return_invoice(form_data, invoiceId):
         
         # payment can be done to only one mode of payment or multiple mode of payments
         if "Payment" in form_data and form_data["Payment"]:
-            for payment in form_data["Payment"]:
+            for i, payment in enumerate(form_data["Payment"]):
                 new_doc = frappe.new_doc("Sales Invoice Payment")
                 new_doc.mode_of_payment = payment["ModeOfPayment"]
-                new_doc.amount = -1 * payment["Amount"]
+                new_doc.amount = -1 * (payment["Amount"] + total_restock_fee) if i == 0 else -1 * payment["Amount"]
                 
                 sales_return.append("payments", new_doc)
         else:
