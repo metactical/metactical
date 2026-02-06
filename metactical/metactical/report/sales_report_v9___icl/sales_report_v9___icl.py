@@ -857,7 +857,8 @@ def get_master(conditions="", filters={}):
 	return data
 
 def get_conditions(filters):
-    conditions = []
+    where_conditions = []
+    limit_conditions = []
     params = {}
 
     if filters.get("supplier"):
@@ -865,16 +866,18 @@ def get_conditions(filters):
         suppliers.extend(["asa", "asaa"])
 
         params["supplier"] = tuple(suppliers)
-        conditions.append("s.supplier IN %(supplier)s")
+        where_conditions.append("s.supplier IN %(supplier)s")
 
     if filters.get("limit") and filters.get("limit") != "All":
         params["limit"] = int(filters.get("limit"))
-        conditions.append("LIMIT %(limit)s")
+        limit_conditions.append("LIMIT %(limit)s")
 
     where_clause = ""
-    if conditions:
+    
+    
+    if where_conditions:
         where_clause = " AND " + " AND ".join(
-            c for c in conditions if not c.startswith("LIMIT")
+            c for c in where_conditions if not c.startswith("LIMIT")
         )
 
     limit_clause = ""
@@ -1097,7 +1100,7 @@ def get_open_po_qty(item,supplier, warehouse=None):
 								`tabPurchase Order Item` c on p.name = c.parent 
 							where 
 								p.docstatus=1 and c.item_code = %s
-								p.status not in ("Closed", "Cancelled", "On Hold")
+								and p.status not in ("Closed", "Cancelled", "On Hold")
 								and p.company = "International Camouflage Ltd"
 							""" + where, 
 						(item), as_dict=True)
