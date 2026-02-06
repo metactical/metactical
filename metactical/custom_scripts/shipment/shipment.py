@@ -121,6 +121,10 @@ class CustomShipment(Shipment):
 		self.update({"shipment_parcel": shipment_parcels})
 
 	def before_cancel(self):
+		# If cancel is triggered from avoid_shpment, skip to avoid recursion
+		if getattr(self, "_cancel_from_avoid_shipment", False):
+			return
+
 		if self.shipments:
 			avoid_shpment(self.name, self.service_provider, [x.name for x in self.shipments])
 
@@ -211,4 +215,3 @@ def get_manifest(start_date, shipment_id, doctype, docname):
 					})
 					file_doc.insert(ignore_permissions=True)
 	return {"shipments": shipment_ids, "found": shipment_found}
-	

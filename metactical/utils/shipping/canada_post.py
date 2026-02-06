@@ -6,6 +6,7 @@ from requests.auth import _basic_auth_str
 from frappe.utils import get_files_path
 from six import string_types
 import ast
+import json
 from PyPDF2 import PdfFileMerger
 from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
@@ -318,43 +319,79 @@ class CanadaPost():
 				'Content-Type': 'application/vnd.cpc.manifest-v8+xml; charset=utf-8'})
 		
 		if response:
+			# Store the manifest links immediately in the manifest document
 			if isinstance(response['manifests']['link'], dict):
 				links = [response['manifests']['link']]
 			else:
 				links = response['manifests']['link']
+			
+			frappe.db.set_value("Manifest", manifest, "manifest_links", json.dumps(links))
+			frappe.db.commit()
+			
 			for link in links:
-				res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-															  'Content-Type': link['@media-type']}, method='GET')
-				if res and res['manifest']['po-number']:
-					po_number = res['manifest']['po-number']
-					for mlink in res['manifest']['links']['link']:
-						if mlink['@rel']=="artifact":
-							manifest_file = self.get_response(
-									mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
-							if manifest_file.status_code == 200:
-								file_name = f"manifest_{manifest}.pdf"
-								file_path = get_files_path(f"{file_name}", is_private=True)
-								with open(file_path, 'wb') as f:
-									f.write(manifest_file.content)
-								file_doc = frappe.new_doc('File')
-								file_doc.update({
-									'file_name': f"{file_name}",
-									'file_url': file_path.replace(frappe.get_site_path(), ''),
-									'is_private': 1,
-									'folder': 'Home/Attachments',
-									'attached_to_doctype': "Manifest",
-									'attached_to_name': manifest
-								})
-								file_doc.insert(ignore_permissions=True)
-						elif mlink["@rel"] == "manifestShipments":
-							manifest_shipments = self.get_response(mlink["@href"], None, headers={'Accept': mlink["@media-type"]}, method="GET")
-							if isinstance(manifest_shipments["shipments"]["link"], dict):
-								shipment_links = [manifest_shipments["shipments"]["link"]]
-							else:
-								shipment_links = manifest_shipments["shipments"]["link"]
-							for shipment in shipment_links:
-								shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
-								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
+				# Add retry logic for manifest availability
+				max_retries = 5
+				retry_delay = 2  # seconds
+				res = None
+				
+				for attempt in range(max_retries):
+					res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
+																  'Content-Type': link['@media-type']}, method='GET')
+					
+					if res is not None:
+						# Manifest is ready
+						break
+					
+					if attempt < max_retries - 1:
+						frappe.logger().info(f"Manifest not ready yet, waiting {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})")
+						time.sleep(retry_delay)
+						retry_delay *= 1.5  # Exponential backoff: 2s, 3s, 4.5s, 6.75s
+
+			frappe.log_error(title=f"Getting Manifest Troubleshooting: {manifest}", 
+				 message=f"Links: {links}, Response: {res}")
+			
+			if res is None:
+				# Manifest still not ready after retries
+				frappe.log_error(
+					title=f"Manifest {manifest} - Not Ready",
+					message=f"Manifest was created but not available after {max_retries} attempts. Link: {link['@href']}"
+				)
+				frappe.throw(_(
+					"The manifest was created in Canada Post but is not ready yet. "
+					"Please use the 'Re-download Manifest' button in a few moments to retrieve it."
+				))
+			
+			if res and res.get('manifest', {}).get('po-number'):
+				po_number = res['manifest']['po-number']
+				for mlink in res['manifest']['links']['link']:
+					if mlink['@rel']=="artifact":
+						manifest_file = self.get_response(
+								mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
+						if manifest_file.status_code == 200:
+							file_name = f"manifest_{manifest}.pdf"
+							file_path = get_files_path(f"{file_name}", is_private=True)
+							with open(file_path, 'wb') as f:
+								f.write(manifest_file.content)
+							file_doc = frappe.new_doc('File')
+							file_doc.update({
+								'file_name': f"{file_name}",
+								'file_url': file_path.replace(frappe.get_site_path(), ''),
+								'is_private': 1,
+								'folder': 'Home/Attachments',
+								'attached_to_doctype': "Manifest",
+								'attached_to_name': manifest
+							})
+							file_doc.insert(ignore_permissions=True)
+					elif mlink["@rel"] == "manifestShipments":
+						manifest_shipments = self.get_response(mlink["@href"], None, headers={'Accept': mlink["@media-type"]}, method="GET")
+						if isinstance(manifest_shipments["shipments"]["link"], dict):
+							shipment_links = [manifest_shipments["shipments"]["link"]]
+						else:
+							shipment_links = manifest_shipments["shipments"]["link"]
+						for shipment in shipment_links:
+							shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
+							shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
+		frappe.log_error(title=f"Manifest for {manifest}", message=response)
 		return shipment_ids, po_number
 							
 	def get_shipments_groups(self, manifest_doc):
@@ -372,16 +409,227 @@ class CanadaPost():
 		groups = [group for group in groups if group in available_groups]
 		return groups
 
-	def get_available_groups(self):
+	def get_available_groups(self, return_links=False):
 		available_groups = []
 		response = self.get_response(
 			f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/group", None, 
 			headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 		
-		for group in response["groups"]["group"]:
-			available_groups.append(group["group-id"])
+		# Ensure groups is a list
+		groups = response["groups"]["group"]
+		if isinstance(groups, dict):
+			groups = [groups]
+		
+		for group in groups:
+			if return_links:
+				# Return both group-id and links structure
+				available_groups.append({
+					"group_id": group["group-id"],
+					"links": group.get("links", {})
+				})
+			else:
+				available_groups.append(group["group-id"])
 		
 		return available_groups
+
+	def get_group_shipments(self, group_id=None, group_links=None):
+		"""
+		Get all shipments for a specific group ID
+		Returns shipment details including references (ERP Shipment names)
+		
+		Args:
+			group_id: The group ID to fetch shipments for (optional if group_links provided)
+			group_links: Links dict from get_available_groups(return_links=True) (optional)
+		"""
+		shipments_data = []
+		
+		# If group_links provided, use them directly; otherwise fetch the group data
+		if group_links and 'link' in group_links:
+			links = group_links['link']
+		else:
+			# Fall back to fetching group data via API
+			if not group_id:
+				frappe.throw(_("Either group_id or group_links must be provided"))
+			
+			url = f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/shipment?groupId={group_id}"
+			headers = {'Accept': 'application/vnd.cpc.shipment-v8+xml'}
+			
+			try:
+				response = self.get_response(url, None, headers=headers, method='GET')
+			except Exception as e:
+				# If group has no shipments or other error, return empty list
+				frappe.log_error(
+					title=f"Canada Post - Get Group Shipments Error for {group_id}",
+					message=f"Error: {str(e)}\n{frappe.get_traceback()}"
+				)
+				return []
+			
+			if not response or 'shipments' not in response:
+				return []
+			
+			if 'link' not in response['shipments']:
+				return []
+			
+			links = response['shipments']['link']
+		
+		# Ensure links is a list
+		if isinstance(links, dict):
+			links = [links]
+		
+		for link in links:
+			if link.get('@rel') == 'self':
+				# This is the group link, skip it
+				continue
+			
+			try:
+				# Get individual shipment details
+				shipment_response = self.get_response(
+					link['@href'], 
+					None, 
+					headers={'Accept': link['@media-type']}, 
+					method='GET'
+				)
+				
+				if shipment_response and 'shipment-info' in shipment_response:
+					shipment_info = shipment_response['shipment-info']
+					
+					# Extract the data we need
+					shipment_data = {
+						'shipment_id': shipment_info.get('shipment-id'),
+						'tracking_pin': shipment_info.get('tracking-pin'),
+						'shipment_status': shipment_info.get('shipment-status'),
+						'group_id': group_id if group_id else shipment_info.get('group-id'),
+						'references': {}
+					}
+						
+					# Get customer references (this contains the ERP Shipment name)
+					if 'customer-references' in shipment_info:
+						refs = shipment_info['customer-references']
+						if 'customer-ref-1' in refs:
+							shipment_data['references']['ref_1'] = refs['customer-ref-1']
+						if 'customer-ref-2' in refs:
+							shipment_data['references']['ref_2'] = refs['customer-ref-2']
+					
+					# Get delivery address
+					if 'delivery-spec' in shipment_info and 'destination' in shipment_info['delivery-spec']:
+						dest = shipment_info['delivery-spec']['destination']
+						shipment_data['delivery_customer'] = dest.get('name', '')
+					
+					# Get service information
+					if 'delivery-spec' in shipment_info and 'service-code' in shipment_info['delivery-spec']:
+						shipment_data['service_code'] = shipment_info['delivery-spec']['service-code']
+					
+					shipments_data.append(shipment_data)
+			except Exception as e:
+				# Log error but continue with other shipments
+				frappe.log_error(
+					title=f"Canada Post - Get Shipment Details Error",
+					message=f"Error getting shipment from {link.get('@href', 'unknown')}: {str(e)}"
+				)
+				continue
+		
+		return shipments_data
+
+	def get_manifests_by_date_range(self, from_date, to_date):
+		"""
+		Get all manifests within a date range from Canada Post API.
+		
+		Args:
+			from_date: Start date in YYYY-MM-DD format
+			to_date: End date in YYYY-MM-DD format
+		
+		Returns:
+			list: List of manifest data with links
+		"""
+		# Convert dates to the format Canada Post expects (YYYYMMDD)
+		if isinstance(from_date, str):
+			from_date_obj = datetime.strptime(from_date, "%Y-%m-%d")
+		else:
+			from_date_obj = from_date
+		
+		if isinstance(to_date, str):
+			to_date_obj = datetime.strptime(to_date, "%Y-%m-%d")
+		else:
+			to_date_obj = to_date
+		
+		# Validate date range (max 90 days)
+		date_diff = (to_date_obj - from_date_obj).days
+		if date_diff > 90:
+			frappe.throw(_("Date range cannot exceed 90 days"))
+		
+		if date_diff < 0:
+			frappe.throw(_("'To Date' must be after 'From Date'"))
+		
+		start_date_str = from_date_obj.strftime("%Y%m%d")
+		end_date_str = to_date_obj.strftime("%Y%m%d")
+		
+		# Query Canada Post API for manifests
+		url = f"/rs/{self.settings.customer_number}/{self.settings.customer_number}/manifest?start={start_date_str}&end={end_date_str}"
+		headers = {'Accept': 'application/vnd.cpc.manifest-v8+xml'}
+		
+		try:
+			response = self.get_response(url, None, headers=headers, method='GET')
+		except Exception as e:
+			frappe.log_error(
+				title="Canada Post - Get Manifests Error",
+				message=f"Error fetching manifests from {start_date_str} to {end_date_str}: {str(e)}\n{frappe.get_traceback()}"
+			)
+			return []
+		
+		if not response or 'manifests' not in response:
+			return []
+		
+		# Ensure manifest links is a list
+		manifest_links = response['manifests'].get('link', [])
+		if isinstance(manifest_links, dict):
+			manifest_links = [manifest_links]
+		
+		manifests_data = []
+		
+		for manifest_link in manifest_links:
+			try:
+				# Get detailed manifest info
+				manifest_response = self.get_response(
+					manifest_link['@href'], 
+					None, 
+					headers={'Accept': manifest_link['@media-type']}, 
+					method='GET'
+				)
+				
+				if manifest_response and 'manifest' in manifest_response:
+					manifest_info = manifest_response['manifest']
+					
+					# Extract manifest data
+					manifest_data = {
+						'po_number': manifest_info.get('po-number'),
+						'manifest_date': manifest_info.get('manifest-date'),
+						'links': {}
+					}
+					
+					# Store links for artifacts and shipments
+					if 'links' in manifest_info and 'link' in manifest_info['links']:
+						links = manifest_info['links']['link']
+						if isinstance(links, dict):
+							links = [links]
+						
+						for link in links:
+							rel = link.get('@rel')
+							if rel in ['artifact', 'manifestShipments']:
+								manifest_data['links'][rel] = {
+									'href': link['@href'],
+									'media_type': link['@media-type']
+								}
+					
+					manifests_data.append(manifest_data)
+					
+			except Exception as e:
+				frappe.log_error(
+					title="Canada Post - Get Manifest Details Error",
+					message=f"Error getting manifest from {manifest_link.get('@href', 'unknown')}: {str(e)}"
+				)
+				continue
+		
+		return manifests_data
 
 	def get_shipment_manifest(self, shipment="SHIPMENT-00009"):
 		doc = frappe.get_doc("Shipment", shipment)
@@ -532,8 +780,6 @@ class CanadaPost():
 					to_be_remove.append(shipment)
 
 			except requests.exceptions.HTTPError as e:
-				# If the shipment is already gone on Canada Post (404),
-				# treat it as voided locally and continue cleanup.
 				if getattr(e, "response", None) and e.response.status_code == 404:
 					frappe.logger().info(
 						f"Canada Post void: shipment {shipment.name} not found remotely (404). "
@@ -541,7 +787,6 @@ class CanadaPost():
 					)
 					to_be_remove.append(shipment)
 				else:
-					# Re‑raise for any other HTTP error
 					raise
 
 		for row in to_be_remove:
@@ -551,7 +796,12 @@ class CanadaPost():
 			doc.ais_shipment_status = "Not Shipped"
 
 		doc.save()
+
+		# Set a transient flag so before_cancel knows this came from avoid_shpment
+		doc._cancel_from_avoid_shipment = True
 		doc.cancel()
+		doc._cancel_from_avoid_shipment = False
+
 		delivery_notes = []
 		for row in doc.shipment_delivery_note:
 			if row.delivery_note not in delivery_notes:
@@ -591,6 +841,9 @@ class CanadaPost():
 			if return_request:
 				return r
 			if r.status_code == 200:
+				# Check if content is empty before trying to parse XML
+				if not r.content or len(r.content.strip()) == 0:
+					return None
 				return self.xml_to_json(r.content)
 
 		except (requests.exceptions.SSLError, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:

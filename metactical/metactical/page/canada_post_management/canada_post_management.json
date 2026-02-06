@@ -1,0 +1,23 @@
+{
+ "content": null,
+ "creation": "2026-01-04 08:00:08.582409",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-01-07 04:15:23.204824",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "canada-post-management",
+ "owner": "Administrator",
+ "page_name": "canada-post-management",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Canada Post Management"
+}

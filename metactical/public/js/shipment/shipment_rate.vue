@@ -280,7 +280,7 @@ export default {
 					provider = piece.selectedProvider;
 					carrier_service[piece.piece_name] = piece.selectedCarrier;
 					service_name[piece.piece_name] = piece.selectedServiceName;
-					shipment_amount = shipment_amount + piece.selectedRate;
+					shipment_amount = flt(shipment_amount) + flt(piece.selectedRate);
 				}
 				console.log("Carrier service: ", carrier_service, " Amount: ", shipment_amount, " Service: ", service_name);
 				frappe.call({
