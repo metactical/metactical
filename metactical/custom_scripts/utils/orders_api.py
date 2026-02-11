@@ -254,6 +254,7 @@ def get_order_detail(parsedContent, province, country, company, shipping_item, f
 		"source": parsedContent['publisher_site'],
 		"taxes_and_charges": get_taxes_and_charges(province, country, company, parsedContent['publisher_site']),
 		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
+		"grand_total": parsedContent['grandTotal'],
 		"company": company,
 		"shipping_item": shipping_item,
 		"far_distance_shipping_item": far_distance_shipping_item,
@@ -411,7 +412,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"customer_address": billing_address_doc.name,
 		"ifw_store_pickup": order_detail["ifw_store_pickup"],
 		"discount_amount": order_detail["total_discount_amount"],
-		"ignore_pricing_rule": 1,  # Ignore pricing rules for this order
+		"ignore_pricing_rule": 1,
 		"is_rush": is_rush(items),
 		"apply_discount_on": "Net Total"
 	}
@@ -432,6 +433,14 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
 	new_order.set_missing_values()	
 	new_order.save()
+ 
+	difference = 0
+	if "grand_total" in order_detail and order_detail["grand_total"] < new_order.grand_total:
+		difference = new_order.grand_total - order_detail["grand_total"]
+		new_order.discount_amount += difference
+		new_order.save()
+		logger.error(f"Adjusted discount amount by {difference} for order {new_order.name} to match grand total from RMQ.")
+ 
 	logger.error(f"New Order Created: {new_order.name} shipping address: {shipping_address_doc.name}, billing address: {billing_address_doc.name}")
 	frappe.db.commit()
 	

@@ -20,7 +20,6 @@
    "fieldname": "payload",
    "fieldtype": "Text",
    "label": "Payload",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -32,19 +31,21 @@
   {
    "fieldname": "sales_order",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Sales Order",
    "read_only": 1
   },
   {
    "fieldname": "sales_invoice",
    "fieldtype": "Data",
-   "label": "Sales Invoice",
-   "read_only": 1
+   "label": "Sales Invoice"
   },
   {
    "fieldname": "request_type",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Request Type",
    "read_only": 1,
    "reqd": 1
@@ -62,9 +63,10 @@
    "read_only": 1
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-29 05:23:01.102683",
+ "modified": "2026-02-02 04:28:21.480351",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS API Log",
@@ -83,6 +85,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

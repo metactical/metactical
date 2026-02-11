@@ -326,6 +326,10 @@ def get_manifest_shipments(manifest_shipments_url, media_type):
 					if 'customer-references' in shipment_info:
 						refs = shipment_info['customer-references']
 						erp_shipment_name = refs.get('customer-ref-1')
+					else:
+						shipment_exists = frappe.db.exists("Canada Post Shipment", {"shipment_id": shipment_info.get('shipment-id')})
+						if shipment_exists:
+							erp_shipment_name = frappe.db.get_value('Canada Post Shipment', shipment_exists, "parent")
 					
 					# Try to get additional data from ERP if shipment exists
 					warehouse = None
@@ -428,4 +432,308 @@ def get_manifest_pdf(artifact_url, media_type):
 			message=frappe.get_traceback()
 		)
 		frappe.throw(_("Error fetching manifest PDF: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def create_manifest_from_groups(warehouse, pickup_date, pickup_address, pickup_contact_person, pickup_company):
+	"""
+	Create a manifest for shipments in a specific warehouse and pickup date.
+	This is called from the Canada Post Management page.
+	
+	Args:
+		warehouse: Warehouse name
+		pickup_date: Pickup date in YYYY-MM-DD format
+		pickup_address: Address name for pickup
+		pickup_contact_person: User email/name for pickup contact
+		pickup_company: Company name for pickup
+	
+	Returns:
+		dict: Created manifest details
+	"""
+	try:
+		# Validate inputs
+		if not all([warehouse, pickup_date, pickup_address, pickup_contact_person, pickup_company]):
+			frappe.throw(_("All fields are required: Warehouse, Pickup Date, Pickup Address, Pickup Contact Person, and Pickup Company"))
+		
+		# Get shipments for this warehouse and date
+		shipments = frappe.db.sql("""
+			SELECT
+				shipment.name AS shipment_name, 
+				cps.shipment_id, 
+				shipment.pickup_company
+			FROM
+				`tabCanada Post Shipment` AS cps
+			LEFT JOIN
+				`tabShipment` AS shipment ON shipment.name = cps.parent
+			WHERE
+				(shipment.po_number IS NULL OR shipment.po_number = "") 
+				AND shipment.pickup_date = %(pickup_date)s
+				AND shipment.warehouse = %(warehouse)s 
+				AND shipment.service_provider = 'Canada Post'
+				AND shipment.docstatus = 1
+				AND shipment.ais_shipment_status = 'Shipped'
+		""", {"pickup_date": pickup_date, "warehouse": warehouse}, as_dict=1)
+		
+		if not shipments:
+			frappe.throw(_("No untransmitted shipments found for the selected warehouse and date"))
+		
+		# Create Manifest document
+		manifest_doc = frappe.new_doc("Manifest")
+		manifest_doc.update({
+			"pickup_date": pickup_date,
+			"warehouse": warehouse,
+			"pickup_address": pickup_address,
+			"pickup_contact_person": pickup_contact_person,
+			"pickup_company": pickup_company,
+			"service_provider": "Canada Post",
+			"status": "Pending"
+		})
+		
+		# Add shipments to manifest
+		for shipment in shipments:
+			manifest_doc.append("items", {
+				"shipment": shipment.shipment_name,
+				"shipment_id": shipment.shipment_id,
+				"status": "Pending"
+			})
+		
+		manifest_doc.insert(ignore_permissions=True)
+		
+		# Now create the manifest on Canada Post
+		cp = CanadaPost()
+		shipment_ids, po_number = cp.create_manifest(manifest_doc.name)
+		
+		# Update the manifest with PO number
+		manifest_doc.reload()
+		manifest_doc.po_number = po_number
+		
+		# Update shipments
+		if len(shipment_ids) > 0:
+			manifest_doc.items = []
+			for shipment_id in shipment_ids:
+				exists = frappe.db.exists("Canada Post Shipment", {"shipment_id": shipment_id})
+				if exists:
+					shipment_name = frappe.db.get_value("Canada Post Shipment", {"shipment_id": shipment_id}, "parent")
+					frappe.db.set_value("Shipment", shipment_name, "po_number", po_number)
+					manifest_doc.append("items", {
+						"shipment": shipment_name,
+						"shipment_id": shipment_id,
+						"status": "Transmitted"
+					})
+		
+		manifest_doc.status = "Completed"
+		manifest_doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		
+		return {
+			"success": True,
+			"manifest_name": manifest_doc.name,
+			"po_number": po_number,
+			"shipments_count": len(shipment_ids)
+		}
+	
+	except Exception as e:
+		# If it's already a user-facing error (ValidationError from frappe.throw), 
+		# just re-raise it without wrapping
+		if isinstance(e, frappe.exceptions.ValidationError):
+			raise
+		
+		frappe.log_error(
+			title="Canada Post - Create Manifest Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error creating manifest: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_warehouse_details(warehouse):
+	"""
+	Get warehouse address and company.
+	
+	Args:
+		warehouse: Warehouse name
+	
+	Returns:
+		dict: Warehouse details including address and company
+	"""
+	try:
+		warehouse_doc = frappe.get_doc("Warehouse", warehouse)
+		
+		# Get warehouse address
+		address = frappe.db.sql("""
+			SELECT
+				address.name AS address_name,
+				address.address_title,
+				address.address_line1,
+				address.city,
+				address.state,
+				address.pincode
+			FROM
+				`tabDynamic Link` AS link
+			LEFT JOIN
+				`tabAddress` AS address ON link.parenttype = 'Address' AND link.parent = address.name
+			WHERE
+				link.link_doctype = "Warehouse" AND link.link_name = %(warehouse)s
+			LIMIT 1
+		""", {"warehouse": warehouse}, as_dict=1)
+		
+		warehouse_address = address[0] if address else None
+		
+		return {
+			"warehouse": warehouse,
+			"address": warehouse_address,
+			"company": warehouse_doc.company if hasattr(warehouse_doc, 'company') else None
+		}
+	
+	except Exception as e:
+		frappe.log_error(
+			title="Canada Post - Get Warehouse Details Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error fetching warehouse details: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_companies():
+	"""
+	Get list of companies.
+	
+	Returns:
+		list: List of companies
+	"""
+	try:
+		companies = frappe.get_all(
+			"Company",
+			filters={
+				"is_group": 0
+			},
+			fields=["name", "company_name"],
+			order_by="name asc"
+		)
+		
+		return companies
+	
+	except Exception as e:
+		frappe.log_error(
+			title="Canada Post - Get Companies Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error fetching companies: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_pickup_contacts():
+	"""
+	Get list of users that can be pickup contacts.
+	
+	Returns:
+		list: List of users with their names
+	"""
+	try:
+		users = frappe.get_all(
+			"User",
+			filters={
+				"enabled": 1,
+				"name": ["!=", "Guest"]
+			},
+			fields=["name", "full_name", "email"],
+			order_by="full_name asc"
+		)
+		
+		return users
+	
+	except Exception as e:
+		frappe.log_error(
+			title="Canada Post - Get Pickup Contacts Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error fetching pickup contacts: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_group_details(group_id):
+	"""
+	Extract warehouse and date from group_id by reverse-engineering the group creation logic.
+	Group ID format: "WarehousePrefix-YYYYMMDD"
+	
+	Args:
+		group_id: Group ID string (e.g., "R01-20260123")
+	
+	Returns:
+		dict: Extracted warehouse prefix, pickup date, and exact warehouse name
+	"""
+	try:
+		parts = group_id.split("-")
+		if len(parts) < 2:
+			frappe.throw(_("Invalid group ID format"))
+		
+		date_str = parts[1]
+		
+		# Convert date from YYYYMMDD to YYYY-MM-DD
+		pickup_date = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
+		
+		# Get all active warehouses
+		warehouses = frappe.get_all(
+			"Warehouse",
+			filters={
+				"disabled": 0,
+				"is_group": 0
+			},
+			fields=["name"]
+		)
+		
+		# Loop through warehouses and apply the same group_id creation logic
+		# until we find an exact match
+		warehouse_name = None
+		for warehouse in warehouses:
+			# Apply the same logic used to create group_id:
+			# warehouse.split("-")[0].replace(" ", "")
+			warehouse_prefix = warehouse.name.split("-")[0].replace(" ", "")
+			generated_group_id = f"{warehouse_prefix}-{date_str}"
+			
+			if generated_group_id == group_id:
+				warehouse_name = warehouse.name
+				break
+		
+		return {
+			"group_id": group_id,
+			"warehouse_prefix": parts[0],
+			"pickup_date": pickup_date,
+			"warehouse_name": warehouse_name
+		}
+	
+	except Exception as e:
+		frappe.log_error(
+			title="Canada Post - Get Group Details Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error parsing group details: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_company_addresses():
+	"""
+	Get list of company addresses (is_your_company_address = 1).
+	
+	Returns:
+		list: List of company addresses
+	"""
+	try:
+		addresses = frappe.get_all(
+			"Address",
+			filters={
+				"is_your_company_address": 1
+			},
+			fields=["name", "address_title", "address_line1", "city", "state", "pincode"],
+			order_by="address_title asc"
+		)
+		
+		return addresses
+	
+	except Exception as e:
+		frappe.log_error(
+			title="Canada Post - Get Company Addresses Error",
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Error fetching company addresses: {0}").format(str(e)))
 

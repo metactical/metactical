@@ -23,7 +23,8 @@
   "po_number",
   "section_break_6",
   "items",
-  "status"
+  "status",
+  "manifest_links"
  ],
  "fields": [
   {
@@ -125,11 +126,17 @@
    "label": "Service Provider",
    "options": "Canada Post\nPurolator",
    "reqd": 1
+  },
+  {
+   "fieldname": "manifest_links",
+   "fieldtype": "Text",
+   "hidden": 1,
+   "label": "Raw Manifest Links"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-01-22 15:58:26.607494",
+ "modified": "2026-01-28 06:47:05.900816",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Manifest",

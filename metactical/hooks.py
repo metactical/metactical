@@ -144,9 +144,6 @@ doc_events = {
 		"before_save": "metactical.custom_scripts.material_request.material_request.before_save",
 		"on_submit": "metactical.custom_scripts.material_request.material_request.on_submit",
 	},
-	"Address": {
-		"validate": "metactical.custom_scripts.address.address.validate"
-	},
 	"Contact": {
 		"validate": "metactical.custom_scripts.contact.contact.validate"
 	},
@@ -195,7 +192,8 @@ override_doctype_class = {
 	"Shipment": "metactical.custom_scripts.shipment.shipment.CustomShipment",
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
-	"Item": "metactical.custom_scripts.item.item.CustomItem"
+	"Item": "metactical.custom_scripts.item.item.CustomItem",
+	"Address": "metactical.custom_scripts.address.address.CustomAddress"
 }
 
 # Scheduled Tasks
@@ -253,7 +251,8 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
-	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title"
+	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title",
+	"erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return": "metactical.custom_scripts.sales_invoice.sales_invoice.make_sales_return"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -873,8 +872,12 @@ fixtures = [{
 			"Lead Source-neb_country",
 			"Item-display_weight",
 			"Stock Entry Detail-custom_ais_active_qoh",
+			"Item-drop_and_create_in_websites",
 			"POS Profile-neb_allow_manual_order",
-			"Address-neb_mobile_not_formatted"
+			"Address-neb_mobile_not_formatted",
+			"POS Profile-custom_cash_float",
+			"Item-neb_life_cycle_recommended_action",
+			"Item-neb_life_cycle_status"
 		]]]
 	},
 	{
@@ -1443,7 +1446,10 @@ fixtures = [{
 			"Purchase Receipt Item-price_list_rate-permlevel",
 			"Work Order-wip_warehouse-default",
 			"Work Order-fg_warehouse-default",
-			"Work Order-source_warehouse-default"
+			"Work Order-source_warehouse-default",
+			"Sales Order-shipping_address_name-allow_on_submit",
+			"Sales Order-customer_address-allow_on_submit",
+			"Sales Order-dispatch_address_name-allow_on_submit"
 		]]]
 	},
   	{

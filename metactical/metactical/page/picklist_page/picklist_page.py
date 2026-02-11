@@ -351,8 +351,8 @@ def submit_pick_list(items):
 								"picked_qty": item.picked_qty
 							})
 		doc.submit()
-		#Get associated delivery note
-		delivery_note = frappe.db.get_value('Delivery Note', {'pick_list': pick_list}, 'name')
+		#Get associated delivery note from Delivery Note Item
+		delivery_note = frappe.db.get_value('Delivery Note Item', {'against_pick_list': pick_list}, 'parent')
 		delivery_notes.update({pick_list: delivery_note})
 	#Add to totes
 	for tote in totes:
@@ -428,8 +428,8 @@ def mark_as_picked(picked_items, user, all_items):
 			"ais_picked_by": picked_by
 		})
 		doc.save()
-		#Get associated delivery note
-		delivery_note = frappe.db.get_value('Delivery Note', {'pick_list': pick_list}, 'name')
+		#Get associated delivery note from Delivery Note Item
+		delivery_note = frappe.db.get_value('Delivery Note Item', {'against_pick_list': pick_list}, 'parent')
 		delivery_notes.update({pick_list: delivery_note})
 	#Add to totes
 	for tote in totes:
