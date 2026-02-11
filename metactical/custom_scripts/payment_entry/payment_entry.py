@@ -214,6 +214,11 @@ def check_if_can_be_refunded(doc):
 @frappe.whitelist()
 def request_refund(doc):
 	doc = frappe.get_doc("Payment Entry", doc)
+	refund_requested = frappe.db.get_value("USAePay Refund", {"payment_entry": doc.name, "status": "Pending"}, "name")
+	if refund_requested:
+		frappe.msgprint("Refund request is already pending for this Payment Entry.")
+		return True
+
 	if not doc.reference_no:
 		references = doc.references
 		for ref in references:
@@ -222,7 +227,7 @@ def request_refund(doc):
 				continue_loop, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref, making_refund=True)
 				if not continue_loop:
 					continue
-				     
+ 
 				refund_doc = frappe.new_doc("USAePay Refund")
 				refund_doc.sales_return = sales_invoice.name
 				refund_doc.sales_order = sales_order
@@ -236,14 +241,14 @@ def request_refund(doc):
 				refund_doc.save()
 				frappe.db.commit()
 		
-		frappe.msgprint("Refund request has been created. Please wait for the approval.")
+				frappe.msgprint("Refund request has been created. Please wait for the approval.")
 		return True
 	else:
 		frappe.msgprint("Refund is not allowed for this Payment Entry.")
 		return False		
 
 def make_refund(refund_doc, payment_entry):
-	doc = frappe.get_doc("Payment Entry", doc)
+	doc = frappe.get_doc("Payment Entry", payment_entry)
 	if not doc.reference_no:
 		references = doc.references
 		for ref in references:
@@ -268,6 +273,8 @@ def make_refund(refund_doc, payment_entry):
 					frappe.msgprint(f"$ {doc.paid_amount} refunded successfully for {sales_order}")
 					
 					log = frappe.get_doc("USAePay Log", log)
+     
+					frappe.db.set_value("USAePay Refund", refund_doc, "status", "Refunded", update_modified=False)
 					create_doc_comment(doc, log)
 					return True
 				else:

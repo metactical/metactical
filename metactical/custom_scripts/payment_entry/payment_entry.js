@@ -150,7 +150,7 @@ var adjust_payment_button = function (
             },
         });
     } else {
-        frm.remove_custom_button("Refund Payment", "USAePay");
+        frm.remove_custom_button("Adjust Payment", "USAePay");
     }
 };
 
@@ -234,7 +234,7 @@ var refund_payment_button = function (
                 if (r.message) {
                     console.log("can be refunded");
                     frm.add_custom_button(
-                        __("Refund Payment"),
+                        __("Request Refund"),
                         function () {
                             frappe.confirm(
                                 __("Are you sure you want to refund this Payment?"),
@@ -246,12 +246,12 @@ var refund_payment_button = function (
                         "USAePay"
                     );
                 } else {
-                    frm.remove_custom_button("Refund Payment", "USAePay");
+                    frm.remove_custom_button("Request Refund", "USAePay");
                 }
             },
         });
     } else {
-        frm.remove_custom_button("Refund Payment", "USAePay");
+        frm.remove_custom_button("Request Refund", "USAePay");
     }
 };
 
