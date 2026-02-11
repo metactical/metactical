@@ -212,10 +212,39 @@ def check_if_can_be_refunded(doc):
 	return False
 
 @frappe.whitelist()
-def make_refund(doc):
+def request_refund(doc):
 	doc = frappe.get_doc("Payment Entry", doc)
 	if not doc.reference_no:
-		usaepay_transaction_key = ""
+		references = doc.references
+		for ref in references:
+			# check if the reference is a Sales Invoice and if it can be refunded
+			if ref.reference_doctype == "Sales Invoice":
+				continue_loop, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref, making_refund=True)
+				if not continue_loop:
+					continue
+				     
+				refund_doc = frappe.new_doc("USAePay Refund")
+				refund_doc.sales_return = sales_invoice.name
+				refund_doc.sales_order = sales_order
+				refund_doc.amount_to_refund = doc.paid_amount
+				refund_doc.status = "Pending"
+				refund_doc.mode_of_payment = doc.mode_of_payment
+    
+				refund_doc.payment_entry = doc.name
+				refund_doc.customer = doc.party if doc.party_type == "Customer" else None
+				refund_doc.lead_source = doc
+				refund_doc.save()
+				frappe.db.commit()
+		
+		frappe.msgprint("Refund request has been created. Please wait for the approval.")
+		return True
+	else:
+		frappe.msgprint("Refund is not allowed for this Payment Entry.")
+		return False		
+
+def make_refund(refund_doc, payment_entry):
+	doc = frappe.get_doc("Payment Entry", doc)
+	if not doc.reference_no:
 		references = doc.references
 		for ref in references:
 			# check if the reference is a Sales Invoice and if it can be refunded
@@ -228,7 +257,7 @@ def make_refund(doc):
 				if not usaepay_transaction_key:
 					frappe.msgprint(f"Transaction Key not found in {sales_order}. Please check the Sales Order.")
 					continue
-	
+ 
 				response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
 				if response:
 					# update usaepay log and set the reference_no in the Payment Entry
@@ -249,7 +278,8 @@ def make_refund(doc):
 		return False
 	else:
 		frappe.msgprint("Refund is not allowed for this Payment Entry.")
-		return False				
+		return False		
+		
 
 @frappe.whitelist()
 def update_payment(doc):
