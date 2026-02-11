@@ -262,7 +262,7 @@ def make_refund(refund_doc, payment_entry):
 				if not usaepay_transaction_key:
 					frappe.msgprint(f"Transaction Key not found in {sales_order}. Please check the Sales Order.")
 					continue
-	
+ 
 				response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
 				if response:
 					# update usaepay log and set the reference_no in the Payment Entry
@@ -285,7 +285,8 @@ def make_refund(refund_doc, payment_entry):
 		return False
 	else:
 		frappe.msgprint("Refund is not allowed for this Payment Entry.")
-		return False				
+		return False		
+		
 
 @frappe.whitelist()
 def update_payment(doc):
