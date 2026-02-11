@@ -237,7 +237,7 @@ def request_refund(doc):
     
 				refund_doc.payment_entry = doc.name
 				refund_doc.customer = doc.party if doc.party_type == "Customer" else None
-				refund_doc.lead_source = frappe.db.get_value("Sales Order", sales_order, "source")
+				refund_doc.lead_source = doc
 				refund_doc.save()
 				frappe.db.commit()
 		
