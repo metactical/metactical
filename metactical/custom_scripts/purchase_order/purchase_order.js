@@ -1,7 +1,7 @@
 frappe.ui.form.on('Purchase Order', {
 	refresh: function(frm){
 		var allow_tax_edit = 1;
-		if(frm.doc.__onload['ais_allow_tax_edit']){
+		if(frm.doc.__onload && frm.doc.__onload['ais_allow_tax_edit']){
 			allow_tax_edit = 0;
 		}
 		frm.set_df_property('taxes', 'read_only', allow_tax_edit);
@@ -37,11 +37,10 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 		}
 
 		/* eslint-disable */
-		// no idea where me is coming from
-		
 		// Metactical Customization: Made company address available in shipping address 
 		// filter in PO even when drop ship PO
 		if(this.frm.get_field('shipping_address')) {
+			var me = this;
 			this.frm.set_query("shipping_address", function() {
 				if(me.frm.doc.customer) {
 					return {
