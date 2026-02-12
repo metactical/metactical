@@ -25,6 +25,9 @@ def validate_party_address(self, party, party_type, billing_address, shipping_ad
 
 	if self.doctype == "Sales Order" and self.ifw_store_pickup:
 		return
+
+	if self.doctype == "Delivery Note":
+		return
 	
 	if billing_address or shipping_address:
 		party_address = frappe.get_all(
