@@ -381,27 +381,51 @@ def get_item_details(item_code):
         item_detail_apis = frappe.get_all("Item Import Validation", filters={"parentfield": "item_detail_apis"}, fields=["*"])
         item_details = frappe.get_doc("Item", item_code).item_detail
         
-        responses_list = []
+        failed_slugs = []
             
         for item_detail in  item_details:
+            setting_found = False
+            site_name = item_detail.price_list.split("-")[-1].strip()
+
             for item_detail_api in item_detail_apis:
                 if item_detail.price_list == item_detail_api.price_list:
+                    setting_found = True
                     url =item_detail_api.api_url + "?slug=" + item_detail.slug
-
+                    
                     response = requests.get(url, headers={"Authorization": "Bearer " + item_detail_api.api_key})
                     if response.status_code == 200:
                         data = response.json()
                         
                         if data.get("Found") == False:
-                            site_name = item_detail_api.price_list.split("-")[-1].strip()
-                            frappe.msgprint(f"Slug <b>{item_detail.slug}</b> not found in {site_name}")
+                            failed_slugs.append({
+                                "message": f"<span class='text-danger'>Slug {item_detail.slug} not found in {site_name}</span>"
+                            })
+                                                
                         else:
-                            data["price_list"] = item_detail.price_list
-                            responses_list.append(data)
+                            item_detail_doc = frappe.get_doc("Item Detail", item_detail.name)
+                            item_detail_doc.item_name = data.get("Name", "")
+                            item_detail_doc.description = data.get("Description", "")
+                            item_detail_doc.slug = data.get("slug", "")
+                            item_detail_doc.productmetasedescription = data.get("ProductMetaSEDescription", "")
+                            item_detail_doc.productmetasekeywords = data.get("ProductMetaSEKeywords", "")
+                            item_detail_doc.productmetasetitle = data.get("ProductMetaSETitle", "")
+                            item_detail_doc.h2 = data.get("h2", "")
+                            item_detail_doc.h3 = data.get("h3", "")
+                            item_detail_doc.save()    
+                            
+                            failed_slugs.append({
+                                "message": f"<span class='text-success'>Successfully updated details for slug {item_detail.slug} from {site_name}</span>"
+                            })
+
                     else:
                         frappe.msgprint("Failed to fetch details for slug {0} from API {1}. Status code: {2}".format(item_detail.slug, item_detail_api.api_url, response.status_code))
-
-        return responses_list
+            if not setting_found:
+                failed_slugs.append({
+                    "message": "<span class='text-warning'>No API setting found for price list {0}</span>".format(item_detail.price_list)
+                })
+            
+                
+        return failed_slugs
     except Exception as e:
         frappe.log_error(title="Error in get_item_details API", message=frappe.get_traceback())
         frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
