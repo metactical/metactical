@@ -4,6 +4,7 @@ from metactical.metactical.doctype.item_inventory_output.item_inventory_output i
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
 import datetime
+import requests
 
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
@@ -373,3 +374,34 @@ def update_child_table(item_names, child_table, child_table_field, updates, upda
                 total_updated_items += 1
                 
     return total_updated_items
+
+@frappe.whitelist()
+def get_item_details(item_code):
+    try:
+        item_detail_apis = frappe.get_all("Item Import Validation", filters={"parentfield": "item_detail_apis"}, fields=["*"])
+        item_details = frappe.get_doc("Item", item_code).item_detail
+        
+        responses_list = []
+            
+        for item_detail in  item_details:
+            for item_detail_api in item_detail_apis:
+                if item_detail.price_list == item_detail_api.price_list:
+                    url =item_detail_api.api_url + "?slug=" + item_detail.slug
+
+                    response = requests.get(url, headers={"Authorization": "Bearer " + item_detail_api.api_key})
+                    if response.status_code == 200:
+                        data = response.json()
+                        
+                        if data.get("Found") == False:
+                            site_name = item_detail_api.price_list.split("-")[-1].strip()
+                            frappe.msgprint(f"Slug <b>{item_detail.slug}</b> not found in {site_name}")
+                        else:
+                            data["price_list"] = item_detail.price_list
+                            responses_list.append(data)
+                    else:
+                        frappe.msgprint("Failed to fetch details for slug {0} from API {1}. Status code: {2}".format(item_detail.slug, item_detail_api.api_url, response.status_code))
+
+        return responses_list
+    except Exception as e:
+        frappe.log_error(title="Error in get_item_details API", message=frappe.get_traceback())
+        frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")

@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-13 09:37:35.885608",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "validation_apis",
+  "section_break_itpt",
+  "item_detail_apis"
+ ],
+ "fields": [
+  {
+   "allow_bulk_edit": 1,
+   "fieldname": "validation_apis",
+   "fieldtype": "Table",
+   "label": "Item Import Validation APIs",
+   "options": "Item Import Validation"
+  },
+  {
+   "fieldname": "section_break_itpt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item_detail_apis",
+   "fieldtype": "Table",
+   "label": "Item Detail APIs (Slugs and Descriptions)",
+   "options": "Item Import Validation"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-02-13 09:40:45.164276",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Storebuilder Sync Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
