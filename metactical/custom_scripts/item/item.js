@@ -1,5 +1,6 @@
 frappe.ui.form.on("Item", {
     refresh: function (frm) {
+        frm.trigger("add_item_details_action_buttons");
         metactical.utils.load_website_specifications_options(frm);
     },
     neb_copy_from_item_group: function (frm) {
@@ -57,7 +58,50 @@ frappe.ui.form.on("Item", {
             },
         });
     },
-    
+    add_item_details_action_buttons: function(frm) {
+        const grid = frm.fields_dict["item_detail"].grid;
+        if (!grid) return;
+
+        // Avoid adding buttons multiple times
+        if (grid.custom_buttons_added) return;
+        grid.custom_buttons_added = true;
+
+        grid.add_custom_button(__('Load Data From SB'), function() {
+            frappe.call({
+                freeze: true,
+                method: "metactical.custom_scripts.item.item.get_item_details",
+                args: {
+                    item_code: frm.doc.item_code
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        const responses = r.message;
+                        const existing_details = frm.doc.item_detail || [];
+                        
+                        // update existing details and collect slugs for which we got responses
+                        existing_details.forEach(detail => {
+                            const response = responses.find(res => res.slug === detail.slug && res.price_list === detail.price_list);
+                            // console.log(response)
+                            if (response) {
+                                detail.item_name = response.Name;
+                                detail.description = response.Description;
+                                detail.slug = response.slug;
+                                detail.productmetasedescription = response.ProductMetaSEDescription;
+                                detail.productmetasekeywords = response.ProductMetaSEKeywords;
+                                detail.productmetasetitle = response.ProductMetaSETitle;
+                                detail.h2 = response.h2;
+                                detail.h3 = response.h3;
+                            }
+                        });
+
+                        frm.refresh_field("item_detail");
+                        frm.dirty();
+                        frm.save();
+                    }
+                },
+            });
+        });
+    }
 });
 
 frappe.ui.form.on("MT Item Website Specification", {
