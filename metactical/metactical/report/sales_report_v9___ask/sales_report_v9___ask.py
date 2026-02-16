@@ -900,7 +900,7 @@ def get_date_last_received(item, supplier):
 						where 
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
-							and p.company = 'Ask Sports Pvt Ltd..'
+							and p.company = 'Ask Sports Pvt Ltd.'
 		""",(item))
 	if data:
 		date = data[0][0]
@@ -915,7 +915,7 @@ def get_sales_rev(item_code):
 		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s
-			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd..'
+			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
 			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", item_code, as_dict=1)
 
@@ -928,7 +928,7 @@ def get_nocust12months(last_year, item_code):
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
-			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd..'
+			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
 			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
