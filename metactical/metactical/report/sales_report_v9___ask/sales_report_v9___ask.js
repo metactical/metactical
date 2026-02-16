@@ -27,7 +27,7 @@ frappe.query_reports["Sales Report V9 - ASK"] = {
 				// if (!party_type) return;
 
 				return frappe.db.get_link_options("Supplier", txt);
-			},
+			}
 		},
 		{
 			"fieldname":"limit",
