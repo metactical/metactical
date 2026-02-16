@@ -25,6 +25,9 @@ def validate_party_address(self, party, party_type, billing_address, shipping_ad
 
 	if self.doctype == "Sales Order" and self.ifw_store_pickup:
 		return
+
+	if self.doctype == "Delivery Note":
+		return
 	
 	if billing_address or shipping_address:
 		party_address = frappe.get_all(
@@ -38,7 +41,7 @@ def validate_party_address(self, party, party_type, billing_address, shipping_ad
 			frappe.throw(_("Shipping Address does not belong to the {0}").format(party))
 
 def validate_company_linked_addresses(self):
-    return
+	return
 
 def set_order_defaults(
 	parent_doctype, parent_doctype_name, child_doctype, child_docname, trans_item

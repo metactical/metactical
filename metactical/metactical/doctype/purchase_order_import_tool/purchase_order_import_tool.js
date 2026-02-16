@@ -5,7 +5,8 @@
 frappe.provide("metactical.PurchaseOrderImportTool");
 frappe.provide("erpnext.buying");
 frappe.provide("erpnext.accounts.dimensions");
-{% include 'erpnext/public/js/controllers/buying.js' %};
+
+erpnext.buying.setup_buying_controller();
 
 frappe.ui.form.on('Purchase Order Import Tool', {
 	// refresh: function(frm) {

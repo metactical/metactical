@@ -125,11 +125,11 @@
 					</tr>
 				</thead>
 				<tbody>
-					<tr v-for="item in items">
+					<tr v-for="item in items" :key="item.item_code">
 						<td>{{ item.retail_sku }}</td>
 						<td>{{ item.item_name }}</td>
 						<td>
-							<input type="number" v-model="item.qty" @change="edit_item_qty(item.item_code, item.qty)">
+							<input type="number" v-model.number="item.qty" @change="edit_item_qty(item.item_code, item.qty)">
 						</td>
 						<td>
 							<button @click="delete_item(item.item_code)" alt="Delete">
@@ -147,10 +147,10 @@
 	{% endraw %}
 </div>
 <!-- js should be loaded in body! -->
-<script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>
-<!--<script type="text/javascript" src="/assets/js/libs.min.js"></script>-->
-<script type="text/javascript" src="/assets/js/frappe-web.min.js?ver={{ build_version }}"></script>
-<script type="text/javascript" src="/assets/js/bootstrap-4-web.min.js"></script>
+<!--<script type="text/javascript" src="/assets/frappe/js/lib/jquery/jquery.min.js"></script>-->
+<!--<script type="text/javascript" src="/assets/frappe/dist/js/frappe-web.min.js"></script>-->
+<!-- <script type="text/javascript" src="/assets/frappe/dist/js/frappe-web.bundle.js"></script> -->
+ {{ include_script('frappe-web.bundle.js') }}
 <script>
 	frappe.boot = {
 		sysdefaults: {

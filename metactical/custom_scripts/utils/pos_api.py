@@ -633,6 +633,8 @@ def update_sales_order(sales_order, form_data):
                 if (item['item_code'] == "2" and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != "2"):
                     item["name"] = sales_item.name
                     item["docname"] = sales_item.name
+                    item["conversion_factor"] = sales_item.conversion_factor
+                    item["uom"] = sales_item.uom
                     item["idx"] = i + 1
                     found = True
                     
@@ -645,9 +647,10 @@ def update_sales_order(sales_order, form_data):
         parent_doctype = sales_order.doctype
         parent_doctype_name = sales_order.name
         child_docname = "items"
-            
-        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
         
+        frappe.set_user("Administrator")    
+        
+        from erpnext.controllers.accounts_controller import update_child_qty_rate
         trans_items = json.dumps(items)
         
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
@@ -655,6 +658,7 @@ def update_sales_order(sales_order, form_data):
         frappe.db.commit()
         return {"success": True, "message": ""}
     except Exception as e:
+        frappe.log_error(title='Update Sales Order Error', message=frappe.get_traceback())
         return {"success": False, "error": str(e)}
 
 def submit_sales_order(sales_order, form_data, log):
@@ -1315,7 +1319,11 @@ def create_return_invoice(form_data, invoiceId):
             total_payment += payment["Amount"]
             
         if total_payment > abs(sales_return.grand_total + sales_return.write_off_amount):
-            frappe.throw("Total payment amount cannot be greater than the total return amount")
+            extra_amount = total_payment - abs(sales_return.grand_total + sales_return.write_off_amount)
+            if extra_amount < write_off_limit:
+                sales_return.payments[0].amount += extra_amount
+            else:
+                frappe.throw("Total payment amount cannot be greater than the total return amount")
         
         sales_return.advances = []
         sales_return.update_outstanding_for_self = False
