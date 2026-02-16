@@ -121,7 +121,7 @@ def continue_to_payment(order, payment_detail):
 		if payment_detail['transactions'] and succesfull_transaction["paymentGatewayAlias"] != "interacetransfer":
 			if order.neb_usaepay_transaction_key or succesfull_transaction['paymentGatewayAlias'] == 'paypalexpress':
 				payment = create_payment(payment_detail, order, company, logger)
-				logger.error(f"Draft payment {payment.name} created for order {order.name}")
+				# logger.error(f"Draft payment {payment.name} created for order {order.name}")
 			else:
 				logger.error(f"Creating payment entry for order {order.name} from usaepay")
 				process_payment_entry(succesfull_transaction, order)
