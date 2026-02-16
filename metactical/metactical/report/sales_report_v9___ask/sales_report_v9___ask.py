@@ -1126,9 +1126,6 @@ def get_open_po_qty(item,supplier, warehouse=None):
 								and p.company = "Ask Sports Pvt Ltd."
 						""" + where,(item), as_dict=True)
 
-	if item == "UF1032102-3":
-		frappe.log_error(title="get_open_po_qty", message=f"POS: {pos}, PRS: {prs}")
-
 	total_po_qty = 0
 	total_pr_qty = 0
  
