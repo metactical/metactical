@@ -134,9 +134,9 @@ def create_usaepay_log(doctype, docname, action):
 def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None):
 	usaepay_account = None
 	if lead_source:
-		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source})
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source, "parent":"USAePay Settings"})
 	elif merchant_id:
-		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id})
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id, "parent":"USAePay Settings"})
 	elif transaction_key:
 		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "source")
 
