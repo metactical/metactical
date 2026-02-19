@@ -1267,10 +1267,14 @@ def create_return_invoice(form_data, invoiceId):
         sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
         total_restock_fee = 0.0
         
-        for item in items:
-            for updated_item in formatted_items:
+        for updated_item in formatted_items:
+            for item in items:
                 if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
                     (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
+                    
+                    if (updated_item["price_list_rate"] != item.price_list_rate):
+                        continue
+                    
                     item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
                     item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
                     item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
@@ -1279,6 +1283,7 @@ def create_return_invoice(form_data, invoiceId):
                     item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
                     item.rate = item.price_list_rate - item.discount_amount
                     filtered_items.append(item)
+                    break
 
 
         for items in form_data["Items"]:

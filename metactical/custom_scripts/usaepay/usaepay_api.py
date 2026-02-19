@@ -433,7 +433,8 @@ def create_payment_entry(doc, data, log, logger=None):
 
 		pe = get_payment_entry(doc.doctype, doc.name)
 		pe.mode_of_payment = mode_of_payment
-		pe.paid_amount = data["object"]["auth_amount"] if "auth_amount" in data["object"] else data["object"]["amount"]
+		pe.paid_amount = float(data["object"]["auth_amount"]) if "auth_amount" in data["object"] else float(data["object"]["amount"])
+	
 		pe.reference_no = data["object"]["key"]
 		pe.reference_date = frappe.utils.now()
 		pe.set_missing_values()

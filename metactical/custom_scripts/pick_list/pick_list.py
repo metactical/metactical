@@ -209,7 +209,14 @@ class CustomPickList(PickList):
 		super(CustomPickList, self).on_cancel()
 
 		# Metactical Customization: Delete delivery notes and clear submitted date in sales orders
-		delivery_notes = frappe.get_all('Delivery Note', filters={'pick_list': self.name, 'docstatus': 0}, fields=['name'])
+		delivery_notes = frappe.db.sql("""
+						SELECT DISTINCT dni.parent as name
+						FROM `tabDelivery Note Item` dni
+						INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+						WHERE dni.against_pick_list = %(pick_list)s
+								AND dn.docstatus = 0
+						""", {"pick_list": self.name}, as_dict=1)
+  
 		for delivery_note in delivery_notes:
 			# Delete shipments first before deleting delivery notes
 			shipments = frappe.db.sql("""
