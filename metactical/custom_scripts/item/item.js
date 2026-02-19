@@ -1,5 +1,6 @@
 frappe.ui.form.on("Item", {
     refresh: function (frm) {
+        frm.trigger("add_item_details_action_buttons");
         metactical.utils.load_website_specifications_options(frm);
     },
     neb_copy_from_item_group: function (frm) {
@@ -57,7 +58,38 @@ frappe.ui.form.on("Item", {
             },
         });
     },
-    
+    add_item_details_action_buttons: function(frm) {
+        const grid = frm.fields_dict["item_detail"].grid;
+        if (!grid) return;
+
+        // Avoid adding buttons multiple times
+        if (grid.custom_buttons_added) return;
+        grid.custom_buttons_added = true;
+
+        grid.add_custom_button(__('Load Data From SB'), function() {
+            frappe.call({
+                freeze: true,
+                method: "metactical.custom_scripts.item.item.get_item_details",
+                args: {
+                    item_code: frm.doc.item_code
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        frm.reload_doc();
+                        
+                        let messages = r.message
+                        messages.forEach(msg => {
+                            frappe.msgprint({
+                                title: __('Item Detail Load Status'),
+                                message: msg.message,
+                                indicator: msg.success ? 'green' : 'red'
+                            });
+                        })
+                    }
+                },
+            });
+        });
+    },
 });
 
 frappe.ui.form.on("MT Item Website Specification", {

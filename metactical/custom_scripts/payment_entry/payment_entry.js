@@ -150,7 +150,7 @@ var adjust_payment_button = function (
             },
         });
     } else {
-        frm.remove_custom_button("Refund Payment", "USAePay");
+        frm.remove_custom_button("Adjust Payment", "USAePay");
     }
 };
 
@@ -234,7 +234,7 @@ var refund_payment_button = function (
                 if (r.message) {
                     console.log("can be refunded");
                     frm.add_custom_button(
-                        __("Refund Payment"),
+                        __("Request Refund"),
                         function () {
                             frappe.confirm(
                                 __("Are you sure you want to refund this Payment?"),
@@ -246,12 +246,12 @@ var refund_payment_button = function (
                         "USAePay"
                     );
                 } else {
-                    frm.remove_custom_button("Refund Payment", "USAePay");
+                    frm.remove_custom_button("Request Refund", "USAePay");
                 }
             },
         });
     } else {
-        frm.remove_custom_button("Refund Payment", "USAePay");
+        frm.remove_custom_button("Request Refund", "USAePay");
     }
 };
 
@@ -299,12 +299,12 @@ var void_payment = function (frm) {
 
 var make_refund = function (frm) {
     frappe.call({
-        method: "metactical.custom_scripts.payment_entry.payment_entry.make_refund",
+        method: "metactical.custom_scripts.payment_entry.payment_entry.request_refund",
         args: {
             doc: frm.doc.name,
         },
         freeze: true,
-        freeze_message: "Refunding Payment in Progress...",
+        freeze_message: "Refund Request Payment in Progress...",
         callback: function (res) {
             if (res.message) {
                 frm.reload_doc();
