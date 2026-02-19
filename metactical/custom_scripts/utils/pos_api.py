@@ -348,6 +348,7 @@ def process_manual_order(form_data):
 		sales_invoice.company_address = pos_profile_doc.company_address
 		sales_invoice.shipping_address_name = pos_profile_doc.company_address
 		sales_invoice.update_stock = 1
+		sales_invoice.pos_profile = pos_profile
   
 		for item in sales_invoice.items:
 			item.warehouse = pos_profile_doc.warehouse
@@ -1264,6 +1265,7 @@ def create_return_invoice(form_data, invoiceId):
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
         filtered_items = []
+        sales_return.is_pos = 1
         sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
         total_restock_fee = 0.0
         
