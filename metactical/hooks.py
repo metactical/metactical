@@ -249,6 +249,7 @@ override_whitelisted_methods = {
 	"erpnext.selling.doctype.sales_order.sales_order.update_status": "metactical.custom_scripts.sales_order.sales_order.update_status",
 	"erpnext.stock.doctype.pick_list.pick_list.PickList.set_item_locations": "metactical.custom_scripts.pick_list.pick_list.CustomPickList.set_item_locations",
 	"frappe.desk.doctype.tag.tag.add_tag": "metactical.custom_scripts.tag.tag.add_tag",
+	"frappe.desk.doctype.tag.tag.add_tags": "metactical.custom_scripts.tag.tag.add_tags",
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
 	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title",
