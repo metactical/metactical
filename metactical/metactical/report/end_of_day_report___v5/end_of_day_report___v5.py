@@ -302,27 +302,55 @@ def get_website_stores_data(filters, location, sources):
 def get_website_orders_sql(source, date, end_date=None, field="total_without_tax"):
 	if end_date is None:
 		end_date = date
-
-	sql = """
-		SELECT 
-			COALESCE(SUM(net_total), 0) AS `{field}`
-		FROM
-			`tabSales Order`
-		JOIN
-			`tabGL Entry` ON `tabSales Order`.name = `tabGL Entry`.against_voucher
+ 
+	sql = """SELECT COALESCE(SUM(`tabSales Order`.net_total), 0) AS `{field}`
+		FROM `tabSales Order`
+		JOIN `tabPayment Entry Reference` ON `tabPayment Entry Reference`.reference_name = `tabSales Order`.name
+		JOIN `tabPayment Entry` ON `tabPayment Entry`.name = `tabPayment Entry Reference`.parent	
 		WHERE
 			`tabSales Order`.source = %(source)s
 			AND `tabSales Order`.transaction_date BETWEEN %(date)s AND %(end_date)s
 			AND `tabSales Order`.docstatus = 1
-			AND `tabGL Entry`.is_cancelled = 0
-	""".format(field=field)
+			AND `tabPayment Entry`.docstatus = 1
+			AND `tabPayment Entry Reference`.reference_doctype = "Sales Order"
+		""".format(field=field)
+	
+	total_net_advance_paid = frappe.db.sql(sql, {"source": source, "date": date, "end_date": end_date}, as_dict=1)
 
-	return frappe.db.sql(sql, {
-		"source": source,
-		"date": date,
-		"end_date": end_date
-	}, as_dict=1)
+	sales_invoice_totals = frappe.db.sql(f"""
+		SELECT
+			COALESCE(SUM(CASE 
+				WHEN per.advance_voucher_type = 'Sales Order' THEN si.net_total 
+				ELSE 0 END), 0) AS `{field}_with_advances`,
+			
+			COALESCE(SUM(CASE 
+				WHEN per.advance_voucher_type IS NULL THEN si.net_total 
+				ELSE 0 END), 0) AS `{field}_without_advances`
+				
+		FROM `tabSales Invoice` si
+		JOIN `tabPayment Entry Reference` per 
+			ON per.reference_name = si.name
+		JOIN `tabPayment Entry` pe 
+			ON pe.name = per.parent
+		WHERE
+			si.source = %s
+			AND pe.posting_date BETWEEN %s AND %s
+			AND si.docstatus = 1
+			AND pe.docstatus = 1
+			AND per.reference_doctype = "Sales Invoice"
+	""", (source, date, end_date), as_dict=1)
 
+
+	# get values safely from query results
+	so_total = total_net_advance_paid[0].get(field, 0) if total_net_advance_paid else 0
+	si_total = sales_invoice_totals[0].get(f"{field}_with_advances", 0) if sales_invoice_totals else 0
+	si_p_total = sales_invoice_totals[0].get(f"{field}_without_advances", 0) if sales_invoice_totals else 0
+
+	# sum them
+	total = so_total + si_total + si_p_total
+ 
+	# return in required format
+	return [frappe._dict({field: total})]
  
 def get_stores_sql(source, date, end_date=None, field="total_without_tax"):
 	if end_date is None:
