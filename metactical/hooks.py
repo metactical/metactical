@@ -193,7 +193,8 @@ override_doctype_class = {
 	"Prepared Report": "metactical.custom_scripts.prepared_report.prepared_report.CustomPreparedReport",
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 	"Item": "metactical.custom_scripts.item.item.CustomItem",
-	"Address": "metactical.custom_scripts.address.address.CustomAddress"
+	"Address": "metactical.custom_scripts.address.address.CustomAddress",
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
 }
 
 # Scheduled Tasks
