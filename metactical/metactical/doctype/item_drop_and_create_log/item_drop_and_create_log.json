@@ -31,12 +31,14 @@
   {
    "fieldname": "deletion_response",
    "fieldtype": "Text",
-   "label": "Deletion Response"
+   "label": "Deletion Response",
+   "read_only": 1
   },
   {
    "fieldname": "creation_response",
    "fieldtype": "Text",
-   "label": "Creation Response"
+   "label": "Creation Response",
+   "read_only": 1
   },
   {
    "fieldname": "item_name",
@@ -87,7 +89,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 08:21:21.099064",
+ "modified": "2026-01-30 02:10:44.404182",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Drop and Create Log",

@@ -326,6 +326,10 @@ def get_manifest_shipments(manifest_shipments_url, media_type):
 					if 'customer-references' in shipment_info:
 						refs = shipment_info['customer-references']
 						erp_shipment_name = refs.get('customer-ref-1')
+					else:
+						shipment_exists = frappe.db.exists("Canada Post Shipment", {"shipment_id": shipment_info.get('shipment-id')})
+						if shipment_exists:
+							erp_shipment_name = frappe.db.get_value('Canada Post Shipment', shipment_exists, "parent")
 					
 					# Try to get additional data from ERP if shipment exists
 					warehouse = None
@@ -649,42 +653,51 @@ def get_pickup_contacts():
 @frappe.whitelist()
 def get_group_details(group_id):
 	"""
-	Extract warehouse and date from group_id.
+	Extract warehouse and date from group_id by reverse-engineering the group creation logic.
 	Group ID format: "WarehousePrefix-YYYYMMDD"
 	
 	Args:
-		group_id: Group ID string
+		group_id: Group ID string (e.g., "R01-20260123")
 	
 	Returns:
-		dict: Extracted warehouse prefix and pickup date
+		dict: Extracted warehouse prefix, pickup date, and exact warehouse name
 	"""
 	try:
 		parts = group_id.split("-")
 		if len(parts) < 2:
 			frappe.throw(_("Invalid group ID format"))
 		
-		warehouse_prefix = parts[0]
 		date_str = parts[1]
 		
 		# Convert date from YYYYMMDD to YYYY-MM-DD
 		pickup_date = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
 		
-		# Find warehouse that matches the prefix
+		# Get all active warehouses
 		warehouses = frappe.get_all(
 			"Warehouse",
 			filters={
 				"disabled": 0,
-				"is_group": 0,
-				"name": ["like", f"{warehouse_prefix}%"]
+				"is_group": 0
 			},
 			fields=["name"]
 		)
 		
-		warehouse_name = warehouses[0].name if warehouses else None
+		# Loop through warehouses and apply the same group_id creation logic
+		# until we find an exact match
+		warehouse_name = None
+		for warehouse in warehouses:
+			# Apply the same logic used to create group_id:
+			# warehouse.split("-")[0].replace(" ", "")
+			warehouse_prefix = warehouse.name.split("-")[0].replace(" ", "")
+			generated_group_id = f"{warehouse_prefix}-{date_str}"
+			
+			if generated_group_id == group_id:
+				warehouse_name = warehouse.name
+				break
 		
 		return {
 			"group_id": group_id,
-			"warehouse_prefix": warehouse_prefix,
+			"warehouse_prefix": parts[0],
 			"pickup_date": pickup_date,
 			"warehouse_name": warehouse_name
 		}
