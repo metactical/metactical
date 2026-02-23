@@ -188,22 +188,48 @@ class CustomPickList(PickList):
 		# 	delivery_note.source = pick_list.ais_source
 		# delivery_note.save()
 
-		delivery_note = create_dn_for_pick_lists(self.name)
 		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
-		sales_orders = set(sales_orders)
-		for sales_order in sales_orders:
-			delivery_note.update({
-				'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule'),
-				"disable_rounded_total": 1
-			})
-			#Add pick list submitted date in sales order
-			sales_doc = frappe.get_doc("Sales Order", sales_order)
-			sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
-			sales_doc.save()
-		delivery_note.save()
-		
-
+		so = sales_orders[0] if sales_orders else None
 	
+		if so:
+			delivery_note = create_delivery_note_from_sales_order(so)
+			items = delivery_note.items
+			dn_items = []
+			total_discount_amount = 0
+   
+			for item in items:
+				for location in self.locations:
+					if location.sales_order_item == item.so_detail:
+						distributed_discount_amount = frappe.db.get_value('Sales Order Item', item.so_detail, 'distributed_discount_amount') or 0
+						total_ordered = frappe.db.get_value('Sales Order Item', item.so_detail, 'qty') or 0
+						if total_ordered:
+							discount_amount = flt(distributed_discount_amount) / flt(total_ordered)
+							total_discount_amount += discount_amount * flt(location.picked_qty)
+						item.qty = location.picked_qty
+						item.warehouse = location.warehouse
+						item.pick_list_item = location.name
+						item.against_pick_list = self.name
+      
+						dn_items.append(item)
+						break
+  
+			for sales_order in sales_orders:
+				delivery_note.update({
+					'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule'),
+					"disable_rounded_total": 1
+				})
+    
+				#Add pick list submitted date in sales order
+				sales_doc = frappe.get_doc("Sales Order", sales_order)
+				sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
+				sales_doc.save()
+  
+			delivery_note.items = dn_items
+			delivery_note.discount_amount = total_discount_amount
+			
+			delivery_note.save()
+			frappe.db.commit()
+		
 	
 	def on_cancel(self):
 		super(CustomPickList, self).on_cancel()
