@@ -206,6 +206,8 @@ class CustomPickList(PickList):
 							discount_amount = flt(distributed_discount_amount) / flt(total_ordered)
 							total_discount_amount += discount_amount * flt(location.picked_qty)
 						item.qty = location.picked_qty
+						item.pick_list_item = location.name
+						item.against_pick_list = self.name
       
 						dn_items.append(item)
 						break
