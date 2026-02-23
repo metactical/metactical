@@ -267,9 +267,10 @@ def create_material_request(**args):
 	source_warehouse = "W01-WHS-Active Stock - " + frappe.db.get_value("Company", init_data[0].company, "abbr")
 	
 	doc = frappe.new_doc("Material Request")
+	schedule_date = now()
 	doc.update({
 		"material_request_type": "Material Transfer",
-		"schedule_date": now(),
+		"schedule_date": schedule_date,
 	})
 
 	for row in init_data:
@@ -280,8 +281,8 @@ def create_material_request(**args):
 			transit_warehouse = "R02-Edm-Active Stock - " + frappe.db.get_value("Company", row.company, "abbr")
 		else:
 			transit_warehouse = get_transit_warehouse(row.warehouse)
-	
-		if stock_levels > 0 and transit_warehouse != "":
+		
+		if stock_levels > 0 and transit_warehouse != "" and row.qty > 0:
 			doc.append("items", {
 				"from_warehouse": source_warehouse,
 				"warehouse": transit_warehouse,
@@ -290,7 +291,8 @@ def create_material_request(**args):
 				"uom": row.uom,
 				"stock_uom": row.stock_uom,
 				"ifw_location": row.ifw_location,
-				"conversion_factor": row.conversion_factor
+				"conversion_factor": row.conversion_factor,
+				"schedule_date": schedule_date
 			})
 	doc.insert(ignore_permissions=True)
 	return doc
