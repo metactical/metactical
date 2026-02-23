@@ -135,11 +135,14 @@ class CustomItem(Item):
         # check website specification values
         validate_website_specifications(self)
         validate_item_group(self)
-        self.update_item_inventory_output()
         self.update_sb_tags()
         
         if self.drop_and_create_in_websites:
             self.create_item_deletion_log()
+            self.update_item_inventory_output()
+        else:
+            # Only trigger inventory output update if the item is not being dropped and created in websites
+            self.update_item_inventory_output()
             
     def update_sb_tags(self):
         if not self.neb_website_specifications:
@@ -239,6 +242,7 @@ class CustomItem(Item):
             item_deletion_log.insert(ignore_permissions=True)
             
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
+        
         self.reload()
 
 def validate_website_specifications(doc):
