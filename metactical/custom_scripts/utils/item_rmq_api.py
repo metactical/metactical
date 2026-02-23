@@ -1,4 +1,5 @@
 import frappe
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
@@ -74,7 +75,14 @@ def receive_deletion_message(parsedContent):
                 for variant in variants:
                     item = frappe.get_doc("Item", variant)
                     item.save()
-                                    
+                    
+                    is_product_bundle = frappe.db.exists('Product Bundle', item.item_code)
+                    if is_product_bundle:
+                        all_bins = get_all_bins_for_product_bundle(item.item_code)
+                        update_item_inventory_output(item_code=item.item_code, net_available_bins=all_bins, bundle=True, voucher_type=item.doctype)
+                    else:
+                        frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type=item.doctype, queue='default')
+                        
                 all_logs = frappe.get_all(
                     "Item Drop and Create Log",
                     filters={"product": item_code, "status": "Issued", "deleted": 1},

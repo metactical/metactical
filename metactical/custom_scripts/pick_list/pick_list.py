@@ -206,6 +206,9 @@ class CustomPickList(PickList):
 							discount_amount = flt(distributed_discount_amount) / flt(total_ordered)
 							total_discount_amount += discount_amount * flt(location.picked_qty)
 						item.qty = location.picked_qty
+						item.warehouse = location.warehouse
+						item.pick_list_item = location.name
+						item.against_pick_list = self.name
       
 						dn_items.append(item)
 						break
@@ -223,9 +226,9 @@ class CustomPickList(PickList):
   
 			delivery_note.items = dn_items
 			delivery_note.discount_amount = total_discount_amount
+			
 			delivery_note.save()
-			frappe.db.commit()
-		
+			frappe.db.commit()	
 	
 	def on_cancel(self):
 		super(CustomPickList, self).on_cancel()
