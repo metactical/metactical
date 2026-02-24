@@ -874,7 +874,8 @@ fixtures = [{
 			"Item-display_weight",
 			"Stock Entry Detail-custom_ais_active_qoh",
 			"POS Profile-neb_allow_manual_order",
-			"Address-neb_mobile_not_formatted"
+			"Address-neb_mobile_not_formatted",
+			"Supplier-variant_availability_rule"
 		]]]
 	},
 	{
