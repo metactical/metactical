@@ -54,7 +54,7 @@
 							>
 						</div>
 					</div>
-					<div :class="showDateFilters ? 'col-md-2' : 'col-md-6'">
+					<div :class="showDateFilters ? 'col-md-2' : 'col-md-3'">
 						<div class="form-group">
 							<label>&nbsp;</label>
 							<button 
@@ -66,8 +66,19 @@
 									<i class="fa fa-spinner fa-spin"></i> Loading...
 								</span>
 								<span v-else>
-									<i class="fa fa-download"></i> Load
+									<i class="fa fa-download"></i> {{ hasLoaded ? 'Re-Load' : 'Load' }}
 								</span>
+							</button>
+						</div>
+					</div>
+					<div class="col-md-3" v-if="!showDateFilters && hasLoadedData && filters.load_type === 'shipments_without_manifests' && availableGroups.length > 0">
+						<div class="form-group">
+							<label>&nbsp;</label>
+							<button 
+								class="btn btn-success btn-block" 
+								@click="openCreateManifestDialog"
+							>
+								<i class="fa fa-plus"></i> Create Manifest
 							</button>
 						</div>
 					</div>
@@ -371,6 +382,145 @@
 				<p class="text-muted mt-3">No manifests found for the selected date range</p>
 			</div>
 		</div>
+
+		<!-- Create Manifest Dialog -->
+		<div v-if="showCreateManifestDialog" class="modal" style="display: block; background: rgba(0,0,0,0.5);">
+			<div class="modal-dialog modal-lg">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Create Manifest</h5>
+						<button type="button" class="close" @click="closeCreateManifestDialog">
+							<span>&times;</span>
+						</button>
+					</div>
+					<div class="modal-body">
+						<div class="row">
+							<div class="col-md-6">
+								<div class="form-group">
+									<label>Warehouse <span class="text-danger">*</span></label>
+									<select 
+										v-model="manifestForm.warehouse" 
+										class="form-control"
+										@change="onWarehouseOrDateChange"
+									>
+										<option value="">Select a warehouse</option>
+										<option 
+											v-for="warehouse in availableWarehouses" 
+											:key="warehouse"
+											:value="warehouse"
+										>
+											{{ warehouse }}
+										</option>
+									</select>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="form-group">
+									<label>Pickup Date <span class="text-danger">*</span></label>
+									<select 
+										v-model="manifestForm.pickup_date" 
+										class="form-control"
+										@change="onWarehouseOrDateChange"
+									>
+										<option value="">Select a pickup date</option>
+										<option 
+											v-for="date in availablePickupDates" 
+											:key="date"
+											:value="date"
+										>
+											{{ formatDate(date) }}
+										</option>
+									</select>
+								</div>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label>Pickup Company <span class="text-danger">*</span></label>
+							<select 
+								v-model="manifestForm.pickup_company" 
+								class="form-control"
+							>
+								<option value="">Select pickup company</option>
+								<option 
+									v-for="company in companies" 
+									:key="company.name"
+									:value="company.name"
+								>
+									{{ company.company_name || company.name }}
+								</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<label>Pickup Address <span class="text-danger">*</span></label>
+							<select 
+								v-model="manifestForm.pickup_address" 
+								class="form-control"
+							>
+								<option value="">Select pickup address</option>
+								<option 
+									v-for="address in companyAddresses"
+									:key="address.name"
+									:value="address.name"
+								>
+									{{ address.address_title || address.name }} - {{ address.city }}, {{ address.state }}
+								</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<label>Pickup Contact Person <span class="text-danger">*</span></label>
+							<select 
+								v-model="manifestForm.pickup_contact_person" 
+								class="form-control"
+							>
+								<option value="">Select contact person</option>
+								<option 
+									v-for="contact in pickupContacts" 
+									:key="contact.name"
+									:value="contact.name"
+								>
+									{{ contact.full_name || contact.name }}
+								</option>
+							</select>
+						</div>
+
+						<div v-if="manifestForm.warehouse && manifestForm.pickup_date" class="alert alert-info">
+							<strong>Shipments to be included:</strong>
+							<p class="mb-0 mt-2">
+								All untransmitted Canada Post shipments for 
+								<strong>{{ manifestForm.warehouse }}</strong> 
+								on <strong>{{ formatDate(manifestForm.pickup_date) }}</strong>
+							</p>
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button 
+							type="button" 
+							class="btn btn-secondary" 
+							@click="closeCreateManifestDialog"
+							:disabled="creatingManifest"
+						>
+							Cancel
+						</button>
+						<button 
+							type="button" 
+							class="btn btn-success" 
+							@click="createManifest"
+							:disabled="!isManifestFormValid || creatingManifest"
+						>
+							<span v-if="creatingManifest">
+								<i class="fa fa-spinner fa-spin"></i> Creating...
+							</span>
+							<span v-else>
+								<i class="fa fa-check"></i> Create Manifest
+							</span>
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 </template>
 
@@ -387,10 +537,28 @@ export default {
 			manifests: [],
 			warehouses: [],
 			availableGroups: [],
-			pickupDateFilter: '',
-			expandedManifests: {},
-			manifestShipmentsCache: {},
-			loadingManifestShipments: {},
+		groupDetails: [],
+		pickupDateFilter: '',
+		expandedManifests: {},
+		manifestShipmentsCache: {},
+		loadingManifestShipments: {},
+		
+		// Create Manifest Dialog
+		showCreateManifestDialog: false,
+		creatingManifest: false,
+		loadingWarehouseDetails: false,
+		manifestForm: {
+			group_id: '',
+			warehouse: '',
+			pickup_date: '',
+			pickup_company: '',
+			pickup_address: '',
+			pickup_contact_person: ''
+		},
+		warehouseAddress: null,
+		pickupContacts: [],
+		companies: [],
+		companyAddresses: [],
 			filters: {
 				load_type: "shipments_without_manifests",
 				warehouse: "",
@@ -427,9 +595,40 @@ export default {
 				return pickupDate === this.pickupDateFilter;
 			});
 		},
+		isManifestFormValid() {
+			return this.manifestForm.warehouse && 
+				   this.manifestForm.pickup_date && 
+				   this.manifestForm.pickup_company &&
+				   this.manifestForm.pickup_address && 
+				   this.manifestForm.pickup_contact_person;
+		},
+		availableWarehouses() {
+			const warehouses = new Set();
+			this.canadaPostShipments.forEach(shipment => {
+				if (shipment.warehouse) {
+					warehouses.add(shipment.warehouse);
+				}
+			});
+			return Array.from(warehouses).sort();
+		},
+		availablePickupDates() {
+			const dates = new Set();
+			this.canadaPostShipments.forEach(shipment => {
+				if (shipment.pickup_date) {
+					dates.add(shipment.pickup_date);
+				}
+			});
+			return Array.from(dates).sort((a, b) => {
+				// Sort in descending order (latest date first)
+				return new Date(b) - new Date(a);
+			});
+		},
 	},
 	mounted() {
 		this.loadWarehouses();
+		this.loadPickupContacts();
+		this.loadCompanies();
+		this.loadCompanyAddresses();
 	},
 	methods: {
 		refresh() {
@@ -479,6 +678,34 @@ export default {
 			}
 		},
 
+		async loadGroupDetails() {
+			if (this.availableGroups.length === 0) {
+				this.groupDetails = [];
+				return;
+			}
+
+			try {
+				const promises = this.availableGroups.map(group_id => 
+					frappe.call({
+						method: "metactical.metactical.page.canada_post_management.canada_post_management.get_group_details",
+						args: { group_id }
+					})
+				);
+
+				const responses = await Promise.all(promises);
+				this.groupDetails = responses
+					.filter(resp => resp.message)
+					.map(resp => ({
+						group_id: resp.message.group_id,
+						warehouse_name: resp.message.warehouse_name,
+						pickup_date: resp.message.pickup_date
+					}));
+			} catch (error) {
+				console.error("Error loading group details:", error);
+				this.groupDetails = [];
+			}
+		},
+
 		async fetchShipments() {
 			if (this.filters.load_type === 'past_manifests') {
 				return this.fetchManifests();
@@ -488,6 +715,7 @@ export default {
 			this.canadaPostShipments = [];
 			this.erpnextShipments = [];
 			this.availableGroups = [];
+			this.groupDetails = [];
 
 			try {
 				// Fetch Canada Post shipments
@@ -502,6 +730,9 @@ export default {
 					console.log("Canada Post Shipments: ", cpResponse.message);
 					this.canadaPostShipments = cpResponse.message.shipments || [];
 					this.availableGroups = cpResponse.message.available_groups || [];
+					
+					// Load details for each group
+					await this.loadGroupDetails();
 				}
 
 				// Fetch ERPNext shipments (those not on Canada Post)
@@ -687,6 +918,179 @@ export default {
 				}
 			});
 		},
+
+		async loadPickupContacts() {
+			try {
+				const response = await frappe.call({
+					method: "metactical.metactical.page.canada_post_management.canada_post_management.get_pickup_contacts",
+				});
+
+				if (response.message) {
+					this.pickupContacts = response.message;
+				}
+			} catch (error) {
+				console.error("Error loading pickup contacts:", error);
+			}
+		},
+
+		async loadCompanies() {
+			try {
+				const response = await frappe.call({
+					method: "metactical.metactical.page.canada_post_management.canada_post_management.get_companies",
+				});
+
+				if (response.message) {
+					this.companies = response.message;
+				}
+			} catch (error) {
+				console.error("Error loading companies:", error);
+			}
+		},
+
+		async loadCompanyAddresses() {
+			try {
+				const response = await frappe.call({
+					method: "metactical.metactical.page.canada_post_management.canada_post_management.get_company_addresses",
+				});
+
+				if (response.message) {
+					this.companyAddresses = response.message;
+				}
+			} catch (error) {
+				console.error("Error loading company addresses:", error);
+			}
+		},
+
+		openCreateManifestDialog() {
+			this.showCreateManifestDialog = true;
+			this.resetManifestForm();
+		},
+
+		closeCreateManifestDialog() {
+			this.showCreateManifestDialog = false;
+			this.resetManifestForm();
+		},
+
+		resetManifestForm() {
+			this.manifestForm = {
+				group_id: '',
+				warehouse: '',
+				pickup_date: '',
+				pickup_company: '',
+				pickup_address: '',
+				pickup_contact_person: ''
+			};
+			this.warehouseAddress = null;
+		},
+
+		async onWarehouseOrDateChange() {
+			// Find the matching group_id from loaded Canada Post shipments
+			if (this.manifestForm.warehouse && this.manifestForm.pickup_date) {
+				const matchingShipment = this.canadaPostShipments.find(shipment => 
+					shipment.warehouse === this.manifestForm.warehouse && 
+					shipment.pickup_date === this.manifestForm.pickup_date
+				);
+				
+				if (matchingShipment && matchingShipment.group_id) {
+					this.manifestForm.group_id = matchingShipment.group_id;
+					console.log('Loading warehouse details for:', this.manifestForm.warehouse);
+					// Load warehouse details
+					await this.loadWarehouseDetails();
+				} else {
+					this.manifestForm.group_id = '';
+					this.warehouseAddress = null;
+				}
+			} else {
+					this.warehouseAddress = null;
+				}
+		},
+
+		async loadWarehouseDetails() {
+			if (!this.manifestForm.warehouse) {
+				return;
+			}
+
+			this.loadingWarehouseDetails = true;
+
+			try {
+				const response = await frappe.call({
+					method: "metactical.metactical.page.canada_post_management.canada_post_management.get_warehouse_details",
+					args: {
+						warehouse: this.manifestForm.warehouse
+					},
+				});
+
+				if (response.message) {
+					this.warehouseAddress = response.message.address;
+					
+					// Auto-select address if only one available
+					if (this.warehouseAddress) {
+						this.manifestForm.pickup_address = this.warehouseAddress.address_name;
+					}
+					
+					// Auto-select company from warehouse if available
+					if (response.message.company && !this.manifestForm.pickup_company) {
+						this.manifestForm.pickup_company = response.message.company;
+					}
+				}
+			} catch (error) {
+				console.error("Error loading warehouse details:", error);
+				frappe.msgprint({
+					title: "Error",
+					message: error.message || "Failed to load warehouse details",
+					indicator: "red",
+				});
+			} finally {
+				this.loadingWarehouseDetails = false;
+			}
+		},
+
+		async createManifest() {
+			if (!this.isManifestFormValid) {
+				frappe.msgprint({
+					title: "Validation Error",
+					message: "Please fill in all required fields",
+					indicator: "red",
+				});
+				return;
+			}
+
+			this.creatingManifest = true;
+
+			try {
+				const response = await frappe.call({
+					method: "metactical.metactical.page.canada_post_management.canada_post_management.create_manifest_from_groups",
+					args: {
+						warehouse: this.manifestForm.warehouse,
+						pickup_date: this.manifestForm.pickup_date,
+						pickup_company: this.manifestForm.pickup_company,
+						pickup_address: this.manifestForm.pickup_address,
+						pickup_contact_person: this.manifestForm.pickup_contact_person,
+					},
+				});
+
+				if (response.message && response.message.success) {
+					frappe.show_alert({
+						message: `Manifest ${response.message.manifest_name} created successfully with PO# ${response.message.po_number}`,
+						indicator: 'green'
+					}, 5);
+
+					// Close dialog
+					this.closeCreateManifestDialog();
+
+					// Open the created manifest in a new tab
+					window.open(`/app/manifest/${response.message.manifest_name}`, '_blank');
+
+					// Refresh the shipments list
+					await this.fetchShipments();
+				}
+			} catch (error) {
+				// Error is already displayed by frappe.throw from backend
+				console.error("Error creating manifest:", error);
+			} finally {
+				this.creatingManifest = false;
+			}
+		},
 	},
 };
 </script>
@@ -742,5 +1146,80 @@ export default {
 	margin: 0;
 	font-size: 32px;
 	font-weight: 700;
+}
+
+/* Modal Styles */
+.modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1050;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.modal-dialog {
+	margin: 1.75rem auto;
+	max-width: 700px;
+}
+
+.modal-content {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	background-color: #fff;
+	border: 1px solid rgba(0,0,0,.2);
+	border-radius: 0.3rem;
+	box-shadow: 0 3px 9px rgba(0,0,0,.5);
+}
+
+.modal-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 1rem;
+	border-bottom: 1px solid #dee2e6;
+}
+
+.modal-title {
+	margin: 0;
+	line-height: 1.5;
+}
+
+.modal-body {
+	position: relative;
+	flex: 1 1 auto;
+	padding: 1rem;
+}
+
+.modal-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	padding: 1rem;
+	border-top: 1px solid #dee2e6;
+}
+
+.modal-footer > :not(:first-child) {
+	margin-left: 0.5rem;
+}
+
+.close {
+	padding: 0;
+	background-color: transparent;
+	border: 0;
+	font-size: 1.5rem;
+	font-weight: 700;
+	line-height: 1;
+	color: #000;
+	text-shadow: 0 1px 0 #fff;
+	opacity: .5;
+	cursor: pointer;
+}
+
+.close:hover {
+	opacity: .75;
 }
 </style>

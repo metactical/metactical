@@ -31,6 +31,6 @@ class CustomAddress(Address):
 		
 		if self.phone:
 			self.neb_mobile_not_formatted = self.normalize_phone(self.phone)
-			allowed = "1234567890-+()"
+			allowed = "1234567890-+() "
 			if not all(digit in allowed for digit in self.phone):
 				frappe.throw('Only numbers and characters +-() allowed in phone number field')

@@ -4,10 +4,12 @@
 import frappe
 from frappe.model.document import Document
 from frappe import _
+import json
 from metactical.utils.shipping.canada_post import CanadaPost
 from datetime import datetime
 from frappe.utils import get_files_path
 from metactical.utils.shipping.purolator import Purolator
+import json
 
 
 class Manifest(Document):
@@ -47,7 +49,21 @@ def create_manifest(manifest, service_provider):
 		return {"po_number": po_number, "shipments": shipments}
 	except ValueError as e:
 		if str(e) == "9122":
-			redownload_manifest(manifest, "Manifest")
+			# Manifest already exists in Canada Post, re-download it
+			result = redownload_manifest(manifest, "Manifest")
+			# Return the result so frontend gets updated
+			return result
+		else:
+			# Re-raise other ValueErrors
+			raise
+	except Exception as e:
+		# Log the full error for debugging
+		frappe.log_error(
+			title=f"Error creating manifest {manifest}",
+			message=f"Service Provider: {service_provider}\nError: {str(e)}\n{frappe.get_traceback()}"
+		)
+		# Re-raise so user sees the error
+		raise
 
 @frappe.whitelist()		
 def redownload_manifest(docname, doctype):
@@ -65,17 +81,51 @@ def redownload_cp_manifest(doc):
 	for row in doc.items:
 		ref_shipments.append(row.shipment_id)
 	cp = CanadaPost()
-	date = doc.pickup_date.strftime("%Y%m%d")
-	url = f"/rs/{cp.settings.customer_number}/{cp.settings.customer_number}/manifest?start={date}&end={date}"
-	headers={'Accept': 'application/vnd.cpc.manifest-v8+xml'}
-	response = cp.get_response(url, "", headers=headers, method='GET')
+	
 	manifest_links = []
-	if response["manifests"].get("link") and isinstance(response["manifests"]["link"], list):
-		for manifest in response["manifests"]["link"]:
+	
+	# Check if manifest_links field has stored links
+	if doc.manifest_links:
+		try:
+			# Parse the stored links
+			stored_links = json.loads(doc.manifest_links)
+			frappe.logger().info(f"Using stored manifest links for {doc.name}")
+			
+			# Fetch manifest details using stored links
+			if isinstance(stored_links, dict):
+				stored_links = [stored_links]
+			
+			for link in stored_links:
+				manifest_response = cp.get_response(
+					link['@href'], 
+					None, 
+					headers={'Accept': link['@media-type']}, 
+					method='GET'
+				)
+				if manifest_response:
+					manifest_links.append(manifest_response)
+		except Exception as e:
+			frappe.log_error(
+				title=f"Error using stored manifest links for {doc.name}",
+				message=f"Error: {str(e)}\nFalling back to date-based search"
+			)
+			# Fall back to date-based search if stored links fail
+			doc.manifest_links = None
+	
+	# If no stored links or they failed, fall back to date-based search
+	if not manifest_links:
+		frappe.logger().info(f"No stored links found, searching by date for {doc.name}")
+		date = doc.pickup_date.strftime("%Y%m%d")
+		url = f"/rs/{cp.settings.customer_number}/{cp.settings.customer_number}/manifest?start={date}&end={date}"
+		headers={'Accept': 'application/vnd.cpc.manifest-v8+xml'}
+		response = cp.get_response(url, "", headers=headers, method='GET')
+		
+		if response["manifests"].get("link") and isinstance(response["manifests"]["link"], list):
+			for manifest in response["manifests"]["link"]:
+				manifest_links.append(cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET"))
+		elif response["manifests"].get("link"):
+			manifest = response["manifests"]["link"]
 			manifest_links.append(cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET"))
-	elif response["manifests"].get("link"):
-		manifest = response["manifests"]["link"]
-		manifest_links.append(cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET"))
 	
 	shipments = []
 	shipment_infos = []
@@ -139,6 +189,7 @@ def redownload_cp_manifest(doc):
 				doc.po_number = po_number
 		doc.status = "Completed"
 		doc.save()
+		return {"po_number": po_number, "shipments": shipments}
 	return shipment_ids, shipments_found
 
 

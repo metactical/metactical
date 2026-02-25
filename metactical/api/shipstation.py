@@ -108,12 +108,12 @@ def create_shipstation_orders(order_no=None, is_cancelled=False):
 				if settings.name not in orderIds:
 					sorder = response.json()
 					# frappe.db.set_value('Delivery Note', order_no, "ais_shipstation_orderid", sorder.get('orderId'))
-					order_table = frappe.new_doc('Shipstation Order ID', order, 'ais_shipstation_order_ids')
-					order_table.update({
+					# order_table = frappe.new_doc('Shipstation Order ID', order, 'ais_shipstation_order_ids')
+					order.append("ais_shipstation_order_ids", {
 						'settings_id': settings.name,
 						'shipstation_order_id': sorder.get('orderId')
 					})
-					order_table.save()
+					order.save()
 			except requests.exceptions.HTTPError as e:
 				# Add the request to Shipstation API requests for troubleshooting
 				new_req = frappe.new_doc('Shipstation API Requests')

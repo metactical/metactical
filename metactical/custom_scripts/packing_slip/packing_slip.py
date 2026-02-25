@@ -17,7 +17,12 @@ class CustomPackingSlip(PackingSlip):
 				'used_by': '',
 				'tote_items': []
 			})
-			doc.save(ignore_permissions=True)
+			try:
+				doc.save(ignore_permissions=True)
+			except Exception as e:
+				frappe.log_error(title="Error Clearing Tote", message=f"Failed to clear tote for {self.name}: {str(e)}")
+		else:
+			frappe.log_error(title="Totes Clearing Testing", message=f"Tote for {self.name} doesn't exist")
 
 	def calculate_net_total_pkg(self):
 		self.net_weight_uom = self.items[0].weight_uom if self.items else None

@@ -308,6 +308,16 @@ class PicklistPage{
 	
 	load_summary(){
 		var me = this;
+		
+		// Check if warehouse is set
+		if (!metactical.pick_list.selected_warehouse || metactical.pick_list.selected_warehouse === "") {
+			frappe.throw({
+				title: __('Warehouse Not Set'),
+				message: __('No default warehouse has been configured for you. Please contact your administrator to set a default warehouse in Pick List Settings.')
+			});
+			return;
+		}
+		
 		this.$summary = {};
 		this.$summary.ready_to_ship = this.wrapper.find('#ready_to_ship');
 		this.$summary.ready_to_pick = this.wrapper.find('#ready_to_pick');

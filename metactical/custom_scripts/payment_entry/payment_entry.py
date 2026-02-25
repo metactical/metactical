@@ -212,10 +212,44 @@ def check_if_can_be_refunded(doc):
 	return False
 
 @frappe.whitelist()
-def make_refund(doc):
+def request_refund(doc):
 	doc = frappe.get_doc("Payment Entry", doc)
+	refund_requested = frappe.db.get_value("USAePay Refund", {"payment_entry": doc.name, "status": "Pending"}, "name")
+	if refund_requested:
+		frappe.msgprint("Refund request is already pending for this Payment Entry.")
+		return True
+
 	if not doc.reference_no:
-		usaepay_transaction_key = ""
+		references = doc.references
+		for ref in references:
+			# check if the reference is a Sales Invoice and if it can be refunded
+			if ref.reference_doctype == "Sales Invoice":
+				continue_loop, sales_order, sales_invoice = check_if_payment_can_be_refunded(doc, ref, making_refund=True)
+				if not continue_loop:
+					continue
+ 
+				refund_doc = frappe.new_doc("USAePay Refund")
+				refund_doc.sales_return = sales_invoice.name
+				refund_doc.sales_order = sales_order
+				refund_doc.amount_to_refund = doc.paid_amount
+				refund_doc.status = "Pending"
+				refund_doc.mode_of_payment = doc.mode_of_payment
+    
+				refund_doc.payment_entry = doc.name
+				refund_doc.customer = doc.party if doc.party_type == "Customer" else None
+				refund_doc.lead_source = doc
+				refund_doc.save()
+				frappe.db.commit()
+		
+				frappe.msgprint("Refund request has been created. Please wait for the approval.")
+		return True
+	else:
+		frappe.msgprint("Refund is not allowed for this Payment Entry.")
+		return False		
+
+def make_refund(refund_doc, payment_entry):
+	doc = frappe.get_doc("Payment Entry", payment_entry)
+	if not doc.reference_no:
 		references = doc.references
 		for ref in references:
 			# check if the reference is a Sales Invoice and if it can be refunded
@@ -228,7 +262,7 @@ def make_refund(doc):
 				if not usaepay_transaction_key:
 					frappe.msgprint(f"Transaction Key not found in {sales_order}. Please check the Sales Order.")
 					continue
-	
+ 
 				response, log = refund_payment(sales_order, doc.remarks, doc.paid_amount)
 				if response:
 					# update usaepay log and set the reference_no in the Payment Entry
@@ -239,6 +273,8 @@ def make_refund(doc):
 					frappe.msgprint(f"$ {doc.paid_amount} refunded successfully for {sales_order}")
 					
 					log = frappe.get_doc("USAePay Log", log)
+     
+					frappe.db.set_value("USAePay Refund", refund_doc, "status", "Refunded", update_modified=False)
 					create_doc_comment(doc, log)
 					return True
 				else:
@@ -249,7 +285,8 @@ def make_refund(doc):
 		return False
 	else:
 		frappe.msgprint("Refund is not allowed for this Payment Entry.")
-		return False				
+		return False		
+		
 
 @frappe.whitelist()
 def update_payment(doc):
@@ -393,12 +430,45 @@ def get_mode_of_payment(reference_doctype, reference_name):
 	pe_detail = None
 	if reference_doctype == "Sales Invoice":
 		return_doc = frappe.get_doc("Sales Invoice", reference_name)
-		advances = frappe.get_doc("Sales Invoice", return_doc.return_against).advances
+		advances = []
+  
+		if not return_doc.return_against:
+      
+			# get delivery note from sales return
+			return_delivery_note = None
+			for item in return_doc.items:
+				if item.delivery_note:
+					return_delivery_note = item.delivery_note
+					break
+			
+			# get sales invoice from the original delivery note
+			if return_delivery_note:
+				delivery_note = frappe.db.get_value("Delivery Note", return_delivery_note, "return_against")
+    
+				if delivery_note:     
+					sales_invoices = frappe.db.get_all(
+						"Sales Invoice",
+						filters=[
+							["Sales Invoice Item", "delivery_note", "=", delivery_note],
+							["Sales Invoice", "docstatus", "=", 1]
+						],
+						fields=["name"]
+					)
+     
+					if sales_invoices:
+						for si in sales_invoices:
+							advances = frappe.get_doc("Sales Invoice", si.name).advances
+							if advances:
+								break
+
+		else:
+			advances = frappe.get_doc("Sales Invoice", return_doc.return_against).advances
+   
 		if advances:
 			for adv in advances:
 				pe_detail = frappe.db.get_value("Payment Entry", adv.reference_name, ["mode_of_payment", "reference_no"], as_dict=True)
 				if pe_detail.mode_of_payment:
-					frappe.msgprint(f"Mode of Payment picked from advance payments")
+					frappe.msgprint(f"Mode of Payment picked from payment entries")
 					break
      
 	frappe.response["mode_of_payment"] = pe_detail.mode_of_payment if pe_detail else ""
