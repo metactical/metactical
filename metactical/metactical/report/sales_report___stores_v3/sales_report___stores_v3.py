@@ -217,6 +217,7 @@ def create_material_transfer(**args):
 	init_data = get_data(conditions, filters)
 	source_warehouse = "W01-WHS-Active Stock - " + frappe.db.get_value("Company", init_data[0].company, "abbr")
 	doc = frappe.new_doc("Stock Entry")
+	schedule_date = now()
 	doc.update({
 		"stock_entry_type": "Material Transfer",
 		"ais_from_report": 1
@@ -226,7 +227,7 @@ def create_material_transfer(**args):
 		wh_res = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "reserved_qty") or 0.0
 		stock_levels = wh_actual - wh_res
 		transit_warehouse = get_transit_warehouse(row.warehouse)
-		if stock_levels > 0 and transit_warehouse != "":
+		if stock_levels > 0 and transit_warehouse != "" and row.qty > 0:
 			doc.append("items", {
 				"s_warehouse": source_warehouse,
 				"t_warehouse": transit_warehouse,

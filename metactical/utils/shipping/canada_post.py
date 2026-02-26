@@ -6,6 +6,7 @@ from requests.auth import _basic_auth_str
 from frappe.utils import get_files_path
 from six import string_types
 import ast
+import json
 from PyPDF2 import PdfFileMerger
 from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
@@ -318,43 +319,79 @@ class CanadaPost():
 				'Content-Type': 'application/vnd.cpc.manifest-v8+xml; charset=utf-8'})
 		
 		if response:
+			# Store the manifest links immediately in the manifest document
 			if isinstance(response['manifests']['link'], dict):
 				links = [response['manifests']['link']]
 			else:
 				links = response['manifests']['link']
+			
+			frappe.db.set_value("Manifest", manifest, "manifest_links", json.dumps(links))
+			frappe.db.commit()
+			
 			for link in links:
-				res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
-															  'Content-Type': link['@media-type']}, method='GET')
-				if res and res['manifest']['po-number']:
-					po_number = res['manifest']['po-number']
-					for mlink in res['manifest']['links']['link']:
-						if mlink['@rel']=="artifact":
-							manifest_file = self.get_response(
-									mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
-							if manifest_file.status_code == 200:
-								file_name = f"manifest_{manifest}.pdf"
-								file_path = get_files_path(f"{file_name}", is_private=True)
-								with open(file_path, 'wb') as f:
-									f.write(manifest_file.content)
-								file_doc = frappe.new_doc('File')
-								file_doc.update({
-									'file_name': f"{file_name}",
-									'file_url': file_path.replace(frappe.get_site_path(), ''),
-									'is_private': 1,
-									'folder': 'Home/Attachments',
-									'attached_to_doctype': "Manifest",
-									'attached_to_name': manifest
-								})
-								file_doc.insert(ignore_permissions=True)
-						elif mlink["@rel"] == "manifestShipments":
-							manifest_shipments = self.get_response(mlink["@href"], None, headers={'Accept': mlink["@media-type"]}, method="GET")
-							if isinstance(manifest_shipments["shipments"]["link"], dict):
-								shipment_links = [manifest_shipments["shipments"]["link"]]
-							else:
-								shipment_links = manifest_shipments["shipments"]["link"]
-							for shipment in shipment_links:
-								shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
-								shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
+				# Add retry logic for manifest availability
+				max_retries = 5
+				retry_delay = 2  # seconds
+				res = None
+				
+				for attempt in range(max_retries):
+					res = self.get_response(link['@href'], None, {'Accept': link['@media-type'],
+																  'Content-Type': link['@media-type']}, method='GET')
+					
+					if res is not None:
+						# Manifest is ready
+						break
+					
+					if attempt < max_retries - 1:
+						frappe.logger().info(f"Manifest not ready yet, waiting {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})")
+						time.sleep(retry_delay)
+						retry_delay *= 1.5  # Exponential backoff: 2s, 3s, 4.5s, 6.75s
+
+			frappe.log_error(title=f"Getting Manifest Troubleshooting: {manifest}", 
+				 message=f"Links: {links}, Response: {res}")
+			
+			if res is None:
+				# Manifest still not ready after retries
+				frappe.log_error(
+					title=f"Manifest {manifest} - Not Ready",
+					message=f"Manifest was created but not available after {max_retries} attempts. Link: {link['@href']}"
+				)
+				frappe.throw(_(
+					"The manifest was created in Canada Post but is not ready yet. "
+					"Please use the 'Re-download Manifest' button in a few moments to retrieve it."
+				))
+			
+			if res and res.get('manifest', {}).get('po-number'):
+				po_number = res['manifest']['po-number']
+				for mlink in res['manifest']['links']['link']:
+					if mlink['@rel']=="artifact":
+						manifest_file = self.get_response(
+								mlink['@href'], None, {'Accept': mlink['@media-type'], 'Content-Type': mlink['@media-type']}, True, 'GET')
+						if manifest_file.status_code == 200:
+							file_name = f"manifest_{manifest}.pdf"
+							file_path = get_files_path(f"{file_name}", is_private=True)
+							with open(file_path, 'wb') as f:
+								f.write(manifest_file.content)
+							file_doc = frappe.new_doc('File')
+							file_doc.update({
+								'file_name': f"{file_name}",
+								'file_url': file_path.replace(frappe.get_site_path(), ''),
+								'is_private': 1,
+								'folder': 'Home/Attachments',
+								'attached_to_doctype': "Manifest",
+								'attached_to_name': manifest
+							})
+							file_doc.insert(ignore_permissions=True)
+					elif mlink["@rel"] == "manifestShipments":
+						manifest_shipments = self.get_response(mlink["@href"], None, headers={'Accept': mlink["@media-type"]}, method="GET")
+						if isinstance(manifest_shipments["shipments"]["link"], dict):
+							shipment_links = [manifest_shipments["shipments"]["link"]]
+						else:
+							shipment_links = manifest_shipments["shipments"]["link"]
+						for shipment in shipment_links:
+							shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
+							shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
+		frappe.log_error(title=f"Manifest for {manifest}", message=response)
 		return shipment_ids, po_number
 							
 	def get_shipments_groups(self, manifest_doc):

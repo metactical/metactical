@@ -1,5 +1,6 @@
 import "../../erpnext_public/js/conf";
 import "../../erpnext_public/js/utils";
+import "../../custom_scripts/public/erpnext/utils";
 import "../../erpnext_public/js/queries";
 import "../../erpnext_public/js/sms_manager";
 import "../../erpnext_public/js/utils/party";

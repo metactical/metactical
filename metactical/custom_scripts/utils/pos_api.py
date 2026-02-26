@@ -348,6 +348,7 @@ def process_manual_order(form_data):
 		sales_invoice.company_address = pos_profile_doc.company_address
 		sales_invoice.shipping_address_name = pos_profile_doc.company_address
 		sales_invoice.update_stock = 1
+		sales_invoice.pos_profile = pos_profile
   
 		for item in sales_invoice.items:
 			item.warehouse = pos_profile_doc.warehouse
@@ -860,7 +861,7 @@ def get_items(form_data):
 			'sales_person': sales_person,
 		}
 
-		if item_code == "2":
+		if item_code == "2" or item_code.startswith("BSUR"):
 			item_info.update({'item_name': item_name})
 		
 		items.append(item_info)
@@ -1264,21 +1265,45 @@ def create_return_invoice(form_data, invoiceId):
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
         filtered_items = []
+        sales_return.is_pos = 1
         sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
         total_restock_fee = 0.0
         
-        for item in items:
-            for updated_item in formatted_items:
-                if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
-                    (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
-                    item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
-                    item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
-                    item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
-                    item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
-                    item.margin_type = ""
-                    item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
-                    item.rate = item.price_list_rate - item.discount_amount
-                    filtered_items.append(item)
+        for updated_item in formatted_items:
+            for item in items:
+                # skip zero qty early
+                if updated_item["qty"] == 0:
+                    continue
+
+                # CASE 1: normal items (not code "2" and not BSUR prefix)
+                if updated_item["item_code"] != "2" and not updated_item["item_code"].startswith("BSUR"):
+
+                    if item.item_code == updated_item["item_code"]:
+                        item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                        item.price_list_rate = updated_item["price_list_rate"]
+                        item.discount_percentage = updated_item["discount_percentage"]
+                        item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                        item.margin_type = ""
+                        item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
+                        item.rate = item.price_list_rate - item.discount_amount
+
+                        filtered_items.append(item)
+                        break
+
+                # CASE 2: misc item ("2") OR BSUR items → match by item_name
+                else:
+                    if item.item_name == updated_item["item_name"]:
+                        item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                        item.price_list_rate = updated_item["price_list_rate"]
+                        item.discount_percentage = updated_item["discount_percentage"]
+                        item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                        item.margin_type = ""
+                        item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
+                        item.rate = item.price_list_rate - item.discount_amount
+
+                        filtered_items.append(item)
+                        break
+
 
 
         for items in form_data["Items"]:
