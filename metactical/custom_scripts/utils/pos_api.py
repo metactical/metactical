@@ -651,7 +651,7 @@ def update_sales_order(sales_order, form_data):
         
         frappe.set_user("Administrator")    
         
-        from erpnext.controllers.accounts_controller import update_child_qty_rate
+        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
         trans_items = json.dumps(items)
         
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
