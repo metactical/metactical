@@ -634,6 +634,7 @@ def update_sales_order(sales_order, form_data):
                 if (item['item_code'] == "2" and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != "2"):
                     item["name"] = sales_item.name
                     item["docname"] = sales_item.name
+                    item["warehouse"] = sales_item.warehouse
                     item["conversion_factor"] = sales_item.conversion_factor
                     item["uom"] = sales_item.uom
                     item["idx"] = i + 1
@@ -651,7 +652,7 @@ def update_sales_order(sales_order, form_data):
         
         frappe.set_user("Administrator")    
         
-        from erpnext.controllers.accounts_controller import update_child_qty_rate
+        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
         trans_items = json.dumps(items)
         
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
@@ -1539,7 +1540,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     # Fetch matching items
     items = frappe.db.sql(f"""
         SELECT
-            tabItem.name AS item_code, item_name, ifw_retailskusuffix,
+            tabItem.name AS item_code, item_name, ifw_retailskusuffix, ifw_discontinued,
             variant_of, asi_item_class, ifw_location,
             brand, image, is_stock_item, tabItem.has_variants,
             (
@@ -1658,6 +1659,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "Sku": item.item_code,
             "ItemName": item.item_name,
             "RetailSku": item.ifw_retailskusuffix,
+            "Discontinued": True if item.ifw_discontinued else False,
             "Categories": [],
             "Comment": "",
             "ItemClass": item.asi_item_class or "",
