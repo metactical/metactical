@@ -34,7 +34,7 @@ frappe.ui.form.on('Cycle Count V2', {
 	},
 	
 	get_items: function(frm){
-		if(!frm.doc.items){
+		if(!frm.doc.items || frm.doc.items.length == 0){
 			frappe.call({
 				method: "metactical.metactical.doctype.cycle_count_v2.cycle_count_v2.get_items",
 				args: {
