@@ -134,17 +134,18 @@ def create_usaepay_log(doctype, docname, action):
 def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None):
 	usaepay_account = None
 	if lead_source:
-		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source})
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": lead_source, "parent": "USAePay Settings"})
+		print("lead_source", lead_source, usaepay_account)
 	elif merchant_id:
-		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id})
+		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id, "parent": "USAePay Settings"})
 	elif transaction_key:
-		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "source")
+		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key, "docstatus": 1}, "source")
 
 		if not source:
 			source = frappe.db.get_value("SO USAePay Transaction", {"transaction_key": transaction_key}, "lead_source")
 
 		if source:
-			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source})
+			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source, "parent": "USAePay Settings"})
 
 	if usaepay_account:
 		return frappe.get_doc("USAePay Accounts", usaepay_account)
@@ -606,3 +607,17 @@ def custom_parse_json(json_string, key=None):
         return data.get(key) if key else data
     except:
         return None
+    
+def get_refund_details_for_print(doc):
+	usaepay_refund = frappe.db.exists("USAePay Refund", {"sales_return": doc.name, "docstatus": 1})
+
+	if usaepay_refund:
+		refund_doc = frappe.get_doc("USAePay Refund", usaepay_refund)
+		usaepay_account = get_usaepay_account(lead_source=refund_doc.lead_source)
+
+		from metactical.custom_scripts.usaepay.usaepay_api import get_refund_transaction_detail	
+
+		transaction_id = frappe.db.get_value("Payment Entry", refund_doc.payment_entry, "reference_no")
+		transaction_detail = get_refund_transaction_detail(usaepay_account, transaction_id) if transaction_id else None
+  
+		return transaction_detail			
