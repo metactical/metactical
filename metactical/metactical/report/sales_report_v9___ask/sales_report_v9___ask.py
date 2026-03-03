@@ -677,11 +677,11 @@ def get_column(filters,conditions):
 	return columns
 
 def get_gpdsales(item_code):
-
 	data =  frappe.db.sql("""
 		SELECT SUM(`tabSales Invoice Item`.stock_qty) as total from `tabSales Invoice Item`
 		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.source = 'Website - GPD'
+			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code), as_dict=1)
 	gpdsales = 0
 	if data[0].total:
@@ -698,7 +698,8 @@ def get_mthsck(item_code, warehouse, today):
 		where `tabSales Invoice`.status ="Paid" 
   		and `tabSales Invoice Item`.item_code =%s 
     	and `tabSales Invoice`.posting_date BETWEEN %s and %s
-		and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.Ltd'
+		and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
+		and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, fromdate , enddate), as_dict=1)
 	tqoh = 0
 	if data[0].total:
@@ -717,7 +718,8 @@ def get_discountitem(last_year, item_code):
   			and `tabSales Invoice Item`.discount_amount > 0 
      		and `tabSales Invoice Item`.item_code =%s 
        		and `tabSales Invoice`.posting_date BETWEEN %s and %s
-			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.Ltd'
+			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
+			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -743,7 +745,7 @@ def get_avgorderqty(last_year, item_code):
 		where `tabPurchase Receipt`.docstatus =1 
   			and `tabPurchase Receipt Item`.item_code =%s 
      		and `tabPurchase Receipt`.posting_date BETWEEN %s and %s
-			and `tabPurchase Receipt`.company = 'Ask Sports Pvt Ltd.Ltd'
+			and `tabPurchase Receipt`.company = 'Ask Sports Pvt Ltd.'
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -754,7 +756,8 @@ def get_orderfreq(last_year, item_code):
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
-			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.Ltd'
+			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
+			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -775,7 +778,7 @@ def get_endinvt(item_code, warehouse, today):
 	data = frappe.db.sql("""
 		Select sum(actual_qty) as total from `tabStock Ledger Entry`
 		where item_code =%s and posting_date between %s and %s 
-			and company = 'Ask Sports Pvt Ltd.Ltd'
+			and company = 'Ask Sports Pvt Ltd.'
 	""",(item_code, fromdate, enddate), as_dict=1)
 	total = 0
 	if data[0].total:
@@ -789,7 +792,7 @@ def get_beginvt(item_code, warehouse, today):
 	data = frappe.db.sql("""
 		Select sum(actual_qty) as total from `tabStock Ledger Entry`
 		where item_code =%s and posting_date between %s and %s 
-			and company = 'Ask Sports Pvt Ltd.Ltd'
+			and company = 'Ask Sports Pvt Ltd.'
 	""",(item_code, fromdate, enddate), as_dict=1)
 	total = 0
 	if data[0].total:
@@ -806,13 +809,13 @@ def get_invtor(item_code, warehouse, today):
 	current = frappe.db.sql("""
 		Select sum(stock_value_difference) as total from `tabStock Ledger Entry`
 		where item_code =%s  and posting_date between %s and %s 
-		and company = 'Ask Sports Pvt Ltd.Ltd'
+		and company = 'Ask Sports Pvt Ltd.'
 	""",(item_code,  fromdate, enddate), as_dict=1)
 
 	prev = frappe.db.sql("""
 		Select sum(stock_value_difference) as total from `tabStock Ledger Entry`
 		where item_code =%s  and posting_date between %s and %s 
-		and company = 'Ask Sports Pvt Ltd.Ltd'
+		and company = 'Ask Sports Pvt Ltd.'
 	""",(item_code, prev_fromdate, prev_enddate), as_dict=1)
 	
 	total = 0
@@ -849,7 +852,8 @@ def get_master(conditions="", filters={}):
 				`tabItem Supplier` s 
 			inner join 
 				`tabItem` i on i.name = s.parent
-			where 1 = 1 and i.has_variants=0 %s
+			where 1 = 1 and i.has_variants=0 and s.supplier = "ASK Sports - Pakistan"
+   			%s
 		"""%(conditions), filters, as_dict=1)
  
 	frappe.log_error(title="get_master", message=f"conditions: {conditions}, filters: {filters}")
@@ -896,7 +900,7 @@ def get_date_last_received(item, supplier):
 						where 
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
-							and p.company = 'Ask Sports Pvt Ltd.Ltd'
+							and p.company = 'Ask Sports Pvt Ltd.'
 		""",(item))
 	if data:
 		date = data[0][0]
@@ -911,7 +915,8 @@ def get_sales_rev(item_code):
 		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s
-			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.Ltd'
+			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
+			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", item_code, as_dict=1)
 
 	return data[0].total
@@ -923,7 +928,8 @@ def get_nocust12months(last_year, item_code):
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
-			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.Ltd'
+			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
+			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -942,8 +948,10 @@ def get_date_last_sold(item):
 						where 
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
-							and p.company = 'Ask Sports Pvt Ltd.Ltd'
+							and p.company = 'Ask Sports Pvt Ltd.'
+							and p.customer <> "International Camouflage Ltd."
 		""",(item))
+
 	if data:
 		date = data[0][0]
 	if date:
@@ -960,10 +968,11 @@ def get_total_sold(item):
 							`tabSales Invoice Item` c 
 						left join
 							`tabSales Invoice` p on p.name = c.parent 
-						where 
+						where
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
-							and p.company = 'Ask Sports Pvt Ltd.Ltd'
+							and p.company = 'Ask Sports Pvt Ltd.'
+							and p.customer <> "International Camouflage Ltd."
 						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
@@ -988,7 +997,7 @@ def get_open_material_request(item, warehouse=None):
 		`tabMaterial Request Item` c on c.parent = p.name where 
   		p.docstatus=1 
   		and c.item_code = %s
-		and p.company = 'Ask Sports Pvt Ltd.Ltd'
+		and p.company = 'Ask Sports Pvt Ltd.'
 		and p.status IN ('Pending', 'Partially Ordered')""" + where,(item))
 	for d in data:
 		material_requests += d[0]+" ("+str(d[1])+")" if material_requests == '' else ", " + d[0]+" ("+str(d[1])+")"
@@ -1014,7 +1023,7 @@ def get_purchase_orders(item,supplier):
 							where 
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and p.status in ("To Receive and Bill", "To Receive")
-								and p.company = "Ask Sports Pvt Ltd.Ltd"
+								and p.company = "Ask Sports Pvt Ltd."
 								and p.supplier = %s and c.warehouse <> 'US02-Houston - Active Stock - ICL'""",
 						(item, supplier))
 	for d in data:
@@ -1045,7 +1054,7 @@ def get_last_purchase_orders(item,supplier):
 							where 
 								p.docstatus=1 and c.item_code = %s and c.received_qty < c.qty 
 								and p.status in ("To Receive and Bill", "To Receive")
-								and p.company = "Ask Sports Pvt Ltd.Ltd"
+								and p.company = "Ask Sports Pvt Ltd."
 								and p.supplier = %s and c.warehouse <> 'US02-Houston - Active Stock - ICL'""",
 				(item, supplier))
 	for d in data:
@@ -1101,7 +1110,7 @@ def get_open_po_qty(item,supplier, warehouse=None):
 							where 
 								p.docstatus=1 and c.item_code = %s
 								and p.status not in ("Closed", "Cancelled", "On Hold")
-								and p.company = "Ask Sports Pvt Ltd.Ltd"
+								and p.company = "Ask Sports Pvt Ltd."
 							""" + where, 
 						(item), as_dict=True)
  
@@ -1114,11 +1123,8 @@ def get_open_po_qty(item,supplier, warehouse=None):
 							where
 								p.docstatus=1 and ri.item_code = %s 
         						and ri.purchase_order <> '' and p.purchase_order IS NOT NULL
-								and p.company = "Ask Sports Pvt Ltd.Ltd"
+								and p.company = "Ask Sports Pvt Ltd."
 						""" + where,(item), as_dict=True)
-
-	if item == "UF1032102-3":
-		frappe.log_error(title="get_open_po_qty", message=f"POS: {pos}, PRS: {prs}")
 
 	total_po_qty = 0
 	total_pr_qty = 0

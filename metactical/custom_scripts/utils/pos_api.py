@@ -348,6 +348,7 @@ def process_manual_order(form_data):
 		sales_invoice.company_address = pos_profile_doc.company_address
 		sales_invoice.shipping_address_name = pos_profile_doc.company_address
 		sales_invoice.update_stock = 1
+		sales_invoice.pos_profile = pos_profile
   
 		for item in sales_invoice.items:
 			item.warehouse = pos_profile_doc.warehouse
@@ -525,7 +526,8 @@ def create_sales_order(form_data, customer, company=None):
 		if sales_order.items:
 			item = sales_order.items[0].name
 			frappe.delete_doc('Sales Order Item', item)
-			
+			frappe.db.set_value('Sales Order', sales_order.name, 'taxes_and_charges', "", update_modified=False)
+
 		return {"success": False, "error": str(e), "sales_order": sales_order}
 
 	frappe.set_user("Administrator")
@@ -633,6 +635,9 @@ def update_sales_order(sales_order, form_data):
                 if (item['item_code'] == "2" and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != "2"):
                     item["name"] = sales_item.name
                     item["docname"] = sales_item.name
+                    item["warehouse"] = sales_item.warehouse
+                    item["conversion_factor"] = sales_item.conversion_factor
+                    item["uom"] = sales_item.uom
                     item["idx"] = i + 1
                     found = True
                     
@@ -645,9 +650,10 @@ def update_sales_order(sales_order, form_data):
         parent_doctype = sales_order.doctype
         parent_doctype_name = sales_order.name
         child_docname = "items"
-            
-        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
         
+        frappe.set_user("Administrator")    
+        
+        from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
         trans_items = json.dumps(items)
         
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
@@ -655,6 +661,7 @@ def update_sales_order(sales_order, form_data):
         frappe.db.commit()
         return {"success": True, "message": ""}
     except Exception as e:
+        frappe.log_error(title='Update Sales Order Error', message=frappe.get_traceback())
         return {"success": False, "error": str(e)}
 
 def submit_sales_order(sales_order, form_data, log):
@@ -856,7 +863,7 @@ def get_items(form_data):
 			'sales_person': sales_person,
 		}
 
-		if item_code == "2":
+		if item_code == "2" or item_code.startswith("BSUR"):
 			item_info.update({'item_name': item_name})
 		
 		items.append(item_info)
@@ -1016,8 +1023,11 @@ def get_so_comment(sales_order, form_data, error=None):
         comment += "<br>*No Payments*"
         
     # add taxes to the comment
+    if form_data['TaxesAndChargesTemplate']:
+        comment += "<br><br><b>Taxes and Charges Template:</b> {0}".format(form_data['TaxesAndChargesTemplate'])
+    
     if form_data['Taxes']:
-        comment += "<br><br><b>Taxes</b>"
+        comment += "<br><b>Taxes</b>"
         for tax in form_data['Taxes']:
             comment += "<br>{0} - {1}%".format(tax['TaxId'], tax['Amount'])
     else:
@@ -1260,21 +1270,45 @@ def create_return_invoice(form_data, invoiceId):
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
         filtered_items = []
+        sales_return.is_pos = 1
         sales_return.pos_profile = pos_profile.name if pos_profile else sales_return.pos_profile
         total_restock_fee = 0.0
         
-        for item in items:
-            for updated_item in formatted_items:
-                if ((item.item_code == updated_item["item_code"] and updated_item["qty"] != 0 and updated_item["item_code"] != "2") or 
-                    (updated_item["item_code"] == "2" and item.item_name == updated_item["item_name"] and updated_item["qty"] != 0)):
-                    item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
-                    item.price_list_rate = updated_item["price_list_rate"] if updated_item["qty"] > 0 else updated_item["price_list_rate"]
-                    item.discount_percentage = updated_item["discount_percentage"] if updated_item["qty"] > 0 else updated_item["discount_percentage"]
-                    item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
-                    item.margin_type = ""
-                    item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
-                    item.rate = item.price_list_rate - item.discount_amount
-                    filtered_items.append(item)
+        for updated_item in formatted_items:
+            for item in items:
+                # skip zero qty early
+                if updated_item["qty"] == 0:
+                    continue
+
+                # CASE 1: normal items (not code "2" and not BSUR prefix)
+                if updated_item["item_code"] != "2" and not updated_item["item_code"].startswith("BSUR"):
+
+                    if item.item_code == updated_item["item_code"]:
+                        item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                        item.price_list_rate = updated_item["price_list_rate"]
+                        item.discount_percentage = updated_item["discount_percentage"]
+                        item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                        item.margin_type = ""
+                        item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
+                        item.rate = item.price_list_rate - item.discount_amount
+
+                        filtered_items.append(item)
+                        break
+
+                # CASE 2: misc item ("2") OR BSUR items → match by item_name
+                else:
+                    if item.item_name == updated_item["item_name"]:
+                        item.qty = (-1 * updated_item["qty"]) if updated_item["qty"] > 0 else updated_item["qty"]
+                        item.price_list_rate = updated_item["price_list_rate"]
+                        item.discount_percentage = updated_item["discount_percentage"]
+                        item.discount_amount = item.price_list_rate * (item.discount_percentage / 100)
+                        item.margin_type = ""
+                        item.warehouse = pos_profile.ifw_return_warehouse if pos_profile else item.warehouse
+                        item.rate = item.price_list_rate - item.discount_amount
+
+                        filtered_items.append(item)
+                        break
+
 
 
         for items in form_data["Items"]:
@@ -1315,7 +1349,11 @@ def create_return_invoice(form_data, invoiceId):
             total_payment += payment["Amount"]
             
         if total_payment > abs(sales_return.grand_total + sales_return.write_off_amount):
-            frappe.throw("Total payment amount cannot be greater than the total return amount")
+            extra_amount = total_payment - abs(sales_return.grand_total + sales_return.write_off_amount)
+            if extra_amount < write_off_limit:
+                sales_return.payments[0].amount += extra_amount
+            else:
+                frappe.throw("Total payment amount cannot be greater than the total return amount")
         
         sales_return.advances = []
         sales_return.update_outstanding_for_self = False
@@ -1506,7 +1544,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     # Fetch matching items
     items = frappe.db.sql(f"""
         SELECT
-            tabItem.name AS item_code, item_name, ifw_retailskusuffix,
+            tabItem.name AS item_code, item_name, ifw_retailskusuffix, ifw_discontinued,
             variant_of, asi_item_class, ifw_location,
             brand, image, is_stock_item, tabItem.has_variants,
             (
@@ -1625,6 +1663,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "Sku": item.item_code,
             "ItemName": item.item_name,
             "RetailSku": item.ifw_retailskusuffix,
+            "Discontinued": True if item.ifw_discontinued else False,
             "Categories": [],
             "Comment": "",
             "ItemClass": item.asi_item_class or "",

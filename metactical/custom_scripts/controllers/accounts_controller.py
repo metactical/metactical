@@ -20,10 +20,7 @@ from erpnext.buying.utils import update_last_purchase_rate
 from frappe import _
 
 def validate_party_address(self, party, party_type, billing_address, shipping_address=None):
-	if self.doctype == "Sales Invoice":
-		return
-
-	if self.doctype == "Sales Order" and self.ifw_store_pickup:
+	if self.doctype in ("Sales Order", "Sales Invoice", "Delivery Note"):
 		return
 	
 	if billing_address or shipping_address:

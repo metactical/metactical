@@ -20,6 +20,7 @@ frappe.query_reports["Sales Report V9 - ASK"] = {
 			"label": __("Supplier"),
 			"fieldtype": "MultiSelectList",
 			"options": "Supplier",
+			"hidden": 1,
 			get_data: function(txt) {
 				// if (!frappe.query_report.filters) return;
 
@@ -27,7 +28,7 @@ frappe.query_reports["Sales Report V9 - ASK"] = {
 				// if (!party_type) return;
 
 				return frappe.db.get_link_options("Supplier", txt);
-			},
+			}
 		},
 		{
 			"fieldname":"limit",

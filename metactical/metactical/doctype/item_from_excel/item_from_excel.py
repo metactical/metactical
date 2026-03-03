@@ -767,7 +767,7 @@ def get_validation_configs():
 	"""
 	validation_configs = frappe.get_all(
 		"Item Import Validation",
-		filters={"enabled": 1},
+		filters={"enabled": 1, "parentfield": "validation_apis"},
 		fields=["name", "api_url", "api_key", "price_list"]
 	)
 	
