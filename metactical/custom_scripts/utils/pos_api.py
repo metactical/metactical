@@ -526,7 +526,8 @@ def create_sales_order(form_data, customer, company=None):
 		if sales_order.items:
 			item = sales_order.items[0].name
 			frappe.delete_doc('Sales Order Item', item)
-			
+			frappe.db.set_value('Sales Order', sales_order.name, 'taxes_and_charges', "", update_modified=False)
+
 		return {"success": False, "error": str(e), "sales_order": sales_order}
 
 	frappe.set_user("Administrator")
@@ -634,6 +635,7 @@ def update_sales_order(sales_order, form_data):
                 if (item['item_code'] == "2" and sales_item.item_name == item['item_name']) or (item['item_code'] == sales_item.item_code and item["item_code"] != "2"):
                     item["name"] = sales_item.name
                     item["docname"] = sales_item.name
+                    item["warehouse"] = sales_item.warehouse
                     item["conversion_factor"] = sales_item.conversion_factor
                     item["uom"] = sales_item.uom
                     item["idx"] = i + 1
@@ -1021,8 +1023,11 @@ def get_so_comment(sales_order, form_data, error=None):
         comment += "<br>*No Payments*"
         
     # add taxes to the comment
+    if form_data['TaxesAndChargesTemplate']:
+        comment += "<br><br><b>Taxes and Charges Template:</b> {0}".format(form_data['TaxesAndChargesTemplate'])
+    
     if form_data['Taxes']:
-        comment += "<br><br><b>Taxes</b>"
+        comment += "<br><b>Taxes</b>"
         for tax in form_data['Taxes']:
             comment += "<br>{0} - {1}%".format(tax['TaxId'], tax['Amount'])
     else:
