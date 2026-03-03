@@ -144,7 +144,7 @@ def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None
 			source = frappe.db.get_value("SO USAePay Transaction", {"transaction_key": transaction_key}, "lead_source")
 
 		if source:
-			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source, "parent": "USAePay Settings"})
+			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source, "parent":"USAePay Settings"})
 
 	if usaepay_account:
 		return frappe.get_doc("USAePay Accounts", usaepay_account)
