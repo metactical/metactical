@@ -1359,9 +1359,11 @@ def create_return_invoice(form_data, invoiceId):
         sales_return.update_outstanding_for_self = False
         sales_return.is_pos = 1
         sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
-        sales_return.set_missing_values()
-        sales_return.save()
         
+        sales_return.selling_price_list = form_data['PriceList']
+        sales_return.currency = frappe.db.get_value("Price List", form_data['PriceList'], 'currency')
+        
+        sales_return.save()
         sales_return.submit()
         return sales_return, total_restock_fee
     except Exception as e:
