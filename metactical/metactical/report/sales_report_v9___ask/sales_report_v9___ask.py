@@ -681,7 +681,6 @@ def get_gpdsales(item_code):
 		SELECT SUM(`tabSales Invoice Item`.stock_qty) as total from `tabSales Invoice Item`
 		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.source = 'Website - GPD'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code), as_dict=1)
 	gpdsales = 0
 	if data[0].total:
@@ -699,7 +698,6 @@ def get_mthsck(item_code, warehouse, today):
   		and `tabSales Invoice Item`.item_code =%s 
     	and `tabSales Invoice`.posting_date BETWEEN %s and %s
 		and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-		and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, fromdate , enddate), as_dict=1)
 	tqoh = 0
 	if data[0].total:
@@ -719,7 +717,6 @@ def get_discountitem(last_year, item_code):
      		and `tabSales Invoice Item`.item_code =%s 
        		and `tabSales Invoice`.posting_date BETWEEN %s and %s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -757,7 +754,6 @@ def get_orderfreq(last_year, item_code):
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -916,7 +912,6 @@ def get_sales_rev(item_code):
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", item_code, as_dict=1)
 
 	return data[0].total
@@ -929,7 +924,6 @@ def get_nocust12months(last_year, item_code):
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total

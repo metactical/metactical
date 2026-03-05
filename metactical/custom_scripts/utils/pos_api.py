@@ -526,7 +526,8 @@ def create_sales_order(form_data, customer, company=None):
 		if sales_order.items:
 			item = sales_order.items[0].name
 			frappe.delete_doc('Sales Order Item', item)
-			
+			frappe.db.set_value('Sales Order', sales_order.name, 'taxes_and_charges', "", update_modified=False)
+
 		return {"success": False, "error": str(e), "sales_order": sales_order}
 
 	frappe.set_user("Administrator")
@@ -1022,8 +1023,11 @@ def get_so_comment(sales_order, form_data, error=None):
         comment += "<br>*No Payments*"
         
     # add taxes to the comment
+    if form_data['TaxesAndChargesTemplate']:
+        comment += "<br><br><b>Taxes and Charges Template:</b> {0}".format(form_data['TaxesAndChargesTemplate'])
+    
     if form_data['Taxes']:
-        comment += "<br><br><b>Taxes</b>"
+        comment += "<br><b>Taxes</b>"
         for tax in form_data['Taxes']:
             comment += "<br>{0} - {1}%".format(tax['TaxId'], tax['Amount'])
     else:
@@ -1355,9 +1359,11 @@ def create_return_invoice(form_data, invoiceId):
         sales_return.update_outstanding_for_self = False
         sales_return.is_pos = 1
         sales_return.pos_profile = form_data['POSProfile'] + ' Operators'
-        sales_return.set_missing_values()
-        sales_return.save()
         
+        sales_return.selling_price_list = form_data['PriceList']
+        sales_return.currency = frappe.db.get_value("Price List", form_data['PriceList'], 'currency')
+        
+        sales_return.save()
         sales_return.submit()
         return sales_return, total_restock_fee
     except Exception as e:
