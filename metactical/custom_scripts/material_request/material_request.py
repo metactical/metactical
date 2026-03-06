@@ -1,5 +1,12 @@
 import frappe
 import json
+from erpnext.stock.doctype.material_request.material_request import MaterialRequest
+from erpnext.buying.utils import validate_for_items
+
+class CustomMaterialRequest(MaterialRequest):
+	def validate(self):
+		# Metactical Customization: reomve automatic loading of price list
+		self.buying_price_list = None
 
 def before_save(self, method):
 	self.set_status(update=True)	
