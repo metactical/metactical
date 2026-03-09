@@ -79,7 +79,8 @@ class TagLinkImportTool(Document):
 						"doctype": "Tag Link",
 						"document_name": item_code,
 						"document_type": "Item",
-						"tag": row[1]
+						"tag": row[1],
+						"autocreated": True
 					})
 					tag_link.insert()
 					updated_items += 1
