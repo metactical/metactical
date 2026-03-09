@@ -1002,3 +1002,18 @@ def create_doc_comment(doc, log):
 		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title="Comment Creation Error", message=frappe.get_traceback())
+  
+def get_refund_transaction_detail(usaepay_account, refund_transaction_key):
+	usaepay_url = usaepay_account.get("usaepay_url")
+	lead_source = usaepay_account.get("lead_source")
+	headers, usaepay_url = get_headers(lead_source=lead_source)
+ 
+	if not usaepay_url:
+		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in USAePay Settings for the lead source {0}".format(lead_source))
+		return None
+
+	if not refund_transaction_key:
+		return None
+
+	transaction = get_transaction_from_usaepay(refund_transaction_key, headers, usaepay_account.get("merchant_id"))
+	return transaction

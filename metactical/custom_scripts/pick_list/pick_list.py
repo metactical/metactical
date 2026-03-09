@@ -228,8 +228,7 @@ class CustomPickList(PickList):
 			delivery_note.discount_amount = total_discount_amount
 			
 			delivery_note.save()
-			frappe.db.commit()
-		
+			frappe.db.commit()	
 	
 	def on_cancel(self):
 		super(CustomPickList, self).on_cancel()
