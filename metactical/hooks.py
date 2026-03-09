@@ -882,7 +882,8 @@ fixtures = [{
 			"Item-neb_life_cycle_status",
 			"Supplier-variant_available_rules",
 			"Supplier-section_break_e11nr",
-			"Supplier-column_break_ov8xt"
+			"Supplier-column_break_ov8xt",
+			"Item-month_on_hand"
 		]]]
 	},
 	{
@@ -1454,8 +1455,7 @@ fixtures = [{
 			"Work Order-source_warehouse-default",
 			"Sales Order-shipping_address_name-allow_on_submit",
 			"Sales Order-customer_address-allow_on_submit",
-			"Sales Order-dispatch_address_name-allow_on_submit",
-			"Item-disabled-permlevel"
+			"Sales Order-dispatch_address_name-allow_on_submit"
 		]]]
 	},
   	{
