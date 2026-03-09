@@ -53,7 +53,12 @@ class TagLinkImportTool(Document):
 		return file_content
 	
 	def add_tag_link(self, data):
-		#enqueue(self.create_order_entries(data))
+		# remove existing  autocreated tag links for items
+		frappe.db.sql("""
+			DELETE FROM `tabTag Link`
+			WHERE document_type = 'Item' AND autocreated = 1
+		""")
+
 		limit = 500
 		start = 0
 		while start < len(data):
@@ -71,8 +76,6 @@ class TagLinkImportTool(Document):
 			item_code = row[0]
 			exists = frappe.db.exists("Item", {"item_code": item_code})
    
-			print(f"Processing Item Code: {item_code}, Tag: {row[1]}, Exists: {exists}")
-
 			if exists:
 				try:
 					tag_link = frappe.get_doc({
@@ -82,7 +85,7 @@ class TagLinkImportTool(Document):
 						"tag": row[1],
 						"autocreated": True
 					})
-					tag_link.insert()
+					tag_link.insert(ignore_permissions=True)
 					updated_items += 1
 				except Exception as e:
 					errors += 1
