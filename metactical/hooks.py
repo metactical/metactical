@@ -879,7 +879,8 @@ fixtures = [{
 			"Address-neb_mobile_not_formatted",
 			"POS Profile-custom_cash_float",
 			"Item-neb_life_cycle_recommended_action",
-			"Item-neb_life_cycle_status"
+			"Item-neb_life_cycle_status",
+			"Tag Link-autocreated"
 		]]]
 	},
 	{
