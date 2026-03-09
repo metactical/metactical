@@ -1454,7 +1454,8 @@ fixtures = [{
 			"Work Order-source_warehouse-default",
 			"Sales Order-shipping_address_name-allow_on_submit",
 			"Sales Order-customer_address-allow_on_submit",
-			"Sales Order-dispatch_address_name-allow_on_submit"
+			"Sales Order-dispatch_address_name-allow_on_submit",
+			"Item-disabled-permlevel"
 		]]]
 	},
   	{
