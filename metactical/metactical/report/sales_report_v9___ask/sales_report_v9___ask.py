@@ -848,7 +848,7 @@ def get_master(conditions="", filters={}):
 				`tabItem Supplier` s 
 			inner join 
 				`tabItem` i on i.name = s.parent
-			where i.has_variants=0"
+			where i.has_variants=0 and s.supplier = "ASK Sports - Pakistan"
    			%s
 		"""%(conditions), filters, as_dict=1)
  
