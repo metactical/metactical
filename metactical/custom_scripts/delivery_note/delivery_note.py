@@ -48,7 +48,7 @@ class DeliveryNoteCustom(DeliveryNote):
 		super(DeliveryNoteCustom, self).on_cancel()
 		
 		# Metactical Customization: Return picked qty to previous one if is return
-		if self.is_return == 1 and self.pick_list:
+		if self.is_return == 1:
 			sales_orders = []
 			for row in self.items:
 				if row.against_sales_order:
@@ -81,7 +81,7 @@ class DeliveryNoteCustom(DeliveryNote):
 			return
 			
 		# Metactical Customization: If is return, set picked qty in sales order to be zero
-		if self.is_return == 1 and self.pick_list:
+		if self.is_return == 1:
 			sales_orders = []
 			for row in self.items:
 				if row.against_sales_order:
@@ -89,7 +89,7 @@ class DeliveryNoteCustom(DeliveryNote):
 						sales_orders.append(row.against_sales_order)
 					#Get the picked qty
 					picked_qty = frappe.db.get_value("Sales Order Item", row.so_detail, "picked_qty")
-					if picked_qty > 0:
+					if picked_qty >= abs(row.qty):
 						new_qty = picked_qty - abs(row.qty)
 						frappe.db.set_value("Sales Order Item", row.so_detail, "picked_qty", new_qty)
 			for sales_order in sales_orders:

@@ -11,7 +11,7 @@ import barcode as _barcode
 from barcode.writer import ImageWriter
 from io import BytesIO
 from erpnext.stock.doctype.pick_list.pick_list import (validate_item_locations, set_delivery_note_missing_values, update_delivery_note_item,
-	create_dn_with_so, create_dn_wo_so, create_dn_for_pick_lists)
+	create_dn_with_so, create_dn_wo_so, create_dn_for_pick_lists, get_picked_items_qty)
 from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note as create_delivery_note_from_sales_order
 import datetime
 from pytz import timezone
@@ -24,6 +24,7 @@ from frappe.utils.nestedset import get_descendants_of
 from erpnext.stock.doctype.packed_item.packed_item import is_product_bundle
 import re
 from frappe.model.docstatus import DocStatus
+from frappe.query_builder.functions import Sum
 
 class CustomPickList(PickList):
 	def save(self):
@@ -187,28 +188,61 @@ class CustomPickList(PickList):
 		# 	delivery_note.source = pick_list.ais_source
 		# delivery_note.save()
 
-		delivery_note = create_dn_for_pick_lists(self.name)
 		sales_orders = [d.sales_order for d in self.locations if d.sales_order]
-		sales_orders = set(sales_orders)
-		for sales_order in sales_orders:
-			delivery_note.update({
-				'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule'),
-				"disable_rounded_total": 1
-			})
-			#Add pick list submitted date in sales order
-			sales_doc = frappe.get_doc("Sales Order", sales_order)
-			sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
-			sales_doc.save()
-		delivery_note.save()
-		
-
+		so = sales_orders[0] if sales_orders else None
 	
+		if so:
+			delivery_note = create_delivery_note_from_sales_order(so)
+			items = delivery_note.items
+			dn_items = []
+			total_discount_amount = 0
+   
+			for item in items:
+				for location in self.locations:
+					if location.sales_order_item == item.so_detail:
+						distributed_discount_amount = frappe.db.get_value('Sales Order Item', item.so_detail, 'distributed_discount_amount') or 0
+						total_ordered = frappe.db.get_value('Sales Order Item', item.so_detail, 'qty') or 0
+						if total_ordered:
+							discount_amount = flt(distributed_discount_amount) / flt(total_ordered)
+							total_discount_amount += discount_amount * flt(location.picked_qty)
+						item.qty = location.picked_qty
+						item.warehouse = location.warehouse
+						item.pick_list_item = location.name
+						item.against_pick_list = self.name
+      
+						dn_items.append(item)
+						break
+  
+			for sales_order in sales_orders:
+				delivery_note.update({
+					'ignore_pricing_rule': frappe.db.get_value('Sales Order', sales_order, 'ignore_pricing_rule'),
+					"disable_rounded_total": 1
+				})
+    
+				#Add pick list submitted date in sales order
+				sales_doc = frappe.get_doc("Sales Order", sales_order)
+				sales_doc.update({"pick_list_submitted_date": datetime.datetime.now(timezone('US/Pacific')).strftime("%Y-%m-%d %H:%M:%S")})
+				sales_doc.save()
+  
+			delivery_note.items = dn_items
+			delivery_note.discount_amount = total_discount_amount
+			
+			delivery_note.save()
+			frappe.db.commit()
+		
 	
 	def on_cancel(self):
 		super(CustomPickList, self).on_cancel()
 
 		# Metactical Customization: Delete delivery notes and clear submitted date in sales orders
-		delivery_notes = frappe.get_all('Delivery Note', filters={'pick_list': self.name, 'docstatus': 0}, fields=['name'])
+		delivery_notes = frappe.db.sql("""
+						SELECT DISTINCT dni.parent as name
+						FROM `tabDelivery Note Item` dni
+						INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+						WHERE dni.against_pick_list = %(pick_list)s
+								AND dn.docstatus = 0
+						""", {"pick_list": self.name}, as_dict=1)
+  
 		for delivery_note in delivery_notes:
 			# Delete shipments first before deleting delivery notes
 			shipments = frappe.db.sql("""
@@ -566,6 +600,29 @@ class CustomPickList(PickList):
 					else:
 						frappe.throw(_("All of <b>{0}</b> has already been picked in a different Pick List(s).").format(sales_order_items.get(so_item).item_code))
 
+	def update_sales_order_item_qty(self, so_items):
+		picked_items = get_picked_items_qty(so_items)
+		returned_items = get_returned_qty(so_items)
+		self.validate_picked_qty(picked_items)
+
+		picked_qty = frappe._dict()
+		for d in picked_items:
+			picked_qty[d.sales_order_item] = d.picked_qty
+
+		returned_qty = frappe._dict()
+		for d in returned_items:
+			returned_qty[d.sales_order_item] = d.returned_qty
+
+		for so_item in so_items:
+			adjusted_qty = flt(picked_qty.get(so_item)) - flt(returned_qty.get(so_item, 0))
+			frappe.db.set_value(
+				"Sales Order Item",
+				so_item,
+				"picked_qty",
+				adjusted_qty,
+				update_modified=False,
+			)
+
 #  Function to extract numerical parts and convert them to integers for sorting
 def sort_key(item):
 	item = re.split(r'[|]', item)
@@ -698,3 +755,21 @@ def submit_pick_list(doc):
 		queue_action(doc, "submit", timeout=2000)
 	else:
 		doc._submit()
+
+def get_returned_qty(items) -> list[dict]:
+	soi = frappe.qb.DocType("Sales Order Item")
+
+	query = (
+		frappe.qb.from_(soi)
+		.select(
+			soi.name.as_("sales_order_item"),
+			soi.item_code,
+			soi.parent.as_("sales_order"),
+			Sum(soi.returned_qty).as_("returned_qty"),
+		)
+		.where((soi.docstatus == 1) & (soi.name.isin(items)))
+		.groupby(soi.name, soi.parent)
+		.for_update()
+	)
+
+	return query.run(as_dict=True)

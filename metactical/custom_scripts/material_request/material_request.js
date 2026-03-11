@@ -2,8 +2,10 @@ frappe.ui.form.on('Material Request', {
 	refresh: function(frm) {
 		if (frm.doc.docstatus == 0) {
 			get_quantities_on_hand(frm);
+			//frm.events.clear_price_list(frm);
 		}
 	},
+
 	onload: function(frm) {
 		frappe.after_ajax(function(){
 			frm.set_query("set_warehouse", function(doc){
@@ -20,10 +22,21 @@ frappe.ui.form.on('Material Request', {
 				}
 			});
 		});
+		frm.doc.buying_price_list = "";
+	},
+	
+	clear_price_list: function(frm) {
+		setTimeout(function(){
+			frappe.after_ajax(function(){
+				if(frm.doc.buying_price_list && frm.doc.buying_price_list != "") {
+					frm.set_value("buying_price_list", "");
+				}
+			});
+		}, 500);
 	},
 
 	get_item_data: function(frm, item, overwrite_warehouse=false) {
-		// Metactical customizatino: Prevent overwriting of target warehouse
+		// Metactical customizatino: Prevent overwriting of target warehouse 
 		overwrite_warehouse = false;
 		
 		if (item && !item.item_code) { return; }
@@ -36,7 +49,9 @@ frappe.ui.form.on('Material Request', {
 					warehouse: item.warehouse,
 					from_warehouse: item.from_warehouse,
 					doctype: frm.doc.doctype,
-					buying_price_list: frappe.defaults.get_default('buying_price_list'),
+					buying_price_list: frm.doc.buying_price_list
+						? frm.doc.buying_price_list
+						: frappe.defaults.get_default("buying_price_list"),
 					currency: frappe.defaults.get_default('Currency'),
 					name: frm.doc.name,
 					qty: item.qty || 1,

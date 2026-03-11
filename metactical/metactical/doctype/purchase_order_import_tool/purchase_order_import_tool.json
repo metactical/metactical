@@ -7,6 +7,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "transaction_date",
   "supplier",
   "currency",
   "conversion_rate",
@@ -18,8 +19,11 @@
   "section_break_cpeyk",
   "company",
   "warehouse",
+  "column_break_mtro",
   "shipping_address",
   "taxes_and_charges",
+  "section_break_mxzy",
+  "taxes",
   "section_break_evaxu",
   "import_based_on",
   "excel_file",
@@ -178,15 +182,40 @@
    "label": "Warehouse",
    "options": "Warehouse",
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_mxzy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "taxes",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "Purchase Taxes and Charges",
+   "options": "Purchase Taxes and Charges",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_mtro",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "transaction_date",
+   "fieldtype": "Date",
+   "label": "Transaction Date",
+   "reqd": 1
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-07-20 09:01:43.449002",
+ "modified": "2026-02-12 05:31:25.757279",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order Import Tool",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -202,7 +231,10 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
