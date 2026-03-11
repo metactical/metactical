@@ -882,7 +882,8 @@ fixtures = [{
 			"Item-neb_life_cycle_status",
 			"Supplier-variant_available_rules",
 			"Supplier-section_break_e11nr",
-			"Supplier-column_break_ov8xt"
+			"Supplier-column_break_ov8xt",
+			"Item-month_on_hand"
 		]]]
 	},
 	{
@@ -1484,7 +1485,8 @@ jinja = {
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
 		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location",
 		"metactical.barcode_generator.get_qr_for_print_format",
-		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json"
+		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json",
+		"metactical.custom_scripts.utils.metactical_utils.get_refund_details_for_print",
 	]
 }
 
