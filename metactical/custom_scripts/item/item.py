@@ -14,6 +14,11 @@ class CustomItem(Item):
             if merge:
                 self.remove_price_lists(old_item_code)
 
+                # Remove Item Inventory Output for old item to avoid unique constraint
+                # conflict during update_link_field_values (item_code is both autoname and unique)
+                if frappe.db.exists("Item Inventory Output", old_item_code):
+                    frappe.delete_doc("Item Inventory Output", old_item_code, ignore_permissions=True, force=True)
+
                 # Fetch the old item document
                 old_item = frappe.get_doc("Item", old_item_code)
                 new_item = frappe.get_doc("Item", new_item_code)
@@ -87,9 +92,26 @@ class CustomItem(Item):
                             frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
                             frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
 
+            self.repost_bin_qty(new_item_code)
+
             frappe.db.commit()
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
+
+    def repost_bin_qty(self, item_code):
+        bins = frappe.get_all(
+            "Bin",
+            filters={"item_code": item_code},
+            pluck="name",
+        )
+        for bin_name in bins:
+            try:
+                frappe.get_doc("Bin", bin_name).recalculate_qty()
+            except Exception:
+                frappe.log_error(
+                    title="Error recalculating bin qty after rename",
+                    message=frappe.get_traceback(),
+                )
         
     def copy_barcodes(self, old_item_code, new_item_code):
         old_barcodes = frappe.get_all("Item Barcode", filters={"parent": old_item_code}, fields=["barcode", "name"])
