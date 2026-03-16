@@ -85,14 +85,13 @@ def create_opening_entry(*args, **kwargs):
                 "amount": amount
             })
             
-        print(total_cash, bills_total, coins_total)
         
         opening.total_cash = total_cash
         opening.bills_total = bills_total
         opening.coins_total = coins_total
         
         # Save the document
-        opening.insert()
+        opening.insert(ignore_permissions=True)
         opening.submit()
         frappe.db.commit()
         
