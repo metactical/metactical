@@ -8,6 +8,9 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "hide_in_filters",
+  "neb_website_specifications",
+  "section_break_sbxf",
   "description"
  ],
  "fields": [
@@ -15,11 +18,28 @@
    "fieldname": "description",
    "fieldtype": "Text",
    "label": "Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "hide_in_filters",
+   "fieldtype": "Check",
+   "label": "Hide In Filters"
+  },
+  {
+   "fieldname": "section_break_sbxf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "neb_website_specifications",
+   "fieldtype": "Table",
+   "label": "Website Specifications",
+   "options": "MT Item Website Specification"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-04 23:27:34.381703",
+ "modified": "2026-02-03 10:05:20.766820",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SB Tag",
@@ -39,6 +59,8 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

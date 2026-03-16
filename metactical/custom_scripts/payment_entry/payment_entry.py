@@ -393,12 +393,45 @@ def get_mode_of_payment(reference_doctype, reference_name):
 	pe_detail = None
 	if reference_doctype == "Sales Invoice":
 		return_doc = frappe.get_doc("Sales Invoice", reference_name)
-		advances = frappe.get_doc("Sales Invoice", return_doc.return_against).advances
+		advances = []
+  
+		if not return_doc.return_against:
+      
+			# get delivery note from sales return
+			return_delivery_note = None
+			for item in return_doc.items:
+				if item.delivery_note:
+					return_delivery_note = item.delivery_note
+					break
+			
+			# get sales invoice from the original delivery note
+			if return_delivery_note:
+				delivery_note = frappe.db.get_value("Delivery Note", return_delivery_note, "return_against")
+    
+				if delivery_note:     
+					sales_invoices = frappe.db.get_all(
+						"Sales Invoice",
+						filters=[
+							["Sales Invoice Item", "delivery_note", "=", delivery_note],
+							["Sales Invoice", "docstatus", "=", 1]
+						],
+						fields=["name"]
+					)
+     
+					if sales_invoices:
+						for si in sales_invoices:
+							advances = frappe.get_doc("Sales Invoice", si.name).advances
+							if advances:
+								break
+
+		else:
+			advances = frappe.get_doc("Sales Invoice", return_doc.return_against).advances
+   
 		if advances:
 			for adv in advances:
 				pe_detail = frappe.db.get_value("Payment Entry", adv.reference_name, ["mode_of_payment", "reference_no"], as_dict=True)
 				if pe_detail.mode_of_payment:
-					frappe.msgprint(f"Mode of Payment picked from advance payments")
+					frappe.msgprint(f"Mode of Payment picked from payment entries")
 					break
      
 	frappe.response["mode_of_payment"] = pe_detail.mode_of_payment if pe_detail else ""

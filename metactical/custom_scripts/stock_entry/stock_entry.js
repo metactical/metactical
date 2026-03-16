@@ -1,5 +1,31 @@
 frappe.ui.form.on('Stock Entry', {
 	refresh: function(frm){
+		if (frm.doc.docstatus === 0) {
+			frm.add_custom_button(__('Recalculate Available Qty'), function() {
+				var items = frm.doc.items.map(function(item) {
+					return {
+						name: item.name,
+						item_code: item.item_code,
+						s_warehouse: item.s_warehouse
+					};
+				});
+				frappe.call({
+					method: "metactical.custom_scripts.stock_entry.stock_entry.recalculate_available_qty",
+					args: { items: items },
+					freeze: true,
+					callback: function(r) {
+						if (r.message) {
+							frm.doc.items.forEach(function(item) {
+								if (r.message[item.name] !== undefined) {
+									frappe.model.set_value(item.doctype, item.name, 'actual_qty', r.message[item.name]);
+								}
+							});
+							frappe.show_alert(__('Available Qty Recalculated'), 3);
+						}
+					}
+				});
+			});
+		}
 		if (frm.doc.docstatus === 1) {
 			if (!frm.doc.add_to_transit && frm.doc.purpose=='Material Transfer' && frm.doc.per_transferred < 100) {
 				var is_active = false

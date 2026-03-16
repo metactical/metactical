@@ -167,8 +167,8 @@ class CustomStockEntry(StockEntry):
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):
 	def update_item_quantity(source, target, source_parent):
-		qty = flt(flt(source.stock_qty) - flt(source.ordered_qty))/ target.conversion_factor \
-			if flt(source.stock_qty) > flt(source.ordered_qty) else 0
+		qty = flt(flt(source.stock_qty) - flt(source.delivered_qty))/ target.conversion_factor \
+			if flt(source.stock_qty) > flt(source.delivered_qty) else 0
 		target.qty = qty
 		target.transfer_qty = qty * source.conversion_factor
 		target.conversion_factor = source.conversion_factor
@@ -193,7 +193,7 @@ def create_stock_entry(source_name, target_doc=None):
 				'warehouse': 't_warehouse'
 			},
 			'postprocess': update_item_quantity,
-			'condition': lambda doc: doc.ordered_qty < doc.stock_qty
+			'condition': lambda doc: doc.delivered_qty < doc.stock_qty
 		},
 	}, target_doc)
 
@@ -248,6 +248,27 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 @frappe.whitelist()
 def get_default_transit(user):
 	return frappe.db.get_value('Stock Entry User Permissions', user, 'add_to_transit')
+
+@frappe.whitelist()
+def recalculate_available_qty(items):
+	import json
+	if isinstance(items, str):
+		items = json.loads(items)
+
+	result = {}
+	for item in items:
+		item_code = item.get("item_code")
+		s_warehouse = item.get("s_warehouse")
+		row_name = item.get("name")
+
+		if item_code and s_warehouse and row_name:
+			bin_name = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": s_warehouse})
+			if bin_name:
+				bin_doc = frappe.get_doc("Bin", bin_name)
+				bin_doc.recalculate_qty()
+				result[row_name] = bin_doc.actual_qty
+
+	return result
 	
 @frappe.whitelist()
 def move_stock(source_name, target_doc=None):
