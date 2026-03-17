@@ -880,9 +880,12 @@ fixtures = [{
 			"POS Profile-custom_cash_float",
 			"Item-neb_life_cycle_recommended_action",
 			"Item-neb_life_cycle_status",
+			"Tag Link-autocreated",
+   			"Item-month_on_hand",
 			"Supplier-variant_available_rules",
 			"Supplier-section_break_e11nr",
-			"Supplier-column_break_ov8xt"
+			"Supplier-column_break_ov8xt",
+			"Item-month_on_hand"
 		]]]
 	},
 	{

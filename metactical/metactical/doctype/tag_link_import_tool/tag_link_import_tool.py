@@ -1,6 +1,3 @@
-# Copyright (c) 2025, Techlift Technologies and contributors
-# For license information, please see license.txt
-
 import frappe
 from frappe.model.document import Document
 import os
@@ -10,7 +7,7 @@ from frappe.utils.file_manager import save_file
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe.model.docstatus import DocStatus
 
-class ItemClassImportTool(Document):
+class TagLinkImportTool(Document):
 	def save(self):
 		if self.docstatus == DocStatus.submitted() and \
 			self.ais_queue_status and self.ais_queue_status != "Queued":
@@ -27,7 +24,7 @@ class ItemClassImportTool(Document):
 
 	def on_submit(self):
 		file_content = self.check_file()
-		self.edit_item_class(file_content)
+		self.add_tag_link(file_content)
 
 	def read_file(self):
 		file_path = self.excel_file
@@ -55,47 +52,47 @@ class ItemClassImportTool(Document):
 			frappe.throw("Only xls and xlsx files are supported.")
 		return file_content
 	
-	def edit_item_class(self, data):
-		#enqueue(self.create_order_entries(data))
+	def add_tag_link(self, data):
+		# remove existing  autocreated tag links for items
+		frappe.db.sql("""
+			DELETE FROM `tabTag Link`
+			WHERE document_type = 'Item' AND autocreated = 1
+		""")
+
 		limit = 500
 		start = 0
 		while start < len(data):
 			end = start + limit
-			self._edit_item_class(data[start:end])
+			self._add_tag_link(data[start:end])
 			start = end
 
-	def _edit_item_class(self, data):
+	def _add_tag_link(self, data):
 		updated_items = 0
 		errors = 0
-		for row in data:
+		for row in data[1:]:  # Skip header row
 			if row[0] == "Item Code":
 				continue
 
 			item_code = row[0]
 			exists = frappe.db.exists("Item", {"item_code": item_code})
-
+   
 			if exists:
 				try:
+					tag_link = frappe.get_doc({
+						"doctype": "Tag Link",
+						"document_name": item_code,
+						"document_type": "Item",
+						"tag": row[1],
+						"autocreated": True
+					})
+					tag_link.insert(ignore_permissions=True)
 					updated_items += 1
-					frappe.db.set_value("Item", exists, {
-						"asi_item_class": row[1],
-						"neb_life_cycle_status": row[2],
-						"neb_life_cycle_recommended_action": row[3],
-						"month_on_hand": row[4] if row[4] else 0,
-						"safety_stock": row[5] if row[5] else 0
-					}, update_modified=False)
-					
 				except Exception as e:
 					errors += 1
-     
-					if errors > 10:
-						break
-  
-					frappe.log_error(title="Error inserting item class", message=frappe.get_traceback())
-					frappe.publish_realtime("msgprint", "Error inserting item class : " + str(e), user=frappe.session.user)
-
-				if updated_items and updated_items % 100 == 0:
-					frappe.db.commit()
+					self.log_error(item_code, str(e))
+			else:
+				errors += 1
+				self.log_error(item_code, "Item does not exist")
 
 		frappe.db.commit()
    
@@ -108,7 +105,7 @@ class ItemClassImportTool(Document):
 		self.save(ignore_permissions=True)
 
 @frappe.whitelist(methods=["POST"])
-def import_item_class():
+def import_tag_link():
 	uploaded_file = frappe.request.files.get('file')
 	if not uploaded_file:
 		frappe.throw("No file received")
@@ -122,24 +119,24 @@ def import_item_class():
 		is_private=True
 	)
 
-	item_class_import_tool = frappe.get_doc({
-		"doctype": "Item Class Import Tool",
+	tag_link_import_tool = frappe.get_doc({
+		"doctype": "Tag Link Import Tool",
 		"excel_file": file_doc.file_url
 	})
 
-	item_class_import_tool.check_file()
+	tag_link_import_tool.check_file()
 
 	# Insert document
-	item_class_import_tool.insert()
+	tag_link_import_tool.insert()
 
 	# Link the file to the doc
 	file_doc.reload()
-	file_doc.dt = "Item Class Import Tool"
-	file_doc.dn = item_class_import_tool.name
+	file_doc.dt = "Tag Link Import Tool"
+	file_doc.dn = tag_link_import_tool.name
 	file_doc.save()
 
-	item_class_import_tool.reload()
-	item_class_import_tool.submit()
+	tag_link_import_tool.reload()
+	tag_link_import_tool.submit()
 	frappe.db.commit()
 
 	return {

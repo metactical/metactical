@@ -681,7 +681,6 @@ def get_gpdsales(item_code):
 		SELECT SUM(`tabSales Invoice Item`.stock_qty) as total from `tabSales Invoice Item`
 		Inner join `tabSales Invoice` on `tabSales Invoice Item`.parent = `tabSales Invoice`.name
 		where `tabSales Invoice`.status ="Paid" and `tabSales Invoice Item`.item_code =%s and `tabSales Invoice`.source = 'Website - GPD'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code), as_dict=1)
 	gpdsales = 0
 	if data[0].total:
@@ -699,7 +698,6 @@ def get_mthsck(item_code, warehouse, today):
   		and `tabSales Invoice Item`.item_code =%s 
     	and `tabSales Invoice`.posting_date BETWEEN %s and %s
 		and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-		and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, fromdate , enddate), as_dict=1)
 	tqoh = 0
 	if data[0].total:
@@ -719,7 +717,6 @@ def get_discountitem(last_year, item_code):
      		and `tabSales Invoice Item`.item_code =%s 
        		and `tabSales Invoice`.posting_date BETWEEN %s and %s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -757,7 +754,6 @@ def get_orderfreq(last_year, item_code):
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -852,12 +848,10 @@ def get_master(conditions="", filters={}):
 				`tabItem Supplier` s 
 			inner join 
 				`tabItem` i on i.name = s.parent
-			where 1 = 1 and i.has_variants=0 and s.supplier = "ASK Sports - Pakistan"
+			where i.has_variants=0 and s.supplier = "ASK Sports - Pakistan"
    			%s
 		"""%(conditions), filters, as_dict=1)
  
-	frappe.log_error(title="get_master", message=f"conditions: {conditions}, filters: {filters}")
-
 	return data
 
 def get_conditions(filters):
@@ -916,7 +910,6 @@ def get_sales_rev(item_code):
 		where `tabSales Invoice`.status ="Paid" 
   			and `tabSales Invoice Item`.item_code =%s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", item_code, as_dict=1)
 
 	return data[0].total
@@ -929,7 +922,6 @@ def get_nocust12months(last_year, item_code):
   			and `tabSales Invoice Item`.item_code =%s 
      		and `tabSales Invoice`.posting_date BETWEEN %s and %s
 			and `tabSales Invoice`.company = 'Ask Sports Pvt Ltd.'
-			and `tabSales Invoice`.customer <> "International Camouflage Ltd."
 	""", (item_code, str(last_year)+"-01-01",str(last_year)+"-12-30"), as_dict=1)
 
 	return data[0].total
@@ -949,7 +941,6 @@ def get_date_last_sold(item):
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
 							and p.company = 'Ask Sports Pvt Ltd.'
-							and p.customer <> "International Camouflage Ltd."
 		""",(item))
 
 	if data:
@@ -972,7 +963,6 @@ def get_total_sold(item):
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
 							and p.company = 'Ask Sports Pvt Ltd.'
-							and p.customer <> "International Camouflage Ltd."
 						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
@@ -1094,9 +1084,7 @@ def get_pr_qty( item, po_name):
 
 def get_open_po_qty(item,supplier, warehouse=None):
 	where = ''
-	if warehouse is not None:
-		where = " AND c.warehouse = '{}'".format(warehouse)
-	
+
 	if supplier is not None:
 		where += " AND p.supplier = '{}'".format(supplier)
   

@@ -12,7 +12,17 @@ class CustomItem(Item):
 
         try:
             if merge:
-                self.remove_price_lists(old_item_code)
+                self.remove_price_lists(new_item_code)
+
+                # Remove Item Inventory Output for old item to avoid unique constraint
+                # conflict during update_link_field_values (item_code is both autoname and unique)
+                if frappe.db.exists("Item Inventory Output", old_item_code):
+                    frappe.delete_doc("Item Inventory Output", old_item_code, ignore_permissions=True, force=True)
+
+                # Remove Item Inventory Output for old item to avoid unique constraint
+                # conflict during update_link_field_values (item_code is both autoname and unique)
+                if frappe.db.exists("Item Inventory Output", old_item_code):
+                    frappe.delete_doc("Item Inventory Output", old_item_code, ignore_permissions=True, force=True)
 
                 # Fetch the old item document
                 old_item = frappe.get_doc("Item", old_item_code)
@@ -20,15 +30,15 @@ class CustomItem(Item):
 
                 # Fields to copy if they don't exist in the new item
                 fields_to_copy = [
-                    "ifw_location", "ifw_duty_rate", "customs_tariff_number", "neb_variantavailabilityrule",
-                    "brand", "ifw_item_notes", "asi_item_class", "country_of_origin"
+                    "ifw_location", "ifw_duty_rate", "customs_tariff_number", "ifw_product_name_ci", "neb_variantavailabilityrule",
+                    "brand", "ifw_item_notes", "asi_item_class", "country_of_origin", "image"
                 ]
-
+                
                 for field in fields_to_copy:
                     if not getattr(new_item, field, None):
                         setattr(new_item, field, getattr(old_item, field, None))
 
-                # Append supplier items from old item to new item if they don't exist
+                # Append Item Suppliers from old item to new item if they don't exist
                 if hasattr(old_item, "supplier_items"):
                     existing_suppliers = {item.supplier for item in new_item.supplier_items}
                     for supplier_item in old_item.supplier_items:
@@ -77,6 +87,7 @@ class CustomItem(Item):
             
             if merge:
                 self.copy_barcodes(old_item_code, new_item_code)
+                self.copy_suppilier_items(old_item_code, new_item_code)
 
                 if old_item.variant_of:
                     remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
@@ -87,29 +98,97 @@ class CustomItem(Item):
                             frappe.msgprint("Error deleting the template item after merge: {0}".format(str(e)))
                             frappe.log_error(title="Error deleting parent item after merge", message=frappe.get_traceback())
 
+            self.repost_bin_qty(new_item_code)
+            update_item_inventory_output(item_code=new_item_code, voucher_type=self.doctype)
+
             frappe.db.commit()
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
+
+    def repost_bin_qty(self, item_code):
+        bins = frappe.get_all(
+            "Bin",
+            filters={"item_code": item_code},
+            pluck="name",
+        )
+        for bin_name in bins:
+            try:
+                frappe.get_doc("Bin", bin_name).recalculate_qty()
+            except Exception:
+                frappe.log_error(
+                    title="Error recalculating bin qty after rename",
+                    message=frappe.get_traceback(),
+                )
         
     def copy_barcodes(self, old_item_code, new_item_code):
-        old_barcodes = frappe.get_all("Item Barcode", filters={"parent": old_item_code}, fields=["barcode", "name"])
-        new_barcodes = frappe.get_all("Item Barcode", filters={"parent": new_item_code}, fields=["barcode"])
-        
-        existing_barcodes = {barcode.barcode for barcode in new_barcodes}
-        
+        old_barcodes = frappe.get_all(
+            "Item Barcode",
+            filters={"parent": old_item_code},
+            pluck="barcode"
+        )
+
+        new_barcodes = set(frappe.get_all(
+            "Item Barcode",
+            filters={"parent": new_item_code},
+            pluck="barcode"
+        ))
+
         for barcode in old_barcodes:
-            if barcode.barcode not in existing_barcodes:
-                frappe.db.delete("Item Barcode", barcode.name)
-                new_barcode = frappe.new_doc("Item Barcode")
-                new_barcode.parent = new_item_code
-                new_barcode.parenttype = "Item"
-                new_barcode.parentfield = "barcodes"
-                new_barcode.barcode = barcode.barcode
+            if barcode not in new_barcodes:
+                frappe.db.delete("Item Barcode", {"parent": old_item_code, "barcode": barcode})
                 try:
-                    new_barcode.insert(ignore_permissions=True)
-                except Exception as e:
-                    frappe.log_error(title="Error copying barcode during item merge", message=frappe.get_traceback())
+                    frappe.get_doc({
+                        "doctype": "Item Barcode",
+                        "parent": new_item_code,
+                        "parenttype": "Item",
+                        "parentfield": "barcodes",
+                        "barcode": barcode
+                    }).insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+                except Exception:
+                    frappe.log_error(
+                        title="Barcode merge error",
+                        message=frappe.get_traceback()
+                    )
+
+        # optional: remove all barcodes from old item
+        frappe.db.delete("Item Barcode", {"parent": old_item_code})
         
+    def copy_suppilier_items(self, old_item_code, new_item_code):
+        old_suppliers = frappe.get_all(
+            "Item Supplier",
+            filters={"parent": old_item_code},
+            fields=["supplier", "supplier_part_no"]
+        )
+
+        new_suppliers = frappe.get_all(
+            "Item Supplier",
+            filters={"parent": new_item_code},
+            fields=["supplier", "supplier_part_no"]
+        )
+
+        existing_suppliers = {(d.supplier, d.supplier_part_no) for d in new_suppliers}
+
+        for supplier in old_suppliers:
+            key = (supplier.supplier, supplier.supplier_part_no)
+
+            if key not in existing_suppliers:
+                try:
+                    frappe.get_doc({
+                        "doctype": "Item Supplier",
+                        "parent": new_item_code,
+                        "parenttype": "Item",
+                        "parentfield": "supplier_items",
+                        "supplier": supplier.supplier,
+                        "supplier_part_no": supplier.supplier_part_no
+                    }).insert(ignore_permissions=True)
+
+                except Exception:
+                    frappe.log_error(
+                        title="Supplier merge error",
+                        message=frappe.get_traceback()
+                    )
+                    
     def remove_price_lists(self, old_item_code):
         price_lists = frappe.get_all("Item Price", filters={"item_code": old_item_code}, fields=["name"])
         for price in price_lists:
