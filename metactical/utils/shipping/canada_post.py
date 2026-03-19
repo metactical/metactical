@@ -909,6 +909,7 @@ class CanadaPost():
 								field_mapping = {
 									'prov-state': 'Province/State',
 									'postal-zip-code': 'Postal/ZIP Code',
+									'postal-code': 'Postal/ZIP Code',
 									'city': 'City',
 									'country-code': 'Country',
 									'address-line-1': 'Address Line 1',
@@ -923,6 +924,14 @@ class CanadaPost():
 								
 								if 'may not be empty' in description:
 									content['messages']['message'][i]['description'] = f"The {friendly_field} field is required but was empty."
+								elif 'is not a valid instance of' in description:
+									value_match = re.search(r"Value is '([^']*)", description)
+									value_str = value_match.group(1) if value_match else ''
+									value_hint = f" \"{value_str}\"" if value_str else ""
+									content['messages']['message'][i]['description'] = (
+										f"The {friendly_field}{value_hint} is invalid. "
+										f"Please double check and try again."
+									)
 								elif 'is not valid' in description:
 									content['messages']['message'][i]['description'] = f"The {friendly_field} field has an invalid format."
 								elif 'length must be' in description:
@@ -959,6 +968,8 @@ class CanadaPost():
 				# Try to extract meaningful information from unparsed response
 				if isinstance(res, str) and 'cvc-simple-type' in res:
 					res = self.convert_validation_error_to_friendly_message(res)
+				elif isinstance(res, bytes) and b'cvc-simple-type' in res:
+					res = self.convert_validation_error_to_friendly_message(res.decode('utf-8', errors='replace'))
 			
 			# If error code is 9122 then it means the manifest is already created, get the manifest
 			if error_code is not None and error_code == "9122":
@@ -988,6 +999,34 @@ class CanadaPost():
 		
 		elif 'address-line-1' in error_text and 'may not be empty' in error_text:
 			return "The Address Line 1 field is required but was empty. Please check both the delivery and pickup addresses."
-		
+
+		# Handle "is not a valid instance" errors with a value (e.g. too long / invalid chars)
+		instance_match = re.search(
+			r'element.*?\}([a-zA-Z-]+).*?is not a valid instance of.*?Value is \'([^\']*)',
+			error_text
+		)
+		if instance_match:
+			field_name = instance_match.group(1)
+			value_str = instance_match.group(2)
+			field_mapping = {
+				'prov-state': 'Province/State',
+				'postal-zip-code': 'Postal/ZIP Code',
+				'postal-code': 'Postal/ZIP Code',
+				'city': 'City',
+				'country-code': 'Country',
+				'address-line-1': 'Address Line 1',
+				'name': 'Name',
+				'phone': 'Phone Number',
+				'address-line-2': 'Address Line 2',
+				'company': 'Company Name',
+				'client-id': 'Client ID',
+			}
+			friendly_field = field_mapping.get(field_name, field_name.replace('-', ' ').title())
+			value_hint = f" \"{value_str}\"" if value_str else ""
+			return (
+				f"The {friendly_field}{value_hint} is invalid. "
+				f"Please double check and try again."
+			)
+
 		# If no specific pattern matched, provide a general message
 		return "There was a validation error with the address information. Please verify that all required fields are filled out correctly."
