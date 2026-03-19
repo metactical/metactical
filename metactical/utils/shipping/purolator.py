@@ -167,6 +167,8 @@ class Purolator:
 			receiver_addr=receiver_address,
 			total_weight=total_weight
 		)
+		# Filter out return services – they are not valid for GetFullEstimate
+		candidate_services = [s for s in candidate_services if 'Return' not in s]
 		# Fallback to a sensible default if none returned
 		if not candidate_services:
 			candidate_services = ['PurolatorGround', 'PurolatorExpress']
