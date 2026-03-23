@@ -5,7 +5,6 @@ frappe.ui.form.on("Item Merge Settings", {
 	refresh: function (frm) {
 		const allow_fields = [];
 
-		const existing_fields = frm.doc.fields_to_overwrite.map((row) => row.field_name);
 		const exclude_field_types = ["HTML", "Section Break", "Column Break", "Button", "Read Only", "Table", "Table MultiSelect"];
 
 		frappe.model.with_doctype("Item", () => {
@@ -32,6 +31,7 @@ frappe.ui.form.on("Item Merge Settings", {
 			}
 
 			frm.fields_dict.fields_to_overwrite.grid.update_docfield_property("field_name", "options", allow_fields);
+			frm.fields_dict.fields_to_copy.grid.update_docfield_property("field_name", "options", allow_fields);
 		});
 	},
 });
