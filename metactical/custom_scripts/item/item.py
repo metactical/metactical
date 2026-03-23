@@ -318,6 +318,9 @@ class CustomItem(Item):
         self.update_sb_tags()
         
         if self.drop_and_create_in_websites:
+            if not self.item_detail:
+                frappe.throw("Please add at least one Item Detail to drop and create in websites.")
+            
             self.create_item_deletion_log()
             
     def update_sb_tags(self):
@@ -409,6 +412,9 @@ class CustomItem(Item):
                 frappe.log_error(title="Error deleting existing Item Drop and Create Log", message=frappe.get_traceback())
         
         for source in self.item_detail:
+            if not source.slug:
+                frappe.throw("Slug is required for Item Detail with price list <b>{0}</b>".format(source.price_list))
+                
             item_deletion_log = frappe.new_doc("Item Drop and Create Log")
             item_deletion_log.product = self.item_code
             item_deletion_log.item_name = self.item_name
