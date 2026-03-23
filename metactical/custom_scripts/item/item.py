@@ -32,6 +32,11 @@ class CustomItem(Item):
                 if frappe.db.exists("Item Inventory Output", old_item_code):
                     frappe.delete_doc("Item Inventory Output", old_item_code, ignore_permissions=True, force=True)
 
+                # Remove Item Inventory Output for old item to avoid unique constraint
+                # conflict during update_link_field_values (item_code is both autoname and unique)
+                if frappe.db.exists("Item Inventory Output", old_item_code):
+                    frappe.delete_doc("Item Inventory Output", old_item_code, ignore_permissions=True, force=True)
+
                 # Fetch the old item document
                 old_item = frappe.get_doc("Item", old_item_code)
                 new_item = frappe.get_doc("Item", new_item_code)
