@@ -15,6 +15,24 @@ frappe.ui.form.on('Purchase Order', {
 	}
 });
 
+if (!erpnext.utils._metactical_purchase_order_party_details_wrapped) {
+	const original_get_party_details = erpnext.utils.get_party_details;
+
+	erpnext.utils.get_party_details = function(frm, method, args, callback) {
+		const is_purchase_order_supplier = frm?.doc?.doctype === "Purchase Order"
+			&& (args?.party_type === "Supplier" || (!args && frm.doc.supplier));
+		const uses_default_party_method = !method || method === "erpnext.accounts.party.get_party_details";
+
+		if (is_purchase_order_supplier && uses_default_party_method) {
+			method = "metactical.custom_scripts.purchase_order.purchase_order.get_party_details";
+		}
+
+		return original_get_party_details.call(this, frm, method, args, callback);
+	};
+
+	erpnext.utils._metactical_purchase_order_party_details_wrapped = true;
+}
+
 erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends erpnext.buying.PurchaseOrderController{
 	onload(doc, cdt, cdn){
 		this.setup_queries(doc, cdt, cdn);
@@ -61,10 +79,8 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 		}
 	}
 	
-	supplier(doc, cdt, cdn){
-		super.supplier();
-		// Metactical Customization: Remove address
-		this.frm.set_value("shipping_address", '');
+	company() {
+		return erpnext.TransactionController.prototype.company.call(this);
 	}
 	
 	add_from_mappers() {
