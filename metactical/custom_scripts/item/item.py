@@ -17,6 +17,11 @@ class CustomItem(Item):
             
             item_merge_settings = frappe.get_single("Item Merge Settings")
             if merge:
+                # Remove Item Inventory Output for old item to avoid unique constraint
+                # conflict during update_link_field_values (item_code is both autoname and unique)
+                if frappe.db.exists("Item Inventory Output", new_item_code):
+                    frappe.delete_doc("Item Inventory Output", new_item_code, ignore_permissions=True, force=True)
+                    
                 self.copy_barcodes(old_item_code, new_item_code)
                 self.copy_suppilier_items(old_item_code, new_item_code)
                 self.overwrite_website_specs(old_item_code, new_item_code)
