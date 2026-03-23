@@ -888,7 +888,11 @@ fixtures = [{
 			"Supplier-column_break_ov8xt",
 			"Item-month_on_hand",
 			"Item Group-category_names",
-			"Item Group-categoy_names_updated"
+			"Item Group-categoy_names_updated",
+   			"Supplier-custom_billing_address",
+			"Supplier-custom_column_break_bm4eg",
+			"Supplier-custom_shipping_address",
+   			"Supplier-custom_default_address"
 		]]]
 	},
 	{
