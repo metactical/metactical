@@ -257,7 +257,7 @@ def get_default_supplier_address(name):
  
 	if supplier:
 		supplier = frappe.get_doc("Supplier", name)
-		return supplier.custom_shipping_address, supplier.custom_billing_address
+		return supplier.nat_shipping_address, supplier.nat_billing_address
   
 	return "", ""
 
