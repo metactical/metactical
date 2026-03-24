@@ -3,6 +3,17 @@ from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.setup.doctype.item_group.item_group import ItemGroup
 
 class CustomItemGroup(ItemGroup):
+    def after_rename(self, old_name, new_name, merge=False):
+        super().after_rename(old_name, new_name, merge)
+        
+        merge_history = frappe.get_doc({
+            'doctype': 'Item Group Merge History',
+            'old_item_group': old_name,
+            'new_item_group': new_name,
+            'merge_type': 'Rename' if not merge else 'Merge'
+        })
+        merge_history.insert(ignore_permissions=True)
+        
     def validate(self):
         super().validate()
         # Add any custom validation logic here
