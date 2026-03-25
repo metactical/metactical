@@ -194,7 +194,8 @@ override_doctype_class = {
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 	"Item": "metactical.custom_scripts.item.item.CustomItem",
 	"Address": "metactical.custom_scripts.address.address.CustomAddress",
-	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
+	"Item Group": "metactical.custom_scripts.item_group.item_group.CustomItemGroup",
 }
 
 # Scheduled Tasks
@@ -883,7 +884,17 @@ fixtures = [{
 			"Supplier-variant_available_rules",
 			"Supplier-section_break_e11nr",
 			"Supplier-column_break_ov8xt",
-			"Item-month_on_hand"
+			"Item-month_on_hand",
+			"Item Group-section_break_mkmgh",
+   			"Item Group-categoy_names_updated",
+			"Item Group-category_names",
+			"Item-first_received_on",
+			"Item-date_last_received",
+			"Item-unitsold30d",
+			"Item-unitsold60d",
+			"Item-unitsold90d",
+			"Item-grosssale12m",
+			"Item-istop20pctsale12m"
 		]]]
 	},
 	{
