@@ -82,7 +82,14 @@ class ItemClassImportTool(Document):
 						"neb_life_cycle_status": row[2],
 						"neb_life_cycle_recommended_action": row[3],
 						"month_on_hand": row[4] if row[4] else 0,
-						"safety_stock": row[5] if row[5] else 0
+						"safety_stock": row[5] if row[5] else 0,
+						"first_received_on": row[6] if row[6] else None,
+						"date_last_received": row[7] if row[7] else None,
+						"unitsold30d": row[8] if row[8] else 0,
+						"unitsold60d": row[9] if row[9] else 0,
+						"unitsold90d": row[10] if row[10] else 0,
+						"grosssale12m": row[11] if row[11] else 0,
+						"istop20pctsale12m": row[12] if row[12] else 0,
 					}, update_modified=False)
 					
 				except Exception as e:
