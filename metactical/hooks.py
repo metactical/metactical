@@ -885,6 +885,8 @@ fixtures = [{
 			"Supplier-section_break_e11nr",
 			"Supplier-column_break_ov8xt",
 			"Item-month_on_hand",
+			"Item Group-section_break_mkmgh",
+   			"Item Group-categoy_names_updated",
 			"Item Group-category_names",
 			"Item-first_received_on",
 			"Item-date_last_received",
