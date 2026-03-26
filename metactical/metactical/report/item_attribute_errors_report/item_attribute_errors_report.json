@@ -1,0 +1,53 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-03-26 04:16:16.850563",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-03-26 04:17:44.733592",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Attribute Errors Report",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT \n    iva.parent as \"Item Code:Link/Item:180\",\n    i.item_name as \"Item Name:Data:250\",\n    iva.attribute as \"Attribute:Data:200\",\n    iva.attribute_value as \"Attribute Value:Data:150\"\nFROM \n    `tabItem Variant Attribute` iva\nINNER JOIN \n    `tabItem` i ON iva.parent = i.name\nLEFT JOIN \n    `tabItem Attribute Value` iav \n    ON iav.parent = iva.attribute \n    AND iav.attribute_value = iva.attribute_value\nWHERE \n    iav.name IS NULL\n    AND iva.attribute != \"Variant Number\"\n    AND i.has_variants = 0\n    AND iva.attribute_value IS NOT NULL\n    AND iva.attribute_value != ''\nORDER BY \n    iva.attribute, iva.attribute_value, iva.parent\n",
+ "ref_doctype": "Item",
+ "report_name": "Item Attribute Errors Report",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Item Manager"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Maintenance User"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Desk User"
+  }
+ ],
+ "timeout": 0
+}
