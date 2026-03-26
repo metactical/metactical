@@ -897,7 +897,8 @@ fixtures = [{
 			"Item-istop20pctsale12m",
    			"Supplier-custom_nat_shipping_address",
 			"Supplier-custom_nat_billing_address",
-			"Supplier-custom_icl_custom_fields"
+			"Supplier-custom_icl_custom_fields",
+   			"custom_column_break_2gkhs"
 		]]]
 	},
 	{
