@@ -100,7 +100,11 @@ class Purolator:
 				'WeightUnit': 'kg'
 			}
 		}
-		resp = client.service.GetQuickEstimate(**req)
+		try:
+			resp = client.service.GetQuickEstimate(**req)
+		except Exception as e:
+			frappe.msgprint(_("Purolator service is not available, please wait and try again after a moment."))
+			return []
 		resp = getattr(resp, 'body', resp)
 		services = []
 		if getattr(resp, 'ShipmentEstimates', None) and getattr(resp.ShipmentEstimates, 'ShipmentEstimate', None):
@@ -163,6 +167,8 @@ class Purolator:
 			receiver_addr=receiver_address,
 			total_weight=total_weight
 		)
+		# Filter out return services – they are not valid for GetFullEstimate
+		candidate_services = [s for s in candidate_services if 'Return' not in s]
 		# Fallback to a sensible default if none returned
 		if not candidate_services:
 			candidate_services = ['PurolatorGround', 'PurolatorExpress']

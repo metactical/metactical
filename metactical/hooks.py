@@ -194,7 +194,8 @@ override_doctype_class = {
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 	"Item": "metactical.custom_scripts.item.item.CustomItem",
 	"Address": "metactical.custom_scripts.address.address.CustomAddress",
-	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
+	"Item Group": "metactical.custom_scripts.item_group.item_group.CustomItemGroup",
 }
 
 # Scheduled Tasks
