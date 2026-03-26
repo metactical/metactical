@@ -3,6 +3,11 @@
 
 frappe.ui.form.on("USAePay Refund", {
 	refresh(frm) {
+            frm.page.set_indicator(`${frm.doc.status}`, {
+                "Refunded": "green",
+                "Pending": "yellow"
+            }[frm.doc.status], "status-indicator");
+
         if (frm.doc.docstatus === 0) {
             frm.page.clear_primary_action();
 
