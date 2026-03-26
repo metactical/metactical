@@ -475,6 +475,7 @@
    "link_to": "Pricing Rule Report - V1",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Pricing Rule",
    "type": "Link"
   },
   {
@@ -485,6 +486,7 @@
    "link_to": "Item Price Excel - V3",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Item Price",
    "type": "Link"
   },
   {
@@ -730,6 +732,7 @@
    "link_to": "Stock Reconciliation Report - Positive",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Stock Reconciliation",
    "type": "Link"
   },
   {
@@ -740,6 +743,7 @@
    "link_to": "Stock Reconciliation Report - Negative",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Stock Reconciliation",
    "type": "Link"
   },
   {
@@ -750,6 +754,7 @@
    "link_to": "End of Day Report - V4",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -760,6 +765,7 @@
    "link_to": "End of Day Report - V4 Franchise",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -770,6 +776,7 @@
    "link_to": "Dead Stock Report",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -780,6 +787,7 @@
    "link_to": "POS Discount Report",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -799,6 +807,7 @@
    "link_to": "Item-Wise Sales Invoice Report",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -867,6 +876,7 @@
    "link_to": "Returns and Store Credits - POS",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -877,6 +887,7 @@
    "link_to": "Returns and Store Credits - Non POS",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -935,6 +946,7 @@
    "link_to": "Sales Report by Location",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -945,6 +957,7 @@
    "link_to": "Item Locations",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Item",
    "type": "Link"
   },
   {
@@ -955,6 +968,7 @@
    "link_to": "Sales Report - Stores Restocking V1",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -1074,10 +1088,22 @@
    "link_to": "Stock Balance Totals - Purchase Rates",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Bin",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Report - Item Attribute Errors Report",
+   "link_count": 0,
+   "link_to": "Item Attribute Errors Report",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "Item",
    "type": "Link"
   }
  ],
- "modified": "2025-12-23 07:26:36.708218",
+ "modified": "2026-03-26 04:18:01.033661",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
