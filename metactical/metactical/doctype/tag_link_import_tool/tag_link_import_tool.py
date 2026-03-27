@@ -102,7 +102,7 @@ class TagLinkImportTool(Document):
 			"error": error
 		}
 		self.append("error_log", error_entry)
-		self.save(ignore_permissions=True)
+		self.insert(ignore_permissions=True)
 
 @frappe.whitelist(methods=["POST"])
 def import_tag_link():
