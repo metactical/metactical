@@ -88,21 +88,9 @@ class TagLinkImportTool(Document):
 					tag_link.insert(ignore_permissions=True)
 					updated_items += 1
 				except Exception as e:
-					errors += 1
-					self.log_error(item_code, str(e))
-			else:
-				errors += 1
-				self.log_error(item_code, "Item does not exist")
+					pass
 
 		frappe.db.commit()
-   
-	def log_error(self, item_code, error):
-		error_entry = {
-			"item_code": item_code,
-			"error": error
-		}
-		self.append("error_log", error_entry)
-		self.insert(ignore_permissions=True)
 
 @frappe.whitelist(methods=["POST"])
 def import_tag_link():
