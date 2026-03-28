@@ -234,7 +234,7 @@ var refund_payment_button = function (
                 if (r.message) {
                     console.log("can be refunded");
                     frm.add_custom_button(
-                        __("Refund Payment"),
+                        __("Request Refund"),
                         function () {
                             frappe.confirm(
                                 __("Are you sure you want to refund this Payment?"),
