@@ -898,7 +898,8 @@ fixtures = [{
    			"Supplier-custom_nat_shipping_address",
 			"Supplier-custom_nat_billing_address",
 			"Supplier-custom_icl_custom_fields",
-   			"Supplier-column_break_ov8xt"
+   			"Supplier-column_break_ov8xt",
+			"Tag Link-autocreated"
 		]]]
 	},
 	{
