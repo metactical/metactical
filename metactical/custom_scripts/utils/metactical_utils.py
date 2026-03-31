@@ -41,45 +41,54 @@ def queue_action(self, action, **kwargs):
 	enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 		action=action, **kwargs)
 		
-def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
+def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment=None, filename=None):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
 		if not rocket_chat_settings.rocket_notification:
-			return
+			if not rocket_chat_settings.pr_rocket_notification:
+				return
+			else:
+				if not rocket_chat_settings.pr_room_id:
+					frappe.log_error(title='Rocket Chat Error', message="PR Room ID not found in settings")
+					return
 
 		channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
+   
 		headers = {
-			'Content-type': rocket_chat_settings.content_type or 'application/json',
 			'X-Auth-Token': rocket_chat_settings.auth_token,
 			'X-User-Id': rocket_chat_settings.user_id
 		}
+	
+		if attachment and filename:
+			base_url = rocket_chat_settings.url
+			upload_url = f"{base_url}/api/v1/rooms.upload/{rocket_chat_settings.pr_room_id}"
 
-		if pos:	
-			message = msg
-		elif rmq:
-			message = msg
-		else:	
-			url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
-			message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
-							administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
-			
-			if failed:
-				message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
-							\n[{0}]({1})'.format(get_url(url), get_url(url))
+			files = {
+				'file': (filename, attachment, 'application/pdf'),
+			}
 
-		payload = {
-			'channel': "#"+channel_name,
-			'text': message
-		}
-
-		response = requests.post(rocket_chat_settings.url, 
-								headers=headers, 
-								data=json.dumps(payload))
-
-		if response.status_code == 200:
-			pass
+			response = requests.post(
+				upload_url,
+				headers=headers,
+				files=files
+			)
+			if response.status_code != 200:
+				frappe.log_error(title='Rocket Chat Error', message=response.text)
 		else:
-			frappe.log_error(title='Rocket Chat Error', message=response.json())
+			headers['Content-type'] = rocket_chat_settings.content_type or 'application/json'
+			payload = {
+				'channel': "#" + channel_name,
+				'text': msg
+			}
+			response = requests.post(
+				rocket_chat_settings.url,
+				headers=headers,
+				data=json.dumps(payload)
+			)
+
+		if response.status_code != 200:
+			frappe.log_error(title='Rocket Chat Error', message=response.text)
+
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
 
