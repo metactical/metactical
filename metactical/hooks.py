@@ -888,10 +888,20 @@ fixtures = [{
 			"Supplier-column_break_ov8xt",
 			"Item-month_on_hand",
 			"Item Group-category_names",
-			"Item Group-categoy_names_updated",
-			"Supplier-custom_nat_shipping_address",
-   			"Supplier-custom_nat_billing_address",
-			"Supplier-custom_icl_custom_fields"
+			"Item-first_received_on",
+			"Item-date_last_received",
+			"Item-unitsold30d",
+			"Item-unitsold60d",
+			"Item-unitsold90d",
+			"Item-grosssale12m",
+			"Item-istop20pctsale12m",
+   			"Supplier-custom_nat_shipping_address",
+			"Supplier-custom_nat_billing_address",
+			"Supplier-custom_icl_custom_fields",
+   			"Supplier-column_break_ov8xt",
+			"Tag Link-autocreated",
+			"Item Attribute Value-color",
+			"Item Attribute Value-short_name"
 		]]]
 	},
 	{
