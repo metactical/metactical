@@ -2,7 +2,7 @@ import frappe
 from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime, cint
 from frappe import _, msgprint, is_whitelisted
-from metactical.custom_scripts.utils.metactical_utils import queue_action
+from metactical.custom_scripts.utils.metactical_utils import queue_action, post_to_rocket_chat
 from frappe.model.docstatus import DocStatus
 
 class CustomPurchaseReceipt(PurchaseReceipt):
@@ -44,6 +44,13 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 			if not barcode_exists:
 				frappe.throw(f"Error: Please add a barcode for item {item.item_code}")
 
+	def on_submit(self):
+		super(CustomPurchaseReceipt, self).on_submit()
+		frappe.enqueue(
+			send_pdf_to_rocket_chat,
+			name=self.name
+		)
+
 def validate(self, method):
 	if self.set_warehouse:
 		for item in self.items:
@@ -72,3 +79,36 @@ def get_pr_items(docname):
 def get_print_format(docname):
 	doc = frappe.get_doc('Purchase Receipt', docname)
 	return frappe.get_print(doctype=doc.doctype, name=doc.name, print_format="Purchase Receipt Barcode - V2", no_letterhead=0)
+
+
+@frappe.whitelist()
+def send_pdf_to_rocket_chat(name):
+    try:
+        doc = frappe.get_doc("Purchase Receipt", name)
+
+        html = frappe.get_print(
+            "Purchase Receipt",
+            name,
+            print_format="PR Report V5",
+            no_letterhead=0,
+        )
+        pdf_content = frappe.utils.pdf.get_pdf(html)
+
+        supplier = frappe.get_doc("Supplier", doc.supplier)
+        po = doc.purchase_order
+        if supplier.country == "China":
+            filename = f"China PO-{po}.pdf"
+        else:
+            filename = f"{supplier.name} PO-{po}.pdf"
+
+        post_to_rocket_chat(
+            doc=doc,
+            msg=None,
+            attachment=pdf_content,
+            filename=filename,
+        )
+    except Exception:
+        frappe.log_error(
+            title="Rocket Chat PDF Upload Failed",
+            message=frappe.get_traceback(),
+        )
