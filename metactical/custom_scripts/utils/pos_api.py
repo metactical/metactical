@@ -873,7 +873,7 @@ def get_items(form_data):
 def get_item_code(item):
     item_code_input = item.get('ItemCode')
     retail_sku      = item.get('RetailSku')
-    barcode         = item.get('StoredBarcodeCode')
+    barcode         = item.get('Barcode')
 
     resolved_item_code = None
 
