@@ -1,12 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:kit_name",
+ "autoname": "field:kit_item",
  "creation": "2026-04-01 12:04:36.929615",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "kit_name",
+  "section_break_vpnf",
+  "kit_item",
   "discount_percentage",
   "column_break_jise",
   "disabled",
@@ -16,14 +17,6 @@
   "kit_items"
  ],
  "fields": [
-  {
-   "fieldname": "kit_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Kit Name",
-   "reqd": 1,
-   "unique": 1
-  },
   {
    "fieldname": "discount_percentage",
    "fieldtype": "Float",
@@ -60,12 +53,23 @@
    "label": "Kit Items",
    "options": "Product Bundle Item",
    "reqd": 1
+  },
+  {
+   "fieldname": "kit_item",
+   "fieldtype": "Link",
+   "label": "Kit Item",
+   "options": "Item",
+   "unique": 1
+  },
+  {
+   "fieldname": "section_break_vpnf",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-01 12:13:07.266452",
+ "modified": "2026-04-02 10:28:55.368091",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Kits",

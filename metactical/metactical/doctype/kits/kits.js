@@ -10,6 +10,14 @@ frappe.ui.form.on("Kits", {
                 }
             }
         });
+
+        frm.set_query("kit_item", function(){
+            return {
+                filters: {
+                    is_stock_item: 0
+                }
+            }
+        });
 	},
 });
 
