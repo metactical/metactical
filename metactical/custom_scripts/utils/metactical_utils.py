@@ -99,7 +99,8 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment
 				'channel': "#"+channel_name,
 				'text': message
 			}
-   
+
+			base_url = rocket_chat_settings.url
 			upload_url = f"{base_url}/api/v1/chat.postMessage"
 			response = requests.post(upload_url, 
 									headers=headers, 
