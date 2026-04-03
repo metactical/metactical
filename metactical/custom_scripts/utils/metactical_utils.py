@@ -44,13 +44,17 @@ def queue_action(self, action, **kwargs):
 def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment=None, filename=None):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
-		if not rocket_chat_settings.rocket_notification:
+
+		if attachment and filename:
 			if not rocket_chat_settings.pr_rocket_notification:
 				return
 			else:
 				if not rocket_chat_settings.pr_room_id:
 					frappe.log_error(title='Rocket Chat Error', message="PR Room ID not found in settings")
 					return
+ 
+		elif not rocket_chat_settings.rocket_notification:
+				return
 
 		if attachment and filename:
 			headers = {
