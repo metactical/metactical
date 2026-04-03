@@ -74,7 +74,7 @@ frappe.ui.form.on('Sales Order', {
             frm._base_plc_rate = current;
         }
 
-        let expected = frm._base_plc_rate + 0.2;
+        let expected = frm._base_plc_rate + 0.02;
 
         // ONLY adjust if not already adjusted
         if (Math.abs(current - expected) > 0.0001) {
