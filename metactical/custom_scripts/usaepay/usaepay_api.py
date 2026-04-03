@@ -464,8 +464,9 @@ def create_payment_entry(doc, data, log, logger=None):
 		frappe.db.commit()
 		return pe
 	except Exception as e:
-		logger.error(f"Error creating payment entry for {doc.name}: {e}")
 		frappe.log_error(title="PE Creation from USAePay Error", message=frappe.get_traceback())
+		if logger:
+			logger.error(f"Error creating payment entry for {doc.name}: {e}")
 
 def process_credit_card_tokens(event_body, customer, lead_source=None, logger=None):
 	transaction_key = event_body["object"]["key"]

@@ -171,7 +171,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'name': item_code})
 		retail_sku = frappe.db.get_value('Item', item_code, 'ifw_retailskusuffix')
 		inventory_ouput_data = []
-
+  
 		# Loop through each lead source to calculate quantity to send
 		for lead_source in lead_sources:
 			allowed_warehouses = frappe.get_all(
