@@ -580,6 +580,7 @@ def make_payment(customer, amount, token, payment_entry=None):
 	if not customer:
 		frappe.throw(_("Customer is required"))
 
+	customer_cc = None
 	if token:
 		customer_cc = frappe.db.get_value("Customer CC Tokens", token, ["token", "card_holder"], as_dict=1)
 		if not customer_cc:
