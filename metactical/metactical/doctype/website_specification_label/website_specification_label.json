@@ -51,13 +51,15 @@
    "default": "0",
    "fieldname": "is_a_product_selector",
    "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Is A Product Selector"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-06 09:01:01.646890",
+ "modified": "2026-04-06 09:07:31.092567",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Specification Label",
