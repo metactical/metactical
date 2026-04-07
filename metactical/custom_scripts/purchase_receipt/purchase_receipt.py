@@ -46,10 +46,11 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 
 	def on_submit(self):
 		super(CustomPurchaseReceipt, self).on_submit()
-		frappe.enqueue(
-			send_pdf_to_rocket_chat,
-			name=self.name
-		)
+		if not self.is_return:
+			frappe.enqueue(
+				send_pdf_to_rocket_chat,
+				name=self.name
+			)
 
 def validate(self, method):
 	if self.set_warehouse:
