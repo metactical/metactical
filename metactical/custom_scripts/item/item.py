@@ -324,59 +324,42 @@ class CustomItem(Item):
             self.create_item_deletion_log()
             
     def update_sb_tags(self):
-        matched_tags = set()
-
-        if self.item_group:
-            matched_tags.update(
-                frappe.get_all(
-                    "Item Groups List",
-                    filters={
-                        "parenttype": "SB Tag",
-                        "parentfield": "nat_item_groups",
-                        "item_group": self.item_group,
-                    },
-                    pluck="parent",
-                )
-            )
-
-        for row in self.neb_website_specifications or []:
-            if not row.label or not row.description:
-                continue
-
-            matched_tags.update(
-                frappe.get_all(
-                    "MT Item Website Specification",
-                    filters={
-                        "parenttype": "SB Tag",
-                        "parentfield": "neb_website_specifications",
-                        "label": row.label,
-                        "description": row.description,
-                    },
-                    pluck="parent",
-                )
-            )
-
-            matched_tags.update(
-                tag
-                for tag in frappe.get_all(
-                    "Website Spec Label Descriptions",
-                    filters={
-                        "parent": row.label,
-                        "description": row.description,
-                    },
-                    pluck="sb_tag",
-                )
-                if tag
-            )
+        item_specs = {
+            (row.label, row.description)
+            for row in self.neb_website_specifications or []
+            if row.label and row.description
+        }
 
         manual_rows = [tag for tag in self.sb_tags if tag.manual_selection]
         manual_tags = {tag.sb_tag for tag in manual_rows if tag.sb_tag}
 
         self.set("sb_tags", manual_rows)
+        
+        sb_tags = frappe.get_all("SB Tag", pluck="name")
+        for tag_name in sb_tags:
+            tag_doc = frappe.get_doc("SB Tag", tag_name)
+            tag_specs = {
+                (row.label, row.description)
+                for row in tag_doc.neb_website_specifications or []
+            }
 
-        for tag_name in sorted(matched_tags - manual_tags):
+            tag_item_groups = {
+                row.item_group
+                for row in tag_doc.nat_item_groups or []
+                if row.item_group
+            }
+
+            if self.item_group not in tag_item_groups:
+                continue
+
+            if not tag_specs.issubset(item_specs):
+                continue
+
+            if tag_doc.name in manual_tags:
+                continue
+
             self.append("sb_tags", {
-                "sb_tag": tag_name
+                "sb_tag": tag_doc.name
             })
 
     def update_item_inventory_output(self):
