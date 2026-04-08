@@ -1,17 +1,21 @@
 frappe.ui.form.on('Purchase Order', {
 	refresh: function(frm){
-		var allow_tax_edit = 1;
-		if(frm.doc.__onload && frm.doc.__onload['ais_allow_tax_edit']){
-			allow_tax_edit = 0;
-		}
-		frm.set_df_property('taxes', 'read_only', allow_tax_edit);
-		frm.doc.taxes.forEach((row)=>{
-			var tax_fields = ['charge_type', 'account_head', 'rate']
-			tax_fields.forEach((field) => {
-				frappe.meta.get_docfield(row.doctype, field, row.name).read_only = allow_tax_edit;
+		if (frm.doc.docstatus == 1) {
+			var allow_tax_edit = 1;
+
+			if(frm.doc.__onload && frm.doc.__onload['ais_allow_tax_edit']){
+				allow_tax_edit = 0;
+			}
+
+			frm.set_df_property('taxes', 'read_only', allow_tax_edit);
+			frm.doc.taxes.forEach((row)=>{
+				var tax_fields = ['charge_type', 'account_head', 'rate']
+				tax_fields.forEach((field) => {
+					frappe.meta.get_docfield(row.doctype, field, row.name).read_only = allow_tax_edit;
+				});
+				frm.refresh_field("taxes");
 			});
-			frm.refresh_field("taxes");
-		});
+		}
 	}
 });
 
