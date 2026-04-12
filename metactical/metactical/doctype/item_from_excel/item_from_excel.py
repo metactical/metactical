@@ -62,7 +62,7 @@ class ItemFromExcel(Document):
 		for spec in specs:
 			if not frappe.db.exists("Website Specification Label", spec):
 				missing_specs.append(spec)
-    
+	
 		if missing_specs:	
 			frappe.throw(f"The following Specification Labels are missing in the ERP: <b>{', '.join(missing_specs)}</b>")
 
@@ -91,7 +91,7 @@ class ItemFromExcel(Document):
 		for d in data[1:] if not is_template else []:
 			if d and d[0]:
 				template_with_last_variant[d[variant_of_header]] = d[0]
-    
+	
 		# Helper function to initialize data structures for a new item
 		def initialize_item_data():
 			return frappe.new_doc("Item"), "", {ld: [] for ld in linked_dcts}, {ld: {} for ld in linked_dcts}, [price_list_headers]
@@ -100,7 +100,7 @@ class ItemFromExcel(Document):
 		def update_item_field(item, field, value):
 			if field in item_field_map and value is not None:
 				item.set(item_field_map[field], value)
-    
+	
 		def validate_mandatory_specs(item, spec_labels):
 			item_group = frappe.get_cached_doc("Item Group", item.item_group)
 			website_specifications = item_group.get("neb_website_specifications") if item_group else []
@@ -130,7 +130,7 @@ class ItemFromExcel(Document):
 							child_table = get_key_from_value(linked_dcts, doctype)
 							child_table_field = updated_linked_doctypes_to_map[doctype][field]
 							temp_child_table_values[child_table][child_table_field] = row[i]
-       
+	   
 			# check if the number of attributes and attribute values match
 			if self.attributes and self.attribute_values and not is_template:
 				attributes = self.attributes.split(', ') if "," in self.attributes else [self.attributes]
@@ -158,16 +158,16 @@ class ItemFromExcel(Document):
 				is_last_item_of_template = True if item.variant_of and template_with_last_variant.get(item.variant_of) == item.item_code else False
 				validate_mandatory_specs(item, spec_labels)
 				self.save_item(item, 
-                   				child_table_values, 
-                   				is_template, price_list_rows, 
-                       			self.attributes, 
-                          		self.attribute_values, 
-                            	data[index][price_list_index], 
-                             	is_last_item_of_template,
-                              	templates_with_ai_request,
+				   				child_table_values, 
+				   				is_template, price_list_rows, 
+					   			self.attributes, 
+						  		self.attribute_values, 
+								data[index][price_list_index], 
+							 	is_last_item_of_template,
+							  	templates_with_ai_request,
 								spec_labels
 							  )	
-    
+	
 				item, item_code, child_table_values, temp_child_table_values, price_list_rows = initialize_item_data()
 
 			prices = []
@@ -201,12 +201,12 @@ class ItemFromExcel(Document):
 			validate_mandatory_specs(item, spec_labels)
 			# Save the last item after the loop
 			self.save_item(item, 
-                  			child_table_values, 
-                  			is_template, 
-                     		price_list_rows, 
-                       		self.attributes, 
-                         	self.attribute_values, 
-                          	data[-1][price_list_index],
+				  			child_table_values, 
+				  			is_template, 
+					 		price_list_rows, 
+					   		self.attributes, 
+						 	self.attribute_values, 
+						  	data[-1][price_list_index],
 							is_last_item_of_template,
 							templates_with_ai_request,
 							spec_labels
@@ -250,7 +250,7 @@ class ItemFromExcel(Document):
 				
 				if len(row) > col_idx and row[col_idx] is not None:
 					description = str(row[col_idx]).strip()
-     
+	 
 					if not frappe.db.exists("Website Spec Label Descriptions", {"parent": spec_info["label"], "description": description}):
 						frappe.throw(f"Specification description '{description}' for label '{spec_info['label']}' does not exist in ERP.")
 					
@@ -269,17 +269,17 @@ class ItemFromExcel(Document):
 
 
 	def save_item(self, item, 
-               			child_table_values, 
-                  		is_template, 
-                    	price_list_rows, 
-                     	attributes, 
-                      	attribute_values, 
-                       	price_list, 
-                        is_last_item_of_template, 
-                        templates_with_ai_request,
+			   			child_table_values, 
+				  		is_template, 
+						price_list_rows, 
+					 	attributes, 
+					  	attribute_values, 
+					   	price_list, 
+						is_last_item_of_template, 
+						templates_with_ai_request,
 						spec_labels
 					  ):
-     
+	 
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
 		item = add_child_table_values_to_item(item, child_table_values, is_template, attributes, attribute_values)
 		item = self.add_website_specifications_to_item(item, spec_labels)
@@ -356,7 +356,7 @@ class ItemFromExcel(Document):
 					"label": spec.label,
 					"description": spec.description
 				})
-    
+	
 		return item
    
 	def create_item_defaults(self, item, supplier):
@@ -613,7 +613,7 @@ def add_child_table_values_to_item(item, child_table_values, is_template, attrib
 						child_table_values[child].append({
 							"price_list": pl.strip()
 						})
-     
+	 
 		if len(child_table_values[child]):
 			item.set(child, child_table_values[child])
 			child_table_values[child] = []
@@ -790,6 +790,7 @@ def get_column_indices(headers):
 		dict: {field_name: column_index}
 	"""
 	return {
+		'item_code': headers.index('Item Code') if 'Item Code' in headers else -1,
 		'item_group': headers.index('Item Group') if 'Item Group' in headers else -1,
 		'brand': headers.index('Brand') if 'Brand' in headers else -1,
 		'availability_rule': headers.index('VariantAvailabilityRule') if 'VariantAvailabilityRule' in headers else -1
@@ -801,24 +802,24 @@ def extract_specs_from_third_sheet(wb):
 	Extract specification labels from third sheet
 	
 	Third sheet structure:
-	- Column 1: Item Group
+	- Column 1: Item Code (ERP SKU)
 	- Columns 2+: Specification Labels
 	
 	Returns:
-		dict: {item_group: set of spec labels}
+		dict: {item_code: set of spec labels}
 	"""
-	specs_by_item_group = {}
+	specs_by_item_code = {}
 	
 	if len(wb.sheetnames) < 3:
 		frappe.logger().info("No third sheet found for specifications")
-		return specs_by_item_group
+		return specs_by_item_code
 	
 	specs_sheet = wb[wb.sheetnames[2]]
 	spec_headers = get_sheet_headers(specs_sheet)
 	
 	if not spec_headers or len(spec_headers) < 2:
 		frappe.logger().warning("Third sheet has invalid structure")
-		return specs_by_item_group
+		return specs_by_item_code
 	
 	# Get spec labels (columns 2+)
 	spec_labels = []
@@ -831,9 +832,9 @@ def extract_specs_from_third_sheet(wb):
 	
 	if not spec_labels:
 		frappe.logger().warning("No specification labels found")
-		return specs_by_item_group
+		return specs_by_item_code
 	
-	# Extract specs for each item group
+	# Extract specs for each item code
 	for idx, row in enumerate(specs_sheet.iter_rows(values_only=True)):
 		if idx == 0:  # Skip header
 			continue
@@ -841,8 +842,8 @@ def extract_specs_from_third_sheet(wb):
 		if not row or not row[0]:  # Skip empty rows
 			continue
 		
-		item_group = str(row[0]).strip()
-		item_group_specs = set()
+		item_code = str(row[0]).strip()
+		item_specs = set()
 		
 		# Check each spec label column
 		for spec_info in spec_labels:
@@ -851,13 +852,13 @@ def extract_specs_from_third_sheet(wb):
 			if len(row) > col_idx and row[col_idx] is not None:
 				description = str(row[col_idx]).strip()
 				if description:  # Only add if not empty
-					item_group_specs.add(spec_info["label"])
+					item_specs.add(spec_info["label"])
 		
-		if item_group_specs:
-			specs_by_item_group[item_group] = item_group_specs
+		if item_specs:
+			specs_by_item_code[item_code] = item_specs
 	
-	frappe.logger().info(f"Extracted specs for {len(specs_by_item_group)} item groups from third sheet")
-	return specs_by_item_group
+	frappe.logger().info(f"Extracted specs for {len(specs_by_item_code)} item codes from third sheet")
+	return specs_by_item_code
 
 
 def has_price_in_column(row, price_column_idx):
@@ -871,7 +872,7 @@ def has_price_in_column(row, price_column_idx):
 	return False
 
 
-def extract_data_for_price_list(variants_sheet, price_column_idx, column_indices, specs_by_item_group):
+def extract_data_for_price_list(variants_sheet, price_column_idx, column_indices, specs_by_item_code):
 	"""
 	Extract unique specs, categories, brands, and availability rules
 	for items with prices in the specified price list column
@@ -880,7 +881,7 @@ def extract_data_for_price_list(variants_sheet, price_column_idx, column_indices
 		variants_sheet: Worksheet object
 		price_column_idx: Index of price list column
 		column_indices: Dict of important column indices
-		specs_by_item_group: Dict mapping item groups to their specs
+		specs_by_item_code: Dict mapping item codes to their specs
 	
 	Returns:
 		dict: Payload with SpecsExternalIds, CategoriesExternalIds, etc.
@@ -897,6 +898,12 @@ def extract_data_for_price_list(variants_sheet, price_column_idx, column_indices
 		# Only process items with prices
 		if not has_price_in_column(row, price_column_idx):
 			continue
+
+		# Extract Item Code to look up specs from the third sheet
+		item_code = None
+		if column_indices['item_code'] != -1:
+			if len(row) > column_indices['item_code'] and row[column_indices['item_code']]:
+				item_code = str(row[column_indices['item_code']]).strip()
 		
 		# Extract Item Group (Category)
 		if column_indices['item_group'] != -1:
@@ -904,10 +911,10 @@ def extract_data_for_price_list(variants_sheet, price_column_idx, column_indices
 				item_group = str(row[column_indices['item_group']]).strip()
 				if item_group:
 					categories_external_ids.add(item_group)
-					
-					# Extract specs for this item group
-					if item_group in specs_by_item_group:
-						specs_external_ids.update(specs_by_item_group[item_group])
+
+		# Extract specs for this item code
+		if item_code and item_code in specs_by_item_code:
+			specs_external_ids.update(specs_by_item_code[item_code])
 		
 		# Extract Brand
 		if column_indices['brand'] != -1:
@@ -1002,7 +1009,7 @@ def call_validation_api(config, payload, price_list_name):
 
 
 def process_price_list(price_list_name, price_column_idx, variants_sheet, 
-                       column_indices, specs_by_item_group, price_list_to_config):
+					   column_indices, specs_by_item_code, price_list_to_config):
 	# Check if validation config exists
 	if price_list_name not in price_list_to_config:
 		return None
@@ -1014,7 +1021,7 @@ def process_price_list(price_list_name, price_column_idx, variants_sheet,
 		variants_sheet,
 		price_column_idx,
 		column_indices,
-		specs_by_item_group
+		specs_by_item_code
 	)
 	
 	# Make API call
@@ -1046,7 +1053,7 @@ def extract_and_validate_excel_data(file_url):
 		column_indices = get_column_indices(variants_headers)
 		
 		# Extract specs from third sheet
-		specs_by_item_group = extract_specs_from_third_sheet(wb)
+		specs_by_item_code = extract_specs_from_third_sheet(wb)
 		
 		# Process each price list
 		results = {}
@@ -1057,7 +1064,7 @@ def extract_and_validate_excel_data(file_url):
 				price_column_idx,
 				variants_sheet,
 				column_indices,
-				specs_by_item_group,
+				specs_by_item_code,
 				price_list_to_config
 			)
    			
@@ -1065,7 +1072,7 @@ def extract_and_validate_excel_data(file_url):
 				results[price_list_name] = result
 			else:
 				no_result.append(price_list_name)
-    
+	
 		frappe.msgprint(f"No validation config found for price lists: <b>{', '.join(no_result)}</b>") if no_result else None
 		
 		wb.close()
@@ -1411,16 +1418,16 @@ def process_sheet_for_summary(sheet, summary, specs_sheet):
 			rule = str(row[availability_idx]).strip()
 			summary["availability_rules"][rule] = summary["availability_rules"].get(rule, 0) + 1
 		
-		# Specs from third sheet
-		if specs_sheet and item_group_idx != -1 and len(row) > item_group_idx and row[item_group_idx]:
-			item_group = str(row[item_group_idx]).strip()
-			specs = get_specs_for_item_group(specs_sheet, item_group)
+		# Specs from third sheet are keyed by ERP SKU / Item Code
+		if specs_sheet and item_code_idx != -1 and len(row) > item_code_idx and row[item_code_idx]:
+			item_code = str(row[item_code_idx]).strip()
+			specs = get_specs_for_item_code(specs_sheet, item_code)
 			for spec in specs:
 				summary["specs"][spec] = summary["specs"].get(spec, 0) + 1
 
 
-def get_specs_for_item_group(specs_sheet, item_group):
-	"""Get specification labels for an item group from third sheet"""
+def get_specs_for_item_code(specs_sheet, item_code):
+	"""Get specification labels for an item code from third sheet"""
 	specs = []
 	
 	# Get headers
@@ -1433,7 +1440,7 @@ def get_specs_for_item_group(specs_sheet, item_group):
 	if not spec_headers or len(spec_headers) < 2:
 		return specs
 	
-	# Find row for this item group
+	# Find row for this item code
 	for idx, row in enumerate(specs_sheet.iter_rows(values_only=True)):
 		if idx == 0:  # Skip header
 			continue
@@ -1441,7 +1448,7 @@ def get_specs_for_item_group(specs_sheet, item_group):
 		if not row or not row[0]:
 			continue
 		
-		if str(row[0]).strip() == item_group:
+		if str(row[0]).strip() == item_code:
 			# Check which spec columns have values
 			for i, header in enumerate(spec_headers[1:], start=1):
 				if header and len(row) > i and row[i] is not None:
@@ -1474,7 +1481,7 @@ def extract_website_spec_labels(specs_sheet, summary):
 		if header and str(header).strip():
 			spec_label_columns[i] = str(header).strip()
 	
-	# Count how many item groups use each label
+	# Count how many item codes use each label
 	label_counts = {}
 	
 	for idx, row in enumerate(specs_sheet.iter_rows(values_only=True)):

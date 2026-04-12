@@ -2,14 +2,23 @@ import frappe
 from erpnext.controllers.buying_controller import BuyingController
 from six import string_types
 from frappe.model.mapper import get_mapped_doc
+from frappe.model.utils import get_fetch_values
 from frappe import msgprint, _
-from frappe.utils import cstr, flt, getdate, new_line_sep, nowdate, add_days
-from erpnext.accounts.party import get_party_details
+from frappe.utils import cint, cstr, flt, getdate, new_line_sep, nowdate, add_days
+from erpnext.accounts.party import (
+	get_address_tax_category,
+	get_party_details as erpnext_get_party_details,
+)
 from erpnext.buying.doctype.purchase_order.purchase_order import PurchaseOrder
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime
 from frappe import _, msgprint, is_whitelisted
 from frappe.model.docstatus import DocStatus
 from metactical.custom_scripts.utils.metactical_utils import queue_action
+
+try:
+	from frappe.contacts.doctype.address.address import render_address
+except ImportError:
+	from frappe.contacts.doctype.address.address import get_address_display as render_address
 
 class CustomPurchaseOrder(PurchaseOrder):
 	def save(self):
@@ -241,3 +250,68 @@ def update_item(obj, target, source_parent):
 	target.stock_qty = (target.qty * target.conversion_factor)
 	if getdate(target.schedule_date) < getdate(nowdate()):
 		target.schedule_date = None
+
+@frappe.whitelist()
+def get_default_supplier_address(name):
+	supplier = frappe.db.exists("Supplier", name)
+ 
+	if supplier:
+		supplier = frappe.get_doc("Supplier", name)
+		return supplier.nat_shipping_address, supplier.nat_billing_address
+  
+	return "", ""
+
+
+@frappe.whitelist()
+def get_party_details(*args, **kwargs):
+	kwargs.pop("cmd", None)
+	kwargs.pop("data", None)
+	kwargs.pop("method", None)
+
+	party_details = erpnext_get_party_details(*args, **kwargs)
+
+	party_type = kwargs.get("party_type") or (len(args) > 2 and args[2]) or "Customer"
+	doctype = kwargs.get("doctype") or (len(args) > 8 and args[8])
+	party = kwargs.get("party") or (args[0] if args else None)
+	ignore_permissions = kwargs.get("ignore_permissions", False)
+
+	if party_type != "Supplier" or doctype != "Purchase Order" or not party:
+		return party_details
+
+	shipping_address, billing_address = get_default_supplier_address(party)
+	billing_address = billing_address or ""
+	shipping_address = shipping_address or ""
+
+	party_details.update(
+		billing_address=billing_address,
+		billing_address_display=(
+			render_address(billing_address, check_permissions=not ignore_permissions)
+			if billing_address else ""
+		),
+		shipping_address=shipping_address,
+		shipping_address_display=(
+			render_address(shipping_address, check_permissions=not ignore_permissions)
+			if shipping_address else ""
+		),
+	)
+
+	if billing_address:
+		party_details.update(get_fetch_values(doctype, "billing_address", billing_address))
+
+	if shipping_address:
+		party_details.update(get_fetch_values(doctype, "shipping_address", shipping_address))
+
+	party_details["tax_category"] = get_address_tax_category(
+		party_details.get("tax_category"),
+		billing_address or None,
+		shipping_address or None,
+	)
+
+	return party_details
+
+
+@frappe.whitelist()
+def get_billing_shipping_address(supplier_name):
+	shipping_address, billing_address = get_default_supplier_address(supplier_name)
+
+	return {"shipping_address": shipping_address, "billing_address": billing_address}
