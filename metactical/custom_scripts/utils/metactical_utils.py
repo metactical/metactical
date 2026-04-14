@@ -728,9 +728,11 @@ def get_refund_details_for_print(doc):
 		if linked_doc.doctype == "Sales Order":
 			result["po_no"] = getattr(linked_doc, "po_no", None)
 			result["sales_order"] = linked_doc.name
+			result["sales_invoice"] = ""
 
 		elif linked_doc.doctype == "Sales Invoice":
 			sales_order = None
+			result["sales_invoice"] = linked_doc.name
 
 			for item in getattr(linked_doc, "items", []):
 				if item.sales_order:
@@ -746,5 +748,9 @@ def get_refund_details_for_print(doc):
 			if sales_order:
 				result["po_no"] = getattr(sales_order, "po_no", None)
 				result["sales_order"] = sales_order.name
+    
+		company_address = frappe.db.get_value("Address", linked_doc.company_address, ["city", "address_line1", "phone", "country", 'pincode', "state"], as_dict=True)
+		result['phone'] = company_address.get('phone') if company_address else None
+		result['address'] = company_address.get('city') + ", " + company_address.get('state') +" " + company_address.get('pincode') if company_address else None
 
 		return result
