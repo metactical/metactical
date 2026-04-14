@@ -642,16 +642,115 @@ def custom_parse_json(json_string, key=None):
     except:
         return None
     
+
 def get_refund_details_for_print(doc):
-	usaepay_refund = frappe.db.exists("USAePay Refund", {"sales_return": doc.name, "docstatus": 1})
+	if doc.doctype == "Sales Invoice":
+		usaepay_refund = frappe.db.exists("USAePay Refund", {"sales_return": doc.name})
+  		
+		if usaepay_refund:
+			refund_doc = frappe.get_doc("USAePay Refund", usaepay_refund)
+			usaepay_account = get_usaepay_account(lead_source=refund_doc.lead_source)
+   
+			from metactical.custom_scripts.usaepay.usaepay_api import get_refund_transaction_detail	
 
-	if usaepay_refund:
-		refund_doc = frappe.get_doc("USAePay Refund", usaepay_refund)
-		usaepay_account = get_usaepay_account(lead_source=refund_doc.lead_source)
+			transaction_id = frappe.db.get_value("Payment Entry", refund_doc.payment_entry, "reference_no")
+			transaction_detail = get_refund_transaction_detail(usaepay_account, transaction_id) if transaction_id else None
 
-		from metactical.custom_scripts.usaepay.usaepay_api import get_refund_transaction_detail	
+			return transaction_detail		
+	
+	elif doc.doctype == "Payment Entry":
+		# Get Payment Entry
+		payment_entry = frappe.db.exists("Payment Entry", {"name": doc.name})
+		if not payment_entry:
+			return None
 
-		transaction_id = frappe.db.get_value("Payment Entry", refund_doc.payment_entry, "reference_no")
-		transaction_detail = get_refund_transaction_detail(usaepay_account, transaction_id) if transaction_id else None
-  
-		return transaction_detail			
+		transaction_id = frappe.db.get_value(
+			"Payment Entry", payment_entry, "reference_no"
+		)
+		if not transaction_id:
+			return None
+
+		# Get linked Sales Order / Invoice
+		references = frappe.db.get_all(
+			"Payment Entry Reference",
+			{"parent": payment_entry},
+			["reference_doctype", "reference_name"],
+		)
+
+		linked_doc = None
+		for ref in references:
+			if ref.reference_doctype in ("Sales Order", "Sales Invoice") and ref.reference_name:
+				try:
+					linked_doc = frappe.get_doc(ref.reference_doctype, ref.reference_name)
+					break
+				except Exception:
+					frappe.log_error(
+						f"Failed to fetch {ref.reference_doctype} {ref.reference_name}",
+						"Transaction Detail Error",
+					)
+
+		if not linked_doc:
+			return None
+
+		# Get USAePay account safely
+		lead_source = getattr(linked_doc, "source", None)
+		if not lead_source:
+			return None
+
+		usaepay_account = get_usaepay_account(lead_source=lead_source)
+		if not usaepay_account:
+			return None
+
+		# Fetch transaction detail
+		from metactical.custom_scripts.usaepay.usaepay_api import get_refund_transaction_detail
+
+		try:
+			transaction_detail = get_refund_transaction_detail(
+				usaepay_account, transaction_id
+			)
+		except Exception:
+			frappe.log_error(
+				f"Failed to fetch transaction {transaction_id}",
+				"USAePay API Error",
+			)
+			return None
+
+		if not isinstance(transaction_detail, dict):
+			return None
+
+		# Copy to avoid mutating API response
+		result = dict(transaction_detail)
+
+		# Enrich data
+		result["customer"] = getattr(linked_doc, "customer", None)
+		result["name"] = linked_doc.name
+
+		if linked_doc.doctype == "Sales Order":
+			result["po_no"] = getattr(linked_doc, "po_no", None)
+			result["sales_order"] = linked_doc.name
+			result["sales_invoice"] = ""
+
+		elif linked_doc.doctype == "Sales Invoice":
+			sales_order = None
+			result["sales_invoice"] = linked_doc.name
+
+			for item in getattr(linked_doc, "items", []):
+				if item.sales_order:
+					try:
+						sales_order = frappe.get_doc("Sales Order", item.sales_order)
+						break
+					except Exception:
+						frappe.log_error(
+							f"Failed to fetch Sales Order {item.sales_order}",
+							"Transaction Detail Error",
+						)
+
+			if sales_order:
+				result["po_no"] = getattr(sales_order, "po_no", None)
+				result["sales_order"] = sales_order.name
+    
+		company_address = frappe.db.get_value("Address", linked_doc.company_address, ["city", "address_line1", "phone", "country", 'pincode', "state"], as_dict=True)
+		result['phone'] = company_address.get('phone') if company_address else None
+		result['address'] = company_address.get('city') + ", " + company_address.get('state') +" " + company_address.get('pincode') if company_address else None
+
+		return result
