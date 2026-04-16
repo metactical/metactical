@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from metactical.custom_scripts.utils.metactical_utils import get_returns, group_invoice_data
+from bs4 import BeautifulSoup
 
 @frappe.whitelist()
 def load_si_from_so_pos(sales_order):
@@ -23,7 +24,7 @@ def load_si_from_so_pos(sales_order):
     
     sales_invoice = get_sales_invoice(sales_order.name)
     if sales_invoice:
-        sales_invoice = load_si_pos(sales_invoice.parent)
+        sales_invoice = load_si_pos(sales_invoice.parent, sales_order)
     else:
         frappe.response["Status"] = 404
         frappe.response["Message"] = f"{sales_order.name} has no Paid or Credit Note Issued Sales Invoice"
@@ -45,7 +46,7 @@ def get_sales_invoice(sales_order):
     return invoice
 
 @frappe.whitelist()
-def load_si_pos(sales_invoice):
+def load_si_pos(sales_invoice, sales_order):
     message = ""
     status = 200
     invoice = None
@@ -123,7 +124,7 @@ def load_si_pos(sales_invoice):
 
     invoice_details["ApprovalList"] = []
     invoice_details["SalesPerson"] = invoice.owner
-    invoice_details["Comments"] = []
+    invoice_details["Comments"] = get_comments(sales_order)
     invoice_details["InvoiceId"] = invoice.name
     invoice_details["Total"] = invoice.grand_total
     invoice_details["PriceList"] = invoice.selling_price_list
@@ -165,7 +166,7 @@ def load_so_pos(sales_order):
     
     order_details["ApprovalList"] = []
     order_details["SalesPerson"] = sales_order.owner
-    order_details["Comments"] = []
+    order_details["Comments"] = get_comments(sales_order)
     order_details["InvoiceId"] = sales_order.name
     order_details["Total"] = sales_order.grand_total
     order_details["PriceList"] = sales_order.selling_price_list
@@ -278,3 +279,16 @@ def get_address_detail(sales_order):
     customer["Country"] = customer_contact.get("country")
     
     return customer
+
+def get_comments(doc):
+    # get all commments for the doc that start with "printable:"
+    comments = frappe.db.get_all("Comment", filters={"reference_doctype": doc.doctype, "reference_name": doc.name, "comment_type": "Comment"}, fields=["content", "comment_by"])
+    printable_comments = []
+    for comment in comments:
+        soup = BeautifulSoup(comment.content, "html.parser")
+        text = soup.get_text()
+        
+        if text and text.lower().startswith("printable:"):
+            printable_comments.append({"UserId": comment.comment_by, "Text": text})
+            
+    return printable_comments
