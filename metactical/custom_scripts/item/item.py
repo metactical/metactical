@@ -324,42 +324,43 @@ class CustomItem(Item):
             self.create_item_deletion_log()
             
     def update_sb_tags(self):
-        if not self.neb_website_specifications:
-            return
-
         item_specs = {
             (row.label, row.description)
-            for row in self.neb_website_specifications
+            for row in self.neb_website_specifications or []
             if row.label and row.description
         }
 
-        # ------------------------------------------------
-        # Get all SB Tags
-        # ------------------------------------------------
-        sb_tags = frappe.get_all(
-            "SB Tag",
-            fields=["name"]
-        )
+        manual_rows = [tag for tag in self.sb_tags if tag.manual_selection]
+        manual_tags = {tag.sb_tag for tag in manual_rows if tag.sb_tag}
 
-        # Clear existing tags with manual_selection = 0
-        self.set("sb_tags", [tag for tag in self.sb_tags if tag.manual_selection])
-        manual_tags = {tag.sb_tag for tag in self.sb_tags if tag.manual_selection}
-
-        for tag in sb_tags:
-            tag_doc = frappe.get_doc("SB Tag", tag.name)
-
-            # Convert tag table into set
+        self.set("sb_tags", manual_rows)
+        
+        sb_tags = frappe.get_all("SB Tag", pluck="name")
+        for tag_name in sb_tags:
+            tag_doc = frappe.get_doc("SB Tag", tag_name)
             tag_specs = {
                 (row.label, row.description)
-                for row in tag_doc.neb_website_specifications
-                if row.label and row.description
+                for row in tag_doc.neb_website_specifications or []
             }
-            
-            if tag_specs and tag_specs.issubset(item_specs):
-                if tag_doc.name not in manual_tags:
-                    self.append("sb_tags", {
-                        "sb_tag": tag_doc.name
-                    })
+
+            tag_item_groups = {
+                row.item_group
+                for row in tag_doc.nat_item_groups or []
+                if row.item_group
+            }
+
+            if self.item_group not in tag_item_groups:
+                continue
+
+            if not tag_specs.issubset(item_specs):
+                continue
+
+            if tag_doc.name in manual_tags:
+                continue
+
+            self.append("sb_tags", {
+                "sb_tag": tag_doc.name
+            })
 
     def update_item_inventory_output(self):
         # Trigger update for item inventory output if deduct_qty has been updated
