@@ -46,10 +46,16 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 
 	def on_submit(self):
 		super(CustomPurchaseReceipt, self).on_submit()
-		if not self.is_return:
+		post_rc_message(self)
+		
+def post_rc_message(doc):
+	if not doc.is_return and doc.company == "International Camouflage Ltd":
+		warehouse = frappe.get_doc("Purchase Order", doc.purchase_order).set_warehouse
+  
+		if warehouse == "W01-WHS-Active Stock - ICL":
 			frappe.enqueue(
 				send_pdf_to_rocket_chat,
-				name=self.name
+				name=doc.name
 			)
 
 def validate(self, method):
