@@ -94,7 +94,14 @@ def create_manual_order(*args, **kwargs):
 				sales_order=sales_order.name,
 				log=log
 			)
-			
+
+			frappe.enqueue(
+				create_comments,
+				queue="default", # one of short, default, long
+				form_data=form_data,
+				sales_order=sales_order.name
+			)	
+
 		frappe.response["Status"] = "200"
 		frappe.response["InvoiceId"] = sales_order.name
 		frappe.response["Message"] = []
@@ -837,7 +844,7 @@ def get_taxes(form_data, company):
         })
             
     return taxes
-
+            
 def get_items(form_data):
 	items = []
 	location = form_data['POSProfile'] + ' Operators'
@@ -845,8 +852,8 @@ def get_items(form_data):
 		location = form_data['Location'] + ' Operators'
   
 	warehouse = frappe.db.get_value('POS Profile', location, 'warehouse')
-	for item in form_data['Items']:        
-		item_code = get_item_code(item)  										   
+	for item in form_data['Items']:
+		item_code = item['ItemCode']
 		rate = item['Rate']
 		qty = item['Qty']
 		item_name = item['ItemName'] if 'ItemName' in item else ''
@@ -869,56 +876,7 @@ def get_items(form_data):
 		items.append(item_info)
 		
 	return items
-
-def get_item_code(item):
-    item_code_input = item.get('ItemCode')
-    retail_sku      = item.get('RetailSku')
-    barcode         = item.get('Barcode')
-
-    resolved_item_code = None
-
-    # 1. Check by item_code directly
-    if item_code_input and frappe.db.exists("Item", item_code_input):
-        resolved_item_code = item_code_input
-
-    # 2. If not found → check by retail SKU
-    if not resolved_item_code and retail_sku:
-        sku_items = frappe.get_all(
-            "Item",
-            filters={"ifw_retailskusuffix": retail_sku},
-            pluck="name"
-        )
-
-        if len(sku_items) == 1:
-            resolved_item_code = sku_items[0]
-
-        elif len(sku_items) > 1 and barcode:
-            # filter by barcode
-            barcode_item = frappe.db.get_value(
-                "Item Barcode",
-                {"barcode": barcode, "parent": ["in", sku_items]},
-                "parent"
-            )
-            if barcode_item:
-                resolved_item_code = barcode_item
-
-    # 3. If still not found → check by barcode
-    if not resolved_item_code and barcode:
-        barcode_items = frappe.get_all(
-            "Item Barcode",
-            filters={"barcode": barcode},
-            pluck="parent"
-        )
-        
-        if len(barcode_items) == 1:
-            resolved_item_code = barcode_items[0]
-        else:
-            # multiple or none → fallback to input item_code
-            resolved_item_code = item_code_input
-
-    # Final assignment
-    return resolved_item_code or item_code_input
-
+	
 def get_customer(form_data):
 	frappe.set_user(form_data['SalesPerson'])
 	try:
