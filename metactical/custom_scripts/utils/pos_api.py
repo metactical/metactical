@@ -94,7 +94,14 @@ def create_manual_order(*args, **kwargs):
 				sales_order=sales_order.name,
 				log=log
 			)
-			
+
+			frappe.enqueue(
+				create_comments,
+				queue="default", # one of short, default, long
+				form_data=form_data,
+				sales_order=sales_order.name
+			)	
+
 		frappe.response["Status"] = "200"
 		frappe.response["InvoiceId"] = sales_order.name
 		frappe.response["Message"] = []
@@ -837,7 +844,7 @@ def get_taxes(form_data, company):
         })
             
     return taxes
-
+            
 def get_items(form_data):
 	items = []
 	location = form_data['POSProfile'] + ' Operators'
