@@ -136,14 +136,15 @@ class CanadaPost():
 			if response and response['price-quotes'] and response['price-quotes']['price-quote']:
 				for pq in response['price-quotes']['price-quote']:
 					options[pq['service-code']] = pq['service-name']
+					service_standard = pq.get('service-standard') or {}
 					items.append({
 						'carrier_service': pq['service-code'],
 						'service_name': pq['service-name'],
 						'base': pq['price-details']['base'],
 						'shipment_amount': pq['price-details']['due'],
-						'guaranteed_delivery': pq['service-standard']['guaranteed-delivery'],
-						'expected_transit_time': pq['service-standard']['expected-transit-time'],
-						'expected_delivery_date': pq['service-standard']['expected-delivery-date'],
+						'guaranteed_delivery': service_standard.get('guaranteed-delivery'),
+						'expected_transit_time': service_standard.get('expected-transit-time'),
+						'expected_delivery_date': service_standard.get('expected-delivery-date'),
 					})
 			if items:
 				res.append({

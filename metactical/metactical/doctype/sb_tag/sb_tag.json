@@ -10,6 +10,8 @@
  "field_order": [
   "hide_in_filters",
   "neb_website_specifications",
+  "section_break_mzif",
+  "nat_item_groups",
   "section_break_sbxf",
   "description"
  ],
@@ -34,12 +36,24 @@
    "fieldtype": "Table",
    "label": "Website Specifications",
    "options": "MT Item Website Specification"
+  },
+  {
+   "fieldname": "section_break_mzif",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_bulk_edit": 1,
+   "columns": 2,
+   "fieldname": "nat_item_groups",
+   "fieldtype": "Table MultiSelect",
+   "label": "Item Group",
+   "options": "Item Groups List"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-03 10:05:20.766820",
+ "modified": "2026-04-06 04:29:58.922802",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SB Tag",

@@ -531,7 +531,10 @@ var make_payment = function (frm, values, tokens) {
             if (res.error) {
                 frappe.msgprint(res.error);
             } else {
-                frappe.msgprint("Payment successful");
+                frappe.msgprint(
+                    `✅ Payment successful: <b>${res.amount}</b> has been processed successfully ` +
+                    `${res.card_holder ? " using the card registered to <b>" + res.card_holder : ""}.`
+                );
                 frm.reload_doc();
             }
         },
