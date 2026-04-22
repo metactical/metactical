@@ -1,27 +1,40 @@
 """
 Bulk Update Rule controller.
 
-Handles building dynamic filters from conditions, previewing matched items,
-and executing bulk updates as a background job.
-
-KEY DESIGN NOTE:
+KEY DESIGN:
   - price_list_rate and standard_rate live on Item Price, NOT Item.
-  - Whenever these fields appear in conditions or actions, we query/update
-    Item Price filtered by  price_list = 'RET - Camo'.
-  - All other fields are treated as Item fields.
+  - They always filter/update via price_list = 'RET - Camo'.
+  - Actions use a message-type pattern: action_type (e.g. UpdatePrice) + action_value.
+  - ACTION_TYPE_MAP maps each type to (doc_source, fieldname).
 """
 
 import json
 import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime, cstr, flt, cint
-
+from frappe.desk.doctype.tag.tag import DocTags
 
 # ─── Constants ────────────────────────────────────────────────────────
 PRICE_LIST = "RET - Camo"
 
-# Fields that actually live on Item Price, not Item
+# Fields that live on Item Price
 ITEM_PRICE_FIELDS = {"price_list_rate", "standard_rate"}
+
+# action_type → (doc_source, fieldname)
+#   doc_source: "item" = tabItem, "price" = tabItem Price
+ACTION_TYPE_MAP = {
+    "UpdateItemGroup":       ("item",  "item_group"),
+    "AddTag":                ("item",  "_user_tags"),
+    "RemoveTag":             ("item",  "_user_tags"),
+    "UpdateUOM":             ("item",  "stock_uom"),
+    "DisableItem":           ("item",  "disabled"),
+    "EnableItem":            ("item",  "disabled"),
+    "UpdateValuationRate":   ("item",  "valuation_rate"),
+    "UpdateDescription":     ("item",  "description"),
+    "UpdateBrand":           ("item",  "brand"),
+    "SetOpeningStock":       ("item",  "opening_stock"),
+    "UpdateWeightPerUnit":   ("item",  "weight_per_unit"),
+}
 
 OPERATOR_MAP = {
     "Equals To":              "=",
@@ -42,42 +55,28 @@ OPERATOR_MAP = {
 
 
 def _resolve_field(field_name, custom_field_name=None):
-    """Return the actual fieldname, handling the custom_field case."""
     if field_name == "custom_field":
         return (custom_field_name or "").strip()
     return field_name
 
 
 def _is_price_field(fieldname):
-    """True if this field lives on Item Price."""
     return fieldname in ITEM_PRICE_FIELDS
 
 
 class BulkUpdateRule(Document):
-    """DocType controller for Bulk Update Rule."""
 
     def validate(self):
         if not self.conditions:
             frappe.throw("At least one search condition is required.")
         if not self.actions:
             frappe.throw("At least one action is required.")
-        self._validate_actions()
-
-    def _validate_actions(self):
-        for action in self.actions:
-            if action.action_type == "Set To Formula":
-                allowed = set("abcdefghijklmnopqrstuvwxyz_0123456789.+-*/() ")
-                if not set(action.action_value.lower()).issubset(allowed):
-                    frappe.throw(
-                        f"Action row {action.idx}: formula contains invalid characters."
-                    )
 
     # ──────────────────────────────────────────────────────────────────
-    #  Helpers: classify conditions / actions into Item vs Item Price
+    #  Classify conditions / actions
     # ──────────────────────────────────────────────────────────────────
 
     def _classify_conditions(self):
-        """Split conditions into Item conditions and Item Price conditions."""
         item_conds = []
         price_conds = []
         for c in self.conditions:
@@ -89,31 +88,28 @@ class BulkUpdateRule(Document):
         return item_conds, price_conds
 
     def _classify_action_fields(self):
-        """Return sets of (item_fields, price_fields) targeted by actions."""
         item_fields = set()
         price_fields = set()
         for a in self.actions:
-            fn = _resolve_field(a.target_field, a.custom_target_field)
-            if _is_price_field(fn):
-                price_fields.add(fn)
-            else:
-                item_fields.add(fn)
+            mapping = ACTION_TYPE_MAP.get(a.action_type)
+            if not mapping:
+                continue
+            doc_type, fieldname = mapping
+            if doc_type == "price" and fieldname:
+                price_fields.add(fieldname)
+            elif fieldname:
+                item_fields.add(fieldname)
         return item_fields, price_fields
 
     # ──────────────────────────────────────────────────────────────────
-    #  Build WHERE clause fragment from a condition row
+    #  SQL condition builder
     # ──────────────────────────────────────────────────────────────────
 
     @staticmethod
     def _condition_to_sql(cond, table_alias):
-        """
-        Return (sql_fragment, params_list) for one condition row.
-        table_alias is 'i' for Item or 'ip' for Item Price.
-        """
         fn = _resolve_field(cond.field_name, cond.custom_field_name)
         op = cond.operator
         val = cond.value or ""
-        sql_op = OPERATOR_MAP.get(op, "=")
 
         col = f"`{table_alias}`.`{fn}`"
 
@@ -121,26 +117,24 @@ class BulkUpdateRule(Document):
             return f"({col} IS NOT NULL AND {col} != '')", []
         if op == "Is Not Set":
             return f"({col} IS NULL OR {col} = '')", []
-
         if op == "Begins With":
             return f"{col} LIKE %s", [f"{val}%"]
         if op == "Ends With":
             return f"{col} LIKE %s", [f"%{val}"]
-        if op in ("Contains",):
+        if op == "Contains":
             return f"{col} LIKE %s", [f"%{val}%"]
         if op == "Does Not Contain":
             return f"{col} NOT LIKE %s", [f"%{val}%"]
-
         if op in ("In", "Not In"):
             vals = [v.strip() for v in val.split(",") if v.strip()]
             if not vals:
-                # No values → match nothing / everything
                 return ("1=0" if op == "In" else "1=1"), []
             placeholders = ", ".join(["%s"] * len(vals))
             kw = "IN" if op == "In" else "NOT IN"
             return f"{col} {kw} ({placeholders})", vals
 
-        # Numeric comparisons – try to cast
+
+        sql_op = OPERATOR_MAP.get(op, "=")
         if op in ("Greater Than", "Less Than",
                   "Greater Than Or Equal", "Less Than Or Equal"):
             try:
@@ -155,29 +149,12 @@ class BulkUpdateRule(Document):
     # ──────────────────────────────────────────────────────────────────
 
     def get_matched_items(self, limit_page_length=10, start=0):
-        """
-        Return items matching conditions across Item and Item Price.
-
-        Always LEFT JOINs Item Price (price_list = PRICE_LIST) so that
-        price_list_rate / standard_rate are available for conditions,
-        preview, and actions.
-        """
         item_conds, price_conds = self._classify_conditions()
-        _, price_action_fields = self._classify_action_fields()
+        item_action_fields, price_action_fields = self._classify_action_fields()
 
-        # Determine if we need Item Price at all
         needs_price = bool(price_conds) or bool(price_action_fields)
 
-        # Also check if any formula references a price field
-        for a in self.actions:
-            if a.action_type in ("Set To Formula", "Multiply By",
-                                  "Add Value", "Subtract Value",
-                                  "Set To Field Value"):
-                for token in self._tokenize_formula(a.action_value):
-                    if _is_price_field(token):
-                        needs_price = True
-
-        # ── SELECT columns ──
+        # ── SELECT ──
         select_cols = [
             "`i`.`name` AS `name`",
             "`i`.`item_code` AS `item_code`",
@@ -185,62 +162,51 @@ class BulkUpdateRule(Document):
             "`i`.`item_group` AS `item_group`",
         ]
 
-        # Add Item-level action target fields
-        extra_item_fields = set()
+        # Extra Item fields needed by actions
+        extra_item = set()
         for a in self.actions:
-            fn = _resolve_field(a.target_field, a.custom_target_field)
-            if not _is_price_field(fn) and fn not in ("name", "item_code", "item_name", "item_group"):
-                extra_item_fields.add(fn)
-            # Also add formula source fields
-            if a.action_type in ("Set To Formula", "Multiply By",
-                                  "Add Value", "Subtract Value",
-                                  "Set To Field Value"):
-                for token in self._tokenize_formula(a.action_value):
-                    if not _is_price_field(token) and token not in ("name", "item_code", "item_name", "item_group"):
-                        extra_item_fields.add(token)
+            mapping = ACTION_TYPE_MAP.get(a.action_type)
+            if not mapping:
+                continue
+            doc_type, fieldname = mapping
+            if doc_type == "item" and fieldname and fieldname not in ("name", "item_code", "item_name", "item_group"):
+                extra_item.add(fieldname)
 
-        # Add condition fields that are Item-level (for display)
+        # Condition fields for display
         for c in self.conditions:
             fn = _resolve_field(c.field_name, c.custom_field_name)
             if not _is_price_field(fn) and fn not in ("name", "item_code", "item_name", "item_group"):
-                extra_item_fields.add(fn)
+                extra_item.add(fn)
 
-        for f in extra_item_fields:
+        for f in extra_item:
             select_cols.append(f"`i`.`{f}` AS `{f}`")
 
         if needs_price:
-            select_cols.append(f"`ip`.`price_list_rate` AS `price_list_rate`")
-            select_cols.append(f"`ip`.`name` AS `item_price_name`")
-            # standard_rate is not a standard Item Price field in ERPNext v15;
-            # it may be price_list_rate or a custom field. Include if it exists:
+            select_cols.append("`ip`.`price_list_rate` AS `price_list_rate`")
+            select_cols.append("`ip`.`name` AS `item_price_name`")
             try:
                 meta = frappe.get_meta("Item Price")
                 if meta.has_field("standard_rate"):
-                    select_cols.append(f"`ip`.`standard_rate` AS `standard_rate`")
+                    select_cols.append("`ip`.`standard_rate` AS `standard_rate`")
             except Exception:
                 pass
-            
-        print(f"SELECT columns: {select_cols}")
-        print(f"Needs price join: {needs_price}")
-        print(f"Item conditions: {len(item_conds)}, Price conditions: {len(price_conds)}")
 
         select_sql = ", ".join(select_cols)
 
         # ── FROM + JOIN ──
         from_sql = "`tabItem` AS `i`"
+        params = []
+
         if needs_price:
-            from_sql += f"""
+            from_sql += """
                 LEFT JOIN `tabItem Price` AS `ip`
                     ON `ip`.`item_code` = `i`.`item_code`
                     AND `ip`.`price_list` = %s
             """
+            params.append(PRICE_LIST)
 
         # ── WHERE ──
         where_parts = []
-        params = []
-
-        if needs_price:
-            params.append(PRICE_LIST)
 
         for c in item_conds:
             frag, p = self._condition_to_sql(c, "i")
@@ -259,8 +225,8 @@ class BulkUpdateRule(Document):
         total = frappe.db.sql(count_query, params, as_dict=True)[0].cnt
 
         # ── DATA ──
-        limit_clause = ""
         data_params = list(params)
+        limit_clause = ""
         if limit_page_length:
             limit_clause = "LIMIT %s OFFSET %s"
             data_params.extend([cint(limit_page_length), cint(start)])
@@ -276,19 +242,8 @@ class BulkUpdateRule(Document):
 
         return {"items": items, "total": total}
 
-    @staticmethod
-    def _tokenize_formula(formula):
-        """Extract alphanumeric tokens (potential field names) from a formula string."""
-        tokens = []
-        for token in formula.replace("*", " ").replace("+", " ").replace(
-            "-", " ").replace("/", " ").replace("(", " ").replace(")", " ").split():
-            cleaned = token.strip()
-            if cleaned and cleaned.replace("_", "").replace(".", "").isalpha():
-                tokens.append(cleaned)
-        return tokens
-
     # ──────────────────────────────────────────────────────────────────
-    #  Preview: compute before/after for each matched item
+    #  Preview / action computation
     # ──────────────────────────────────────────────────────────────────
 
     def compute_preview(self, items):
@@ -296,140 +251,131 @@ class BulkUpdateRule(Document):
         for item in items:
             row = {"name": item.get("name") or item.get("item_code")}
             for action in self.actions:
-                target = _resolve_field(action.target_field, action.custom_target_field)
-                before_val = item.get(target)
+                mapping = ACTION_TYPE_MAP.get(action.action_type)
+                if not mapping or not mapping[1]:
+                    continue
+                _, fieldname = mapping
+                if fieldname == "_user_tags":
+                    tag_val = (action.action_value or "").strip()
+                    row[f"{action.action_type}_before"] = ""
+                    row[f"{action.action_type}_after"] = tag_val
+                    continue
+                
+                before_val = item.get(fieldname)
                 after_val = self._compute_action_value(action, item)
-                row[f"{target}_before"] = before_val
-                row[f"{target}_after"] = after_val
+                row[f"{fieldname}_before"] = before_val
+                row[f"{fieldname}_after"] = after_val
             preview.append(row)
         return preview
 
     def _compute_action_value(self, action, item):
-        atype = action.action_type
-        aval = action.action_value
-        target = _resolve_field(action.target_field, action.custom_target_field)
+            atype = action.action_type
+            aval = (action.action_value or "").strip()
 
-        if atype == "Set To Value":
+            if atype == "DisableItem":
+                return 1
+            if atype == "EnableItem":
+                return 0
+
+            if atype in ("AddTag", "RemoveTag"):
+                return aval  # handled separately in run_bulk_update
+
             return self._cast_value(aval)
-
-        if atype == "Set To Field Value":
-            return item.get(aval.strip())
-
-        if atype == "Multiply By":
-            return flt(item.get(target)) * flt(aval)
-
-        if atype == "Add Value":
-            return flt(item.get(target)) + flt(aval)
-
-        if atype == "Subtract Value":
-            return flt(item.get(target)) - flt(aval)
-
-        if atype == "Set To Formula":
-            return self._eval_formula(aval, item)
-
-        return None
-
-    @staticmethod
-    def _eval_formula(formula, item):
-        ns = {}
-        for key, val in item.items():
-            try:
-                ns[key] = flt(val)
-            except Exception:
-                ns[key] = 0
-        try:
-            code = compile(formula, "<formula>", "eval")
-            allowed = {
-                "__builtins__": {},
-                "abs": abs, "round": round, "min": min, "max": max,
-                "int": int, "float": float,
-            }
-            allowed.update(ns)
-            return eval(code, allowed)
-        except Exception as e:
-            frappe.log_error(f"Formula evaluation error: {e}", "Bulk Update Rule")
-            return None
 
     @staticmethod
     def _cast_value(val):
         if val is None:
             return None
         val = val.strip()
-        if val.lower() in ("true", "1", "yes"):
+        if not val:
+            return val
+        if val.lower() in ("true", "yes"):
             return 1
-        if val.lower() in ("false", "0", "no"):
+        if val.lower() in ("false", "no"):
             return 0
+        # Only cast to number if it actually looks like a number
         try:
+            float(val)
             return flt(val) if "." in val else cint(val)
-        except Exception:
+        except ValueError:
             return val
 
+    def _get_action_columns(self):
+        columns = []
+        for action in self.actions:
+            mapping = ACTION_TYPE_MAP.get(action.action_type)
+            if not mapping or not mapping[1]:
+                continue
+            if mapping[1] == "_user_tags":
+                col = action.action_type  # "AddTag" or "RemoveTag"
+                if col not in columns:
+                    columns.append(col)
+            elif mapping[1] not in columns:
+                columns.append(mapping[1])
+        return columns
 
 # ═══════════════════════════════════════════════════════════════════════
 #  Background execution
 # ═══════════════════════════════════════════════════════════════════════
 
 def run_bulk_update(rule_name):
-    """
-    Background job: fetch all matching items and apply actions.
-
-    For Item fields  → update the Item doc.
-    For price fields → update the Item Price doc (price_list = PRICE_LIST).
-    """
     doc = frappe.get_doc("Bulk Update Rule", rule_name)
     doc.db_set("execution_status", "Running")
     frappe.db.commit()
 
     updated = 0
     errors = []
+    updated_item_ids = []
 
     try:
         result = doc.get_matched_items(limit_page_length=0)
-        print(f"Total matched items: {result['total']}")
         total = result["total"]
         items = result["items"]
 
-        frappe.publish_realtime(
-            "bulk_update_progress",
-            {"rule_name": rule_name, "total": total, "current": 0, "status": "Running"},
-            user=frappe.session.user,
-        )
-
         _, price_action_fields = doc._classify_action_fields()
-        item_action_fields_set, _ = doc._classify_action_fields()
 
         for i, item in enumerate(items):
             try:
-                item_changed = False
-                price_changed = False
-
-                # ── Collect new values ──
                 item_updates = {}
                 price_updates = {}
+                tag_actions = []
 
                 for action in doc.actions:
-                    target = _resolve_field(action.target_field, action.custom_target_field)
+                    mapping = ACTION_TYPE_MAP.get(action.action_type)
+                    if not mapping:
+                        continue
+                    doc_type, fieldname = mapping
+
+                    if fieldname == "_user_tags":
+                        tag_val = (action.action_value or "").strip()
+                        if tag_val:
+                            tag_actions.append((action.action_type, tag_val))
+                        continue
+
+                    if not fieldname:
+                        continue
                     new_val = doc._compute_action_value(action, item)
                     if new_val is None:
                         continue
 
-                    if _is_price_field(target):
-                        price_updates[target] = new_val
+                    if doc_type == "price":
+                        price_updates[fieldname] = new_val
                     else:
-                        item_updates[target] = new_val
+                        item_updates[fieldname] = new_val
 
-                # ── Apply Item updates ──
+                # Apply Item updates
+                item_changed = False
                 if item_updates:
-                    item_doc = frappe.get_doc("Item", item["name"])
+                    dt = doc.target_doctype or "Item"
+                    item_name = item["name"]
                     for field, val in item_updates.items():
-                        if item_doc.get(field) != val:
-                            item_doc.set(field, val)
+                        current_val = frappe.db.get_value(dt, item_name, field)
+                        if current_val != val:
+                            frappe.db.set_value(dt, item_name, field, val)
                             item_changed = True
-                    if item_changed:
-                        item_doc.flags.ignore_validate_update_after_submit = True
-                        item_doc.save(ignore_permissions=True)
 
-                # ── Apply Item Price updates ──
+                # Apply Item Price updates
+                price_changed = False
                 if price_updates and item.get("item_price_name"):
                     price_doc = frappe.get_doc("Item Price", item["item_price_name"])
                     for field, val in price_updates.items():
@@ -440,8 +386,24 @@ def run_bulk_update(rule_name):
                         price_doc.flags.ignore_validate_update_after_submit = True
                         price_doc.save(ignore_permissions=True)
 
-                if item_changed or price_changed:
+                # Apply tag actions
+                tag_changed = False
+                item_name = item.get("name")
+                dt = doc.target_doctype or "Item"
+                for tag_action, tag_val in tag_actions:
+                    try:
+                        if tag_action == "AddTag":
+                            DocTags(dt).add(item_name, tag_val)
+                            tag_changed = True
+                        elif tag_action == "RemoveTag":
+                            DocTags(dt).remove(item_name, tag_val)
+                            tag_changed = True
+                    except Exception:
+                        pass
+
+                if item_changed or price_changed or tag_changed:
                     updated += 1
+                    updated_item_ids.append(item_name)
 
                 if (i + 1) % 50 == 0:
                     frappe.db.commit()
@@ -473,9 +435,11 @@ def run_bulk_update(rule_name):
             "last_executed_by": frappe.session.user,
             "last_match_count": total,
             "execution_log": "\n".join(log_lines),
+            "updated_items": ",".join(updated_item_ids),
         })
         frappe.db.commit()
 
+        # Single completion event — no progress event before this
         frappe.publish_realtime(
             "bulk_update_progress",
             {"rule_name": rule_name, "total": total, "current": total,
@@ -496,8 +460,7 @@ def run_bulk_update(rule_name):
             {"rule_name": rule_name, "status": "Failed", "error": cstr(e)},
             user=frappe.session.user,
         )
-
-
+        
 # ═══════════════════════════════════════════════════════════════════════
 #  Whitelisted API endpoints
 # ═══════════════════════════════════════════════════════════════════════
@@ -507,10 +470,7 @@ def preview_rule(rule_name, limit=10, start=0):
     doc = frappe.get_doc("Bulk Update Rule", rule_name)
     result = doc.get_matched_items(limit_page_length=cint(limit), start=cint(start))
     result["preview"] = doc.compute_preview(result["items"])
-    columns = []
-    for action in doc.actions:
-        columns.append(_resolve_field(action.target_field, action.custom_target_field))
-    result["action_columns"] = columns
+    result["action_columns"] = doc._get_action_columns()
     return result
 
 
@@ -518,17 +478,14 @@ def preview_rule(rule_name, limit=10, start=0):
 def execute_rule(rule_name):
     doc = frappe.get_doc("Bulk Update Rule", rule_name)
     doc.db_set("execution_status", "Queued")
-
-    # job = frappe.enqueue(
-    #     "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule.run_bulk_update",
-    #     queue="long",
-    #     timeout=3600,
-    #     rule_name=rule_name,
-    #     now=False,
-    # )
-    
-    run_bulk_update(rule_name)
-    # return {"status": "queued", "job_id": job.id if job else None}
+    job = frappe.enqueue(
+        "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule.run_bulk_update",
+        queue="long",
+        timeout=3600,
+        rule_name=rule_name,
+        now=False,
+    )
+    return {"status": "queued", "job_id": job.id if job else None}
 
 
 @frappe.whitelist()
@@ -539,9 +496,7 @@ def export_preview(rule_name):
     doc = frappe.get_doc("Bulk Update Rule", rule_name)
     result = doc.get_matched_items(limit_page_length=0)
     preview = doc.compute_preview(result["items"])
-    columns = []
-    for action in doc.actions:
-        columns.append(_resolve_field(action.target_field, action.custom_target_field))
+    columns = doc._get_action_columns()
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -586,11 +541,7 @@ def preview_from_data(conditions, actions, target_doctype="Item", limit=20, star
 
     result = doc.get_matched_items(limit_page_length=cint(limit), start=cint(start))
     result["preview"] = doc.compute_preview(result["items"])
-
-    columns = []
-    for action in doc.actions:
-        columns.append(_resolve_field(action.target_field, action.custom_target_field))
-    result["action_columns"] = columns
+    result["action_columns"] = doc._get_action_columns()
     return result
 
 
@@ -649,10 +600,8 @@ def load_rule_data(rule_name):
         ],
         "actions": [
             {
-                "target_field": a.target_field,
-                "custom_target_field": a.custom_target_field or "",
                 "action_type": a.action_type,
-                "action_value": a.action_value,
+                "action_value": a.action_value or "",
             }
             for a in doc.actions
         ],
@@ -689,3 +638,16 @@ def get_doctype_fields(doctype="Item"):
                 "options": df.options,
             })
     return fields
+
+
+@frappe.whitelist()
+def get_action_link_map():
+    """Return a map of action_type -> Link DocType for the JS to render Link fields."""
+    return {
+        "UpdateItemGroup": "Item Group",
+        "UpdateBrand": "Brand",
+        "UpdateUOM": "UOM",
+        "UpdateDefaultWarehouse": "Warehouse",
+        "AddTag": "Tag",
+        "RemoveTag": "Tag",
+    }

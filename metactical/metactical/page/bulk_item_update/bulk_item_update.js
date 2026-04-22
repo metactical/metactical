@@ -1,20 +1,20 @@
 /**
  * Bulk Item Update – Full Page Application
  *
- * Three views matching the wireframe:
- *   1. Initial Screen   – select saved rules, create new rule set
+ * Three views:
+ *   1. Initial Screen   – select saved rules, create new
  *   2. Editor Screen    – build Search conditions + Actions inline
- *   3. Preview Screen   – table of matches with before/after, execute buttons top & bottom
+ *   3. Preview Screen   – table with before/after, execute buttons top & bottom
  *
- * All rule creation/editing happens on this page.
- * Saving stores to the Bulk Update Rule doctype for reuse.
+ * Actions use a message-type pattern:
+ *   action_type (e.g. UpdatePrice, DisableItem) + action_value
+ *
+ * CTRL+N adds a new row to whichever section (conditions/actions) was last focused.
  */
 
-// ─── Module path (adjust to your app) ───
 const API = "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule";
 
-// ─── Field / operator options ───
-// {value, label} pairs – price fields are tagged so users know they query Item Price
+// ─── Search condition field options ───
 const FIELD_OPTIONS = [
     { value: "item_code",        label: "Item Code" },
     { value: "item_name",        label: "Item Name" },
@@ -31,31 +31,41 @@ const FIELD_OPTIONS = [
 ];
 
 const OPERATOR_OPTIONS = [
-    "Begins With", "Ends With", "Contains", "Does Not Contain",
-	"Equals To", "Not Equal To", "Greater Than", "Less Than",
+    "Begins With", "Ends With", "Contains",
+    "Equals To", "Not Equal To", "Does Not Contain", 
+    "Greater Than", "Less Than",
     "Greater Than Or Equal", "Less Than Or Equal",
     "In", "Not In", "Is Set", "Is Not Set"
 ];
 
-const ACTION_TARGET_OPTIONS = [
-    { value: "discounted_price", label: "Discounted Price" },
-    { value: "valuation_rate",   label: "Valuation Rate" },
-    { value: "disabled",         label: "Disabled" },
-    { value: "item_group",       label: "Item Group" },
-    { value: "stock_uom",        label: "Stock UOM" },
-    { value: "standard_rate",    label: "Standard Rate (Item Price)" },
-    { value: "price_list_rate",  label: "Price List Rate (Item Price)" },
-    { value: "custom_field",     label: "Custom Field…" },
-];
-
+// ─── Action types ───
 const ACTION_TYPE_OPTIONS = [
-    "Set To Value", "Set To Formula", "Multiply By",
-    "Add Value", "Subtract Value", "Set To Field Value"
+    { value: "UpdateItemGroup",       label: "Update Item Group" },
+    { value: "AddTag",                label: "Add Tag" },
+    { value: "RemoveTag",             label: "Remove Tag" },
+    { value: "UpdateUOM",             label: "Update UOM" },
+    { value: "DisableItem",           label: "Disable Item" },
+    { value: "EnableItem",            label: "Enable Item" },
+    { value: "UpdateValuationRate",   label: "Update Valuation Rate" },
+    { value: "UpdateDescription",     label: "Update Description" },
+    { value: "UpdateBrand",           label: "Update Brand" },
+    { value: "SetOpeningStock",       label: "Set Opening Stock" },
+    { value: "UpdateWeightPerUnit",   label: "Update Weight Per Unit" },
 ];
 
-// Fields that live on Item Price (always uses price list "RET - Camo an")
-const PRICE_FIELDS = new Set(["price_list_rate", "standard_rate"]);
+const NO_VALUE_ACTIONS = new Set(["DisableItem", "EnableItem"]);
 
+// Action types that should render a Link field instead of a text input
+const ACTION_LINK_MAP = {
+    "UpdateItemGroup": "Item Group",
+    "UpdateBrand": "Brand",
+    "UpdateUOM": "UOM",
+    "UpdateDefaultWarehouse": "Warehouse",
+    "AddTag": "Tag",
+    "RemoveTag": "Tag",
+};
+
+const PRICE_FIELDS = new Set(["price_list_rate", "standard_rate"]);
 
 frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     const page = frappe.ui.make_app_page({
@@ -66,11 +76,11 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
 
     // ─── State ───
     let state = {
-        view: "initial",          // initial | editor | preview
+        view: "initial",
         rule_name: "",
         description: "",
         target_doctype: "Item",
-        existing_rule: null,       // set when editing a saved rule
+        existing_rule: null,
         conditions: [],
         actions: [],
         preview_data: null,
@@ -87,11 +97,11 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     // ═══════════════════════════════════════════════════════════════════
     function render() {
         $app.empty();
+        $(document).off("keydown.biu_editor");
         if (state.view === "initial") render_initial();
         else if (state.view === "editor") render_editor();
         else if (state.view === "preview") render_preview();
     }
-
 
     // ═══════════════════════════════════════════════════════════════════
     //  1. INITIAL SCREEN
@@ -113,17 +123,17 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                         <option value="">-- Saved Rules List --</option>
                     </select>
                     <button id="biu-btn-show" class="btn btn-default btn-sm">Show Rule</button>
-					<button id="biu-btn-new" class="btn btn-primary btn-sm">
-						+ New Rule Set
-					</button>
                 </div>
+
+                <button id="biu-btn-new" class="btn btn-primary btn-sm btn-block mt-3">
+                    + New Rule Set
+                </button>
 
                 <div class="biu-section-label">Most Recent Rules</div>
                 <div id="biu-recent-list"></div>
             </div>
         `);
 
-        // Load rules
         frappe.call({
             method: API + ".get_recent_rules",
             args: { limit: 50 },
@@ -131,7 +141,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 const rules = r.message || [];
                 const $sel = $app.find("#biu-rule-select");
                 rules.forEach(rule => {
-                    $sel.append(`<option value="${rule.name}">${rule.rule_name}</option>`);
+                    $sel.append(`<option value="${rule.name}">${frappe.utils.escape_html(rule.rule_name)}</option>`);
                 });
 
                 const $list = $app.find("#biu-recent-list");
@@ -162,21 +172,18 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     `);
                 });
 
-                // Click on a recent rule card
                 $list.find(".biu-rule-card").on("click", function () {
                     load_rule_into_editor($(this).data("rule"));
                 });
             },
         });
 
-        // Show Rule button
         $app.find("#biu-btn-show").on("click", () => {
             const v = $app.find("#biu-rule-select").val();
             if (!v) return frappe.show_alert({ message: "Select a rule first.", indicator: "orange" });
             load_rule_into_editor(v);
         });
 
-        // New Rule Set
         $app.find("#biu-btn-new").on("click", () => {
             state.existing_rule = null;
             state.rule_name = "";
@@ -209,20 +216,19 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     function default_condition() {
         return { logic_operator: "And", field_name: "item_code", operator: "Equals To", value: "", custom_field_name: "" };
     }
+
     function default_action() {
-        return { target_field: "discounted_price", action_type: "Set To Value", action_value: "", custom_target_field: "" };
+        return { action_type: "UpdatePrice", action_value: "" };
     }
 
-
     // ═══════════════════════════════════════════════════════════════════
-    //  2. EDITOR SCREEN  (Search conditions + Actions, inline)
+    //  2. EDITOR SCREEN
     // ═══════════════════════════════════════════════════════════════════
     function render_editor() {
         page.set_title(state.existing_rule ? `Edit Rule: ${state.rule_name}` : "New Rule Set");
 
         $app.html(`
             <div class="biu-editor">
-                <!-- Top bar -->
                 <div class="biu-topbar">
                     <button class="btn btn-xs btn-default biu-btn-back">← Back</button>
                     <div class="biu-rule-name-wrap">
@@ -231,16 +237,15 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     </div>
                 </div>
 
-                <!-- SEARCH CONDITIONS -->
                 <div class="biu-price-note">
-                    <strong>Note:</strong> Price List Rate and Standard Rate fields are
-                    read from / written to <strong>Item Price</strong> with price list
-                    <strong>RET - Camo an</strong>.
+                    <kbd>Ctrl+B</kbd> add row to both Rules and Actions
+                    <kbd>Ctrl+S</kbd> save
                 </div>
 
-                <div class="biu-section">
+                <!-- SEARCH CONDITIONS -->
+                <div class="biu-section" id="biu-section-conditions">
                     <div class="biu-section-header">
-                        <h5>Search Conditions</h5>
+                        <h5>Search</h5>
                         <button class="btn btn-xs btn-default biu-add-condition">+ Add Condition</button>
                     </div>
                     <div class="biu-conditions-summary" id="biu-cond-summary"></div>
@@ -248,7 +253,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 </div>
 
                 <!-- ACTIONS -->
-                <div class="biu-section">
+                <div class="biu-section" id="biu-section-actions">
                     <div class="biu-section-header">
                         <h5>Actions</h5>
                         <button class="btn btn-xs btn-default biu-add-action">+ Add Action</button>
@@ -257,7 +262,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     <div class="biu-actions-rows" id="biu-action-rows"></div>
                 </div>
 
-                <!-- Bottom buttons -->
                 <div class="biu-editor-buttons">
                     <button class="btn btn-default btn-sm biu-btn-preview">Preview</button>
                     <button class="btn btn-primary btn-sm biu-btn-save-preview">Save and Preview</button>
@@ -265,61 +269,27 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             </div>
         `);
 
-        // Render condition rows
         render_condition_rows();
         render_action_rows();
         render_conditions_summary();
         render_actions_summary();
 
-        // ── Event bindings ──
-        $app.find(".biu-btn-back").on("click", () => { state.view = "initial"; render(); });
-
-		$app.find(".biu-btn-back").on("click", () => {
-            $(document).off("keydown.biu_editor");
+        // ── Navigation ──
+        $app.find(".biu-btn-back").on("click", () => {
             state.view = "initial";
             render();
-        });
-
-		// ── Keyboard shortcut: CTRL+N to add row ──
-        // Track which section was last focused to know where to add
-        let last_focused_section = "conditions";
-
-        $app.find("#biu-cond-rows, #biu-cond-summary, .biu-add-condition").on("click focus", () => {
-            last_focused_section = "conditions";
-        });
-        $app.find("#biu-action-rows, #biu-action-summary, .biu-add-action").on("click focus", () => {
-            last_focused_section = "actions";
-        });
-
-        $(document).off("keydown.biu_editor").on("keydown.biu_editor", (e) => {
-			console.log(`Keydown: ${e.key}, Ctrl: ${e.ctrlKey}, Last focused section: ${last_focused_section}`);
-            if (state.view !== "editor") return;
-            if (e.ctrlKey && e.key === "b") {
-                e.preventDefault();
-                e.stopPropagation();
-                if (last_focused_section === "actions") {
-                    state.actions.push(default_action());
-                    render_action_rows();
-                    render_actions_summary();
-                    // Focus the last action row's first select
-                    $app.find("#biu-action-rows .biu-row:last select:first").focus();
-                } else {
-                    state.conditions.push(default_condition());
-                    render_condition_rows();
-                    render_conditions_summary();
-                    $app.find("#biu-cond-rows .biu-row:last select:first").focus();
-                }
-            }
         });
 
         $app.find(".biu-add-condition").on("click", () => {
             state.conditions.push(default_condition());
             render_condition_rows();
+            render_conditions_summary();
         });
 
         $app.find(".biu-add-action").on("click", () => {
             state.actions.push(default_action());
             render_action_rows();
+            render_actions_summary();
         });
 
         $app.find(".biu-btn-preview").on("click", () => {
@@ -333,8 +303,59 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             if (!validate_editor()) return;
             do_save(() => do_preview());
         });
+
+        // ── Keyboard shortcuts ──
+        let last_focused_section = "conditions";
+
+        $app.find("#biu-section-conditions").on("click focus", () => { last_focused_section = "conditions"; });
+        $app.find("#biu-section-actions").on("click focus", () => { last_focused_section = "actions"; });
+
+        $(document).off("keydown.biu_editor").on("keydown.biu_editor", (e) => {
+            if (state.view !== "editor") return;
+            if (!e.ctrlKey) return;
+
+            // CTRL+N → add row to last focused section
+            if (e.key === "n") {
+                e.preventDefault();
+                e.stopPropagation();
+                if (last_focused_section === "actions") {
+                    state.actions.push(default_action());
+                    render_action_rows();
+                    render_actions_summary();
+                    $app.find("#biu-action-rows .biu-row:last select:first").focus();
+                } else {
+                    state.conditions.push(default_condition());
+                    render_condition_rows();
+                    render_conditions_summary();
+                    $app.find("#biu-cond-rows .biu-row:last select:first").focus();
+                }
+            }
+
+            // CTRL+B → add row to BOTH sections
+            if (e.key === "b") {
+                e.preventDefault();
+                e.stopPropagation();
+                state.conditions.push(default_condition());
+                render_condition_rows();
+                render_conditions_summary();
+                state.actions.push(default_action());
+                render_action_rows();
+                render_actions_summary();
+                $app.find("#biu-cond-rows .biu-row:last select:first").focus();
+            }
+
+            // CTRL+S → save
+            if (e.key === "s") {
+                e.preventDefault();
+                e.stopPropagation();
+                collect_editor_values();
+                if (!validate_editor()) return;
+                do_save();
+            }
+        });
     }
 
+    // ── Condition summary pills ──
     function render_conditions_summary() {
         const $el = $app.find("#biu-cond-summary");
         $el.empty();
@@ -346,16 +367,20 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         });
     }
 
+    // ── Action summary pills ──
     function render_actions_summary() {
         const $el = $app.find("#biu-action-summary");
         $el.empty();
         state.actions.forEach(a => {
-            const tf = a.target_field === "custom_field" ? (a.custom_target_field || "custom_field") : a.target_field;
-            const ptag = PRICE_FIELDS.has(tf) ? ' <small style="opacity:0.6">(Item Price)</small>' : "";
-            $el.append(`<div class="biu-pill biu-pill-action">Set <strong>${tf}</strong>${ptag} → ${a.action_type}: <em>${frappe.utils.escape_html(a.action_value || "")}</em></div>`);
+            const label = ACTION_TYPE_OPTIONS.find(o => o.value === a.action_type)?.label || a.action_type;
+            const val_display = NO_VALUE_ACTIONS.has(a.action_type)
+                ? ""
+                : `: <em>${frappe.utils.escape_html(a.action_value || "")}</em>`;
+            $el.append(`<div class="biu-pill biu-pill-action"><strong>${label}</strong>${val_display}</div>`);
         });
     }
 
+    // ── Condition rows ──
     function render_condition_rows() {
         const $wrap = $app.find("#biu-cond-rows");
         $wrap.empty();
@@ -381,13 +406,11 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             `);
         });
 
-        // Change events → live update state & summary
         $wrap.find("select, input").on("change input", () => {
             collect_conditions_from_dom();
             render_conditions_summary();
         });
 
-        // Toggling custom_field → re-render
         $wrap.find("select[id^='cond-field-']").on("change", function () {
             collect_conditions_from_dom();
             render_condition_rows();
@@ -403,35 +426,66 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         });
     }
 
+    // ── Action rows ──
     function render_action_rows() {
         const $wrap = $app.find("#biu-action-rows");
         $wrap.empty();
 
         state.actions.forEach((a, idx) => {
-            const tf_sel = build_select("act-tf-" + idx, ACTION_TARGET_OPTIONS, a.target_field);
             const at_sel = build_select("act-at-" + idx, ACTION_TYPE_OPTIONS, a.action_type);
+            const needs_value = !NO_VALUE_ACTIONS.has(a.action_type);
+            const link_doctype = ACTION_LINK_MAP[a.action_type] || null;
+
+            let value_html;
+            if (!needs_value) {
+                value_html = '<span class="text-muted small" style="padding:0 8px;">(no value needed)</span>';
+            } else if (link_doctype) {
+                // Placeholder div — frappe.ui.form.make_control will mount here
+                value_html = `<div class="biu-link-field" data-idx="${idx}" style="min-width:180px;max-width:250px;"></div>`;
+            } else {
+                value_html = `<input type="text" class="form-control form-control-sm biu-input biu-act-value"
+                              placeholder="Value" value="${frappe.utils.escape_html(a.action_value || "")}">`;
+            }
 
             $wrap.append(`
                 <div class="biu-row" data-idx="${idx}">
-                    ${tf_sel}
-                    ${a.target_field === "custom_field"
-                        ? `<input type="text" class="form-control form-control-sm biu-input biu-act-custom"
-                                  placeholder="Custom fieldname" value="${frappe.utils.escape_html(a.custom_target_field || "")}">`
-                        : ""}
                     ${at_sel}
-                    <input type="text" class="form-control form-control-sm biu-input biu-act-value"
-                           placeholder="Value / Formula" value="${frappe.utils.escape_html(a.action_value || "")}">
+                    ${value_html}
                     <button class="btn btn-xs btn-danger biu-remove-action" data-idx="${idx}" title="Remove">&times;</button>
                 </div>
             `);
+
+            // Mount Frappe Link control if needed
+            if (needs_value && link_doctype) {
+                const $mount = $wrap.find(`.biu-link-field[data-idx="${idx}"]`);
+                const control = frappe.ui.form.make_control({
+                    df: {
+                        fieldname: "act_value_" + idx,
+                        fieldtype: "Link",
+                        options: link_doctype,
+                        placeholder: link_doctype,
+                    },
+                    parent: $mount,
+                    render_input: true,
+                });
+                control.set_value(a.action_value || "");
+                control.$input.on("change", () => {
+                    state.actions[idx].action_value = control.get_value() || "";
+                    render_actions_summary();
+                });
+                // Store reference so we can read it later
+                $mount.data("control", control);
+            }
         });
 
-        $wrap.find("select, input").on("change input", () => {
+        // Plain text inputs — live sync
+        $wrap.find("input.biu-act-value").on("change input", () => {
             collect_actions_from_dom();
             render_actions_summary();
         });
 
-        $wrap.find("select[id^='act-tf-']").on("change", function () {
+        // Action type dropdown change → re-render (to swap between link/text/none)
+        $wrap.find("select[id^='act-at-']").on("change", function () {
             collect_actions_from_dom();
             render_action_rows();
             render_actions_summary();
@@ -465,12 +519,24 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         const $rows = $app.find("#biu-action-rows .biu-row");
         $rows.each(function (i) {
             const $r = $(this);
-            state.actions[i] = {
-                target_field: $r.find("select[id^='act-tf']").val() || "discounted_price",
-                custom_target_field: $r.find(".biu-act-custom").val() || "",
-                action_type: $r.find("select[id^='act-at']").val() || "Set To Value",
-                action_value: $r.find(".biu-act-value").val() || "",
-            };
+            const action_type = $r.find("select[id^='act-at']").val() || "UpdatePrice";
+
+            let action_value = "";
+            if (action_type === "DisableItem") {
+                action_value = "1";
+            } else if (action_type === "EnableItem") {
+                action_value = "0";
+            } else {
+                // Check if there's a Link control
+                const $link = $r.find(".biu-link-field");
+                if ($link.length && $link.data("control")) {
+                    action_value = $link.data("control").get_value() || "";
+                } else {
+                    action_value = $r.find(".biu-act-value").val() || "";
+                }
+            }
+
+            state.actions[i] = { action_type, action_value };
         });
     }
 
@@ -490,7 +556,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             return false;
         }
         for (const a of state.actions) {
-            if (!a.action_value) {
+            if (!NO_VALUE_ACTIONS.has(a.action_type) && !a.action_value) {
                 frappe.show_alert({ message: "All actions need a value.", indicator: "orange" });
                 return false;
             }
@@ -504,7 +570,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             frappe.show_alert({ message: "Please enter a Rule Name.", indicator: "orange" });
             return;
         }
-
         frappe.call({
             method: API + ".save_rule_from_page",
             args: {
@@ -532,7 +597,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     // ── Preview ──
     function do_preview(start) {
         state.preview_start = start || 0;
-
         frappe.call({
             method: API + ".preview_from_data",
             args: {
@@ -555,7 +619,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         });
     }
 
-
     // ═══════════════════════════════════════════════════════════════════
     //  3. PREVIEW SCREEN
     // ═══════════════════════════════════════════════════════════════════
@@ -573,7 +636,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         const has_next = (start + limit) < total;
         const is_saved = !!state.existing_rule;
 
-        // Build rules summary
+        // Rules summary
         let rules_html = "";
         state.conditions.forEach((c, i) => {
             const field = c.field_name === "custom_field" ? (c.custom_field_name || "custom_field") : c.field_name;
@@ -581,24 +644,24 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             rules_html += `<li>${prefix}${field} ${c.operator} ${frappe.utils.escape_html(c.value || "")}</li>`;
         });
         state.actions.forEach(a => {
-            const tf = a.target_field === "custom_field" ? (a.custom_target_field || "custom_field") : a.target_field;
-            rules_html += `<li class="biu-action-li">Set ${tf} → ${a.action_type}: ${frappe.utils.escape_html(a.action_value)}</li>`;
+            const label = ACTION_TYPE_OPTIONS.find(o => o.value === a.action_type)?.label || a.action_type;
+            const val_display = NO_VALUE_ACTIONS.has(a.action_type) ? "" : `: ${frappe.utils.escape_html(a.action_value)}`;
+            rules_html += `<li class="biu-action-li">${label}${val_display}</li>`;
         });
 
-        // Build table header
+        // Table header
         let th = `<th class="biu-th">SKU</th><th class="biu-th">Name</th>`;
         cols.forEach(col => {
             const tag = PRICE_FIELDS.has(col) ? " <small>(Item Price)</small>" : "";
             th += `<th class="biu-th">${col}${tag}</th><th class="biu-th">${col} (After)</th>`;
         });
 
-        // Build table rows
+        // Table rows
         let rows_html = "";
         if (preview.length) {
             preview.forEach(row => {
-                let cells = `<td>${frappe.utils.escape_html(row.name || "")}</td>`;
-                // Try to get item_name from the items data
                 const item_data = d.items ? d.items.find(it => it.name === row.name) : null;
+                let cells = `<td>${frappe.utils.escape_html(row.name || "")}</td>`;
                 cells += `<td>${frappe.utils.escape_html(item_data ? (item_data.item_name || "") : "")}</td>`;
                 cols.forEach(col => {
                     const before = row[col + "_before"];
@@ -615,17 +678,12 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
 
         $app.html(`
             <div class="biu-preview">
-                <!-- Top action bar -->
                 <div class="biu-preview-topbar">
-                    <div>
-                        <a class="biu-link biu-edit-link">← Edit Rules &amp; Actions</a>
-                    </div>
-                    <div>
-                        <button class="btn btn-default btn-xs biu-btn-new-from-preview">New Rule Set</button>
-                    </div>
+                    <a class="biu-link biu-edit-link">← Edit Rules &amp; Actions</a>
+                    <button class="btn btn-default btn-xs biu-btn-new-from-preview">New Rule Set</button>
                 </div>
 
-                <!-- Execute button TOP -->
+                <!-- Execute bar TOP -->
                 <div class="biu-execute-bar">
                     <div class="biu-match-count">
                         Showing ${start + 1}–${end} of <strong>${total}</strong> matches
@@ -639,7 +697,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     </div>
                 </div>
 
-                <!-- Data table -->
                 <div class="biu-table-wrap">
                     <table class="table table-bordered table-sm biu-table">
                         <thead><tr>${th}</tr></thead>
@@ -647,20 +704,18 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     </table>
                 </div>
 
-                <!-- Pagination -->
                 <div class="biu-pagination">
                     <button class="btn btn-xs btn-default biu-page-prev" ${has_prev ? "" : "disabled"}>← Previous</button>
                     <span class="text-muted small">${start + 1}–${end} of ${total}</span>
                     <button class="btn btn-xs btn-default biu-page-next" ${has_next ? "" : "disabled"}>Next →</button>
                 </div>
 
-                <!-- Rules summary -->
                 <div class="biu-rules-summary">
                     <div class="biu-section-label">Active Rules &amp; Actions</div>
                     <ul class="biu-summary-list">${rules_html}</ul>
                 </div>
 
-                <!-- Execute button BOTTOM -->
+                <!-- Execute bar BOTTOM -->
                 <div class="biu-execute-bar biu-execute-bar-bottom">
                     <div class="biu-match-count">
                         <strong>${total}</strong> items will be updated
@@ -674,7 +729,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             </div>
         `);
 
-        // ── Preview event bindings ──
+        // ── Events ──
         $app.find(".biu-edit-link").on("click", () => { state.view = "editor"; render(); });
         $app.find(".biu-btn-new-from-preview").on("click", () => {
             state.existing_rule = null;
@@ -695,8 +750,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     (values) => {
                         state.rule_name = values.rule_name;
                         do_save(() => {
-                            frappe.show_alert({ message: "Rule saved.", indicator: "green" });
-                            // Re-enable execute buttons
                             $app.find(".biu-btn-execute").removeClass("disabled");
                         });
                     },
@@ -747,26 +800,38 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             );
         });
 
-        // ── Realtime progress ──
+        // Realtime progress
         frappe.realtime.off("bulk_update_progress");
         frappe.realtime.on("bulk_update_progress", (data) => {
             if (data.rule_name !== state.existing_rule) return;
             if (data.status === "Completed") {
+                // Force-close any open progress dialogs
                 frappe.hide_progress();
-                frappe.show_alert({
-                    message: `Done! ${data.updated} items updated, ${data.errors} errors.`,
-                    indicator: data.errors ? "orange" : "green",
-                });
+                $('.frappe-control .progress').closest('.modal').modal('hide');
+                setTimeout(() => {
+                    frappe.hide_progress();
+                    frappe.msgprint({
+                        title: __("Bulk Update Complete"),
+                        message: `<strong>${data.updated}</strong> items updated. ${data.errors ? data.errors + " errors." : "No errors."}`,
+                        indicator: data.errors ? "orange" : "green",
+                    });
+                }, 300);
             } else if (data.status === "Failed") {
                 frappe.hide_progress();
-                frappe.show_alert({ message: "Update failed: " + (data.error || "Unknown error"), indicator: "red" });
+                setTimeout(() => {
+                    frappe.hide_progress();
+                    frappe.msgprint({
+                        title: __("Bulk Update Failed"),
+                        message: data.error || "Unknown error",
+                        indicator: "red",
+                    });
+                }, 300);
             } else {
                 frappe.show_progress("Executing Bulk Update", data.current, data.total,
                     `Processing ${data.current} of ${data.total}`);
             }
         });
     }
-
 
     // ═══════════════════════════════════════════════════════════════════
     //  HELPERS
@@ -782,7 +847,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         return html;
     }
 
-
     // ═══════════════════════════════════════════════════════════════════
     //  STYLES
     // ═══════════════════════════════════════════════════════════════════
@@ -790,11 +854,9 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         const style = document.createElement("style");
         style.id = "biu-styles";
         style.textContent = `
-            /* ── Layout ── */
             #bulk-update-app { max-width: 1200px; margin: 0 auto; padding: 15px; }
 
-            /* ── Initial Screen ── */
-            .biu-initial { max-width: 80%; margin: 0 auto; }
+            .biu-initial { max-width: 600px; margin: 0 auto; }
             .biu-intro { color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; }
             .biu-selector-row { display: flex; gap: 8px; align-items: center; }
             .biu-selector-row select { flex: 1; }
@@ -811,14 +873,22 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             .biu-rule-card:hover { background: var(--bg-light-gray); }
             .biu-rule-link { font-weight: 600; font-size: 13px; color: var(--primary); cursor: pointer; }
 
-            /* ── Editor ── */
-            .biu-editor { }
             .biu-topbar {
                 display: flex; gap: 12px; align-items: center;
                 margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
             }
             .biu-rule-name-wrap { flex: 1; }
             .biu-rule-name-wrap input { font-weight: 600; font-size: 15px; }
+
+            .biu-price-note {
+                font-size: 12px; color: var(--text-muted);
+                background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fde68a);
+                border-radius: var(--border-radius); padding: 8px 12px; margin-bottom: 14px;
+            }
+            .biu-price-note kbd {
+                background: var(--bg-dark-gray, #374151); color: #fff;
+                padding: 1px 5px; border-radius: 3px; font-size: 11px;
+            }
 
             .biu-section {
                 border: 1px solid var(--border-color); border-radius: var(--border-radius);
@@ -841,7 +911,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 display: flex; gap: 6px; align-items: center;
                 margin-bottom: 6px; flex-wrap: wrap;
             }
-            .biu-select { min-width: 100px; max-width: 180px; font-size: 12px; }
+            .biu-select { min-width: 100px; max-width: 220px; font-size: 12px; }
             .biu-input { min-width: 80px; max-width: 200px; font-size: 12px; }
 
             .biu-editor-buttons {
@@ -849,8 +919,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 padding-top: 16px; border-top: 1px solid var(--border-color);
             }
 
-            /* ── Preview ── */
-            .biu-preview { }
             .biu-preview-topbar {
                 display: flex; justify-content: space-between; align-items: center;
                 margin-bottom: 14px;
@@ -889,16 +957,9 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             .biu-action-li { color: var(--primary); }
 
             .btn.disabled { opacity: 0.5; cursor: not-allowed; }
-
-            .biu-price-note {
-                font-size: 12px; color: var(--text-muted);
-                background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fde68a);
-                border-radius: var(--border-radius); padding: 8px 12px; margin-bottom: 14px;
-            }
         `;
         document.head.appendChild(style);
     }
 
-    // ── Initial render ──
     render();
 };
