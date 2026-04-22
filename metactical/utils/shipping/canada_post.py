@@ -7,7 +7,7 @@ from frappe.utils import get_files_path
 from six import string_types
 import ast
 import json
-from PyPDF2 import PdfFileMerger
+from PyPDF2 import PdfMerger
 from metactical.custom_scripts.utils.metactical_utils import get_state_code
 from datetime import datetime
 import re
@@ -32,10 +32,9 @@ class CanadaPost():
 
 	def set_default_headers(self):
 		self.sess.headers = {
-			'Accept': 'application/vnd.cpc.shipment-v8+xml',
-			'Content-Type': 'application/vnd.cpc.shipment-v8+xml; charset=utf-8',
 			'Accept-language': 'en-CA',
-			'Authorization': _basic_auth_str(self.settings.api_key, self.settings.get_password("api_secret"))
+			'Authorization': _basic_auth_str(self.settings.api_key, self.settings.get_password("api_secret")),
+			'Expect': '',
 		}
 		self.sess.verify = False
 
@@ -280,7 +279,7 @@ class CanadaPost():
 	def pdf_merge(self, files, doc, prefix="before"):
 		file_path = get_files_path(
 			f"{prefix}_manifest_{doc.name}.pdf", is_private=True)
-		wFile = PdfFileMerger()
+		wFile = PdfMerger()
 		for file in files:
 			wFile.append(frappe.get_site_path(file.lstrip('/')))
 		wFile.write(file_path)
@@ -384,13 +383,13 @@ class CanadaPost():
 							})
 							file_doc.insert(ignore_permissions=True)
 					elif mlink["@rel"] == "manifestShipments":
-						manifest_shipments = self.get_response(mlink["@href"], None, headers={'Accept': mlink["@media-type"]}, method="GET")
+						manifest_shipments = self.get_response(mlink["@href"], None, headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 						if isinstance(manifest_shipments["shipments"]["link"], dict):
 							shipment_links = [manifest_shipments["shipments"]["link"]]
 						else:
 							shipment_links = manifest_shipments["shipments"]["link"]
 						for shipment in shipment_links:
-							shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
+							shipment_info = self.get_response(shipment["@href"], None, headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 							shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 		frappe.log_error(title=f"Manifest for {manifest}", message=response)
 		return shipment_ids, po_number
@@ -662,13 +661,13 @@ class CanadaPost():
 				continue
 			for manifest in manifest_link["manifest"]["links"]["link"]:
 				if manifest["@rel"] == "manifestShipments":
-					manifest_shipments = cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET")
+					manifest_shipments = cp.get_response(manifest["@href"], None, headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 					shipments.append(manifest_shipments)
 					#return manifest_shipments["shipments"]["link"]
 					for shipment in manifest_shipments["shipments"]["link"]:
 						not_shipments = ["@rel", "@href", "@media-type"]
 						if shipment not in not_shipments:
-							shipment_info = cp.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
+							shipment_info = cp.get_response(shipment["@href"], None, headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 							shipment_infos.append(shipment_info)
 							shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 							if shipment_info["shipment-info"]['shipment-id'] == shipment_id:
@@ -815,12 +814,14 @@ class CanadaPost():
 		return doc.as_dict()
 
 	def get_response(self, url, body, headers=None, return_request=False, method='POST', retry=False, retry_count=0):
+		# Build per-request headers; always suppress Expect: 100-continue
+		request_headers = {'Expect': ''}
 		if headers:
 			# Double check if charset is set in headers
 			ct = headers.get('Content-Type')
 			if ct and 'charset=' not in ct.lower():
 				headers['Content-Type'] = f'{ct}; charset=utf-8'
-			self.sess.headers.update(headers)
+			request_headers.update(headers)
 		try:
 			if isinstance(body, str):
 				body = body.encode('utf-8')
@@ -829,6 +830,7 @@ class CanadaPost():
 				method,
 				url if url.startswith('https://') else f'{self.settings.host}{url}',
 				data=body,
+				headers=request_headers,
 				timeout=30
 			)
 

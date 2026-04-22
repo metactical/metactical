@@ -25,4 +25,5 @@
             <postal-zip-code>{{ pickup_address_doc.pincode|replace(' ','') }}</postal-zip-code>
         </address-details>
     </manifest-address>
+    <customer-reference>{{ manifest_doc.name.split('-')[0] }}-{{ manifest_doc.name.split('-')[-1] }}</customer-reference>
 </transmit-set>
