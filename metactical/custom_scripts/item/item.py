@@ -131,7 +131,7 @@ class CustomItem(Item):
         old_defaults = frappe.get_all(
             "Item Default",
             filters={"parent": old_item_code},
-            fields=["default_warehouse", "company"]
+            fields=["default_warehouse", "company", "default_supplier"]
         )
 
         # remove existing defaults from new item to avoid duplicates
@@ -144,7 +144,8 @@ class CustomItem(Item):
                     "parenttype": "Item",
                     "parentfield": "item_defaults",
                     "default_warehouse": default.default_warehouse,
-                    "company": default.company
+                    "company": default.company,
+                    "default_supplier": default.default_supplier
                 })
                 new_default.insert(ignore_permissions=True)
             except Exception:
