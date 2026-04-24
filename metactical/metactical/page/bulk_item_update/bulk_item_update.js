@@ -23,11 +23,17 @@ const FIELD_OPTIONS = [
     { value: "is_trashed",       label: "Is Trashed" },
     { value: "has_variants",     label: "Has Variants" },
     { value: "disabled",         label: "Disabled" },
+    { value: "ifw_retailskusuffix", label: "Retail SKU" },
+    { value: "brand",           label: "Brand" },
+    { value: "supplier",        label: "Supplier (Item Supplier)" },
+    { value: "default_supplier", label: "Default Supplier (Item Default)" },
+    { value: "has_inventory",   label: "Has Inventory" },
+    { value: "variants_have_no_inventory", label: "All Variants Have No Inventory" },  // ← ADD
     { value: "valuation_rate",   label: "Valuation Rate" },
     { value: "discounted_price", label: "Discounted Price" },
     { value: "standard_rate",    label: "Standard Rate (Item Price)" },
     { value: "price_list_rate",  label: "Price List Rate (Item Price)" },
-    { value: "custom_field",     label: "Custom Field…" },
+    { value: 'variant_of',      label: 'Variant Of' },
 ];
 
 const OPERATOR_OPTIONS = [
@@ -49,8 +55,6 @@ const ACTION_TYPE_OPTIONS = [
     { value: "UpdateValuationRate",   label: "Update Valuation Rate" },
     { value: "UpdateDescription",     label: "Update Description" },
     { value: "UpdateBrand",           label: "Update Brand" },
-    { value: "SetOpeningStock",       label: "Set Opening Stock" },
-    { value: "UpdateWeightPerUnit",   label: "Update Weight Per Unit" },
 ];
 
 const NO_VALUE_ACTIONS = new Set(["DisableItem", "EnableItem"]);
@@ -635,6 +639,8 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         const has_prev = start > 0;
         const has_next = (start + limit) < total;
         const is_saved = !!state.existing_rule;
+        const max_allowed = d.max_allowed || 0;
+        const exceeds_max = max_allowed > 0 && total > max_allowed;
 
         // Rules summary
         let rules_html = "";
@@ -691,9 +697,14 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                     <div class="biu-execute-buttons">
                         <button class="btn btn-default btn-xs biu-btn-export">Export for Review</button>
                         <button class="btn btn-default btn-xs biu-btn-save-changes">Save Rule</button>
-                        <button class="btn btn-primary btn-sm biu-btn-execute ${!is_saved ? "disabled" : ""}">
-                            Execute Update
-                        </button>
+                        ${exceeds_max
+                            ? `<span class="biu-exceeds-warning">
+                                ⚠ ${total.toLocaleString()} items exceeds the limit of ${max_allowed.toLocaleString()}. Refine your filters.
+                            </span>`
+                            : `<button class="btn btn-primary btn-sm biu-btn-execute ${!is_saved ? "disabled" : ""}">
+                                Execute Update
+                            </button>`
+                        }
                     </div>
                 </div>
 
@@ -721,9 +732,14 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                         <strong>${total}</strong> items will be updated
                     </div>
                     <div class="biu-execute-buttons">
-                        <button class="btn btn-primary btn-sm biu-btn-execute ${!is_saved ? "disabled" : ""}">
-                            Execute Update
-                        </button>
+                        ${exceeds_max
+                            ? `<span class="biu-exceeds-warning">
+                                ⚠ ${total.toLocaleString()} items exceeds the limit of ${max_allowed.toLocaleString()}. Refine your filters.
+                            </span>`
+                            : `<button class="btn btn-primary btn-sm biu-btn-execute ${!is_saved ? "disabled" : ""}">
+                                Execute Update
+                            </button>`
+                        }
                     </div>
                 </div>
             </div>
@@ -957,6 +973,16 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             .biu-action-li { color: var(--primary); }
 
             .btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
+            .biu-exceeds-warning {
+                color: var(--red-600, #dc2626);
+                font-size: 12px;
+                font-weight: 600;
+                padding: 4px 8px;
+                background: var(--red-50, #fef2f2);
+                border: 1px solid var(--red-200, #fecaca);
+                border-radius: var(--border-radius);
+            }
         `;
         document.head.appendChild(style);
     }

@@ -20,6 +20,12 @@ PRICE_LIST = "RET - Camo"
 # Fields that live on Item Price
 ITEM_PRICE_FIELDS = {"price_list_rate", "standard_rate"}
 
+# Item Default fields
+ITEM_DEFAULT_FIELDS = {"default_supplier"}
+
+#Item Supplier fields
+ITEM_SUPPLIER_FIELDS = {"supplier"}
+
 # action_type → (doc_source, fieldname)
 #   doc_source: "item" = tabItem, "price" = tabItem Price
 ACTION_TYPE_MAP = {
@@ -32,8 +38,6 @@ ACTION_TYPE_MAP = {
     "UpdateValuationRate":   ("item",  "valuation_rate"),
     "UpdateDescription":     ("item",  "description"),
     "UpdateBrand":           ("item",  "brand"),
-    "SetOpeningStock":       ("item",  "opening_stock"),
-    "UpdateWeightPerUnit":   ("item",  "weight_per_unit"),
 }
 
 OPERATOR_MAP = {
@@ -63,6 +67,11 @@ def _resolve_field(field_name, custom_field_name=None):
 def _is_price_field(fieldname):
     return fieldname in ITEM_PRICE_FIELDS
 
+def _is_item_default_field(fieldname):
+    return fieldname in ITEM_DEFAULT_FIELDS
+
+def _is_item_supplier_field(fieldname):
+    return fieldname in ITEM_SUPPLIER_FIELDS
 
 class BulkUpdateRule(Document):
 
@@ -71,7 +80,7 @@ class BulkUpdateRule(Document):
             frappe.throw("At least one search condition is required.")
         if not self.actions:
             frappe.throw("At least one action is required.")
-
+            
     # ──────────────────────────────────────────────────────────────────
     #  Classify conditions / actions
     # ──────────────────────────────────────────────────────────────────
@@ -79,13 +88,27 @@ class BulkUpdateRule(Document):
     def _classify_conditions(self):
         item_conds = []
         price_conds = []
+        item_default_conds = []
+        item_supplier_conds = []
+        inventory_conds = []
+        variant_inventory_conds = []       # ← ADD THIS
+
         for c in self.conditions:
             fn = _resolve_field(c.field_name, c.custom_field_name)
             if _is_price_field(fn):
                 price_conds.append(c)
+            elif _is_item_default_field(fn):
+                item_default_conds.append(c)
+            elif _is_item_supplier_field(fn):
+                item_supplier_conds.append(c)
+            elif fn == "has_inventory":
+                inventory_conds.append(c)
+            elif fn == "variants_have_no_inventory":    # ← ADD THIS
+                variant_inventory_conds.append(c)       # ← ADD THIS
             else:
                 item_conds.append(c)
-        return item_conds, price_conds
+
+        return item_conds, price_conds, item_default_conds, item_supplier_conds, inventory_conds, variant_inventory_conds
 
     def _classify_action_fields(self):
         item_fields = set()
@@ -148,11 +171,14 @@ class BulkUpdateRule(Document):
     #  Main query: Item LEFT JOIN Item Price
     # ──────────────────────────────────────────────────────────────────
 
-    def get_matched_items(self, limit_page_length=10, start=0):
-        item_conds, price_conds = self._classify_conditions()
+    def get_matched_items(self, limit_page_length=10, start=0, for_update=False):
+        item_conds, price_conds, item_default_conds, item_supplier_conds, inventory_conds, variant_inventory_conds = self._classify_conditions()
         item_action_fields, price_action_fields = self._classify_action_fields()
 
         needs_price = bool(price_conds) or bool(price_action_fields)
+        needs_item_default = bool(item_default_conds)
+        needs_item_supplier = bool(item_supplier_conds)
+        needs_inventory = bool(inventory_conds)
 
         # ── SELECT ──
         select_cols = [
@@ -173,9 +199,10 @@ class BulkUpdateRule(Document):
                 extra_item.add(fieldname)
 
         # Condition fields for display
+        VIRTUAL_FIELDS = {"has_inventory", "supplier", "default_supplier", "variants_have_no_inventory"}
         for c in self.conditions:
             fn = _resolve_field(c.field_name, c.custom_field_name)
-            if not _is_price_field(fn) and fn not in ("name", "item_code", "item_name", "item_group"):
+            if not _is_price_field(fn) and fn not in ("name", "item_code", "item_name", "item_group") and fn not in VIRTUAL_FIELDS:
                 extra_item.add(fn)
 
         for f in extra_item:
@@ -190,6 +217,12 @@ class BulkUpdateRule(Document):
                     select_cols.append("`ip`.`standard_rate` AS `standard_rate`")
             except Exception:
                 pass
+            
+        if needs_item_default:
+            select_cols.append("`id`.`default_supplier` AS `default_supplier`")
+        
+        if needs_item_supplier:
+            select_cols.append("`isup`.`supplier` AS `supplier`")
 
         select_sql = ", ".join(select_cols)
 
@@ -205,6 +238,18 @@ class BulkUpdateRule(Document):
             """
             params.append(PRICE_LIST)
 
+        if needs_item_default:
+            from_sql += """
+                LEFT JOIN `tabItem Default` AS `id`
+                    ON `id`.`parent` = `i`.`name`
+            """
+
+        if needs_item_supplier:
+            from_sql += """
+                LEFT JOIN `tabItem Supplier` AS `isup`
+                    ON `isup`.`parent` = `i`.`name`
+            """
+
         # ── WHERE ──
         where_parts = []
 
@@ -218,12 +263,49 @@ class BulkUpdateRule(Document):
             where_parts.append(frag)
             params.extend(p)
 
+        for c in item_default_conds:
+            frag, p = self._condition_to_sql(c, "id")
+            where_parts.append(frag)
+            params.extend(p)
+
+        for c in item_supplier_conds:
+            frag, p = self._condition_to_sql(c, "isup")
+            where_parts.append(frag)
+            params.extend(p)
+
+        for c in inventory_conds:
+            op = c.operator
+            if op in ("Is Set", "Equals To") and (c.value or "").strip() in ("1", "yes", "true", "", "True"):
+                where_parts.append(
+                    "EXISTS (SELECT 1 FROM `tabBin` WHERE `tabBin`.`item_code` = `i`.`item_code` AND `tabBin`.`actual_qty` > 0)"
+                )
+            else:
+                where_parts.append(
+                    "NOT EXISTS (SELECT 1 FROM `tabBin` WHERE `tabBin`.`item_code` = `i`.`item_code` AND `tabBin`.`actual_qty` > 0)"
+                )
+                
+        for c in variant_inventory_conds:
+            where_parts.append("""
+                (
+                    `i`.`has_variants` = 1
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM `tabItem` AS `vi`
+                        JOIN `tabBin` AS `vb` ON `vb`.`item_code` = `vi`.`item_code`
+                        WHERE `vi`.`variant_of` = `i`.`name`
+                        AND `vb`.`actual_qty` > 0
+                    )
+                )
+            """)
+
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
 
         # ── COUNT ──
-        count_query = f"SELECT COUNT(*) AS cnt FROM {from_sql} WHERE {where_sql}"
+        count_query = f"SELECT COUNT(DISTINCT `i`.`name`) AS cnt FROM {from_sql} WHERE {where_sql}"
         total = frappe.db.sql(count_query, params, as_dict=True)[0].cnt
-
+        if for_update:
+            return total
+        
         # ── DATA ──
         data_params = list(params)
         limit_clause = ""
@@ -232,7 +314,7 @@ class BulkUpdateRule(Document):
             data_params.extend([cint(limit_page_length), cint(start)])
 
         data_query = f"""
-            SELECT {select_sql}
+            SELECT DISTINCT {select_sql}
             FROM {from_sql}
             WHERE {where_sql}
             ORDER BY `i`.`modified` DESC
@@ -390,16 +472,32 @@ def run_bulk_update(rule_name):
                 tag_changed = False
                 item_name = item.get("name")
                 dt = doc.target_doctype or "Item"
+                
+                # Replace the tag_actions block inside run_bulk_update:
                 for tag_action, tag_val in tag_actions:
                     try:
+                        existing_tags = frappe.db.get_list("Tag Link", filters={"document_name": item_name}, pluck="tag")
                         if tag_action == "AddTag":
-                            DocTags(dt).add(item_name, tag_val)
-                            tag_changed = True
+                            if tag_val not in existing_tags:
+                                existing_tags.append(tag_val)
+                                frappe.get_doc({
+                                    "doctype": "Tag Link",
+                                    "document_type": dt,
+                                    "document_name": item_name,
+                                    "tag": tag_val,
+                                }).insert(ignore_permissions=True)
+
+                                frappe.db.set_value(dt, item_name, "_user_tags", ",".join(existing_tags))
+                                tag_changed = True
                         elif tag_action == "RemoveTag":
-                            DocTags(dt).remove(item_name, tag_val)
-                            tag_changed = True
+                            if tag_val in existing_tags:
+                                existing_tags.remove(tag_val)
+                                frappe.db.set_value(dt, item_name, "_user_tags", ",".join(existing_tags))
+                                frappe.db.delete("Tag Link", filters={"document_type": dt, "document_name": item_name, "tag": tag_val})
+                            
+                                tag_changed = True
                     except Exception:
-                        pass
+                        frappe.throw(f"Error processing tag action '{tag_action}' for tag '{tag_val}' on item '{item_name}'")
 
                 if item_changed or price_changed or tag_changed:
                     updated += 1
@@ -478,14 +576,16 @@ def preview_rule(rule_name, limit=10, start=0):
 def execute_rule(rule_name):
     doc = frappe.get_doc("Bulk Update Rule", rule_name)
     doc.db_set("execution_status", "Queued")
-    job = frappe.enqueue(
-        "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule.run_bulk_update",
-        queue="long",
-        timeout=3600,
-        rule_name=rule_name,
-        now=False,
-    )
-    return {"status": "queued", "job_id": job.id if job else None}
+    # job = frappe.enqueue(
+    #     "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule.run_bulk_update",
+    #     queue="long",
+    #     timeout=3600,
+    #     rule_name=rule_name,
+    #     now=False,
+    # )
+    
+    run_bulk_update(rule_name=rule_name)
+    # return {"status": "queued", "job_id": job.id if job else None}
 
 
 @frappe.whitelist()
@@ -542,8 +642,12 @@ def preview_from_data(conditions, actions, target_doctype="Item", limit=20, star
     result = doc.get_matched_items(limit_page_length=cint(limit), start=cint(start))
     result["preview"] = doc.compute_preview(result["items"])
     result["action_columns"] = doc._get_action_columns()
-    return result
 
+    # ── Fetch max allowed and attach to result so JS can react ──
+    max_allowed = frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_bulk_update")
+    result["max_allowed"] = cint(max_allowed) if max_allowed else 0
+
+    return result
 
 @frappe.whitelist()
 def save_rule_from_page(rule_name, conditions, actions, target_doctype="Item",
@@ -576,9 +680,20 @@ def save_rule_from_page(rule_name, conditions, actions, target_doctype="Item",
         })
         doc.insert()
 
+    # ── Check max BEFORE committing ──
+    max_allowed = frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_bulk_update")
+    if max_allowed:
+        total_matched = doc.get_matched_items(limit_page_length=0, for_update=True)
+        if total_matched > cint(max_allowed):
+            frappe.db.rollback()
+            frappe.throw(
+                f"This rule matches <b>{total_matched:,}</b> items, which exceeds the maximum "
+                f"of <b>{cint(max_allowed):,}</b>. Please refine your search conditions.",
+                title="Too Many Items"
+            )
+
     frappe.db.commit()
     return {"name": doc.name, "rule_name": doc.rule_name}
-
 
 @frappe.whitelist()
 def load_rule_data(rule_name):
