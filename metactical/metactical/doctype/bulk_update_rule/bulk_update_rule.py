@@ -576,16 +576,15 @@ def preview_rule(rule_name, limit=10, start=0):
 def execute_rule(rule_name):
     doc = frappe.get_doc("Bulk Update Rule", rule_name)
     doc.db_set("execution_status", "Queued")
-    # job = frappe.enqueue(
-    #     "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule.run_bulk_update",
-    #     queue="long",
-    #     timeout=3600,
-    #     rule_name=rule_name,
-    #     now=False,
-    # )
+    job = frappe.enqueue(
+        "metactical.metactical.doctype.bulk_update_rule.bulk_update_rule.run_bulk_update",
+        queue="long",
+        timeout=3600,
+        rule_name=rule_name,
+        now=False,
+    )
     
-    run_bulk_update(rule_name=rule_name)
-    # return {"status": "queued", "job_id": job.id if job else None}
+    return {"status": "queued", "job_id": job.id if job else None}
 
 
 @frappe.whitelist()
