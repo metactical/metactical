@@ -78,6 +78,14 @@ frappe.query_reports["Item Price Excel - V2"] = {
 					"name": ["like", "RET%"]
 				});
 			},
+		},
+		{
+			"label": "Date Item Created",
+			"fieldname": "date_item_created",
+			"fieldtype": "DateRange",
+			on_change: () => {
+				frappe.query_report.refresh();
+			}
 		}
 	]
 };
