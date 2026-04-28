@@ -2,10 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
-from erpnext.setup.utils import get_exchange_rate
-from frappe.utils import flt, getdate, nowdate
-
-EXCHANGE_RATE_CACHE = {}
+from frappe.utils import flt, getdate
 
 
 def ensure_list(value):
@@ -55,6 +52,10 @@ def get_profit_margin_fieldname(price_list):
 	return f"{sanitize_price_list_fieldname(price_list)}_profit_margin"
 
 
+def is_supplier_cost_price_list(price_list):
+	return (price_list or "").strip().upper().startswith("SUP")
+
+
 def parse_amount(value):
 	if value in (None, "", "N/A"):
 		return None
@@ -79,28 +80,11 @@ def normalize_currency(currency, price_list=None):
 	return normalized_currency or None
 
 
-def get_buying_exchange_rate(from_currency, to_currency):
-	from_currency = normalize_currency(from_currency)
-	to_currency = normalize_currency(to_currency)
-
-	if not from_currency or not to_currency:
-		return None
-
-	if from_currency == to_currency:
-		return 1
-
-	cache_key = (from_currency, to_currency)
-	if cache_key not in EXCHANGE_RATE_CACHE:
-		rate = get_exchange_rate(from_currency, to_currency, nowdate(), args="for_buying")
-		EXCHANGE_RATE_CACHE[cache_key] = flt(rate) if rate else None
-
-	return EXCHANGE_RATE_CACHE[cache_key]
-
-
-def convert_amount(amount, from_currency, to_currency):
+def convert_amount(amount, from_currency, to_currency, exchange_rate=None):
 	numeric_amount = parse_amount(amount)
 	from_currency = normalize_currency(from_currency)
 	to_currency = normalize_currency(to_currency)
+	exchange_rate = parse_amount(exchange_rate)
 
 	if numeric_amount is None or not from_currency or not to_currency:
 		return None
@@ -108,29 +92,39 @@ def convert_amount(amount, from_currency, to_currency):
 	if from_currency == to_currency:
 		return numeric_amount
 
-	rate = get_buying_exchange_rate(from_currency, to_currency)
-	if not rate:
+	if exchange_rate in (None, 0):
 		return None
 
-	return numeric_amount * rate
+	if from_currency == "USD" and to_currency == "CAD":
+		return numeric_amount * exchange_rate
+
+	if from_currency == "CAD" and to_currency == "USD":
+		return numeric_amount / exchange_rate
+
+	return None
 
 
 def get_duty_multiplier(duty_rate):
 	return 1 + (flt(duty_rate) / 100)
 
 
-def calculate_current_actual_costs(cost_amount, cost_currency, duty_rate):
+def calculate_current_actual_costs(cost_amount, cost_currency, duty_rate, exchange_rate=None):
 	base_cost = parse_amount(cost_amount)
 	normalized_currency = normalize_currency(cost_currency)
+	exchange_rate = parse_amount(exchange_rate)
 	if base_cost is None or not normalized_currency:
 		return None, None
 
 	if normalized_currency == "CAD":
 		current_actual_cost_cad = base_cost
-		current_actual_cost_usd = convert_amount(current_actual_cost_cad, "CAD", "USD")
+		current_actual_cost_usd = (
+			current_actual_cost_cad / exchange_rate if exchange_rate not in (None, 0) else None
+		)
 	elif normalized_currency == "USD":
 		current_actual_cost_usd = base_cost * get_duty_multiplier(duty_rate)
-		current_actual_cost_cad = convert_amount(current_actual_cost_usd, "USD", "CAD")
+		current_actual_cost_cad = (
+			current_actual_cost_usd * exchange_rate if exchange_rate not in (None, 0) else None
+		)
 	else:
 		return None, None
 
@@ -162,16 +156,21 @@ def get_displayed_price_lists(price_lists, supplier_price_lists=None, show_cost_
 	displayed_price_lists = []
 
 	if not show_cost_column:
-		displayed_price_lists.extend(supplier_price_lists)
+		displayed_price_lists.extend(
+			[price_list for price_list in supplier_price_lists if not is_supplier_cost_price_list(price_list)]
+		)
 
 	for price_list in price_lists:
+		if is_supplier_cost_price_list(price_list):
+			continue
+
 		if price_list not in displayed_price_lists:
 			displayed_price_lists.append(price_list)
 
 	return displayed_price_lists
 
 
-def select_lowest_cost_entry(price_entries, preferred_supplier=None):
+def select_lowest_cost_entry(price_entries, preferred_supplier=None, exchange_rate=None):
 	if not price_entries:
 		return None, None, "not_found"
 
@@ -183,21 +182,25 @@ def select_lowest_cost_entry(price_entries, preferred_supplier=None):
 
 	lowest_cost = None
 	lowest_cost_currency = None
-	lowest_cost_usd = None
+	lowest_comparable_cost = None
 	lowest_cost_source = "not_found"
 
 	for entry in candidate_entries:
 		price_rate = parse_amount(entry.get("rate"))
 		price_currency = normalize_currency(entry.get("currency"), entry.get("price_list"))
-		price_rate_usd = convert_amount(price_rate, price_currency, "USD")
+		comparable_cost = price_rate
+		if price_currency == "USD":
+			converted_cost = convert_amount(price_rate, "USD", "CAD", exchange_rate)
+			if converted_cost is not None:
+				comparable_cost = converted_cost
 
-		if price_rate is None or price_rate_usd is None:
+		if price_rate is None or comparable_cost is None:
 			continue
 
-		if lowest_cost_usd is None or price_rate_usd < lowest_cost_usd:
+		if lowest_comparable_cost is None or comparable_cost < lowest_comparable_cost:
 			lowest_cost = price_rate
 			lowest_cost_currency = price_currency
-			lowest_cost_usd = price_rate_usd
+			lowest_comparable_cost = comparable_cost
 			lowest_cost_source = f"sup_price_list:{entry.get('price_list')}"
 			if entry.get("supplier"):
 				lowest_cost_source += f" supplier:{entry.get('supplier')}"
@@ -256,6 +259,7 @@ def get_cost_entry_for_row(item, buying_item_prices_dict, costs=None):
 	return select_lowest_cost_entry(
 		buying_item_prices_dict.get(item_code, []),
 		preferred_supplier=item.get("supplier"),
+		exchange_rate=item.get("plc_conversion_rate"),
 	)
 
 def execute(filters=None):
@@ -370,6 +374,7 @@ def get_data(
 					p.supplier,
 					i.ifw_duty_rate,
 					p.buying_price_list,
+					p.plc_conversion_rate,
 					isup.supplier_part_no,
 					i.item_group,
 					i.image,
@@ -465,6 +470,7 @@ def get_data(
 	# Prepare data for the report
 	data = []
 	for item in items:
+		exchange_rate = parse_amount(item.get("plc_conversion_rate"))
 		cost_amount, cost_currency, cost_source = get_cost_entry_for_row(
 			item,
 			buying_item_prices_dict,
@@ -474,6 +480,7 @@ def get_data(
 			cost_amount,
 			cost_currency,
 			item.get("ifw_duty_rate"),
+			exchange_rate,
 		)
 		
 		row = {
@@ -489,6 +496,7 @@ def get_data(
 			"date_item_created": getdate(item["creation"]) if item.get("creation") else "",
 			"ifw_duty_rate": item["ifw_duty_rate"],
 			"cost": flt(cost_amount, 2) if parse_amount(cost_amount) is not None else "",
+			"exchange_rate": flt(exchange_rate, 6) if exchange_rate is not None else "",
 			"current_actual_cost_usd": flt(current_actual_cost_usd, 2) if current_actual_cost_usd is not None else "",
 			"current_actual_cost_cad": flt(current_actual_cost_cad, 2) if current_actual_cost_cad is not None else "",
 		}
@@ -590,13 +598,18 @@ def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders
 		"width": 120
 	}])
 
-	if show_cost_column:
-		columns.append({
-			"label": "Cost",
-			"fieldtype": "Float",
-			"fieldname": "cost",
-			"width": 120
-		})
+	columns.append({
+		"label": "Cost",
+		"fieldtype": "Float",
+		"fieldname": "cost",
+		"width": 120
+	})
+	columns.append({
+		"label": "Exchange Rate",
+		"fieldtype": "Float",
+		"fieldname": "exchange_rate",
+		"width": 120,
+	})
 	columns.append({
 		"label": "Current Actual Cost (USD)",
 		"fieldtype": "Float",
