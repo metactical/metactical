@@ -7,7 +7,7 @@
  "field_order": [
   "section_break_w13y",
   "old_item_group",
-  "merge_type",
+  "action",
   "column_break_tryz",
   "new_item_group",
   "amended_from"
@@ -38,12 +38,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "merge_type",
-   "fieldtype": "Data",
-   "label": "Merge Type",
-   "read_only": 1
-  },
-  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -52,12 +46,18 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "label": "Action",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-24 10:05:36.020533",
+ "modified": "2026-04-29 05:34:18.716593",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Group Merge History",
