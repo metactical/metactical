@@ -13,8 +13,10 @@ class SBTag(Document):
 			'action': 'Rename' if not merge else 'Merge'
 		})
 		merge_history.insert(ignore_permissions=True)
+		frappe.db.commit()
 		
 	def on_trash(self):		
+		
 		merge_history = frappe.get_doc({
 			'doctype': 'SB Tag Merge History',
 			'old_sb_tag': self.name,
@@ -22,3 +24,4 @@ class SBTag(Document):
 			'action': 'Delete'
 		})
 		merge_history.insert(ignore_permissions=True)
+		frappe.db.commit()
