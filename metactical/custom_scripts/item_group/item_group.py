@@ -10,7 +10,18 @@ class CustomItemGroup(ItemGroup):
             'doctype': 'Item Group Merge History',
             'old_item_group': old_name,
             'new_item_group': new_name,
-            'merge_type': 'Rename' if not merge else 'Merge'
+            'action': 'Rename' if not merge else 'Merge'
+        })
+        merge_history.insert(ignore_permissions=True)
+        
+    def on_trash(self):
+        super().on_trash()
+        
+        merge_history = frappe.get_doc({
+            'doctype': 'Item Group Merge History',
+            'old_item_group': self.name,
+            'new_item_group': "",
+            'action': 'Delete'
         })
         merge_history.insert(ignore_permissions=True)
         
