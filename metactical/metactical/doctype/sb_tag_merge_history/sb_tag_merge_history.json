@@ -6,7 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "old_sb_tag",
-  "merge_type",
+  "action",
   "column_break_eudm",
   "new_sb_tag"
  ],
@@ -17,11 +17,6 @@
    "label": "Old SB Tag"
   },
   {
-   "fieldname": "merge_type",
-   "fieldtype": "Data",
-   "label": "Merge Type"
-  },
-  {
    "fieldname": "column_break_eudm",
    "fieldtype": "Column Break"
   },
@@ -29,12 +24,17 @@
    "fieldname": "new_sb_tag",
    "fieldtype": "Data",
    "label": "New SB Tag"
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "label": "Action"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-29 05:02:43.397275",
+ "modified": "2026-04-29 09:05:54.838229",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SB Tag Merge History",

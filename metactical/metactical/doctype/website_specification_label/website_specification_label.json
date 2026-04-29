@@ -11,7 +11,7 @@
   "label",
   "sort_order",
   "is_a_search_filter",
-  "show_as_table",
+  "show_in_table",
   "section_break_0mlim",
   "descriptions"
  ],
@@ -49,15 +49,15 @@
   },
   {
    "default": "0",
-   "fieldname": "show_as_table",
+   "fieldname": "show_in_table",
    "fieldtype": "Check",
-   "label": "Show As Table"
+   "label": "Show In Table"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-29 05:18:28.508682",
+ "modified": "2026-04-29 09:16:31.500906",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Specification Label",
