@@ -126,14 +126,14 @@ class CustomItem(Item):
                 
                 doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
                 try:
-                    
                     doc.deduplicate_similar_repost()
                     frappe.enqueue(repost, doc=doc, queue='long')
                 except Exception as e:
                     frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
                     
             frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
-
+            frappe.db.commit()
+            
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
         old_defaults = frappe.get_all(
