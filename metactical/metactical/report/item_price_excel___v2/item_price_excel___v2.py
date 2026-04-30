@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe.utils import flt, getdate
 
 
@@ -64,6 +65,19 @@ def parse_amount(value):
 		return float(value)
 	except (TypeError, ValueError):
 		return None
+
+
+def get_usd_to_cad_exchange_rate(transaction_date=None):
+	cache = getattr(frappe.flags, "item_price_excel_v2_exchange_rate_cache", None)
+	if cache is None:
+		cache = {}
+		frappe.flags.item_price_excel_v2_exchange_rate_cache = cache
+
+	cache_key = str(getdate(transaction_date)) if transaction_date else "__default__"
+	if cache_key not in cache:
+		cache[cache_key] = parse_amount(get_exchange_rate("USD", "CAD", transaction_date))
+
+	return cache[cache_key]
 
 
 def normalize_currency(currency, price_list=None):
@@ -208,7 +222,7 @@ def select_lowest_cost_entry(price_entries, preferred_supplier=None, exchange_ra
 	return lowest_cost, lowest_cost_currency, lowest_cost_source
 
 
-def get_lowest_supplier_cost(item_code, suppliers=None):
+def get_lowest_supplier_cost(item_code, suppliers=None, transaction_date=None):
 	supplier_names = [supplier.get("supplier") for supplier in suppliers or [] if supplier.get("supplier")]
 	filters = {
 		"item_code": item_code,
@@ -243,12 +257,13 @@ def get_lowest_supplier_cost(item_code, suppliers=None):
 			}
 			for item_price in item_prices
 		],
+		exchange_rate=get_usd_to_cad_exchange_rate(transaction_date),
 	)
 
 
 def get_cost_entry_for_row(item, buying_item_prices_dict, costs=None):
 	item_code = item.get("item_code")
-	precomputed_cost = (costs or {}).get(item_code)
+	precomputed_cost = (costs or {}).get((item.get("parent"), item_code)) or (costs or {}).get(item_code)
 	if precomputed_cost:
 		return (
 			precomputed_cost.get("amount"),
@@ -259,7 +274,7 @@ def get_cost_entry_for_row(item, buying_item_prices_dict, costs=None):
 	return select_lowest_cost_entry(
 		buying_item_prices_dict.get(item_code, []),
 		preferred_supplier=item.get("supplier"),
-		exchange_rate=item.get("plc_conversion_rate"),
+		exchange_rate=get_usd_to_cad_exchange_rate(item.get("transaction_date")),
 	)
 
 def execute(filters=None):
@@ -291,7 +306,8 @@ def execute(filters=None):
 	
 	elif sales_orders:
 		for so in sales_orders:
-			items = frappe.get_doc("Sales Order", so).items
+			sales_order = frappe.get_doc("Sales Order", so)
+			items = sales_order.items
 			for item in items:
 				suppliers = frappe.get_all(
 					"Item Supplier",
@@ -299,8 +315,12 @@ def execute(filters=None):
 					fields=["supplier"],
 				)
 
-				cost_amount, cost_currency, cost_source = get_lowest_supplier_cost(item.item_code, suppliers)
-				costs[item.item_code] = {
+				cost_amount, cost_currency, cost_source = get_lowest_supplier_cost(
+					item.item_code,
+					suppliers,
+					transaction_date=sales_order.transaction_date,
+				)
+				costs[(so, item.item_code)] = {
 					"amount": cost_amount,
 					"currency": cost_currency,
 					"source": cost_source,
@@ -372,9 +392,9 @@ def get_data(
 					i.item_name,
 					poi.parent,
 					p.supplier,
+					p.transaction_date,
 					i.ifw_duty_rate,
 					p.buying_price_list,
-					p.plc_conversion_rate,
 					isup.supplier_part_no,
 					i.item_group,
 					i.image,
@@ -401,6 +421,7 @@ def get_data(
 					i.ifw_retailskusuffix,
 					i.item_name,
 					soi.parent,
+					so.transaction_date,
 					i.ifw_duty_rate,
 					(
 						SELECT isup.supplier_part_no
@@ -414,6 +435,7 @@ def get_data(
 					i.brand,
 					i.creation
 				FROM `tabSales Order Item` soi
+				JOIN `tabSales Order` so ON so.name = soi.parent
 				JOIN `tabItem` i ON i.name = soi.item_code
 				WHERE soi.parent IN %s{item_creation_condition}
 			""",
@@ -470,7 +492,7 @@ def get_data(
 	# Prepare data for the report
 	data = []
 	for item in items:
-		exchange_rate = parse_amount(item.get("plc_conversion_rate"))
+		exchange_rate = get_usd_to_cad_exchange_rate(item.get("transaction_date"))
 		cost_amount, cost_currency, cost_source = get_cost_entry_for_row(
 			item,
 			buying_item_prices_dict,
@@ -496,7 +518,6 @@ def get_data(
 			"date_item_created": getdate(item["creation"]) if item.get("creation") else "",
 			"ifw_duty_rate": item["ifw_duty_rate"],
 			"cost": flt(cost_amount, 2) if parse_amount(cost_amount) is not None else "",
-			"exchange_rate": flt(exchange_rate, 6) if exchange_rate is not None else "",
 			"current_actual_cost_usd": flt(current_actual_cost_usd, 2) if current_actual_cost_usd is not None else "",
 			"current_actual_cost_cad": flt(current_actual_cost_cad, 2) if current_actual_cost_cad is not None else "",
 		}
@@ -603,12 +624,6 @@ def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders
 		"fieldtype": "Float",
 		"fieldname": "cost",
 		"width": 120
-	})
-	columns.append({
-		"label": "Exchange Rate",
-		"fieldtype": "Float",
-		"fieldname": "exchange_rate",
-		"width": 120,
 	})
 	columns.append({
 		"label": "Current Actual Cost (USD)",
