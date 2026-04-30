@@ -79,6 +79,9 @@ class CustomItem(Item):
         
     def after_rename(self, old_item_code, new_item_code, merge=False):
         super().after_rename(old_item_code, new_item_code, merge)
+
+        frappe.flags.renaming = True
+
         try:
             new_item = frappe.get_doc("Item", new_item_code)
             if merge:
@@ -95,7 +98,7 @@ class CustomItem(Item):
             item_merge_history.new_item = self.sanitize(new_item.as_dict())
             
             item_merge_history.insert(ignore_permissions=True)
-            
+
             if merge:
                 if old_item.variant_of:
                     remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
@@ -111,21 +114,26 @@ class CustomItem(Item):
         finally:    
             repost_item_valuations = frappe.get_list("Repost Item Valuation", 
                                                     filters={"item_code": new_item_code, "status": "Queued"}, 
+                                                    fields=["name", "warehouse"],
                                                     order_by="creation desc"
                                                 )
             if not repost_item_valuations:
                 return
-        
+
             for repost_item_valuation in repost_item_valuations:
+                if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
+                    continue
+                
                 doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
                 try:
-                    repost(doc)
+                    
                     doc.deduplicate_similar_repost()
-
-                    frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
+                    frappe.enqueue(repost, doc=doc, queue='long')
                 except Exception as e:
                     frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
-    
+                    
+            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
+
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
         old_defaults = frappe.get_all(
@@ -323,6 +331,8 @@ class CustomItem(Item):
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
             
             self.create_item_deletion_log()
+        
+        frappe.flags.renaming = False
             
     def update_sb_tags(self):
         if not self.neb_website_specifications:
@@ -435,7 +445,7 @@ def validate_website_specifications(doc):
             frappe.throw("<b>Description</b> is required for Website Specification at row <b>{0}</b>".format(spec.idx))
     
 def validate_item_group(doc):
-    if doc.item_group:
+    if doc.item_group and not frappe.flags.renaming:
         is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
         if is_item_group:
             frappe.throw("Item Group <b>{0}</b> is a group. Please select a non-group item group.".format(doc.item_group))
