@@ -11,6 +11,7 @@ from io import BytesIO
 from frappe import _, msgprint
 from frappe.model.docstatus import DocStatus
 import requests
+from frappe.desk.doctype.tag.tag import DocTags
 
 # from erpnext.controllers.item_variant import (
 # 	make_variant_item_code
@@ -79,6 +80,7 @@ class ItemFromExcel(Document):
 	def create_item(self, file_content, item_field_map, linked_dcts, is_template, templates_with_ai_request={}):
 		self.attributes = ""
 		self.attribute_values = ""
+		self.tags = ""
 
 		data = file_content[0] if is_template else file_content[1]
 		specs = file_content[2]
@@ -125,6 +127,8 @@ class ItemFromExcel(Document):
 						self.attributes = row[i]
 					elif field == "Attribute Value (Variant Attributes)" and row[i]:
 						self.attribute_values = row[i]
+					elif field == "Tags" and row[i]:
+						self.tags = row[i]
 					else:
 						if field and field.endswith(f"({parent_label})") and row[i] is not None:
 							child_table = get_key_from_value(linked_dcts, doctype)
@@ -165,9 +169,11 @@ class ItemFromExcel(Document):
 								data[index][price_list_index], 
 							 	is_last_item_of_template,
 							  	templates_with_ai_request,
-								spec_labels
-							  )	
-	
+								spec_labels,
+								self.tags
+							  )
+
+				self.tags = ""
 				item, item_code, child_table_values, temp_child_table_values, price_list_rows = initialize_item_data()
 
 			prices = []
@@ -209,7 +215,8 @@ class ItemFromExcel(Document):
 						  	data[-1][price_list_index],
 							is_last_item_of_template,
 							templates_with_ai_request,
-							spec_labels
+							spec_labels,
+							self.tags
 						)
    
 	def prepare_website_specifications_from_data(self, sheet_data):
@@ -277,7 +284,8 @@ class ItemFromExcel(Document):
 					   	price_list, 
 						is_last_item_of_template, 
 						templates_with_ai_request,
-						spec_labels
+						spec_labels,
+						tags=""
 					  ):
 	 
 		child_table_values = remove_duplicate_child_table_values(child_table_values)
@@ -299,6 +307,13 @@ class ItemFromExcel(Document):
 		frappe.flags.in_import = True
 		frappe.flags.item_from_excel = True
 		item.insert()
+
+		tag_names = parse_tag_cell(tags)
+		if tag_names:
+			doc_tags = DocTags("Item")
+			for tag in tag_names:
+				doc_tags.add(item.item_code, tag)
+
 		supplier = item.supplier_items[0].supplier if item.supplier_items else None
 		if supplier:
 			self.create_item_defaults(item, supplier)
@@ -642,6 +657,11 @@ def add_attributes_to_child_table(item, child_table_values, attributes, attribut
 				"numeric_values": is_numeric
 			})
 
+def parse_tag_cell(value):
+	if value is None:
+		return []
+	return [t.strip() for t in str(value).split(",") if t and t.strip()]
+
 def get_doctype_information():
 	item_doctype_meta = frappe.get_meta("Item")
 	item_field_map = {}
@@ -698,10 +718,6 @@ def remove_all_none_rows(data):
 
 def remove_duplicate_child_table_values(data):
 	return {key: [dict(t) for t in {tuple(d.items()) for d in data[key]}] for key in data}
-
-
-
-
 
 # Refactored extract_and_validate_excel_data - Multiple Helper Methods
 def get_workbook_from_file(file_url):
