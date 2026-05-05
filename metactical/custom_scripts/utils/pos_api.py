@@ -1609,7 +1609,12 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
                 SELECT GROUP_CONCAT(barcode SEPARATOR ', ')
                 FROM `tabItem Barcode`
                 WHERE parent = tabItem.name
-            ) AS barcodes
+            ) AS barcodes,
+            (
+                SELECT GROUP_CONCAT(DISTINCT tag SEPARATOR ', ')
+                FROM `tabTag Link`
+                WHERE document_name = tabItem.name
+            ) as tags
         FROM `tabItem`
         WHERE
             tabItem.disabled = 0
@@ -1739,6 +1744,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
+            "Tags": item.tags,
             "Branches": item.branches
         })
 
