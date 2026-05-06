@@ -7,7 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "lead_source",
-  "category_name"
+  "category_name",
+  "slug"
  ],
  "fields": [
   {
@@ -24,13 +25,19 @@
    "in_list_view": 1,
    "label": "Category Name",
    "reqd": 1
+  },
+  {
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Slug",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-23 04:53:18.047325",
+ "modified": "2026-05-06 06:19:02.488435",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Category Mapping",
