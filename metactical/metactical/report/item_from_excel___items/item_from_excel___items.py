@@ -179,10 +179,6 @@ def build_rows(item_codes, usd_to_cad):
 		},
 		as_dict=True,
 	)
-	
-	frappe.msgprint(f"Fetched {len(prices)} relevant price records for {len(item_codes)} items")
-	frappe.msgprint(f"Fetched {prices} relevant price records for {item_codes} items")
- 
 
 	# Index retail prices and resolve the supplier cost per item. Rows are sorted
 	# DESC by `modified`, so the first SUP - row we see for a given item is the
