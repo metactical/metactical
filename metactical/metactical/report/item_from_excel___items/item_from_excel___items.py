@@ -17,7 +17,7 @@ Available via API at:
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, get_url
 from erpnext.setup.utils import get_exchange_rate
 
 # Price list names (exact, as used elsewhere in the metactical codebase)
@@ -131,7 +131,8 @@ def build_rows(item_codes, usd_to_cad):
 	# Resolve the currency of each retail price list once (drives margin cost basis)
 	price_list_currencies = get_price_list_currencies([PL_CAMO, PL_GPD, PL_CAMO_FRN])
 
-	# Pull all needed Item fields in one query
+	# Pull all needed Item fields in one query. Exclude templates (`has_variants = 1`)
+	# so only variant rows make it to the report.
 	items = frappe.db.sql(
 		"""
 		SELECT
@@ -139,6 +140,7 @@ def build_rows(item_codes, usd_to_cad):
 			variant_of, ifw_retailskusuffix, ifw_duty_rate, creation
 		FROM `tabItem`
 		WHERE name IN %(codes)s
+		  AND COALESCE(has_variants, 0) = 0
 		""",
 		{"codes": tuple(item_codes)},
 		as_dict=True,
@@ -218,8 +220,8 @@ def build_rows(item_codes, usd_to_cad):
 	for code in item_codes:
 		item = items_by_code.get(code)
 		if not item:
-			# Item wasn't created (yet) - emit a sparse row so the user can see it's missing
-			rows.append({"erpsku": code})
+			# Either a template (filtered out of the SQL above) or an item that
+			# hasn't been created yet - skip it entirely.
 			continue
 
 		duty_rate = flt(item.get("ifw_duty_rate"))
@@ -254,10 +256,16 @@ def build_rows(item_codes, usd_to_cad):
 		margin_gpd = safe_margin(ret_gpd, cost_basis_for(PL_GPD))
 		margin_camofrn = safe_margin(ret_camofrn_usd, cost_basis_for(PL_CAMO_FRN))
 
-		image = item.get("image") or ""
+		# Image: store the absolute URL so it works for both UI rendering and API consumers.
+		# `Item.image` is usually a site-relative path like "/files/foo.jpg".
+		raw_image = item.get("image") or ""
+		if raw_image and raw_image.startswith("/"):
+			image = get_url(raw_image)
+		else:
+			image = raw_image  # already absolute (http(s)://...) or empty
+
 		rows.append({
 			"image": image,
-			"image_url": image,
 			"erpsku": item["name"],
 			"retail_sku": item.get("ifw_retailskusuffix"),
 			"template_sku": item.get("variant_of"),
@@ -312,8 +320,7 @@ def safe_margin(retail, cost):
 
 def get_columns():
 	return [
-		{"fieldname": "image", "label": _("Image"), "fieldtype": "Attach Image", "width": 70},
-		{"fieldname": "image_url", "label": _("Image URL"), "fieldtype": "Data", "width": 200},
+		{"fieldname": "image", "label": _("Image"), "fieldtype": "Data", "width": 240},
 		{"fieldname": "erpsku", "label": _("ERPSKU"), "fieldtype": "Link", "options": "Item", "width": 140},
 		{"fieldname": "retail_sku", "label": _("Retail SKU"), "fieldtype": "Data", "width": 140},
 		{"fieldname": "template_sku", "label": _("Template SKU"), "fieldtype": "Link", "options": "Item", "width": 140},
