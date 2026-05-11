@@ -256,7 +256,8 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
 	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title",
-	"erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return": "metactical.custom_scripts.sales_invoice.sales_invoice.make_sales_return"
+	"erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return": "metactical.custom_scripts.sales_invoice.sales_invoice.make_sales_return",
+	"erpnext.stock.dashboard.item_dashboard.get_data": "metactical.custom_scripts.item_dashboard.item_dashboard.get_data"
 }
 #
 # each overriding function accepts a `data` argument;
