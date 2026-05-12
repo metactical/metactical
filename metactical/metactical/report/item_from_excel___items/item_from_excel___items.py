@@ -1,20 +1,6 @@
 # Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 # For license information, please see license.txt
 
-"""
-Item From Excel - Items report.
-
-Lists every variant item that was part of a given `Item From Excel` import along
-with its costs, retail prices and margins. Because items are created in a
-background job, the report first checks the queue status of the source doc and
-refuses to render until the job has finished.
-
-Available via API at:
-    /api/method/frappe.desk.query_report.run
-        ?report_name=Item From Excel - Items
-        &filters={"item_from_excel": "<doc-name>"}
-"""
-
 import frappe
 from frappe import _
 from frappe.utils import flt, get_url
@@ -27,6 +13,7 @@ PL_CAMO_FRN = "RET - CamoFRN - USD"
 
 
 def execute(filters=None):
+	"""Script-report entry point. Returns `(columns, data)` for the desk UI."""
 	filters = filters or {}
 	item_from_excel = filters.get("item_from_excel")
 
@@ -35,7 +22,7 @@ def execute(filters=None):
 
 	doc = frappe.get_doc("Item From Excel", item_from_excel)
 
-	# Status gate: the import is asynchronous - only show data once it's done
+	# Status gate: only show data once the doc has been submitted.
 	check_import_status(doc)
 
 	# Re-parse the attached excel to find the variant item codes that were imported
@@ -51,6 +38,63 @@ def execute(filters=None):
 
 	data = build_rows(item_codes, usd_to_cad)
 	return get_columns(), data
+
+
+def _response(status, message, item_from_excel, columns=None, data=None):
+	"""Single source of truth for the API envelope shape."""
+	return {
+		"success": status == "ok",
+		"status": status,
+		"message": message,
+		"item_from_excel": item_from_excel,
+		"columns": columns or [],
+		"data": data or [],
+	}
+
+
+@frappe.whitelist()
+def get_report(item_from_excel=None):
+	if not item_from_excel:
+		return _response(
+			"error",
+			_("Missing required parameter: item_from_excel"),
+			item_from_excel,
+		)
+
+	if not frappe.db.exists("Item From Excel", item_from_excel):
+		return _response(
+			"not_found",
+			_("Item From Excel {0} does not exist.").format(item_from_excel),
+			item_from_excel,
+		)
+
+	# Reuse the existing docstatus check via the doc we'll need anyway
+	doc = frappe.get_doc("Item From Excel", item_from_excel)
+	if doc.docstatus != 1:
+		return _response(
+			"not_submitted",
+			_("Item From Excel {0} has not been submitted yet. Submit the document to start the import.").format(item_from_excel),
+			item_from_excel,
+		)
+
+	try:
+		columns, data = execute({"item_from_excel": item_from_excel})
+	except Exception as exc:
+		# Anything that slips past the explicit checks above (e.g. excel parse
+		# failure, DB error) gets a uniform error envelope.
+		frappe.log_error(
+			title="Item From Excel - Items: get_report failed",
+			message=frappe.get_traceback(),
+		)
+		return _response("error", str(exc), item_from_excel)
+
+	return _response(
+		"ok",
+		_("Report ready."),
+		item_from_excel,
+		columns=columns,
+		data=data,
+	)
 
 
 def check_import_status(doc):
