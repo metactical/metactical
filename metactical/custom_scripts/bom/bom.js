@@ -16,8 +16,35 @@ frappe.ui.form.on("BOM", {
   //         }
   //     }
   // })
+    apply_usd_pkr_override(frm, "refresh");
+  },
+  currency: function(frm){
+    apply_usd_pkr_override(frm, "currency");
+  },
+  conversion_rate: function(frm){
+    apply_usd_pkr_override(frm, "conversion_rate");
+  },
+  company: function(frm){
+    apply_usd_pkr_override(frm, "company");
   }
 })
+
+var get_company_currency = function(company) {
+  return frappe.db.get_value("Company", company, "default_currency").then(r => {
+    return r && r.message ? r.message.default_currency : null;
+  });
+};
+
+var apply_usd_pkr_override = function(frm, source) {
+  get_company_currency(frm.doc.company).then(company_currency => {
+    if (frm.doc.currency === "USD" && company_currency === "PKR") {
+      if (flt(frm.doc.conversion_rate) !== 280) {
+        frm.set_value("conversion_rate", 280);
+      }
+      return;
+    }
+  });
+};
 
 frappe.ui.form.on("BOM Operation", {
   time_in_mins: function (frm, cdt, cdn) {
