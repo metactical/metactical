@@ -8,22 +8,9 @@ class CustomPackingSlip(PackingSlip):
 	def on_submit(self):
 		super(CustomPackingSlip, self).on_submit()
 		#Clear associated tote if any
-		tote_exists = frappe.db.exists('Picklist Tote', {'current_delivery_note': self.delivery_note})
-		if tote_exists:
-			docname = frappe.db.get_value('Picklist Tote', {'current_delivery_note': self.delivery_note})
-			doc = frappe.get_doc('Picklist Tote', docname)
-			doc.update({
-				'current_delivery_note': '',
-				'used_by': '',
-				'tote_items': []
-			})
-			try:
-				doc.save(ignore_permissions=True)
-			except Exception as e:
-				frappe.log_error(title="Error Clearing Tote", message=f"Failed to clear tote for {self.name}: {str(e)}")
-		else:
-			frappe.log_error(title="Totes Clearing Testing", message=f"Tote for {self.name} doesn't exist")
 
+		frappe.enqueue(self.clear_picklist_tote, queue='long', timeout=300, event='on_submit', doc=self, job_name=f"clear_picklist_tote_{self.name}")
+		
 	def calculate_net_total_pkg(self):
 		self.net_weight_uom = self.items[0].weight_uom if self.items else None
 		# self.gross_weight_uom = self.net_weight_uom
@@ -138,3 +125,20 @@ class CustomPackingSlip(PackingSlip):
 			if res and len(res) > 0:
 				d.net_weight = res["weight_per_unit"]
 				d.weight_uom = res["weight_uom"]
+	
+	def clear_picklist_tote(self, doc):
+		tote_exists = frappe.db.exists('Picklist Tote', {'current_delivery_note': doc.delivery_note})
+		if tote_exists:
+			docname = frappe.db.get_value('Picklist Tote', {'current_delivery_note': doc.delivery_note})
+			doc = frappe.get_doc('Picklist Tote', docname)
+			doc.update({
+				'current_delivery_note': '',
+				'used_by': '',
+				'tote_items': []
+			})
+			try:
+				doc.save(ignore_permissions=True)
+			except Exception as e:
+				frappe.log_error(title="Error Clearing Tote", message=f"Failed to clear tote for {doc.name}: {str(e)}")
+		else:
+			frappe.log_error(title="Totes Clearing Testing", message=f"Tote for {doc.name} doesn't exist")
