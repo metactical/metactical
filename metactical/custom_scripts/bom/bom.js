@@ -16,8 +16,47 @@ frappe.ui.form.on("BOM", {
   //         }
   //     }
   // })
+    default_currency_for_pkr_company(frm);
+    apply_usd_pkr_override(frm, "refresh");
+  },
+  currency: function(frm){
+    apply_usd_pkr_override(frm, "currency");
+  },
+  conversion_rate: function(frm){
+    apply_usd_pkr_override(frm, "conversion_rate");
+  },
+  company: function(frm){
+    default_currency_for_pkr_company(frm);
+    apply_usd_pkr_override(frm, "company");
   }
 })
+
+var get_company_currency = function(company) {
+  return frappe.db.get_value("Company", company, "default_currency").then(r => {
+    return r && r.message ? r.message.default_currency : null;
+  });
+};
+
+// On new BOMs for a PKR company, default the BOM currency to USD.
+// Skip on saved docs so we never overwrite a user's choice.
+var default_currency_for_pkr_company = function(frm) {
+  get_company_currency(frm.doc.company).then(company_currency => {
+    if (company_currency === "PKR" && frm.doc.currency !== "USD") {
+      frm.set_value("currency", "USD");
+    }
+  });
+};
+
+var apply_usd_pkr_override = function(frm, source) {
+  get_company_currency(frm.doc.company).then(company_currency => {
+    if (frm.doc.currency === "USD" && company_currency === "PKR") {
+      if (flt(frm.doc.conversion_rate) !== 280) {
+        frm.set_value("conversion_rate", 280);
+      }
+      return;
+    }
+  });
+};
 
 frappe.ui.form.on("BOM Operation", {
   time_in_mins: function (frm, cdt, cdn) {
