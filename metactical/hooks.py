@@ -906,7 +906,8 @@ fixtures = [{
 			"Item Attribute Value-short_name",
 			"Website Specification Label-custom_show_in_table",
 			"Item Attribute-custom__nat_show_in_table",
-			"Item Attribute-custom_is_search_filter"
+			"Item Attribute-custom_is_search_filter",
+			"Material Request-custom_suppliers"
 		]]]
 	},
 	{
