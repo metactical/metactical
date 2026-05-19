@@ -10,6 +10,7 @@ import json
 from metactical.custom_scripts.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from frappe.desk.doctype.tag.tag import add_tag
+from datetime import timedelta
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
@@ -1609,7 +1610,12 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
                 SELECT GROUP_CONCAT(barcode SEPARATOR ', ')
                 FROM `tabItem Barcode`
                 WHERE parent = tabItem.name
-            ) AS barcodes
+            ) AS barcodes,
+            (
+                SELECT GROUP_CONCAT(DISTINCT tag SEPARATOR ', ')
+                FROM `tabTag Link`
+                WHERE document_name = tabItem.name
+            ) as tags
         FROM `tabItem`
         WHERE
             tabItem.disabled = 0
@@ -1715,7 +1721,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
         sort_orders_index = {name: index for index, name in enumerate(sorted_order)}
         branches = item.branches.values()
         item.branches = sorted(branches, key=lambda x:  sort_orders_index.get(x.get("DisplayName"), len(sorted_order)))
-        on_order = get_on_order_quantity(item.item_code, warehouse)
+        on_order  = get_on_order_quantity(item.item_code, warehouse)
 
         item_details.append({
             "Sku": item.item_code,
@@ -1739,6 +1745,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
+            "Tags": item.tags,
             "Branches": item.branches
         })
 
@@ -1750,31 +1757,41 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
 
 def get_on_order_quantity(item_code, warehouse):
     po_items = frappe.db.sql(f"""
-        SELECT sum(qty), sum(received_qty)
+        SELECT
+            po.name AS po_name,
+            poi.qty,
+            poi.received_qty,
+            po.transaction_date,
+            (poi.qty - poi.received_qty) AS pending_qty
         FROM `tabPurchase Order Item` poi
         JOIN `tabPurchase Order` po ON poi.parent = po.name
         WHERE
             poi.item_code = {frappe.db.escape(item_code)}
-            AND poi.warehouse = "W01-WHS-Active Stock - ICL"
+            AND poi.warehouse = 'W01-WHS-Active Stock - ICL'
             AND po.docstatus = 1
-            AND po.status in ('To Receive and Bill', 'To Receive')
+            AND po.status IN ('To Receive and Bill', 'To Receive')
             AND poi.qty > poi.received_qty
             AND po.company = 'International Camouflage Ltd'
-        GROUP BY poi.item_code, poi.parent
     """, as_dict=True)
-    
-    pending_quantities = ""
-    for po in po_items:
-        pending_qty = int(po["sum(qty)"] - po["sum(received_qty)"])
-        if pending_qty > 0:
-            if pending_quantities:
-                pending_quantities += ", "
-            pending_quantities += str(pending_qty)
 
-    if pending_quantities:
-        return pending_quantities
-    
-    return ""
+    pending_quantities = []
+
+    for po in po_items:
+        pending_qty = int(po["pending_qty"])
+        if pending_qty <= 0:
+            continue
+        
+        lead_time_in_days = frappe.db.get_value("Item", item_code, "lead_time_days") or 0    
+        
+        # add expected delivery date to the pending PO names list
+        expected_delivery_date = po["transaction_date"] + timedelta(days=lead_time_in_days)
+        
+        # convert date to 01-Jan-26
+        eta = expected_delivery_date.strftime('%d-%b-%y')
+        pending_quantities.append(f"{pending_qty} (ETA: {eta})")
+
+    return ", ".join(pending_quantities) if pending_quantities else ""
+
 
 @frappe.whitelist()
 def get_item_by_retail_sku_single(retail_sku, branch):

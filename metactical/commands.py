@@ -54,19 +54,6 @@ def start_background_sync(context):
 	from metactical.metactical.doctype.mt_background_sync.mt_background_sync import sync_items_to_websites
 	sync_items_to_websites()
  
-@click.command("update-availability-rules")
-@pass_context
-def start_background_sync(context):
-	site = get_site(context)
-	if not site:
-		raise SiteNotSpecifiedError
-
-	frappe.init(site=site)
-	frappe.connect()
- 
-	from metactical.patches.update_item_availability import execute
-	execute()
- 
 commands = [
 	rename_customers,
 	delete_dormant_customers,
