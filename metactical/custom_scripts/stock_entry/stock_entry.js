@@ -1,27 +1,5 @@
 frappe.ui.form.on('Stock Entry', {
 	refresh: function(frm){
-		frm.set_query("expense_account", "additional_costs", function () {
-			return {
-				filters: {
-					account_type: [
-						"in",
-						[
-							"Tax",
-							"Chargeable",
-							"Income Account",
-							"Expenses Included In Valuation",
-							"Expenses Included In Asset Valuation",
-							"Expense Account",
-							"Direct Expense",
-							"Indirect Expense",
-							"Stock Received But Not Billed",
-							"Cost of Goods Sold",
-						],
-					],
-					company: frm.doc.company,
-				},
-			};
-		});
 		if (frm.doc.docstatus === 0) {
 			frm.add_custom_button(__('Recalculate Available Qty'), function() {
 				var items = frm.doc.items.map(function(item) {
