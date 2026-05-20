@@ -1,79 +1,28 @@
-erpnext.landed_cost_taxes_and_charges = {
-	setup_triggers: function (doctype) {
-		frappe.ui.form.on(doctype, {
-			refresh: function (frm) {
-				let tax_field = frm.doc.doctype == "Landed Cost Voucher" ? "taxes" : "additional_costs";
-				frm.set_query("expense_account", tax_field, function () {
-					return {
-						filters: {
-							account_type: [
-								"in",
-								[
-									"Tax",
-									"Chargeable",
-									"Income Account",
-									"Expenses Included In Valuation",
-									"Expenses Included In Asset Valuation",
-									"Expense Account",
-									"Direct Expense",
-									"Indirect Expense",
-									"Stock Received But Not Billed",
-									"Cost of Goods Sold",
-								],
-							],
-							company: frm.doc.company,
-						},
-					};
-				});
-			},
+// Extend erpnext.landed_cost_taxes_and_charges to allow accounts with
+// account_type = "Cost of Goods Sold" in the expense_account dropdown of
+// Stock Entry → Additional Costs and Landed Cost Voucher → Taxes, without
+// duplicating the core filter list.
+const _core_setup_triggers = erpnext.landed_cost_taxes_and_charges.setup_triggers;
 
-			set_account_currency: function (frm, cdt, cdn) {
-				let row = locals[cdt][cdn];
-				if (row.expense_account) {
-					frappe.db.get_value("Account", row.expense_account, "account_currency", function (value) {
-						frappe.model.set_value(cdt, cdn, "account_currency", value.account_currency);
-						frm.events.set_exchange_rate(frm, cdt, cdn);
-					});
+erpnext.landed_cost_taxes_and_charges.setup_triggers = function (doctype) {
+	_core_setup_triggers.call(this, doctype);
+
+	frappe.ui.form.on(doctype, {
+		refresh: function (frm) {
+			const tax_field = frm.doc.doctype == "Landed Cost Voucher" ? "taxes" : "additional_costs";
+			const field = frm.fields_dict[tax_field].grid.get_field("expense_account");
+			if (field._cogs_patched) return;
+
+			const original_get_query = field.get_query;
+			field.get_query = function () {
+				const q = original_get_query.apply(this, arguments) || {};
+				const acct = q.filters && q.filters.account_type;
+				if (Array.isArray(acct) && acct[0] === "in" && Array.isArray(acct[1]) && !acct[1].includes("Cost of Goods Sold")) {
+					q.filters.account_type = ["in", [...acct[1], "Cost of Goods Sold"]];
 				}
-			},
-
-			set_exchange_rate: function (frm, cdt, cdn) {
-				let row = locals[cdt][cdn];
-				let company_currency = frappe.get_doc(":Company", frm.doc.company).default_currency;
-
-				if (row.account_currency == company_currency) {
-					row.exchange_rate = 1;
-					frm.set_df_property("taxes", "hidden", 1, frm.docname, "exchange_rate", cdn);
-				} else if (!row.exchange_rate || row.exchange_rate == 1) {
-					frm.set_df_property("taxes", "hidden", 0, frm.docname, "exchange_rate", cdn);
-					frappe.call({
-						method: "erpnext.accounts.doctype.journal_entry.journal_entry.get_exchange_rate",
-						args: {
-							posting_date: frm.doc.posting_date,
-							account: row.expense_account,
-							account_currency: row.account_currency,
-							company: frm.doc.company,
-						},
-						callback: function (r) {
-							if (r.message) {
-								frappe.model.set_value(cdt, cdn, "exchange_rate", r.message);
-							}
-						},
-					});
-				}
-
-				frm.refresh_field("taxes");
-			},
-
-			set_base_amount: function (frm, cdt, cdn) {
-				let row = locals[cdt][cdn];
-				frappe.model.set_value(
-					cdt,
-					cdn,
-					"base_amount",
-					flt(flt(row.amount) * row.exchange_rate, precision("base_amount", row))
-				);
-			},
-		});
-	},
+				return q;
+			};
+			field._cogs_patched = true;
+		},
+	});
 };
