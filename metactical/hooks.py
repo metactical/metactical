@@ -1478,7 +1478,8 @@ fixtures = [{
 			"Work Order-source_warehouse-default",
 			"Sales Order-shipping_address_name-allow_on_submit",
 			"Sales Order-customer_address-allow_on_submit",
-			"Sales Order-dispatch_address_name-allow_on_submit"
+			"Sales Order-dispatch_address_name-allow_on_submit",
+			"Material Request-ais_suppliers-in_list_view"
 		]]]
 	},
   	{
