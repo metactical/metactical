@@ -30,6 +30,7 @@ import "../../erpnext_public/js/utils/crm_activities";
 import "../../erpnext_public/js/templates/crm_activities.html";
 import "../../erpnext_public/js/templates/crm_notes.html";
 import "../../erpnext_public/js/controllers/accounts.js";
+import "../../erpnext_public/js/utils/landed_taxes_and_charges_common.js";
 import "./utils/landed_taxes_and_charges_common.js";
 import "../../erpnext_public/js/utils/sales_common.js";
 import "../../erpnext_public/js/controllers/buying.js";
