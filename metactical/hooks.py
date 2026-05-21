@@ -1477,6 +1477,7 @@ fixtures = [{
 			"Sales Order-customer_address-allow_on_submit",
 			"Sales Order-dispatch_address_name-allow_on_submit",
 			"Item-disabled-permlevel"
+			"Material Request-ais_suppliers-in_list_view"
 		]]]
 	},
   	{
