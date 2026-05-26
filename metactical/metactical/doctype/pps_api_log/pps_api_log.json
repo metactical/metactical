@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "payload",
+  "response",
   "request_type",
   "error",
   "sales_order",
@@ -63,12 +64,18 @@
    "fieldtype": "Data",
    "label": "Packing Slips",
    "read_only": 1
+  },
+  {
+   "fieldname": "response",
+   "fieldtype": "Text",
+   "label": "Response",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-25 12:53:07.367988",
+ "modified": "2026-05-26 12:46:59.964834",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "PPS API Log",

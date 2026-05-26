@@ -4,6 +4,10 @@ from frappe.utils import add_days, nowdate
 from metactical.custom_scripts.pick_list.pick_list import create_pick_list
 from erpnext.stock.doctype.delivery_note.delivery_note import make_packing_slip
 import json
+from metactical.utils.shipping.shipping import get_rate
+from concurrent.futures import ThreadPoolExecutor
+
+site = frappe.local.site
 
 def _get_random_instock_items(warehouse, count):
     """Return `count` random items that have actual_qty >= 1 in `warehouse`."""
@@ -37,7 +41,7 @@ def create_sales_order(*args, **kwargs):
   
         company = form_data.get("company") or frappe.db.get_single_value("Global Defaults", "default_company")
         warehouse = form_data.get("warehouse") or "R01-Gor-Active Stock - ICL"
-        item_count = int(form_data.get("item_count") or 5)
+        item_count = int(form_data.get("item_count") or 2)
 
         stock_items = _get_random_instock_items(warehouse, item_count)
         if not stock_items:
@@ -82,7 +86,7 @@ def create_sales_order(*args, **kwargs):
             packing_slips.append({
                 "parcel_template": f"BOX 1",
                 "dimensions": {"height": 1, "width": 2, "length": 0},
-                "weight": 0,
+                "weight": 1,
                 "items": [{
                     "item_code": item.item_code,
                     "quantity": int(item.qty),
@@ -108,90 +112,129 @@ def pack_order(*args, **kwargs):
     """
     Packs an order using nested packing_slips payload structure.
     """
+    form_data = dict(frappe.form_dict)
+    log = create_log(form_data, "Pack Order")
+    order_id = form_data.get("order_id")
 
-    order_id = None
-    log = None
     try:
-        form_data = dict(frappe.form_dict)
-        log = create_log(form_data, "Pack Order")
-        order_id = form_data.get("order_id")
+        # --- Validate input ---
         if not order_id:
-            return {
-                "status": "error",
-                "message": "Order ID is required."
-            }
+            return _error("Order ID is required.")
 
         packing_slips = form_data.get("packing_slips") or []
         if not packing_slips:
-            return {
-                "status": "error",
-                "message": "Packing slips are required."
-            }
+            return _error("Packing slips are required.")
 
-        validation_errors = validate_packing_slips(
-            packing_slips,
-            order_id
-        )
-
+        validation_errors = validate_packing_slips(packing_slips, order_id)
         if validation_errors:
-            return {
-                "status": "error",
-                "message": "; ".join(validation_errors)
-            }
+            return _error("; ".join(validation_errors))
 
+        # --- Create pick list ---
         items = flatten_packing_slip_items(packing_slips)
-        pick_list_result = create_pick_list_for_order(
-            order_id,
-            items
-        )
+        pick_list_result = create_pick_list_for_order(order_id, items)
 
         if not pick_list_result.get("success"):
-            frappe.db.rollback()
-            frappe.db.set_value("PPS API Log", log, "error", json.dumps({
-                "status": "error",
-                "message": pick_list_result.get("error")
-            }))
-            
-            return {
-                "status": "error",
-                "message": pick_list_result.get("error")
-            }
+            return _fail_with_log(log, pick_list_result.get("error"))
 
-        pick_list = frappe.get_doc("Pick List", pick_list_result.get("pick_list"))
+        pick_list = frappe.get_doc("Pick List", pick_list_result["pick_list"])
         frappe.db.set_value("PPS API Log", log, "pick_list", pick_list.name)
 
-        packing_slip_docs, dn = create_packing_slips(pick_list, packing_slips)        
+        # --- Create packing slips + delivery note ---
+        packing_slip_docs, dn = create_packing_slips(pick_list, packing_slips)
         frappe.db.set_value("PPS API Log", log, {
             "delivery_note": dn,
-            "packing_slips": ", ".join([str(slip) for slip in packing_slip_docs])
+            "packing_slips": ", ".join(str(s) for s in packing_slip_docs),
         })
-        
+
+        # --- Resolve shipment ---
+        shipment_name = _get_shipment_for_delivery_note(dn)
+        if not shipment_name:
+            return _fail_with_log(log, f"No shipment found for Delivery Note {dn}")
+
+        # Trigger parcel auto-population
+        frappe.get_doc("Shipment", shipment_name).save(ignore_permissions=True)
         frappe.db.commit()
 
-        return {
+        # --- Fetch shipping rates concurrently ---
+        rates = _fetch_rates_concurrently(shipment_name)
+        response = {
             "status": "success",
             "message": f"Order {order_id} packed successfully.",
             "pick_list": pick_list.name,
             "delivery_note": dn,
-            "packing_slips": packing_slip_docs
+            "shipment": shipment_name,
+            "canada_post": rates.get("Canada Post"),
+            "purolator": rates.get("Purolator"),
+            "packing_slips": packing_slip_docs,
         }
-
-    except Exception as e:
-        frappe.get_traceback()
-        if log:
-            frappe.db.set_value("PPS API Log", log, "error", json.dumps({
-                "status": "error",
-                "message": str(e)
-            }))
-            
-        frappe.log_error(message=frappe.get_traceback(), title=f"Error packing order {order_id}")
+        
+        frappe.db.set_value("PPS API Log", log, "response", json.dumps(response))
         frappe.db.commit()
         
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        return response
 
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error packing order {order_id}")
+        if log:
+            frappe.db.set_value("PPS API Log", log, "error", json.dumps(_error(str(e))))
+        frappe.db.commit()
+        return _error(str(e))
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _error(message: str) -> dict:
+    return {"status": "error", "message": message}
+
+
+def _fail_with_log(log, message: str) -> dict:
+    frappe.db.rollback()
+    if log:
+        frappe.db.set_value("PPS API Log", log, "error", json.dumps(_error(message)))
+    return _error(message)
+
+
+def _get_shipment_for_delivery_note(dn: str) -> str | None:
+    rows = frappe.db.sql(
+        """
+        SELECT parent
+        FROM `tabShipment Delivery Note`
+        WHERE delivery_note = %s
+        LIMIT 1
+        """,
+        (dn,),
+        as_dict=True,
+    )
+    return rows[0]["parent"] if rows else None
+
+
+def _fetch_rates_concurrently(shipment_name: str) -> dict:
+    providers = ["Canada Post", "Purolator"]
+    results = {}
+
+    def get_rate_threadsafe(provider):
+        frappe.init(site=site)
+        frappe.connect()
+        try:
+            return get_rate(name=shipment_name, provider=provider)
+        finally:
+            frappe.destroy()
+
+    with ThreadPoolExecutor(max_workers=len(providers)) as executor:
+        futures = {p: executor.submit(get_rate_threadsafe, p) for p in providers}
+        for provider, future in futures.items():
+            try:
+                results[provider] = future.result()
+            except Exception:
+                frappe.log_error(
+                    title=f"{provider} Rate Error",
+                    message=frappe.get_traceback(),
+                )
+                results[provider] = None
+
+    return results
 
 def flatten_packing_slip_items(packing_slips):
     """
