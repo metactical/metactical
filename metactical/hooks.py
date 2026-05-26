@@ -907,7 +907,8 @@ fixtures = [{
 			"Website Specification Label-custom_show_in_table",
 			"Item Attribute-custom__nat_show_in_table",
 			"Item Attribute-custom_is_search_filter",
-			"POS Profile-custom_fist_priority_price_list"
+			"POS Profile-custom_fist_priority_price_list",
+			"Item-custom_display_order_in_listing__higher_is_better"
 		]]]
 	},
 	{
