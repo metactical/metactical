@@ -6,6 +6,7 @@ from erpnext.stock.doctype.delivery_note.delivery_note import make_packing_slip
 import json
 from metactical.utils.shipping.shipping import get_rate
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 site = frappe.local.site
 
@@ -23,7 +24,6 @@ def _get_random_instock_items(warehouse, count):
         LIMIT %(count)s
     """, {"warehouse": warehouse, "count": count}, as_dict=True)
     return rows
-
 
 @frappe.whitelist()
 def create_sales_order(*args, **kwargs):
@@ -51,13 +51,13 @@ def create_sales_order(*args, **kwargs):
 
         so = frappe.new_doc("Sales Order")
         so.company = company
-        so.customer = "CS-25-00099"
+        so.customer = "CS-25-05663"
         so.currency = company_currency
         so.set("company_currency", company_currency)
         so.conversion_rate = 1
         so.source = "Store - Camo - Edmonds"
-        so.shipping_address_name = "CS-25-00117-Shipping"
-        so.customer_address = "_Test PPS Shipping Address-9"
+        so.shipping_address_name = "CS-25-05663-Billing"
+        so.customer_address = "CS-25-05663-Billing"
         so.taxes_and_charges = "Alberta - ICL"
         so.exchange_rate = 1
         so.transaction_date = nowdate()
@@ -85,7 +85,7 @@ def create_sales_order(*args, **kwargs):
         for idx, item in enumerate(so.items, start=1):
             packing_slips.append({
                 "parcel_template": f"BOX 1",
-                "dimensions": {"height": 1, "width": 2, "length": 0},
+                "dimensions": {"height": 1, "width": 2, "length": 10},
                 "weight": 1,
                 "items": [{
                     "item_code": item.item_code,
@@ -132,6 +132,7 @@ def pack_order(*args, **kwargs):
         # --- Create pick list ---
         items = flatten_packing_slip_items(packing_slips)
         pick_list_result = create_pick_list_for_order(order_id, items)
+        pick_list_name = pick_list_result.get("pick_list", "")
 
         if not pick_list_result.get("success"):
             return _fail_with_log(log, pick_list_result.get("error"))
@@ -141,6 +142,15 @@ def pack_order(*args, **kwargs):
 
         # --- Create packing slips + delivery note ---
         packing_slip_docs, dn = create_packing_slips(pick_list, packing_slips)
+        if not packing_slip_docs:
+            pick_list = frappe.get_doc("Pick List", pick_list.name)
+            if pick_list.docstatus == 1:
+                pick_list.cancel()
+                pick_list.delete()
+                frappe.db.commit()
+                
+            return _fail_with_log(log, "Failed to create packing slips.")
+        
         frappe.db.set_value("PPS API Log", log, {
             "delivery_note": dn,
             "packing_slips": ", ".join(str(s) for s in packing_slip_docs),
@@ -149,6 +159,7 @@ def pack_order(*args, **kwargs):
         # --- Resolve shipment ---
         shipment_name = _get_shipment_for_delivery_note(dn)
         if not shipment_name:
+            _clear_created_documents(packing_slip_docs, pick_list_name, dn)
             return _fail_with_log(log, f"No shipment found for Delivery Note {dn}")
 
         # Trigger parcel auto-population
@@ -180,14 +191,42 @@ def pack_order(*args, **kwargs):
         frappe.db.commit()
         return _error(str(e))
 
+def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note):
+    """
+    Clear created documents in case of failure.
+    """
+    try:
+        # Cancel and delete packing slips
+        for slip_name in packing_slip_docs:
+            slip = frappe.get_doc("Packing Slip", slip_name)
+            if slip.docstatus == 1:
+                slip.cancel()
+            slip.delete()
+
+        # Cancel and delete pick list
+        if pick_list_name:
+            pick_list = frappe.get_doc("Pick List", pick_list_name)
+            if pick_list.docstatus == 1:
+                pick_list.cancel()
+            pick_list.delete()
+
+        # Cancel and delete delivery note
+        if delivery_note:
+            dn = frappe.get_doc("Delivery Note", delivery_note)
+            if dn.docstatus == 1:
+                dn.cancel()
+            dn.delete()
+
+        frappe.db.commit()
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title="Error clearing created documents")
+        frappe.db.rollback()
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
 def _error(message: str) -> dict:
     return {"status": "error", "message": message}
-
 
 def _fail_with_log(log, message: str) -> dict:
     frappe.db.rollback()
@@ -242,7 +281,6 @@ def flatten_packing_slip_items(packing_slips):
     """
 
     items = []
-
     for slip in packing_slips:
         for item in slip.get("items", []):
             items.append(item)
@@ -256,11 +294,8 @@ def validate_packing_slips(packing_slips, order_id):
     """
 
     errors = []
-
     for index, slip in enumerate(packing_slips, start=1):
-
         items = slip.get("items") or []
-
         if not items:
             errors.append(
                 f"Packing slip {index} has no items."
@@ -318,12 +353,8 @@ def create_pick_list_for_order(order_id, items):
     """
     Create pick list using provided quantities.
     """
-
     try:
-
-        pick_list = create_pick_list(
-            source_name=order_id
-        )
+        pick_list = create_pick_list(source_name=order_id)
 
         items_dict = {
             i["sales_order_item"]: i
@@ -331,18 +362,14 @@ def create_pick_list_for_order(order_id, items):
         }
 
         valid_locations = []
-
         for location in pick_list.locations:
 
             sales_order_item = location.get("sales_order_item")
-
             if sales_order_item not in items_dict:
                 continue
 
             item_data = items_dict[sales_order_item]
-
             location.qty = item_data["quantity"]
-
             valid_locations.append(location)
 
         if not valid_locations:
@@ -369,15 +396,10 @@ def create_pick_list_for_order(order_id, items):
             "error": str(e)
         }
 
-def create_packing_slips(pick_list, packing_slips):
+def create_packing_slips(pick_list, packing_slips, round=1):
     """
     Create ERPNext packing slips.
     """
-
-    print("Creating packing slips in ERPNext...")
-    print(f"Pick List: {pick_list.name}")
-    print(f"Packing Slips Payload: {packing_slips}")
-
     delivery_notes = frappe.db.sql("""
         SELECT DISTINCT parent
         FROM `tabDelivery Note Item`
@@ -385,52 +407,56 @@ def create_packing_slips(pick_list, packing_slips):
     """, (pick_list.name,), as_dict=True)
     
     delivery_note = delivery_notes[0]["parent"] if delivery_notes else None
-    
     if not delivery_note:
-        frappe.throw(
-            f"No Delivery Note found for Pick List {pick_list.name}"
-        )
+        if round < 4:
+            time.sleep(.3)
+            return create_packing_slips(pick_list, packing_slips, round=round+1)
+        else:
+            return [], None
 
     delivery_note = delivery_notes[0]["parent"]
-    print(f"Using Delivery Note: {delivery_note} for packing slips.")
 
     created_slips = []
     case_no = 1
 
-    for slip in packing_slips:
+    try:
+        for slip in packing_slips:
 
-        packing_slip_doc = make_packing_slip(delivery_note)
-        items = []
-        for dn_item in packing_slip_doc.items:
-            for slip_item in slip.get("items", []):
-                if dn_item.item_code == slip_item.get("item_code"):
-                    dn_item.qty = slip_item.get("quantity")
-                    dn_item.sales_order_item = slip_item.get("sales_order_item")
-                    items.append(dn_item)
-                    
+            packing_slip_doc = make_packing_slip(delivery_note)
+            items = []
+            for dn_item in packing_slip_doc.items:
+                for slip_item in slip.get("items", []):
+                    if dn_item.item_code == slip_item.get("item_code"):
+                        dn_item.qty = slip_item.get("quantity")
+                        dn_item.sales_order_item = slip_item.get("sales_order_item")
+                        items.append(dn_item)
+                        
 
-        dimensions = slip.get("dimensions") or {}
+            dimensions = slip.get("dimensions") or {}
 
-        packing_slip_doc.update({
-            "from_case_no": case_no,
-            "to_case_no": case_no,
-            "gross_weight_pkg": slip.get("weight"),
-            "net_weight_pkg": slip.get("weight"),
-            "custom_neb_box_height": dimensions.get("height"),
-            "custom_neb_box_width": dimensions.get("width"),
-            "custom_neb_box_length": dimensions.get("length"),
-            "custom_neb_parcel_template": slip.get("parcel_template"),
-            "items": items
-        })
+            packing_slip_doc.update({
+                "from_case_no": case_no,
+                "to_case_no": case_no,
+                "gross_weight_pkg": slip.get("weight"),
+                "net_weight_pkg": slip.get("weight"),
+                "custom_neb_box_height": dimensions.get("height"),
+                "custom_neb_box_width": dimensions.get("width"),
+                "custom_neb_box_length": dimensions.get("length"),
+                "custom_neb_parcel_template": slip.get("parcel_template"),
+                "items": items
+            })
 
-        packing_slip_doc.insert()
-        packing_slip_doc.submit()
+            packing_slip_doc.insert()
+            packing_slip_doc.submit()
 
-        created_slips.append(packing_slip_doc.name)
-        case_no += 1
+            created_slips.append(packing_slip_doc.name)
+            case_no += 1
 
-    return created_slips, delivery_note
-
+        return created_slips, delivery_note
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error creating packing slips for delivery note {delivery_note}")
+        return [], delivery_note
 
 def create_log(form_data, request_type):
     try:
