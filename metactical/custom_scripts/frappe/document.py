@@ -12,12 +12,11 @@ def execute_action(doctype, name, action, **kwargs):
 	try:
 		frappe.db.set_value(doctype, name, "ais_queue_status", "Not Queued", update_modified=False)
 		getattr(doc, action)(**kwargs)
-	except Exception:
+	except Exception as e:
 		frappe.db.rollback()
-
 		# add a comment (?)
 		if frappe.local.message_log:
-			msg = json.loads(frappe.local.message_log[-1]).get('message')
+			msg = str(e)
 		else:
 			msg = '<pre><code>' + frappe.get_traceback() + '</pre></code>'
 

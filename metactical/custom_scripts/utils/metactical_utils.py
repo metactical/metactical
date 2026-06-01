@@ -113,7 +113,7 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment
 			if response.status_code == 200:
 				pass
 			else:
-				frappe.log_error(title='Rocket Chat Error', message=response.json())
+				frappe.log_error(title='Rocket Chat Error', message=response.text)
 
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
