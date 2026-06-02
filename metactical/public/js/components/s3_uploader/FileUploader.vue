@@ -1644,8 +1644,13 @@ const startUpload = async () => {
       uploadProgress.value.completed = i + 1
     }
 
-    // Save metadata to the S3 Product Image Meta Data doctype (not to S3)
-    if (metadataChanged) {
+    // Only save metadata when every image uploaded and was verified on S3.
+    const uploadSucceeded =
+      uploadErrors.value.length === 0 &&
+      uploadedFiles.value.length === imagesToUpload.length &&
+      uploadedFiles.value.every(f => f.verified)
+
+    if (uploadSucceeded) {
       currentUpload.value = {
         filename: 'metadata',
         status: 'Saving metadata...'
@@ -1683,9 +1688,16 @@ const startUpload = async () => {
           message: (error && error.message) || 'Metadata save failed'
         })
       }
-
-      uploadProgress.value.completed = uploadProgress.value.total
+    } else {
+      // One or more images failed to upload/verify — don't write metadata.
+      uploadErrors.value.push({
+        id: Date.now(),
+        filename: 'metadata',
+        message: 'Metadata not saved because one or more images failed to upload.'
+      })
     }
+
+    uploadProgress.value.completed = uploadProgress.value.total
     
     uploadComplete.value = true
     
