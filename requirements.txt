@@ -5,3 +5,5 @@ pandas
 tqdm
 zeep
 PyMuPDF
+PyPDF2
+boto3
