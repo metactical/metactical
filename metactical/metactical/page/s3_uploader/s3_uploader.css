@@ -1,0 +1,391 @@
+/*
+ * S3 Uploader page styling.
+ *
+ * The ported Vue components (FileUploader.vue / Settings.vue) were authored with
+ * Tailwind utility classes. Frappe's build does not run Tailwind, so this file
+ * implements the small subset of utilities the components actually use, scoped
+ * under #s3_uploader_ui so nothing leaks into the rest of the desk.
+ */
+
+#s3_uploader_ui {
+	color: var(--text-color, #1f2937);
+	font-size: 0.875rem;
+}
+
+/* ---- layout / display ---- */
+#s3_uploader_ui .block { display: block; }
+#s3_uploader_ui .inline-flex { display: inline-flex; }
+#s3_uploader_ui .flex { display: flex; }
+#s3_uploader_ui .grid { display: grid; }
+#s3_uploader_ui .hidden { display: none; }
+#s3_uploader_ui .flex-col { flex-direction: column; }
+#s3_uploader_ui .flex-1 { flex: 1 1 0%; }
+#s3_uploader_ui .flex-shrink-0 { flex-shrink: 0; }
+#s3_uploader_ui .items-center { align-items: center; }
+#s3_uploader_ui .items-start { align-items: flex-start; }
+#s3_uploader_ui .justify-between { justify-content: space-between; }
+#s3_uploader_ui .justify-center { justify-content: center; }
+#s3_uploader_ui .justify-end { justify-content: flex-end; }
+#s3_uploader_ui .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+@media (min-width: 768px) {
+	#s3_uploader_ui .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ---- position ---- */
+#s3_uploader_ui .fixed { position: fixed; }
+#s3_uploader_ui .relative { position: relative; }
+#s3_uploader_ui .absolute { position: absolute; }
+#s3_uploader_ui .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+#s3_uploader_ui .inset-y-0 { top: 0; bottom: 0; }
+#s3_uploader_ui .left-0 { left: 0; }
+#s3_uploader_ui .z-50 { z-index: 50; }
+#s3_uploader_ui .pointer-events-none { pointer-events: none; }
+
+/* ---- sizing ---- */
+#s3_uploader_ui .w-full { width: 100%; }
+#s3_uploader_ui .h-full { height: 100%; }
+#s3_uploader_ui .w-2 { width: 0.5rem; }
+#s3_uploader_ui .h-2 { height: 0.5rem; }
+#s3_uploader_ui .h-1\.5 { height: 0.375rem; }
+#s3_uploader_ui .w-4 { width: 1rem; }
+#s3_uploader_ui .h-4 { height: 1rem; }
+#s3_uploader_ui .w-5 { width: 1.25rem; }
+#s3_uploader_ui .h-5 { height: 1.25rem; }
+#s3_uploader_ui .w-6 { width: 1.5rem; }
+#s3_uploader_ui .h-6 { height: 1.5rem; }
+#s3_uploader_ui .w-10 { width: 2.5rem; }
+#s3_uploader_ui .h-10 { height: 2.5rem; }
+#s3_uploader_ui .w-12 { width: 3rem; }
+#s3_uploader_ui .h-12 { height: 3rem; }
+#s3_uploader_ui .w-16 { width: 4rem; }
+#s3_uploader_ui .h-16 { height: 4rem; }
+#s3_uploader_ui .w-20 { width: 5rem; }
+#s3_uploader_ui .w-32 { width: 8rem; }
+#s3_uploader_ui .w-64 { width: 16rem; }
+#s3_uploader_ui .w-80 { width: 20rem; }
+#s3_uploader_ui .min-w-\[320px\] { min-width: 320px; }
+#s3_uploader_ui .min-w-\[340px\] { min-width: 340px; }
+#s3_uploader_ui .max-w-lg { max-width: 32rem; }
+#s3_uploader_ui .max-w-md { max-width: 28rem; }
+#s3_uploader_ui .max-w-4xl { max-width: 56rem; }
+#s3_uploader_ui .max-h-32 { max-height: 8rem; }
+#s3_uploader_ui .max-h-60 { max-height: 15rem; }
+#s3_uploader_ui .max-h-\[70vh\] { max-height: 70vh; }
+#s3_uploader_ui .max-h-\[90vh\] { max-height: 90vh; }
+#s3_uploader_ui .mx-auto { margin-left: auto; margin-right: auto; }
+
+/* ---- overflow / object ---- */
+#s3_uploader_ui .overflow-hidden { overflow: hidden; }
+#s3_uploader_ui .overflow-x-auto { overflow-x: auto; }
+#s3_uploader_ui .overflow-y-auto { overflow-y: auto; }
+#s3_uploader_ui .object-contain { object-fit: contain; }
+#s3_uploader_ui .break-words { overflow-wrap: break-word; word-break: break-word; }
+
+/* ---- spacing: padding ---- */
+#s3_uploader_ui .p-2 { padding: 0.5rem; }
+#s3_uploader_ui .p-3 { padding: 0.75rem; }
+#s3_uploader_ui .p-4 { padding: 1rem; }
+#s3_uploader_ui .p-6 { padding: 1.5rem; }
+#s3_uploader_ui .p-8 { padding: 2rem; }
+#s3_uploader_ui .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+#s3_uploader_ui .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+#s3_uploader_ui .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+#s3_uploader_ui .px-4 { padding-left: 1rem; padding-right: 1rem; }
+#s3_uploader_ui .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+#s3_uploader_ui .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+#s3_uploader_ui .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+#s3_uploader_ui .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+#s3_uploader_ui .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+#s3_uploader_ui .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+#s3_uploader_ui .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+#s3_uploader_ui .pb-8 { padding-bottom: 2rem; }
+#s3_uploader_ui .pl-3 { padding-left: 0.75rem; }
+#s3_uploader_ui .pl-10 { padding-left: 2.5rem; }
+#s3_uploader_ui .pr-2 { padding-right: 0.5rem; }
+#s3_uploader_ui .pr-4 { padding-right: 1rem; }
+
+/* ---- spacing: margin ---- */
+#s3_uploader_ui .mb-1 { margin-bottom: 0.25rem; }
+#s3_uploader_ui .mb-2 { margin-bottom: 0.5rem; }
+#s3_uploader_ui .mb-3 { margin-bottom: 0.75rem; }
+#s3_uploader_ui .mb-4 { margin-bottom: 1rem; }
+#s3_uploader_ui .mb-6 { margin-bottom: 1.5rem; }
+#s3_uploader_ui .mt-0\.5 { margin-top: 0.125rem; }
+#s3_uploader_ui .mt-1 { margin-top: 0.25rem; }
+#s3_uploader_ui .mt-2 { margin-top: 0.5rem; }
+#s3_uploader_ui .mt-3 { margin-top: 0.75rem; }
+#s3_uploader_ui .mt-4 { margin-top: 1rem; }
+#s3_uploader_ui .ml-2 { margin-left: 0.5rem; }
+#s3_uploader_ui .ml-4 { margin-left: 1rem; }
+#s3_uploader_ui .mr-2 { margin-right: 0.5rem; }
+#s3_uploader_ui .mr-3 { margin-right: 0.75rem; }
+
+/* ---- gap ---- */
+#s3_uploader_ui .gap-1 { gap: 0.25rem; }
+#s3_uploader_ui .gap-2 { gap: 0.5rem; }
+#s3_uploader_ui .gap-3 { gap: 0.75rem; }
+#s3_uploader_ui .gap-4 { gap: 1rem; }
+#s3_uploader_ui .gap-6 { gap: 1.5rem; }
+#s3_uploader_ui .gap-8 { gap: 2rem; }
+
+/* ---- space-y (stacked children) ---- */
+#s3_uploader_ui .space-y-1 > * + * { margin-top: 0.25rem; }
+#s3_uploader_ui .space-y-2 > * + * { margin-top: 0.5rem; }
+#s3_uploader_ui .space-y-3 > * + * { margin-top: 0.75rem; }
+#s3_uploader_ui .space-y-4 > * + * { margin-top: 1rem; }
+#s3_uploader_ui .space-y-6 > * + * { margin-top: 1.5rem; }
+#s3_uploader_ui .space-y-12 > * + * { margin-top: 3rem; }
+
+/* ---- typography ---- */
+#s3_uploader_ui .text-xs { font-size: 0.75rem; line-height: 1rem; }
+#s3_uploader_ui .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+#s3_uploader_ui .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+#s3_uploader_ui .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+#s3_uploader_ui .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+#s3_uploader_ui .font-medium { font-weight: 500; }
+#s3_uploader_ui .font-semibold { font-weight: 600; }
+#s3_uploader_ui .font-bold { font-weight: 700; }
+#s3_uploader_ui .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+#s3_uploader_ui .text-center { text-align: center; }
+#s3_uploader_ui .text-right { text-align: right; }
+#s3_uploader_ui .leading-relaxed { line-height: 1.625; }
+#s3_uploader_ui .underline { text-decoration: underline; }
+
+/* ---- borders / radius ---- */
+#s3_uploader_ui .border { border-width: 1px; border-style: solid; }
+#s3_uploader_ui .border-2 { border-width: 2px; border-style: solid; }
+#s3_uploader_ui .border-4 { border-width: 4px; border-style: solid; }
+#s3_uploader_ui .border-t { border-top-width: 1px; border-top-style: solid; }
+#s3_uploader_ui .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+#s3_uploader_ui .border-dashed { border-style: dashed; }
+/* Default (theme-aware) border colour so bare `.border` doesn't fall back to currentColor.
+ * Explicit `.border-*` colour classes below override this. */
+#s3_uploader_ui .border,
+#s3_uploader_ui .border-2,
+#s3_uploader_ui .border-4,
+#s3_uploader_ui .border-t,
+#s3_uploader_ui .border-b { border-color: var(--border-color); }
+#s3_uploader_ui .rounded { border-radius: 0.25rem; }
+#s3_uploader_ui .rounded-md { border-radius: 0.375rem; }
+#s3_uploader_ui .rounded-lg { border-radius: 0.5rem; }
+#s3_uploader_ui .rounded-xl { border-radius: 0.75rem; }
+#s3_uploader_ui .rounded-2xl { border-radius: 1rem; }
+#s3_uploader_ui .rounded-t-2xl { border-top-left-radius: 1rem; border-top-right-radius: 1rem; }
+#s3_uploader_ui .rounded-b-2xl { border-bottom-left-radius: 1rem; border-bottom-right-radius: 1rem; }
+#s3_uploader_ui .rounded-full { border-radius: 9999px; }
+
+/* ---- shadows ---- */
+#s3_uploader_ui .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+#s3_uploader_ui .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1); }
+#s3_uploader_ui .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); }
+#s3_uploader_ui .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1); }
+#s3_uploader_ui .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); }
+#s3_uploader_ui .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+
+/* ---- background colors ---- */
+#s3_uploader_ui .bg-white { background-color: #ffffff; }
+#s3_uploader_ui .bg-black { background-color: rgba(0,0,0,0.5); } /* only used as bg-black + bg-opacity-50 overlay */
+#s3_uploader_ui .bg-gray-50 { background-color: #f9fafb; }
+#s3_uploader_ui .bg-gray-100 { background-color: #f3f4f6; }
+#s3_uploader_ui .bg-gray-200 { background-color: #e5e7eb; }
+#s3_uploader_ui .bg-gray-500 { background-color: #6b7280; }
+#s3_uploader_ui .bg-blue-50 { background-color: #eff6ff; }
+#s3_uploader_ui .bg-blue-100 { background-color: #dbeafe; }
+#s3_uploader_ui .bg-blue-200 { background-color: #bfdbfe; }
+#s3_uploader_ui .bg-blue-500 { background-color: #3b82f6; }
+#s3_uploader_ui .bg-indigo-500 { background-color: #6366f1; }
+#s3_uploader_ui .bg-green-50 { background-color: #f0fdf4; }
+#s3_uploader_ui .bg-green-100 { background-color: #dcfce7; }
+#s3_uploader_ui .bg-green-500 { background-color: #22c55e; }
+#s3_uploader_ui .bg-red-50 { background-color: #fef2f2; }
+#s3_uploader_ui .bg-red-100 { background-color: #fee2e2; }
+#s3_uploader_ui .bg-red-500 { background-color: #ef4444; }
+#s3_uploader_ui .bg-yellow-50 { background-color: #fefce8; }
+#s3_uploader_ui .bg-yellow-100 { background-color: #fef9c3; }
+#s3_uploader_ui .bg-amber-500 { background-color: #f59e0b; }
+#s3_uploader_ui .bg-orange-500 { background-color: #f97316; }
+#s3_uploader_ui .bg-purple-500 { background-color: #a855f7; }
+
+/* ---- gradients ---- */
+#s3_uploader_ui .bg-gradient-to-r {
+	background-image: linear-gradient(to right, var(--s3-from, transparent), var(--s3-to, transparent));
+}
+#s3_uploader_ui .from-blue-50 { --s3-from: #eff6ff; }
+#s3_uploader_ui .from-blue-500 { --s3-from: #3b82f6; }
+#s3_uploader_ui .from-blue-600 { --s3-from: #2563eb; }
+#s3_uploader_ui .to-indigo-50 { --s3-to: #eef2ff; }
+#s3_uploader_ui .to-blue-600 { --s3-to: #2563eb; }
+#s3_uploader_ui .to-blue-700 { --s3-to: #1d4ed8; }
+
+/* ---- text colors ---- */
+#s3_uploader_ui .text-white { color: #ffffff; }
+#s3_uploader_ui .text-gray-400 { color: #9ca3af; }
+#s3_uploader_ui .text-gray-500 { color: #6b7280; }
+#s3_uploader_ui .text-gray-600 { color: #4b5563; }
+#s3_uploader_ui .text-gray-700 { color: #374151; }
+#s3_uploader_ui .text-gray-800 { color: #1f2937; }
+#s3_uploader_ui .text-blue-500 { color: #3b82f6; }
+#s3_uploader_ui .text-blue-600 { color: #2563eb; }
+#s3_uploader_ui .text-blue-700 { color: #1d4ed8; }
+#s3_uploader_ui .text-blue-800 { color: #1e40af; }
+#s3_uploader_ui .text-blue-900 { color: #1e3a8a; }
+#s3_uploader_ui .text-green-600 { color: #16a34a; }
+#s3_uploader_ui .text-green-700 { color: #15803d; }
+#s3_uploader_ui .text-green-800 { color: #166534; }
+#s3_uploader_ui .text-green-900 { color: #14532d; }
+#s3_uploader_ui .text-red-400 { color: #f87171; }
+#s3_uploader_ui .text-red-500 { color: #ef4444; }
+#s3_uploader_ui .text-red-600 { color: #dc2626; }
+#s3_uploader_ui .text-red-700 { color: #b91c1c; }
+#s3_uploader_ui .text-red-800 { color: #991b1b; }
+#s3_uploader_ui .text-red-900 { color: #7f1d1d; }
+#s3_uploader_ui .text-yellow-700 { color: #a16207; }
+#s3_uploader_ui .text-yellow-800 { color: #854d0e; }
+#s3_uploader_ui .text-amber-600 { color: #d97706; }
+
+/* ---- border colors ---- */
+#s3_uploader_ui .border-gray-200 { border-color: #e5e7eb; }
+#s3_uploader_ui .border-gray-300 { border-color: #d1d5db; }
+#s3_uploader_ui .border-blue-200 { border-color: #bfdbfe; }
+#s3_uploader_ui .border-blue-300 { border-color: #93c5fd; }
+#s3_uploader_ui .border-green-200 { border-color: #bbf7d0; }
+#s3_uploader_ui .border-green-300 { border-color: #86efac; }
+#s3_uploader_ui .border-red-200 { border-color: #fecaca; }
+#s3_uploader_ui .border-red-300 { border-color: #fca5a5; }
+#s3_uploader_ui .border-yellow-200 { border-color: #fef08a; }
+#s3_uploader_ui .border-yellow-300 { border-color: #fde047; }
+
+/* ---- form controls ---- */
+#s3_uploader_ui .accent-blue-500 { accent-color: #3b82f6; }
+/* Theme-aware form controls in both light and dark. Target every input except
+ * checkboxes/radios (note: the SKU field has no `type` attribute, so a
+ * `[type="text"]` selector would miss it). */
+#s3_uploader_ui input:not([type="checkbox"]):not([type="radio"]),
+#s3_uploader_ui select,
+#s3_uploader_ui textarea {
+	background-color: var(--control-bg);
+	color: var(--text-color);
+	border-color: var(--border-color);
+}
+
+/* ---- misc ---- */
+#s3_uploader_ui .cursor-pointer { cursor: pointer; }
+#s3_uploader_ui .transform { transform: translateZ(0); }
+#s3_uploader_ui .scale-100 { transform: scale(1); }
+#s3_uploader_ui .transition-all { transition: all 0.2s ease; }
+#s3_uploader_ui .transition-colors { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
+#s3_uploader_ui .transition-shadow { transition: box-shadow 0.2s ease; }
+#s3_uploader_ui .duration-200 { transition-duration: 0.2s; }
+#s3_uploader_ui .duration-300 { transition-duration: 0.3s; }
+#s3_uploader_ui .ease-in-out { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ---- focus states ---- */
+#s3_uploader_ui .focus\:outline-none:focus { outline: none; }
+#s3_uploader_ui .focus\:ring-2:focus { box-shadow: 0 0 0 2px rgba(59,130,246,0.5); }
+#s3_uploader_ui .focus\:ring-blue-400:focus { box-shadow: 0 0 0 2px rgba(96,165,250,0.6); }
+#s3_uploader_ui .focus\:ring-blue-500:focus { box-shadow: 0 0 0 2px rgba(59,130,246,0.6); }
+#s3_uploader_ui .focus\:ring-gray-400:focus { box-shadow: 0 0 0 2px rgba(156,163,175,0.6); }
+#s3_uploader_ui .focus\:ring-gray-500:focus { box-shadow: 0 0 0 2px rgba(107,114,128,0.6); }
+#s3_uploader_ui .focus\:ring-indigo-400:focus { box-shadow: 0 0 0 2px rgba(129,140,248,0.6); }
+#s3_uploader_ui .focus\:ring-orange-400:focus { box-shadow: 0 0 0 2px rgba(251,146,60,0.6); }
+#s3_uploader_ui .focus\:ring-purple-400:focus { box-shadow: 0 0 0 2px rgba(192,132,252,0.6); }
+#s3_uploader_ui .focus\:ring-red-400:focus { box-shadow: 0 0 0 2px rgba(248,113,113,0.6); }
+#s3_uploader_ui .focus\:border-blue-500:focus { border-color: #3b82f6; }
+
+/* ---- hover states ---- */
+#s3_uploader_ui .hover\:bg-gray-50:hover { background-color: #f9fafb; }
+#s3_uploader_ui .hover\:bg-gray-100:hover { background-color: #f3f4f6; }
+#s3_uploader_ui .hover\:bg-gray-200:hover { background-color: #e5e7eb; }
+#s3_uploader_ui .hover\:bg-gray-600:hover { background-color: #4b5563; }
+#s3_uploader_ui .hover\:bg-blue-600:hover { background-color: #2563eb; }
+#s3_uploader_ui .hover\:bg-green-600:hover { background-color: #16a34a; }
+#s3_uploader_ui .hover\:bg-indigo-600:hover { background-color: #4f46e5; }
+#s3_uploader_ui .hover\:bg-orange-600:hover { background-color: #ea580c; }
+#s3_uploader_ui .hover\:bg-purple-600:hover { background-color: #9333ea; }
+#s3_uploader_ui .hover\:bg-red-600:hover { background-color: #dc2626; }
+#s3_uploader_ui .hover\:border-gray-400:hover { border-color: #9ca3af; }
+#s3_uploader_ui .hover\:text-blue-700:hover { color: #1d4ed8; }
+#s3_uploader_ui .hover\:text-gray-600:hover { color: #4b5563; }
+#s3_uploader_ui .hover\:text-gray-700:hover { color: #374151; }
+#s3_uploader_ui .hover\:from-blue-700:hover { --s3-from: #1d4ed8; }
+#s3_uploader_ui .hover\:to-blue-800:hover { --s3-to: #1e40af; }
+#s3_uploader_ui .hover\:shadow-lg:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1); }
+#s3_uploader_ui .hover\:shadow-xl:hover { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); }
+#s3_uploader_ui .hover\:scale-105:hover { transform: scale(1.05); }
+#s3_uploader_ui .hover\:scale-110:hover { transform: scale(1.1); }
+
+/* ---- disabled states ---- */
+#s3_uploader_ui .disabled\:bg-gray-400:disabled { background-color: #9ca3af; }
+#s3_uploader_ui .disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+#s3_uploader_ui .disabled\:shadow-none:disabled { box-shadow: none; }
+#s3_uploader_ui .disabled\:transform-none:disabled { transform: none; }
+
+/* ---- animations ---- */
+#s3_uploader_ui .animate-spin { animation: s3-spin 1s linear infinite; }
+#s3_uploader_ui .animate-pulse { animation: s3-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes s3-spin { to { transform: rotate(360deg); } }
+@keyframes s3-pulse { 50% { opacity: 0.5; } }
+
+/* =====================================================================
+ * Dark mode: remap the neutral surfaces / text / borders to Frappe theme
+ * variables, and soften the light "callout" panels so they stay readable.
+ * ===================================================================== */
+[data-theme="dark"] #s3_uploader_ui { color: var(--text-color); }
+
+/* Cards sit on the desk bg; give inner panels a step of contrast (900 -> 800 -> 700) */
+[data-theme="dark"] #s3_uploader_ui .bg-white { background-color: var(--card-bg); }
+[data-theme="dark"] #s3_uploader_ui .bg-gray-50 { background-color: var(--subtle-fg); }
+[data-theme="dark"] #s3_uploader_ui .bg-gray-100 { background-color: var(--subtle-accent); }
+[data-theme="dark"] #s3_uploader_ui .bg-gray-200 { background-color: var(--subtle-accent); }
+/* Cards need a visible edge since card-bg == desk bg in dark mode */
+[data-theme="dark"] #s3_uploader_ui .border { border-color: var(--border-color); }
+
+[data-theme="dark"] #s3_uploader_ui .text-gray-800,
+[data-theme="dark"] #s3_uploader_ui .text-gray-700 { color: var(--text-color); }
+[data-theme="dark"] #s3_uploader_ui .text-gray-600,
+[data-theme="dark"] #s3_uploader_ui .text-gray-500 { color: var(--text-muted); }
+[data-theme="dark"] #s3_uploader_ui .text-gray-400 { color: var(--text-light); }
+
+[data-theme="dark"] #s3_uploader_ui .border-gray-200,
+[data-theme="dark"] #s3_uploader_ui .border-gray-300 { border-color: var(--border-color); }
+
+[data-theme="dark"] #s3_uploader_ui input[type="text"],
+[data-theme="dark"] #s3_uploader_ui input[type="number"],
+[data-theme="dark"] #s3_uploader_ui input[type="search"],
+[data-theme="dark"] #s3_uploader_ui select,
+[data-theme="dark"] #s3_uploader_ui textarea {
+	background-color: var(--control-bg);
+	color: var(--text-color);
+	border-color: var(--border-color);
+}
+
+[data-theme="dark"] #s3_uploader_ui .hover\:bg-gray-50:hover,
+[data-theme="dark"] #s3_uploader_ui .hover\:bg-gray-100:hover { background-color: var(--fg-hover-color, rgba(255,255,255,0.06)); }
+[data-theme="dark"] #s3_uploader_ui .hover\:bg-gray-200:hover { background-color: var(--control-bg); }
+
+/* Soften the pale callout/badge backgrounds for dark surfaces */
+[data-theme="dark"] #s3_uploader_ui .bg-blue-50 { background-color: rgba(59,130,246,0.12); }
+[data-theme="dark"] #s3_uploader_ui .bg-blue-100 { background-color: rgba(59,130,246,0.22); }
+[data-theme="dark"] #s3_uploader_ui .bg-green-50 { background-color: rgba(34,197,94,0.12); }
+[data-theme="dark"] #s3_uploader_ui .bg-green-100 { background-color: rgba(34,197,94,0.22); }
+[data-theme="dark"] #s3_uploader_ui .bg-red-50 { background-color: rgba(239,68,68,0.12); }
+[data-theme="dark"] #s3_uploader_ui .bg-red-100 { background-color: rgba(239,68,68,0.22); }
+[data-theme="dark"] #s3_uploader_ui .bg-yellow-50 { background-color: rgba(234,179,8,0.12); }
+[data-theme="dark"] #s3_uploader_ui .bg-yellow-100 { background-color: rgba(234,179,8,0.22); }
+
+/* Brighten the colored text so it reads on the softened panels */
+[data-theme="dark"] #s3_uploader_ui .text-blue-900,
+[data-theme="dark"] #s3_uploader_ui .text-blue-800,
+[data-theme="dark"] #s3_uploader_ui .text-blue-700 { color: #93c5fd; }
+[data-theme="dark"] #s3_uploader_ui .text-green-900,
+[data-theme="dark"] #s3_uploader_ui .text-green-800,
+[data-theme="dark"] #s3_uploader_ui .text-green-700 { color: #86efac; }
+[data-theme="dark"] #s3_uploader_ui .text-red-900,
+[data-theme="dark"] #s3_uploader_ui .text-red-800,
+[data-theme="dark"] #s3_uploader_ui .text-red-700 { color: #fca5a5; }
+[data-theme="dark"] #s3_uploader_ui .text-yellow-800,
+[data-theme="dark"] #s3_uploader_ui .text-yellow-700 { color: #fde047; }
+
+/* The pale gradient header reads as near-black text otherwise */
+[data-theme="dark"] #s3_uploader_ui .from-blue-50 { --s3-from: rgba(59,130,246,0.18); }
+[data-theme="dark"] #s3_uploader_ui .to-indigo-50 { --s3-to: rgba(99,102,241,0.18); }

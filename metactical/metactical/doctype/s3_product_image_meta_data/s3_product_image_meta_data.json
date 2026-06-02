@@ -1,0 +1,97 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-02 06:25:19.066876",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_3fll",
+  "amended_from",
+  "product_sku",
+  "override_full_product",
+  "skus",
+  "sites",
+  "images",
+  "uploaded_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_3fll",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "S3 Product Image Meta Data",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "product_sku",
+   "fieldtype": "Data",
+   "label": "Product SKU"
+  },
+  {
+   "default": "0",
+   "fieldname": "override_full_product",
+   "fieldtype": "Check",
+   "label": "Override Full Product"
+  },
+  {
+   "fieldname": "skus",
+   "fieldtype": "Table",
+   "label": "SKUs",
+   "options": "S3 Product Image SKU"
+  },
+  {
+   "fieldname": "sites",
+   "fieldtype": "Table",
+   "label": "Sites",
+   "options": "S3 Product Image Site"
+  },
+  {
+   "fieldname": "images",
+   "fieldtype": "Table",
+   "label": "Images",
+   "options": "S3 Product Image Item"
+  },
+  {
+   "fieldname": "uploaded_by",
+   "fieldtype": "Link",
+   "label": "Uploaded By",
+   "options": "User"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-02 06:28:51.568381",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "S3 Product Image Meta Data",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
