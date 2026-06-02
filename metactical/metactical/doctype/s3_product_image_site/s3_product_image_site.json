@@ -12,6 +12,7 @@
   {
    "fieldname": "site",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Site"
   }
  ],
@@ -19,7 +20,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-02 06:22:04.625636",
+ "modified": "2026-06-02 11:28:46.543025",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Site",
