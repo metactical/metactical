@@ -192,9 +192,9 @@
               
               <!-- Role Issues -->
               <div v-if="result.incompleteOrders && result.incompleteOrders.length > 0" class="ml-2 mt-1">
-                <span v-for="incomplete in result.incompleteOrders" :key="incomplete.order">
+                <div v-for="incomplete in result.incompleteOrders" :key="incomplete.order">
                   • Missing {{ incomplete.missingRoles.join(', ') }} for order {{ incomplete.order }}
-                </span>
+                </div>
               </div>
               
               <!-- Missing Roles -->
