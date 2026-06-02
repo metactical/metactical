@@ -16,26 +16,31 @@
   {
    "fieldname": "image_order",
    "fieldtype": "Int",
+   "in_list_view": 1,
    "label": "Image Order"
   },
   {
    "fieldname": "icon",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Icon"
   },
   {
    "fieldname": "small",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Small"
   },
   {
    "fieldname": "medium",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Medium"
   },
   {
    "fieldname": "large",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Large"
   }
  ],
@@ -43,7 +48,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-02 06:24:11.980616",
+ "modified": "2026-06-02 11:29:26.509014",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Item",
