@@ -14,15 +14,21 @@ def upsert_from_metadata(product):
 	if not skus:
 		return None
 
-	product_sku = skus[0]
-
 	doc = frappe.new_doc("S3 Product Image Meta Data")
-	doc.nat_product_sku = product_sku
 	doc.nat_override_full_product = 1 if product.get("overrideFullProduct") else 0
 	doc.nat_uploaded_by = frappe.session.user
 
-	for sku in skus:
-		doc.append("nat_skus", {"nat_sku": sku})
+	# Prefer item_code + sku pairs; fall back to bare SKUs.
+	sku_items = product.get("skuItems") or []
+	if sku_items:
+		for item in sku_items:
+			doc.append(
+				"nat_skus",
+				{"nat_item_code": item.get("item_code"), "nat_sku": item.get("sku")},
+			)
+	else:
+		for sku in skus:
+			doc.append("nat_skus", {"nat_sku": sku})
 
 	for site in product.get("sites") or []:
 		doc.append("nat_sites", {"nat_site": site})
