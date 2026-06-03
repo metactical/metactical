@@ -17,25 +17,25 @@ def upsert_from_metadata(product):
 	product_sku = skus[0]
 
 	doc = frappe.new_doc("S3 Product Image Meta Data")
-	doc.product_sku = product_sku
-	doc.override_full_product = 1 if product.get("overrideFullProduct") else 0
-	doc.uploaded_by = frappe.session.user
+	doc.nat_product_sku = product_sku
+	doc.nat_override_full_product = 1 if product.get("overrideFullProduct") else 0
+	doc.nat_uploaded_by = frappe.session.user
 
 	for sku in skus:
-		doc.append("skus", {"sku": sku})
+		doc.append("nat_skus", {"nat_sku": sku})
 
 	for site in product.get("sites") or []:
-		doc.append("sites", {"site": site})
+		doc.append("nat_sites", {"nat_site": site})
 
 	for image in product.get("images") or []:
 		doc.append(
-			"images",
+			"nat_images",
 			{
-				"image_order": image.get("order") or 0,
-				"icon": image.get("icon"),
-				"small": image.get("small"),
-				"medium": image.get("medium"),
-				"large": image.get("large"),
+				"nat_image_order": image.get("order") or 0,
+				"nat_icon": image.get("icon"),
+				"nat_small": image.get("small"),
+				"nat_medium": image.get("medium"),
+				"nat_large": image.get("large"),
 			},
 		)
 
