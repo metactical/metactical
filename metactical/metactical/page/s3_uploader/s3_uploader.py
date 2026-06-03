@@ -25,12 +25,12 @@ def test_connection():
 	settings = _get_settings()
 	try:
 		client = settings.get_client(ignore_disabled=True)
-		client.list_objects_v2(Bucket=settings.bucket_name, MaxKeys=1)
+		client.list_objects_v2(Bucket=settings.nat_bucket_name, MaxKeys=1)
 		return {"success": True, "message": "Connection successful. S3 credentials verified."}
 	except frappe.ValidationError:
 		raise
 	except Exception as e:
-		return {"success": False, "message": _friendly_s3_error(e, settings.bucket_name, settings.region)}
+		return {"success": False, "message": _friendly_s3_error(e, settings.nat_bucket_name, settings.nat_region)}
 
 
 @frappe.whitelist()
@@ -46,7 +46,7 @@ def upload_image(filename, role, content, content_type=None):
 	key = f"{BASE_PREFIX}/{role}/{filename}"
 	body = base64.b64decode(_strip_data_url(content))
 
-	put_args = {"Bucket": settings.bucket_name, "Key": key, "Body": body}
+	put_args = {"Bucket": settings.nat_bucket_name, "Key": key, "Body": body}
 	if content_type:
 		put_args["ContentType"] = content_type
 
@@ -54,11 +54,11 @@ def upload_image(filename, role, content, content_type=None):
 		client.put_object(**put_args)
 	except Exception as e:
 		# Surface a clean message to the uploader instead of a raw traceback.
-		frappe.throw(_friendly_s3_error(e, settings.bucket_name, settings.region))
+		frappe.throw(_friendly_s3_error(e, settings.nat_bucket_name, settings.nat_region))
 
 	verified = False
 	try:
-		client.head_object(Bucket=settings.bucket_name, Key=key)
+		client.head_object(Bucket=settings.nat_bucket_name, Key=key)
 		verified = True
 	except Exception:
 		verified = False
@@ -92,12 +92,12 @@ def list_metadata(filter=None):
 	"""List submitted S3 Product Image Meta Data records (optionally by SKU)."""
 	filters = {"docstatus": 1}
 	if filter:
-		filters["product_sku"] = ["like", f"%{filter}%"]
+		filters["nat_product_sku"] = ["like", f"%{filter}%"]
 
 	records = frappe.get_all(
 		"S3 Product Image Meta Data",
 		filters=filters,
-		fields=["name", "product_sku", "modified"],
+		fields=["name", "nat_product_sku as product_sku", "modified"],
 		order_by="modified desc",
 	)
 
@@ -105,7 +105,7 @@ def list_metadata(filter=None):
 		record["skus"] = frappe.get_all(
 			"S3 Product Image SKU",
 			filters={"parent": record["name"]},
-			pluck="sku",
+			pluck="nat_sku",
 		)
 
 	return records
@@ -117,18 +117,18 @@ def get_metadata(name):
 	doc = frappe.get_doc("S3 Product Image Meta Data", name)
 
 	return {
-		"productsku": [row.sku for row in doc.skus],
-		"sites": [row.site for row in doc.sites],
-		"overrideFullProduct": bool(doc.override_full_product),
+		"productsku": [row.nat_sku for row in doc.nat_skus],
+		"sites": [row.nat_site for row in doc.nat_sites],
+		"overrideFullProduct": bool(doc.nat_override_full_product),
 		"images": [
 			{
-				"order": row.image_order,
-				"icon": row.icon,
-				"small": row.small,
-				"medium": row.medium,
-				"large": row.large,
+				"order": row.nat_image_order,
+				"icon": row.nat_icon,
+				"small": row.nat_small,
+				"medium": row.nat_medium,
+				"large": row.nat_large,
 			}
-			for row in doc.images
+			for row in doc.nat_images
 		],
 	}
 
