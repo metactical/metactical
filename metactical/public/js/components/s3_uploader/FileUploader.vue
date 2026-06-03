@@ -496,19 +496,42 @@
               </p>
             </div>
 
-            <!-- SKUs (multi-text) -->
+            <!-- SKUs (added by Item Code, auto-filled from RetailSKUSuffix) -->
             <div class="space-y-3">
               <div class="flex items-center justify-between">
-                <label class="block text-sm font-medium text-gray-700">SKUs</label>
-                <span v-if="file.skus && file.skus.trim()" class="text-xs font-medium">🟢 Set</span>
+                <label class="block text-sm font-medium text-gray-700">SKUs (by Item Code)</label>
+                <span v-if="file.skuItems && file.skuItems.length" class="text-xs font-medium">🟢 {{ file.skuItems.length }} set</span>
                 <span v-else class="text-xs font-medium">🔴 Missing</span>
               </div>
-              <input
-                v-model="file.skus"
-                @input="cascadeForward('skus', file); markAsModified(file)"
-                class="w-80 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Comma-separated SKUs"
-              />
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="file.newItemCode"
+                  class="w-64 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                >
+                  <option value="">Select item…</option>
+                  <option v-for="item in itemList" :key="item.item_code" :value="item.item_code">
+                    {{ item.item_code }}<template v-if="item.item_name"> — {{ item.item_name }}</template>
+                  </option>
+                </select>
+                <button
+                  @click="addItemCode(file)"
+                  :disabled="file.resolvingItem || !file.newItemCode"
+                  class="bg-blue-500 px-4 py-2 rounded-lg text-sm hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {{ file.resolvingItem ? 'Adding…' : 'Add' }}
+                </button>
+              </div>
+              <p v-if="file.skuError" class="text-xs text-red-600">{{ file.skuError }}</p>
+              <div v-if="file.skuItems && file.skuItems.length" class="flex flex-wrap gap-2">
+                <span
+                  v-for="(item, sIdx) in file.skuItems"
+                  :key="item.item_code"
+                  class="inline-flex items-center gap-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full border border-blue-300"
+                >
+                  {{ item.item_code }} → {{ item.sku }}
+                  <button @click="removeSkuItem(file, sIdx)" class="text-blue-600 hover:text-blue-800 font-bold">×</button>
+                </span>
+              </div>
             </div>
 
             <!-- Sites (multi-checkbox row) -->
@@ -519,16 +542,22 @@
                 <span v-else class="text-xs font-medium">🔴 None selected</span>
               </div>
               <div class="flex flex-col gap-3 bg-gray-50 p-4 rounded-lg">
-                <div v-for="site in siteList" :key="site" class="flex items-center">
+                <div v-if="siteList.length === 0" class="text-xs text-gray-500">
+                  No sites available. Add a Lead Source with a Lead Source Domain.
+                </div>
+                <div v-for="site in siteList" :key="site.name" class="flex items-center">
                   <label class="inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       v-model="file.sites"
-                      :value="site"
+                      :value="site.name"
                       @change="cascadeForward('sites', file); markAsModified(file)"
                       class="mr-3 accent-blue-500 focus:ring-2 focus:ring-blue-400 rounded"
                     />
-                    <span class="text-sm text-gray-700">{{ site }}</span>
+                    <span class="text-sm text-gray-700">
+                      {{ site.name }}
+                      <span v-if="site.lead_source_domain" class="text-gray-500"> ({{ site.lead_source_domain }})</span>
+                    </span>
                   </label>
                 </div>
               </div>
@@ -789,18 +818,31 @@ const canUseServerSideFiltering = computed(() => {
   return filter && /^[a-zA-Z0-9\-]+$/.test(filter)
 })
 
-const siteList = [
-  'Website - RASUSA',
-  'Website - CamoUSA',
-  'Website - Gorilla',
-  'Website - Zelen',
-  'Website - MRK',
-  'Website - Valley',
-  'Website - RAS',
-  'Website - GPD',
-  'Website - Camo',
-  'Website - FRN'
-]
+// Selectable sites — Lead Sources that have a Lead Source Domain set.
+// Each entry is { name, lead_source_domain }; the stored value is the name.
+const siteList = ref([])
+const siteNames = computed(() => siteList.value.map(s => s.name))
+
+const loadSites = async () => {
+  try {
+    const sites = await callBackend('get_sites')
+    siteList.value = sites || []
+  } catch (error) {
+    console.error('Failed to load sites:', error)
+  }
+}
+
+// Selectable items for the SKU picker — enabled Items only. { item_code, item_name }
+const itemList = ref([])
+
+const loadItems = async () => {
+  try {
+    const items = await callBackend('get_items')
+    itemList.value = items || []
+  } catch (error) {
+    console.error('Failed to load items:', error)
+  }
+}
 
 const onDrop = async (e) => {
   isDragOver.value = false
@@ -916,7 +958,11 @@ const processFiles = async (incomingFiles) => {
         role: autoRole,
         width: img.width,
         height: img.height,
-        skus: '',
+        skus: '', // derived comma list of resolved retail SKUs (kept in sync with skuItems)
+        skuItems: [], // [{ item_code, sku }]
+        newItemCode: '', // transient input for adding an item code
+        skuError: '', // transient validation message for the SKU adder
+        resolvingItem: false,
         sites: [],
         imageOrder: autoOrder, // Auto-filled from filename, default 0
         preview: URL.createObjectURL(file),
@@ -1036,6 +1082,49 @@ const cascadeForward = (field, changedFile) => {
   }
 }
 
+// Keep file.skus (comma list of resolved retail SKUs) in sync with skuItems.
+const syncSkus = (file) => {
+  file.skus = (file.skuItems || []).map(i => i.sku).join(', ')
+}
+
+// Add an item code to a file: resolve its retail SKU on the backend, store the pair.
+const addItemCode = async (file) => {
+  const code = (file.newItemCode || '').trim()
+  file.skuError = ''
+  if (!code) return
+
+  if (!file.skuItems) file.skuItems = []
+  if (file.skuItems.some(i => i.item_code === code)) {
+    file.skuError = `Item ${code} is already added.`
+    return
+  }
+
+  file.resolvingItem = true
+  try {
+    const result = await callBackend('get_item_sku', { item_code: code })
+    if (!result || !result.sku) {
+      file.skuError = (result && result.error) || `No RetailSKUSuffix for ${code}.`
+      return
+    }
+    file.skuItems.push({ item_code: result.item_code, sku: result.sku })
+    file.newItemCode = ''
+    cascadeForward('skuItems', file)
+    files.value.forEach(syncSkus) // refresh derived skus on cascaded files too
+    markAsModified(file)
+  } catch (error) {
+    file.skuError = (error && error.message) || `Failed to resolve ${code}.`
+  } finally {
+    file.resolvingItem = false
+  }
+}
+
+const removeSkuItem = (file, index) => {
+  file.skuItems.splice(index, 1)
+  cascadeForward('skuItems', file)
+  files.value.forEach(syncSkus)
+  markAsModified(file)
+}
+
 // Generate S3 filename for a file
 const generateS3Filename = (file) => {
   const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
@@ -1091,6 +1180,7 @@ const createS3Metadata = () => {
       if (!productsByFirstSku[firstSku]) {
         productsByFirstSku[firstSku] = {
           productsku: skuList, // Store all SKUs as an array
+          skuItems: [...(file.skuItems || [])], // [{ item_code, sku }]
           sites: [...file.sites],
           overrideFullProduct: overrideFullProduct.value, // Add override flag
           images: []
@@ -1102,7 +1192,14 @@ const createS3Metadata = () => {
             productsByFirstSku[firstSku].productsku.push(sku)
           }
         })
-        
+
+        // Merge item_code/sku pairs (dedup by item_code)
+        ;(file.skuItems || []).forEach(item => {
+          if (!productsByFirstSku[firstSku].skuItems.some(i => i.item_code === item.item_code)) {
+            productsByFirstSku[firstSku].skuItems.push({ ...item })
+          }
+        })
+
         // Merge sites
         file.sites.forEach(site => {
           if (!productsByFirstSku[firstSku].sites.includes(site)) {
@@ -1791,11 +1888,11 @@ const loadS3Metadata = async (metaFile) => {
               const filename = normalizeFilename(imagePath.split('/').pop()) // Normalize extension to lowercase
               
               // Filter sites to only include valid ones from siteList (remove legacy domains)
-              const validSites = product.sites.filter(site => siteList.includes(site))
-              
+              const validSites = product.sites.filter(site => siteNames.value.includes(site))
+
               // Handle both array and string productsku formats
               const skus = Array.isArray(product.productsku) ? product.productsku : [product.productsku]
-              
+
               allImages.push({
                 productName: skus[0], // Use first SKU as product name
                 role,
@@ -1804,6 +1901,7 @@ const loadS3Metadata = async (metaFile) => {
                   order: imageSet.order
                 },
                 skus: skus,
+                skuItems: product.skuItems || [],
                 sites: validSites
               })
             }
@@ -1816,13 +1914,14 @@ const loadS3Metadata = async (metaFile) => {
         Object.entries(productData.images).forEach(([role, images]) => {
           images.forEach(imageInfo => {
             // Filter sites to only include valid ones from siteList (remove legacy domains)
-            const validSites = productData.sites.filter(site => siteList.includes(site))
-            
+            const validSites = productData.sites.filter(site => siteNames.value.includes(site))
+
             allImages.push({
               productName,
               role,
               imageInfo,
               skus: productData.skus,
+              skuItems: productData.skuItems || [],
               sites: validSites
             })
           })
@@ -1835,7 +1934,7 @@ const loadS3Metadata = async (metaFile) => {
 
     // Load each image
     for (let i = 0; i < allImages.length; i++) {
-      const { productName, role, imageInfo, skus, sites } = allImages[i]
+      const { productName, role, imageInfo, skus, skuItems, sites } = allImages[i]
       
       s3LoadingProgress.value.current = `Loading ${imageInfo.filename}...`
       
@@ -1877,6 +1976,10 @@ const loadS3Metadata = async (metaFile) => {
                 width: imageInfo.dimensions?.width || img.width,
                 height: imageInfo.dimensions?.height || img.height,
                 skus: skus.join(', '),
+                skuItems: (skuItems || []).map(i => ({ ...i })),
+                newItemCode: '',
+                skuError: '',
+                resolvingItem: false,
                 sites: [...sites],
                 imageOrder: imageInfo.order || 0,
                 preview: URL.createObjectURL(imageFile),
@@ -1914,6 +2017,10 @@ const loadS3Metadata = async (metaFile) => {
           width: imageInfo.dimensions?.width || 0,
           height: imageInfo.dimensions?.height || 0,
           skus: skus.join(', '),
+          skuItems: (skuItems || []).map(i => ({ ...i })),
+          newItemCode: '',
+          skuError: '',
+          resolvingItem: false,
           sites: [...sites],
           imageOrder: imageInfo.order || 0,
           preview: null, // No preview for broken images
@@ -1975,14 +2082,18 @@ const isFileModified = (file) => {
   )
 }
 
-// Load S3 config on mount
+// Load S3 config + selectable sites/items on mount
 onMounted(() => {
   loadS3Config()
+  loadSites()
+  loadItems()
 })
 
 // Reload config (used by the page's "refresh" toolbar action)
 const refresh = () => {
   loadS3Config()
+  loadSites()
+  loadItems()
 }
 
 defineExpose({ refresh })

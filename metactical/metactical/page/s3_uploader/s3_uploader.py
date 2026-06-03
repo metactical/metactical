@@ -20,6 +20,48 @@ def get_public_config():
 
 
 @frappe.whitelist()
+def get_sites():
+	"""Selectable sites: Lead Sources that have a Lead Source Domain set."""
+	return frappe.get_all(
+		"Lead Source",
+		filters={"lead_source_domain": ["!=", ""]},
+		fields=["name"],
+		order_by="name",
+	)
+
+
+@frappe.whitelist()
+def get_item_sku(item_code):
+	"""Resolve an Item Code to its retail SKU (ifw_retailskusuffix).
+
+	Returns {item_code, sku, error}. `sku` is None when the item is missing or
+	has no RetailSKUSuffix so the frontend can flag it.
+	"""
+	
+	item = frappe.get_doc("Item", item_code)
+	
+	if not item:
+		return {"item_code": item_code, "sku": None, "error": "Item not found"}
+
+	sku = item.ifw_retailskusuffix
+	if not sku:
+		return {"item_code": item_code, "sku": None, "error": "Item has no RetailSKUSuffix"}
+
+	return {"item_code": item_code, "sku": sku}
+
+
+@frappe.whitelist()
+def get_items():
+	"""Selectable items for the SKU picker: enabled Items only."""
+	return frappe.get_all(
+		"Item",
+		filters={"disabled": 0},
+		fields=["item_code", "item_name"],
+		order_by="item_code",
+	)
+
+
+@frappe.whitelist()
 def test_connection():
 	"""Backend verification of the S3 credentials against the configured bucket."""
 	settings = _get_settings()
@@ -90,23 +132,34 @@ def save_metadata(products):
 @frappe.whitelist()
 def list_metadata(filter=None):
 	"""List submitted S3 Product Image Meta Data records (optionally by SKU)."""
-	filters = {"docstatus": 1}
+	record_filters = {"docstatus": 1}
 	if filter:
-		filters["nat_product_sku"] = ["like", f"%{filter}%"]
+		# SKUs live on the child table now; find parents with a matching SKU.
+		parents = frappe.get_all(
+			"S3 Product Image SKU",
+			filters={"nat_sku": ["like", f"%{filter}%"]},
+			pluck="parent",
+		)
+		if not parents:
+			return []
+		record_filters["name"] = ["in", list(set(parents))]
 
 	records = frappe.get_all(
 		"S3 Product Image Meta Data",
-		filters=filters,
-		fields=["name", "nat_product_sku as product_sku", "modified"],
+		filters=record_filters,
+		fields=["name", "modified"],
 		order_by="modified desc",
 	)
 
 	for record in records:
-		record["skus"] = frappe.get_all(
+		skus = frappe.get_all(
 			"S3 Product Image SKU",
 			filters={"parent": record["name"]},
 			pluck="nat_sku",
 		)
+		record["skus"] = skus
+		# Display label for the modal (first SKU, or the record name as a fallback).
+		record["product_sku"] = skus[0] if skus else record["name"]
 
 	return records
 
@@ -118,6 +171,7 @@ def get_metadata(name):
 
 	return {
 		"productsku": [row.nat_sku for row in doc.nat_skus],
+		"skuItems": [{"item_code": row.nat_item_code, "sku": row.nat_sku} for row in doc.nat_skus],
 		"sites": [row.nat_site for row in doc.nat_sites],
 		"overrideFullProduct": bool(doc.nat_override_full_product),
 		"images": [

@@ -7,7 +7,6 @@
  "field_order": [
   "section_break_3fll",
   "amended_from",
-  "nat_product_sku",
   "nat_override_full_product",
   "nat_skus",
   "nat_sites",
@@ -28,13 +27,6 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
-  },
-  {
-   "fieldname": "nat_product_sku",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Product SKU",
-   "reqd": 1
   },
   {
    "default": "0",
@@ -76,7 +68,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-03 05:46:21.153257",
+ "modified": "2026-06-03 14:22:37.314673",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Meta Data",
