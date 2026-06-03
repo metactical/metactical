@@ -51,17 +51,6 @@ def get_item_sku(item_code):
 
 
 @frappe.whitelist()
-def get_items():
-	"""Selectable items for the SKU picker: enabled Items only."""
-	return frappe.get_all(
-		"Item",
-		filters={"disabled": 0},
-		fields=["item_code", "item_name"],
-		order_by="item_code",
-	)
-
-
-@frappe.whitelist()
 def test_connection():
 	"""Backend verification of the S3 credentials against the configured bucket."""
 	settings = _get_settings()

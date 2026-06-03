@@ -503,35 +503,10 @@
                 <span v-if="file.skuItems && file.skuItems.length" class="text-xs font-medium">🟢 {{ file.skuItems.length }} set</span>
                 <span v-else class="text-xs font-medium">🔴 Missing</span>
               </div>
-              <div class="flex items-center gap-2">
-                <select
-                  v-model="file.newItemCode"
-                  class="w-64 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                >
-                  <option value="">Select item…</option>
-                  <option v-for="item in itemList" :key="item.item_code" :value="item.item_code">
-                    {{ item.item_code }}<template v-if="item.item_name"> — {{ item.item_name }}</template>
-                  </option>
-                </select>
-                <button
-                  @click="addItemCode(file)"
-                  :disabled="file.resolvingItem || !file.newItemCode"
-                  class="bg-blue-500 px-4 py-2 rounded-lg text-sm hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  {{ file.resolvingItem ? 'Adding…' : 'Add' }}
-                </button>
-              </div>
-              <p v-if="file.skuError" class="text-xs text-red-600">{{ file.skuError }}</p>
-              <div v-if="file.skuItems && file.skuItems.length" class="flex flex-wrap gap-2">
-                <span
-                  v-for="(item, sIdx) in file.skuItems"
-                  :key="item.item_code"
-                  class="inline-flex items-center gap-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full border border-blue-300"
-                >
-                  {{ item.item_code }} → {{ item.sku }}
-                  <button @click="removeSkuItem(file, sIdx)" class="text-blue-600 hover:text-blue-800 font-bold">×</button>
-                </span>
-              </div>
+              <SkuManager
+                :sku-items="file.skuItems"
+                @update="(items) => updateSkuItems(file, items)"
+              />
             </div>
 
             <!-- Sites (multi-checkbox row) -->
@@ -709,6 +684,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Settings from './Settings.vue'
+import SkuManager from './SkuManager.vue'
 
 // Dotted path to the whitelisted backend endpoints for this page.
 const API = 'metactical.metactical.page.s3_uploader.s3_uploader'
@@ -832,17 +808,6 @@ const loadSites = async () => {
   }
 }
 
-// Selectable items for the SKU picker — enabled Items only. { item_code, item_name }
-const itemList = ref([])
-
-const loadItems = async () => {
-  try {
-    const items = await callBackend('get_items')
-    itemList.value = items || []
-  } catch (error) {
-    console.error('Failed to load items:', error)
-  }
-}
 
 const onDrop = async (e) => {
   isDragOver.value = false
@@ -1076,50 +1041,19 @@ const cascade = (field, changedFile) => {
 
 const cascadeForward = (field, changedFile) => {
   const index = files.value.findIndex(f => f.name === changedFile.name)
-  const value = JSON.parse(JSON.stringify(changedFile[field]))
   for (let i = index + 1; i < files.value.length; i++) {
-    files.value[i][field] = value
+    files.value[i][field] = JSON.parse(JSON.stringify(changedFile[field])) // clone per file
   }
 }
 
 // Keep file.skus (comma list of resolved retail SKUs) in sync with skuItems.
 const syncSkus = (file) => {
-  file.skus = (file.skuItems || []).map(i => i.sku).join(', ')
+  file.skus = (file.skuItems || []).filter(i => i.sku).map(i => i.sku).join(', ')
 }
 
-// Add an item code to a file: resolve its retail SKU on the backend, store the pair.
-const addItemCode = async (file) => {
-  const code = (file.newItemCode || '').trim()
-  file.skuError = ''
-  if (!code) return
-
-  if (!file.skuItems) file.skuItems = []
-  if (file.skuItems.some(i => i.item_code === code)) {
-    file.skuError = `Item ${code} is already added.`
-    return
-  }
-
-  file.resolvingItem = true
-  try {
-    const result = await callBackend('get_item_sku', { item_code: code })
-    if (!result || !result.sku) {
-      file.skuError = (result && result.error) || `No RetailSKUSuffix for ${code}.`
-      return
-    }
-    file.skuItems.push({ item_code: result.item_code, sku: result.sku })
-    file.newItemCode = ''
-    cascadeForward('skuItems', file)
-    files.value.forEach(syncSkus) // refresh derived skus on cascaded files too
-    markAsModified(file)
-  } catch (error) {
-    file.skuError = (error && error.message) || `Failed to resolve ${code}.`
-  } finally {
-    file.resolvingItem = false
-  }
-}
-
-const removeSkuItem = (file, index) => {
-  file.skuItems.splice(index, 1)
+// The SKU grid emitted a new committed list for this image; store + cascade it.
+const updateSkuItems = (file, items) => {
+  file.skuItems = items
   cascadeForward('skuItems', file)
   files.value.forEach(syncSkus)
   markAsModified(file)
@@ -2082,18 +2016,16 @@ const isFileModified = (file) => {
   )
 }
 
-// Load S3 config + selectable sites/items on mount
+// Load S3 config + selectable sites on mount
 onMounted(() => {
   loadS3Config()
   loadSites()
-  loadItems()
 })
 
 // Reload config (used by the page's "refresh" toolbar action)
 const refresh = () => {
   loadS3Config()
   loadSites()
-  loadItems()
 }
 
 defineExpose({ refresh })
