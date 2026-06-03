@@ -5,38 +5,38 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "bucket_name",
-  "region",
-  "aws_access_key_id",
-  "aws_secret_access_key",
-  "disabled"
+  "nat_bucket_name",
+  "nat_region",
+  "nat_aws_access_key_id",
+  "nat_aws_secret_access_key",
+  "nat_disabled"
  ],
  "fields": [
   {
    "default": "metactical-images",
-   "fieldname": "bucket_name",
+   "fieldname": "nat_bucket_name",
    "fieldtype": "Data",
    "label": "Bucket Name"
   },
   {
    "default": "us-west-2",
-   "fieldname": "region",
+   "fieldname": "nat_region",
    "fieldtype": "Data",
    "label": "Region"
   },
   {
-   "fieldname": "aws_access_key_id",
+   "fieldname": "nat_aws_access_key_id",
    "fieldtype": "Data",
    "label": "AWS Access Key Id"
   },
   {
-   "fieldname": "aws_secret_access_key",
+   "fieldname": "nat_aws_secret_access_key",
    "fieldtype": "Password",
    "label": "AWS Secret Access Key"
   },
   {
    "default": "0",
-   "fieldname": "disabled",
+   "fieldname": "nat_disabled",
    "fieldtype": "Check",
    "label": "Disabled"
   }
@@ -45,7 +45,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-02 06:07:56.036673",
+ "modified": "2026-06-03 05:47:51.126645",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Settings",

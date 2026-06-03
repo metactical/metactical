@@ -6,39 +6,39 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "image_order",
-  "icon",
-  "small",
-  "medium",
-  "large"
+  "nat_image_order",
+  "nat_icon",
+  "nat_small",
+  "nat_medium",
+  "nat_large"
  ],
  "fields": [
   {
-   "fieldname": "image_order",
+   "fieldname": "nat_image_order",
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Image Order"
   },
   {
-   "fieldname": "icon",
+   "fieldname": "nat_icon",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Icon"
   },
   {
-   "fieldname": "small",
+   "fieldname": "nat_small",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Small"
   },
   {
-   "fieldname": "medium",
+   "fieldname": "nat_medium",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Medium"
   },
   {
-   "fieldname": "large",
+   "fieldname": "nat_large",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Large"
@@ -48,7 +48,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-02 11:29:26.509014",
+ "modified": "2026-06-03 05:46:54.732605",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Item",
