@@ -7,12 +7,12 @@
  "field_order": [
   "section_break_3fll",
   "amended_from",
-  "product_sku",
-  "override_full_product",
-  "skus",
-  "sites",
-  "images",
-  "uploaded_by"
+  "nat_product_sku",
+  "nat_override_full_product",
+  "nat_skus",
+  "nat_sites",
+  "nat_images",
+  "nat_uploaded_by"
  ],
  "fields": [
   {
@@ -30,37 +30,44 @@
    "search_index": 1
   },
   {
-   "fieldname": "product_sku",
+   "fieldname": "nat_product_sku",
    "fieldtype": "Data",
-   "label": "Product SKU"
+   "in_list_view": 1,
+   "label": "Product SKU",
+   "reqd": 1
   },
   {
    "default": "0",
-   "fieldname": "override_full_product",
+   "fieldname": "nat_override_full_product",
    "fieldtype": "Check",
+   "in_list_view": 1,
    "label": "Override Full Product"
   },
   {
-   "fieldname": "skus",
+   "fieldname": "nat_skus",
    "fieldtype": "Table",
    "label": "SKUs",
-   "options": "S3 Product Image SKU"
+   "options": "S3 Product Image SKU",
+   "reqd": 1
   },
   {
-   "fieldname": "sites",
+   "fieldname": "nat_sites",
    "fieldtype": "Table",
    "label": "Sites",
-   "options": "S3 Product Image Site"
+   "options": "S3 Product Image Site",
+   "reqd": 1
   },
   {
-   "fieldname": "images",
+   "fieldname": "nat_images",
    "fieldtype": "Table",
    "label": "Images",
-   "options": "S3 Product Image Item"
+   "options": "S3 Product Image Item",
+   "reqd": 1
   },
   {
-   "fieldname": "uploaded_by",
+   "fieldname": "nat_uploaded_by",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Uploaded By",
    "options": "User"
   }
@@ -69,7 +76,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-02 06:28:51.568381",
+ "modified": "2026-06-03 05:46:21.153257",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Meta Data",
