@@ -1659,18 +1659,8 @@ const startUpload = async () => {
       try {
         const metadata = createS3Metadata()
 
-        const result = await callBackend('save_metadata', {
+        await callBackend('save_metadata', {
           products: JSON.stringify(metadata.products)
-        })
-
-        const recordCount = (result && result.records) ? result.records.length : metadata.products.length
-        uploadedFiles.value.push({
-          id: Date.now() + 10000,
-          originalName: 'Product metadata',
-          s3Path: 'S3 Product Image Meta Data',
-          s3Filename: `${recordCount} record(s)`,
-          verified: true,
-          wasModified: false // Metadata is always new/updated
         })
 
         // Reset all modification flags since metadata is now synced

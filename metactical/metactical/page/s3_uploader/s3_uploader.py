@@ -49,7 +49,12 @@ def upload_image(filename, role, content, content_type=None):
 	put_args = {"Bucket": settings.bucket_name, "Key": key, "Body": body}
 	if content_type:
 		put_args["ContentType"] = content_type
-	client.put_object(**put_args)
+
+	try:
+		client.put_object(**put_args)
+	except Exception as e:
+		# Surface a clean message to the uploader instead of a raw traceback.
+		frappe.throw(_friendly_s3_error(e, settings.bucket_name, settings.region))
 
 	verified = False
 	try:

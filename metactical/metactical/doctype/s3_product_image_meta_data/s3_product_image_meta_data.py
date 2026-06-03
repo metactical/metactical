@@ -10,35 +10,11 @@ class S3ProductImageMetaData(Document):
 
 
 def upsert_from_metadata(product):
-	"""Create a submitted S3 Product Image Meta Data record for one product group.
-
-	`product` is one entry from the uploader metadata, shaped like::
-
-		{
-			"productsku": ["vm01", "vm02"],
-			"sites": ["Website - RASUSA"],
-			"overrideFullProduct": false,
-			"images": [{"order": 1, "icon": "...", "small": "...", "medium": "...", "large": "..."}]
-		}
-
-	The first SKU is the grouping key. If a submitted record already exists for that
-	SKU it is cancelled first so the new one replaces it.
-	"""
 	skus = [s for s in (product.get("productsku") or []) if s]
 	if not skus:
 		return None
 
 	product_sku = skus[0]
-
-	# Cancel any existing submitted record for this product SKU.
-	existing = frappe.get_all(
-		"S3 Product Image Meta Data",
-		filters={"product_sku": product_sku, "docstatus": 1},
-		pluck="name",
-	)
-	for name in existing:
-		doc = frappe.get_doc("S3 Product Image Meta Data", name)
-		doc.cancel()
 
 	doc = frappe.new_doc("S3 Product Image Meta Data")
 	doc.product_sku = product_sku
