@@ -1,5 +1,6 @@
 <template>
-  <div ref="gridRef" class="s3-sku-grid"></div>
+  <!-- Native Frappe grid: Add Row, pick an Item Code (auto-loads SKU), select + Delete. -->
+  <div ref="gridRef"></div>
 </template>
 
 <script setup>
@@ -14,7 +15,6 @@ const gridRef = ref(null)
 let control = null
 let seeding = false
 
-// props.skuItems ({item_code, sku}) -> grid rows (child doctype fieldnames)
 const toRows = () =>
   (props.skuItems || []).map((i, idx) => ({
     idx: idx + 1,
@@ -23,7 +23,6 @@ const toRows = () =>
     nat_sku: i.sku,
   }))
 
-// grid rows -> committed {item_code, sku} (only fully-filled rows)
 const committed = () =>
   (control?.grid?.df?.data || [])
     .filter((r) => r.nat_item_code && r.nat_sku)
@@ -33,7 +32,7 @@ const syncToParent = () => {
   if (!seeding) emit('update', committed())
 }
 
-// When an item is picked in a row, resolve its retail SKU into the SKU column.
+// When an Item Code is picked in a row, auto-load its retail SKU.
 const resolveSku = (field) => {
   const row = field.doc
   const code = field.value
@@ -92,9 +91,7 @@ const buildGrid = () => {
   })
   control.refresh()
 
-  // The native standalone delete runs over async tasks (so reading mid-delete
-  // misses rows) and Delete-All touches frm.doc. Replace both with synchronous,
-  // multi-row-safe versions that sync afterwards.
+  // Synchronous, multi-row-safe delete (native one runs async / touches frm.doc).
   const grid = control.grid
   grid.delete_rows = () => {
     const drop = new Set((grid.df.data || []).filter((r) => r.__checked))
@@ -119,7 +116,6 @@ const reseed = () => {
   seeding = false
 }
 
-// Re-seed when the parent changes the list externally (cascade / load from S3).
 watch(
   () => props.skuItems,
   () => {
