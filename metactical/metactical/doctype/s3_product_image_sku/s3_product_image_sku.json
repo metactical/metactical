@@ -11,24 +11,24 @@
  ],
  "fields": [
   {
-   "fieldname": "nat_sku",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "SKU"
-  },
-  {
    "fieldname": "nat_item_code",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Item Code",
    "options": "Item"
+  },
+  {
+   "fieldname": "nat_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SKU"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-03 13:36:28.099108",
+ "modified": "2026-06-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image SKU",

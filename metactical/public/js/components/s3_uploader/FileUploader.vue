@@ -496,10 +496,10 @@
               </p>
             </div>
 
-            <!-- SKUs (added by Item Code, auto-filled from RetailSKUSuffix) -->
+            <!-- SKUs (native grid: Add Row to enter, select + Delete to remove) -->
             <div class="space-y-3">
               <div class="flex items-center justify-between">
-                <label class="block text-sm font-medium text-gray-700">SKUs (by Item Code)</label>
+                <label class="block text-sm font-medium text-gray-700">SKUs</label>
                 <span v-if="file.skuItems && file.skuItems.length" class="text-xs font-medium">🟢 {{ file.skuItems.length }} set</span>
                 <span v-else class="text-xs font-medium">🔴 Missing</span>
               </div>
@@ -1039,6 +1039,7 @@ const cascade = (field, changedFile) => {
   }
 }
 
+// Copy a field's value from the changed file to every file AFTER it (not before).
 const cascadeForward = (field, changedFile) => {
   const index = files.value.findIndex(f => f.name === changedFile.name)
   for (let i = index + 1; i < files.value.length; i++) {
@@ -1051,7 +1052,8 @@ const syncSkus = (file) => {
   file.skus = (file.skuItems || []).filter(i => i.sku).map(i => i.sku).join(', ')
 }
 
-// The SKU grid emitted a new committed list for this image; store + cascade it.
+// The SKU grid emitted a new committed list for this image; store + cascade it
+// to the images after this one, then refresh their derived `skus`.
 const updateSkuItems = (file, items) => {
   file.skuItems = items
   cascadeForward('skuItems', file)
@@ -1100,95 +1102,70 @@ const autoSortFiles = () => {
   })
 }
 
-// Create S3 metadata structure with products array containing productsku, sites, and ordered images
+// Aggregate the upload per SKU: each SKU's item_code, the union of its sites, and
+// its images (by order + role). This is the atomic, per-SKU view that is saved to
+// the doctype; products are formed by merging these afterwards.
+const aggregatePerSku = () => {
+  const bySku = {} // sku -> { item_code, sites: Set, images: { [order]: {icon,small,medium,large} } }
+
+  // sku -> item_code (item_code is fixed per SKU)
+  const skuToItem = {}
+  files.value.forEach(f => (f.skuItems || []).forEach(i => {
+    if (i.sku) skuToItem[i.sku] = i.item_code || null
+  }))
+
+  files.value.forEach(file => {
+    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
+    if (skuList.length === 0) return
+
+    const order = file.imageOrder !== undefined ? file.imageOrder : 0
+
+    skuList.forEach(sku => {
+      if (!bySku[sku]) {
+        bySku[sku] = { item_code: skuToItem[sku] || null, sites: new Set(), images: {} }
+      }
+      file.sites.forEach(site => bySku[sku].sites.add(site))
+
+      if (file.role) {
+        if (!bySku[sku].images[order]) {
+          bySku[sku].images[order] = { order, icon: null, small: null, medium: null, large: null }
+        }
+        bySku[sku].images[order][file.role] = `products/${file.role}/${generateS3Filename(file)}`
+      }
+    })
+  })
+
+  return Object.keys(bySku).map(sku => ({
+    sku,
+    item_code: bySku[sku].item_code,
+    sites: [...bySku[sku].sites],
+    images: Object.values(bySku[sku].images).sort((a, b) => a.order - b.order)
+  }))
+}
+
+// Merge per-SKU entries that share identical sites AND identical images into a
+// single product (productsku lists all those SKUs). Differing entries stay separate.
+const mergeProducts = (perSku) => {
+  const bySig = {}
+  perSku.forEach(entry => {
+    const sig = JSON.stringify({ sites: [...entry.sites].sort(), images: entry.images })
+    if (!bySig[sig]) {
+      bySig[sig] = {
+        productsku: [entry.sku],
+        sites: entry.sites,
+        overrideFullProduct: overrideFullProduct.value,
+        images: entry.images
+      }
+    } else {
+      bySig[sig].productsku.push(entry.sku)
+    }
+  })
+  return Object.values(bySig)
+}
+
+// Create the S3 metadata ({ products: [...] }) used for Export JSON and validation.
 const createS3Metadata = () => {
-  const productsByFirstSku = {}
-  
-  // Group files by their first SKU and organize by order and role
-  files.value.forEach(file => {
-    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
-    
-    if (skuList.length > 0) {
-      const firstSku = skuList[0]
-      
-      if (!productsByFirstSku[firstSku]) {
-        productsByFirstSku[firstSku] = {
-          productsku: skuList, // Store all SKUs as an array
-          skuItems: [...(file.skuItems || [])], // [{ item_code, sku }]
-          sites: [...file.sites],
-          overrideFullProduct: overrideFullProduct.value, // Add override flag
-          images: []
-        }
-      } else {
-        // Merge additional SKUs that aren't already included
-        skuList.forEach(sku => {
-          if (!productsByFirstSku[firstSku].productsku.includes(sku)) {
-            productsByFirstSku[firstSku].productsku.push(sku)
-          }
-        })
-
-        // Merge item_code/sku pairs (dedup by item_code)
-        ;(file.skuItems || []).forEach(item => {
-          if (!productsByFirstSku[firstSku].skuItems.some(i => i.item_code === item.item_code)) {
-            productsByFirstSku[firstSku].skuItems.push({ ...item })
-          }
-        })
-
-        // Merge sites
-        file.sites.forEach(site => {
-          if (!productsByFirstSku[firstSku].sites.includes(site)) {
-            productsByFirstSku[firstSku].sites.push(site)
-          }
-        })
-      }
-    }
-  })
-  
-  // Now organize images by order for each product
-  files.value.forEach(file => {
-    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
-    
-    if (skuList.length > 0 && file.role) {
-      const firstSku = skuList[0]
-      const order = file.imageOrder !== undefined ? file.imageOrder : 0
-      
-      if (productsByFirstSku[firstSku]) {
-        // Find existing image set for this order, or create new one
-        let imageSet = productsByFirstSku[firstSku].images.find(img => img.order === order)
-        if (!imageSet) {
-          imageSet = {
-            order: order,
-            icon: null,
-            small: null,
-            medium: null,
-            large: null
-          }
-          productsByFirstSku[firstSku].images.push(imageSet)
-        }
-        
-        // Set the image path for this role (using first SKU only in filename)
-        const existingImage = imageSet[file.role]
-        if (existingImage) {
-          console.warn(`Duplicate ${file.role} image for ${firstSku} at order ${order}:`, {
-            existing: existingImage,
-            new: `products/${file.role}/${generateS3Filename(file)}`,
-            file: file.name
-          })
-        }
-        
-        imageSet[file.role] = `products/${file.role}/${generateS3Filename(file)}`
-      }
-    }
-  })
-  
-  // Sort images by order for each product
-  Object.values(productsByFirstSku).forEach(product => {
-    product.images.sort((a, b) => a.order - b.order)
-  })
-  
-  return {
-    products: Object.values(productsByFirstSku)
-  }
+  return { products: mergeProducts(aggregatePerSku()) }
 }
 
 // Validate product completeness and export accuracy
@@ -1396,24 +1373,12 @@ const getValidationSummary = () => {
 
 // Export functionality for parsed image data
 const exportData = () => {
-  // Create the metadata structure that will be uploaded to S3
-  const metadataForS3 = createS3Metadata()
-  
-  // For local export, include only essential debugging info
-  const exportData = {
-    s3_metadata: metadataForS3,
-    debug_info: {
-      timestamp: new Date().toISOString(),
-      totalImages: files.value.length,
-      totalProducts: metadataForS3.products.length,
-      exportVersion: "2.0", // Updated version for new structure
-      appName: "S3-SB-UploadManager"
-    }
-  }
-  
+  // Export the exact metadata structure: { products: [...] }
+  const metadata = createS3Metadata()
+
   // Create download link
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
-    type: 'application/json' 
+  const blob = new Blob([JSON.stringify(metadata, null, 2)], {
+    type: 'application/json'
   })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -1688,10 +1653,12 @@ const startUpload = async () => {
       }
 
       try {
-        const metadata = createS3Metadata()
-
+        // Save the atomic per-SKU view (one record per upload). The backend stores
+        // each SKU's sites/images tagged with the SKU; products are re-merged when
+        // building the JSON back out.
         await callBackend('save_metadata', {
-          products: JSON.stringify(metadata.products)
+          entries: JSON.stringify(aggregatePerSku()),
+          override_full_product: overrideFullProduct.value ? 1 : 0
         })
 
         // Reset all modification flags since metadata is now synced
@@ -1835,7 +1802,7 @@ const loadS3Metadata = async (metaFile) => {
                   order: imageSet.order
                 },
                 skus: skus,
-                skuItems: product.skuItems || [],
+                skuItems: product.skuItems || skus.map(s => ({ sku: s })),
                 sites: validSites
               })
             }
@@ -1855,7 +1822,7 @@ const loadS3Metadata = async (metaFile) => {
               role,
               imageInfo,
               skus: productData.skus,
-              skuItems: productData.skuItems || [],
+              skuItems: (productData.skus || []).map(s => ({ sku: s })),
               sites: validSites
             })
           })
