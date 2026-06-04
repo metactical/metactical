@@ -12,6 +12,21 @@
 	font-size: 0.875rem;
 }
 
+/* Native Frappe toolbar buttons with no hover/focus effect (freeze to base state). */
+#s3_uploader_ui .btn { transition: none; }
+#s3_uploader_ui .btn:focus,
+#s3_uploader_ui .btn:focus-visible,
+#s3_uploader_ui .btn:active { box-shadow: none !important; outline: none !important; }
+#s3_uploader_ui .btn-default:hover,
+#s3_uploader_ui .btn-default:focus,
+#s3_uploader_ui .btn-default:active { background-color: var(--control-bg) !important; }
+#s3_uploader_ui .btn-primary:hover,
+#s3_uploader_ui .btn-primary:focus,
+#s3_uploader_ui .btn-primary:active { background-color: var(--btn-primary) !important; }
+#s3_uploader_ui .btn-danger:hover,
+#s3_uploader_ui .btn-danger:focus,
+#s3_uploader_ui .btn-danger:active { background-color: var(--danger) !important; }
+
 /* ---- layout / display ---- */
 #s3_uploader_ui .block { display: block; }
 #s3_uploader_ui .inline-flex { display: inline-flex; }

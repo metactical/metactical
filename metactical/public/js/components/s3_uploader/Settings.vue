@@ -16,8 +16,8 @@
               <p class="text-sm text-gray-600">Credentials are managed in the S3 Settings doctype</p>
             </div>
           </div>
-          <button @click="$emit('close')" class="rounded-xl p-2 transition-all duration-200 hover:scale-110">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <button @click="$emit('close')" class="btn btn-default btn-sm" title="Close">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
@@ -119,14 +119,14 @@
           <div class="flex items-center gap-3">
             <button
               @click="$emit('close')"
-              class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
+              class="btn btn-default btn-sm"
             >
               Close
             </button>
             <button
               @click="testConnection"
               :disabled="!canTest || isValidating"
-              class="px-6 py-2.5 text-sm font-medium bg-gray-50 from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+              class="btn btn-primary btn-sm flex items-center gap-2"
             >
               <span class="flex items-center gap-2">
                 <svg v-if="isValidating" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

@@ -5,9 +5,9 @@
       
       <div class="flex items-center gap-3">
         <!-- Settings button -->
-        <button 
+        <button
           @click="showSettings = true"
-          class="px-3 py-2 rounded-lg shadow transition-colors text-sm flex items-center gap-2"
+          class="btn btn-default btn-sm flex items-center gap-2"
           title="S3 Settings"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -19,18 +19,18 @@
         
         <!-- Control buttons (only shown when images are selected) -->
         <div v-if="files.length" class="flex gap-3">
-          <button 
+          <button
             v-if="files.length"
-            @click="exportData" 
+            @click="exportData"
             :disabled="!allFilesValid"
-            class="px-4 py-2 rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+            class="btn btn-default btn-sm"
           >
             Export JSON
           </button>
-          <button 
-            @click="startUpload" 
+          <button
+            @click="startUpload"
             :disabled="!canUpload || isUploading"
-            class="bg-purple-500 px-4 py-2 rounded-lg shadow hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+            class="btn btn-primary btn-sm flex items-center gap-2"
           >
             <svg v-if="isUploading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -40,10 +40,10 @@
             </svg>
             {{ isUploading ? 'Uploading...' : files.length > 0 ? 'Upload to S3' : 'Upload Metadata' }}
           </button>
-          <button 
+          <button
             v-if="files.length"
-            @click="clearAllFiles" 
-            class="bg-red-500 px-4 py-2 rounded-lg shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors text-sm"
+            @click="clearAllFiles"
+            class="btn btn-danger btn-sm"
           >
             Clear All
           </button>
