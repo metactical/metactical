@@ -5,9 +5,9 @@
       
       <div class="flex items-center gap-3">
         <!-- Settings button -->
-        <button 
+        <button
           @click="showSettings = true"
-          class="px-3 py-2 rounded-lg shadow transition-colors text-sm flex items-center gap-2"
+          class="btn btn-default btn-sm flex items-center gap-2"
           title="S3 Settings"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -19,18 +19,18 @@
         
         <!-- Control buttons (only shown when images are selected) -->
         <div v-if="files.length" class="flex gap-3">
-          <button 
+          <button
             v-if="files.length"
-            @click="exportData" 
+            @click="exportData"
             :disabled="!allFilesValid"
-            class="px-4 py-2 rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+            class="btn btn-default btn-sm"
           >
             Export JSON
           </button>
-          <button 
-            @click="startUpload" 
+          <button
+            @click="startUpload"
             :disabled="!canUpload || isUploading"
-            class="bg-purple-500 px-4 py-2 rounded-lg shadow hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+            class="btn btn-primary btn-sm flex items-center gap-2"
           >
             <svg v-if="isUploading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -40,10 +40,10 @@
             </svg>
             {{ isUploading ? 'Uploading...' : files.length > 0 ? 'Upload to S3' : 'Upload Metadata' }}
           </button>
-          <button 
+          <button
             v-if="files.length"
-            @click="clearAllFiles" 
-            class="bg-red-500 px-4 py-2 rounded-lg shadow hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors text-sm"
+            @click="clearAllFiles"
+            class="btn btn-danger btn-sm"
           >
             Clear All
           </button>
@@ -496,18 +496,16 @@
               </p>
             </div>
 
-            <!-- SKUs (multi-text) -->
+            <!-- SKUs (native grid: Add Row to enter, select + Delete to remove) -->
             <div class="space-y-3">
               <div class="flex items-center justify-between">
                 <label class="block text-sm font-medium text-gray-700">SKUs</label>
-                <span v-if="file.skus && file.skus.trim()" class="text-xs font-medium">🟢 Set</span>
+                <span v-if="file.skuItems && file.skuItems.length" class="text-xs font-medium">🟢 {{ file.skuItems.length }} set</span>
                 <span v-else class="text-xs font-medium">🔴 Missing</span>
               </div>
-              <input
-                v-model="file.skus"
-                @input="cascadeForward('skus', file); markAsModified(file)"
-                class="w-80 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Comma-separated SKUs"
+              <SkuManager
+                :sku-items="file.skuItems"
+                @update="(items) => updateSkuItems(file, items)"
               />
             </div>
 
@@ -519,16 +517,22 @@
                 <span v-else class="text-xs font-medium">🔴 None selected</span>
               </div>
               <div class="flex flex-col gap-3 bg-gray-50 p-4 rounded-lg">
-                <div v-for="site in siteList" :key="site" class="flex items-center">
+                <div v-if="siteList.length === 0" class="text-xs text-gray-500">
+                  No sites available. Add a Lead Source with a Lead Source Domain.
+                </div>
+                <div v-for="site in siteList" :key="site.name" class="flex items-center">
                   <label class="inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       v-model="file.sites"
-                      :value="site"
+                      :value="site.name"
                       @change="cascadeForward('sites', file); markAsModified(file)"
                       class="mr-3 accent-blue-500 focus:ring-2 focus:ring-blue-400 rounded"
                     />
-                    <span class="text-sm text-gray-700">{{ site }}</span>
+                    <span class="text-sm text-gray-700">
+                      {{ site.name }}
+                      <span v-if="site.lead_source_domain" class="text-gray-500"> ({{ site.lead_source_domain }})</span>
+                    </span>
                   </label>
                 </div>
               </div>
@@ -680,6 +684,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Settings from './Settings.vue'
+import SkuManager from './SkuManager.vue'
 
 // Dotted path to the whitelisted backend endpoints for this page.
 const API = 'metactical.metactical.page.s3_uploader.s3_uploader'
@@ -789,18 +794,20 @@ const canUseServerSideFiltering = computed(() => {
   return filter && /^[a-zA-Z0-9\-]+$/.test(filter)
 })
 
-const siteList = [
-  'Website - RASUSA',
-  'Website - CamoUSA',
-  'Website - Gorilla',
-  'Website - Zelen',
-  'Website - MRK',
-  'Website - Valley',
-  'Website - RAS',
-  'Website - GPD',
-  'Website - Camo',
-  'Website - FRN'
-]
+// Selectable sites — Lead Sources that have a Lead Source Domain set.
+// Each entry is { name, lead_source_domain }; the stored value is the name.
+const siteList = ref([])
+const siteNames = computed(() => siteList.value.map(s => s.name))
+
+const loadSites = async () => {
+  try {
+    const sites = await callBackend('get_sites')
+    siteList.value = sites || []
+  } catch (error) {
+    console.error('Failed to load sites:', error)
+  }
+}
+
 
 const onDrop = async (e) => {
   isDragOver.value = false
@@ -916,7 +923,11 @@ const processFiles = async (incomingFiles) => {
         role: autoRole,
         width: img.width,
         height: img.height,
-        skus: '',
+        skus: '', // derived comma list of resolved retail SKUs (kept in sync with skuItems)
+        skuItems: [], // [{ item_code, sku }]
+        newItemCode: '', // transient input for adding an item code
+        skuError: '', // transient validation message for the SKU adder
+        resolvingItem: false,
         sites: [],
         imageOrder: autoOrder, // Auto-filled from filename, default 0
         preview: URL.createObjectURL(file),
@@ -1028,12 +1039,26 @@ const cascade = (field, changedFile) => {
   }
 }
 
+// Copy a field's value from the changed file to every file AFTER it (not before).
 const cascadeForward = (field, changedFile) => {
   const index = files.value.findIndex(f => f.name === changedFile.name)
-  const value = JSON.parse(JSON.stringify(changedFile[field]))
   for (let i = index + 1; i < files.value.length; i++) {
-    files.value[i][field] = value
+    files.value[i][field] = JSON.parse(JSON.stringify(changedFile[field])) // clone per file
   }
+}
+
+// Keep file.skus (comma list of resolved retail SKUs) in sync with skuItems.
+const syncSkus = (file) => {
+  file.skus = (file.skuItems || []).filter(i => i.sku).map(i => i.sku).join(', ')
+}
+
+// The SKU grid emitted a new committed list for this image; store + cascade it
+// to the images after this one, then refresh their derived `skus`.
+const updateSkuItems = (file, items) => {
+  file.skuItems = items
+  cascadeForward('skuItems', file)
+  files.value.forEach(syncSkus)
+  markAsModified(file)
 }
 
 // Generate S3 filename for a file
@@ -1077,87 +1102,70 @@ const autoSortFiles = () => {
   })
 }
 
-// Create S3 metadata structure with products array containing productsku, sites, and ordered images
+// Aggregate the upload per SKU: each SKU's item_code, the union of its sites, and
+// its images (by order + role). This is the atomic, per-SKU view that is saved to
+// the doctype; products are formed by merging these afterwards.
+const aggregatePerSku = () => {
+  const bySku = {} // sku -> { item_code, sites: Set, images: { [order]: {icon,small,medium,large} } }
+
+  // sku -> item_code (item_code is fixed per SKU)
+  const skuToItem = {}
+  files.value.forEach(f => (f.skuItems || []).forEach(i => {
+    if (i.sku) skuToItem[i.sku] = i.item_code || null
+  }))
+
+  files.value.forEach(file => {
+    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
+    if (skuList.length === 0) return
+
+    const order = file.imageOrder !== undefined ? file.imageOrder : 0
+
+    skuList.forEach(sku => {
+      if (!bySku[sku]) {
+        bySku[sku] = { item_code: skuToItem[sku] || null, sites: new Set(), images: {} }
+      }
+      file.sites.forEach(site => bySku[sku].sites.add(site))
+
+      if (file.role) {
+        if (!bySku[sku].images[order]) {
+          bySku[sku].images[order] = { order, icon: null, small: null, medium: null, large: null }
+        }
+        bySku[sku].images[order][file.role] = `products/${file.role}/${generateS3Filename(file)}`
+      }
+    })
+  })
+
+  return Object.keys(bySku).map(sku => ({
+    sku,
+    item_code: bySku[sku].item_code,
+    sites: [...bySku[sku].sites],
+    images: Object.values(bySku[sku].images).sort((a, b) => a.order - b.order)
+  }))
+}
+
+// Merge per-SKU entries that share identical sites AND identical images into a
+// single product (productsku lists all those SKUs). Differing entries stay separate.
+const mergeProducts = (perSku) => {
+  const bySig = {}
+  perSku.forEach(entry => {
+    const sig = JSON.stringify({ sites: [...entry.sites].sort(), images: entry.images })
+    if (!bySig[sig]) {
+      bySig[sig] = {
+        productsku: [entry.sku],
+        sites: entry.sites,
+        overrideFullProduct: overrideFullProduct.value,
+        images: entry.images
+      }
+    } else {
+      bySig[sig].productsku.push(entry.sku)
+    }
+  })
+  return Object.values(bySig)
+}
+
+// Create the S3 metadata ({ products: [...] }) used for Export JSON and validation.
 const createS3Metadata = () => {
-  const productsByFirstSku = {}
-  
-  // Group files by their first SKU and organize by order and role
-  files.value.forEach(file => {
-    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
-    
-    if (skuList.length > 0) {
-      const firstSku = skuList[0]
-      
-      if (!productsByFirstSku[firstSku]) {
-        productsByFirstSku[firstSku] = {
-          productsku: skuList, // Store all SKUs as an array
-          sites: [...file.sites],
-          overrideFullProduct: overrideFullProduct.value, // Add override flag
-          images: []
-        }
-      } else {
-        // Merge additional SKUs that aren't already included
-        skuList.forEach(sku => {
-          if (!productsByFirstSku[firstSku].productsku.includes(sku)) {
-            productsByFirstSku[firstSku].productsku.push(sku)
-          }
-        })
-        
-        // Merge sites
-        file.sites.forEach(site => {
-          if (!productsByFirstSku[firstSku].sites.includes(site)) {
-            productsByFirstSku[firstSku].sites.push(site)
-          }
-        })
-      }
-    }
-  })
-  
-  // Now organize images by order for each product
-  files.value.forEach(file => {
-    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
-    
-    if (skuList.length > 0 && file.role) {
-      const firstSku = skuList[0]
-      const order = file.imageOrder !== undefined ? file.imageOrder : 0
-      
-      if (productsByFirstSku[firstSku]) {
-        // Find existing image set for this order, or create new one
-        let imageSet = productsByFirstSku[firstSku].images.find(img => img.order === order)
-        if (!imageSet) {
-          imageSet = {
-            order: order,
-            icon: null,
-            small: null,
-            medium: null,
-            large: null
-          }
-          productsByFirstSku[firstSku].images.push(imageSet)
-        }
-        
-        // Set the image path for this role (using first SKU only in filename)
-        const existingImage = imageSet[file.role]
-        if (existingImage) {
-          console.warn(`Duplicate ${file.role} image for ${firstSku} at order ${order}:`, {
-            existing: existingImage,
-            new: `products/${file.role}/${generateS3Filename(file)}`,
-            file: file.name
-          })
-        }
-        
-        imageSet[file.role] = `products/${file.role}/${generateS3Filename(file)}`
-      }
-    }
-  })
-  
-  // Sort images by order for each product
-  Object.values(productsByFirstSku).forEach(product => {
-    product.images.sort((a, b) => a.order - b.order)
-  })
-  
-  return {
-    products: Object.values(productsByFirstSku)
-  }
+  return { products: mergeProducts(aggregatePerSku()) }
 }
 
 // Validate product completeness and export accuracy
@@ -1365,24 +1373,12 @@ const getValidationSummary = () => {
 
 // Export functionality for parsed image data
 const exportData = () => {
-  // Create the metadata structure that will be uploaded to S3
-  const metadataForS3 = createS3Metadata()
-  
-  // For local export, include only essential debugging info
-  const exportData = {
-    s3_metadata: metadataForS3,
-    debug_info: {
-      timestamp: new Date().toISOString(),
-      totalImages: files.value.length,
-      totalProducts: metadataForS3.products.length,
-      exportVersion: "2.0", // Updated version for new structure
-      appName: "S3-SB-UploadManager"
-    }
-  }
-  
+  // Export the exact metadata structure: { products: [...] }
+  const metadata = createS3Metadata()
+
   // Create download link
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
-    type: 'application/json' 
+  const blob = new Blob([JSON.stringify(metadata, null, 2)], {
+    type: 'application/json'
   })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -1657,10 +1653,12 @@ const startUpload = async () => {
       }
 
       try {
-        const metadata = createS3Metadata()
-
+        // Save the atomic per-SKU view (one record per upload). The backend stores
+        // each SKU's sites/images tagged with the SKU; products are re-merged when
+        // building the JSON back out.
         await callBackend('save_metadata', {
-          products: JSON.stringify(metadata.products)
+          entries: JSON.stringify(aggregatePerSku()),
+          override_full_product: overrideFullProduct.value ? 1 : 0
         })
 
         // Reset all modification flags since metadata is now synced
@@ -1791,11 +1789,11 @@ const loadS3Metadata = async (metaFile) => {
               const filename = normalizeFilename(imagePath.split('/').pop()) // Normalize extension to lowercase
               
               // Filter sites to only include valid ones from siteList (remove legacy domains)
-              const validSites = product.sites.filter(site => siteList.includes(site))
-              
+              const validSites = product.sites.filter(site => siteNames.value.includes(site))
+
               // Handle both array and string productsku formats
               const skus = Array.isArray(product.productsku) ? product.productsku : [product.productsku]
-              
+
               allImages.push({
                 productName: skus[0], // Use first SKU as product name
                 role,
@@ -1804,6 +1802,7 @@ const loadS3Metadata = async (metaFile) => {
                   order: imageSet.order
                 },
                 skus: skus,
+                skuItems: product.skuItems || skus.map(s => ({ sku: s })),
                 sites: validSites
               })
             }
@@ -1816,13 +1815,14 @@ const loadS3Metadata = async (metaFile) => {
         Object.entries(productData.images).forEach(([role, images]) => {
           images.forEach(imageInfo => {
             // Filter sites to only include valid ones from siteList (remove legacy domains)
-            const validSites = productData.sites.filter(site => siteList.includes(site))
-            
+            const validSites = productData.sites.filter(site => siteNames.value.includes(site))
+
             allImages.push({
               productName,
               role,
               imageInfo,
               skus: productData.skus,
+              skuItems: (productData.skus || []).map(s => ({ sku: s })),
               sites: validSites
             })
           })
@@ -1835,7 +1835,7 @@ const loadS3Metadata = async (metaFile) => {
 
     // Load each image
     for (let i = 0; i < allImages.length; i++) {
-      const { productName, role, imageInfo, skus, sites } = allImages[i]
+      const { productName, role, imageInfo, skus, skuItems, sites } = allImages[i]
       
       s3LoadingProgress.value.current = `Loading ${imageInfo.filename}...`
       
@@ -1877,6 +1877,10 @@ const loadS3Metadata = async (metaFile) => {
                 width: imageInfo.dimensions?.width || img.width,
                 height: imageInfo.dimensions?.height || img.height,
                 skus: skus.join(', '),
+                skuItems: (skuItems || []).map(i => ({ ...i })),
+                newItemCode: '',
+                skuError: '',
+                resolvingItem: false,
                 sites: [...sites],
                 imageOrder: imageInfo.order || 0,
                 preview: URL.createObjectURL(imageFile),
@@ -1914,6 +1918,10 @@ const loadS3Metadata = async (metaFile) => {
           width: imageInfo.dimensions?.width || 0,
           height: imageInfo.dimensions?.height || 0,
           skus: skus.join(', '),
+          skuItems: (skuItems || []).map(i => ({ ...i })),
+          newItemCode: '',
+          skuError: '',
+          resolvingItem: false,
           sites: [...sites],
           imageOrder: imageInfo.order || 0,
           preview: null, // No preview for broken images
@@ -1975,14 +1983,16 @@ const isFileModified = (file) => {
   )
 }
 
-// Load S3 config on mount
+// Load S3 config + selectable sites on mount
 onMounted(() => {
   loadS3Config()
+  loadSites()
 })
 
 // Reload config (used by the page's "refresh" toolbar action)
 const refresh = () => {
   loadS3Config()
+  loadSites()
 }
 
 defineExpose({ refresh })

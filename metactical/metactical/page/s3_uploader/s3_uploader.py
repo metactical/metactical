@@ -4,7 +4,7 @@ import json
 import frappe
 
 from metactical.metactical.doctype.s3_product_image_meta_data.s3_product_image_meta_data import (
-	upsert_from_metadata,
+	upsert_upload,
 )
 from metactical.metactical.doctype.s3_settings.s3_settings import BASE_PREFIX
 
@@ -17,6 +17,37 @@ def _get_settings():
 def get_public_config():
 	"""Non-secret S3 config for the frontend (never returns the secret key)."""
 	return _get_settings().get_public_config()
+
+
+@frappe.whitelist()
+def get_sites():
+	"""Selectable sites: Lead Sources that have a Lead Source Domain set."""
+	return frappe.get_all(
+		"Lead Source",
+		filters={"lead_source_domain": ["!=", ""]},
+		fields=["name"],
+		order_by="name",
+	)
+
+
+@frappe.whitelist()
+def get_item_sku(item_code):
+	"""Resolve an Item Code to its retail SKU (ifw_retailskusuffix).
+
+	Returns {item_code, sku, error}. `sku` is None when the item is missing or
+	has no RetailSKUSuffix so the frontend can flag it.
+	"""
+	
+	item = frappe.get_doc("Item", item_code)
+	
+	if not item:
+		return {"item_code": item_code, "sku": None, "error": "Item not found"}
+
+	sku = item.ifw_retailskusuffix
+	if not sku:
+		return {"item_code": item_code, "sku": None, "error": "Item has no RetailSKUSuffix"}
+
+	return {"item_code": item_code, "sku": sku}
 
 
 @frappe.whitelist()
@@ -72,41 +103,51 @@ def upload_image(filename, role, content, content_type=None):
 
 
 @frappe.whitelist()
-def save_metadata(products):
-	"""Store the grouped product metadata as S3 Product Image Meta Data records."""
-	if isinstance(products, str):
-		products = json.loads(products)
+def save_metadata(entries, override_full_product=0):
+	"""Store one upload as a single S3 Product Image Meta Data record.
 
-	names = []
-	for product in products:
-		name = upsert_from_metadata(product)
-		if name:
-			names.append(name)
+	`entries` is the per-SKU array produced by the uploader; sites/images are stored
+	tagged with their SKU.
+	"""
+	if isinstance(entries, str):
+		entries = json.loads(entries)
 
+	name = upsert_upload(entries, override_full_product)
 	frappe.db.commit()
-	return {"success": True, "records": names}
+	return {"success": True, "records": [name] if name else []}
 
 
 @frappe.whitelist()
 def list_metadata(filter=None):
 	"""List submitted S3 Product Image Meta Data records (optionally by SKU)."""
-	filters = {"docstatus": 1}
+	record_filters = {"docstatus": 1}
 	if filter:
-		filters["nat_product_sku"] = ["like", f"%{filter}%"]
+		# SKUs live on the child table now; find parents with a matching SKU.
+		parents = frappe.get_all(
+			"S3 Product Image SKU",
+			filters={"nat_sku": ["like", f"%{filter}%"]},
+			pluck="parent",
+		)
+		if not parents:
+			return []
+		record_filters["name"] = ["in", list(set(parents))]
 
 	records = frappe.get_all(
 		"S3 Product Image Meta Data",
-		filters=filters,
-		fields=["name", "nat_product_sku as product_sku", "modified"],
+		filters=record_filters,
+		fields=["name", "modified"],
 		order_by="modified desc",
 	)
 
 	for record in records:
-		record["skus"] = frappe.get_all(
+		skus = frappe.get_all(
 			"S3 Product Image SKU",
 			filters={"parent": record["name"]},
 			pluck="nat_sku",
 		)
+		record["skus"] = skus
+		# Display label for the modal (first SKU, or the record name as a fallback).
+		record["product_sku"] = skus[0] if skus else record["name"]
 
 	return records
 
@@ -118,6 +159,7 @@ def get_metadata(name):
 
 	return {
 		"productsku": [row.nat_sku for row in doc.nat_skus],
+		"skuItems": [{"item_code": row.nat_item_code, "sku": row.nat_sku} for row in doc.nat_skus],
 		"sites": [row.nat_site for row in doc.nat_sites],
 		"overrideFullProduct": bool(doc.nat_override_full_product),
 		"images": [
@@ -131,6 +173,75 @@ def get_metadata(name):
 			for row in doc.nat_images
 		],
 	}
+
+
+@frappe.whitelist()
+def build_export_json(names=None):
+	"""Rebuild the export JSON ({"products": [...]}) from stored metadata records.
+
+	Each record holds one upload, stored per-SKU. SKUs whose sites AND images are
+	identical are merged into one product (productsku lists all of them). Pass `names`
+	(a JSON list or single name) to limit records; otherwise all submitted records.
+	"""
+	if isinstance(names, str):
+		names = json.loads(names) if names.strip().startswith("[") else [names]
+
+	filters = {"docstatus": 1}
+	if names:
+		filters["name"] = ["in", names]
+
+	record_names = frappe.get_all(
+		"S3 Product Image Meta Data", filters=filters, order_by="creation asc", pluck="name"
+	)
+
+	products = []
+	for name in record_names:
+		doc = frappe.get_doc("S3 Product Image Meta Data", name)
+
+		# Group sites/images by their SKU tag.
+		sites_by_sku = {}
+		for row in doc.nat_sites:
+			sites_by_sku.setdefault(row.nat_sku, []).append(row.nat_site)
+
+		images_by_sku = {}
+		for row in doc.nat_images:
+			images_by_sku.setdefault(row.nat_sku, []).append(
+				{
+					"order": row.nat_image_order or 0,
+					"icon": row.nat_icon,
+					"small": row.nat_small,
+					"medium": row.nat_medium,
+					"large": row.nat_large,
+				}
+			)
+
+		override = bool(doc.nat_override_full_product)
+
+		# Build a product per SKU, then merge SKUs with identical sites + images.
+		by_sig = {}
+		seen = set()
+		for sku_row in doc.nat_skus:
+			sku = sku_row.nat_sku
+			if not sku or sku in seen:
+				continue
+			seen.add(sku)
+
+			sites = sites_by_sku.get(sku, [])
+			images = sorted(images_by_sku.get(sku, []), key=lambda i: i["order"])
+			sig = json.dumps({"sites": sorted(sites), "images": images}, sort_keys=True)
+
+			if sig not in by_sig:
+				by_sig[sig] = {
+					"productsku": [sku],
+					"sites": sites,
+					"overrideFullProduct": override,
+					"images": images,
+				}
+				products.append(by_sig[sig])
+			else:
+				by_sig[sig]["productsku"].append(sku)
+
+	return {"products": products}
 
 
 def _strip_data_url(content):
