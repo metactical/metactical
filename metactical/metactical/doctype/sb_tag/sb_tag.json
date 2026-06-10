@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "hide_in_filters",
+  "published",
   "neb_website_specifications",
   "section_break_mzif",
   "nat_item_groups",
@@ -48,12 +49,18 @@
    "fieldtype": "Table MultiSelect",
    "label": "Item Group",
    "options": "Item Groups List"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "label": "Published"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-06 04:29:58.922802",
+ "modified": "2026-04-20 13:13:39.047867",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SB Tag",
