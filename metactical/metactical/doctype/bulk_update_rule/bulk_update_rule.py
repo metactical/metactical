@@ -411,6 +411,14 @@ def run_bulk_update(rule_name):
 
     try:
         result = doc.get_matched_items(limit_page_length=0)
+        
+        max_allowed = frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_bulk_update")
+        if max_allowed and result["total"] > cint(max_allowed):
+            raise Exception(
+                f"This rule matches <b>{result['total']:,}</b> items, which exceeds the maximum "
+                f"of <b>{cint(max_allowed):,}</b>. Please refine your search conditions."
+            )
+        
         total = result["total"]
         items = result["items"]
 
