@@ -38,6 +38,7 @@ ACTION_TYPE_MAP = {
     "UpdateValuationRate":   ("item",  "valuation_rate"),
     "UpdateDescription":     ("item",  "description"),
     "UpdateBrand":           ("item",  "brand"),
+    "UpdateLastPingedOn":    ("item",  "last_pinged_on"),
 }
 
 OPERATOR_MAP = {
@@ -358,6 +359,8 @@ class BulkUpdateRule(Document):
                 return 1
             if atype == "EnableItem":
                 return 0
+            if atype == "UpdateLastPingedOn":
+                return frappe.utils.today()
 
             if atype in ("AddTag", "RemoveTag"):
                 return aval  # handled separately in run_bulk_update

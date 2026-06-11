@@ -55,9 +55,10 @@ const ACTION_TYPE_OPTIONS = [
     { value: "UpdateValuationRate",   label: "Update Valuation Rate" },
     { value: "UpdateDescription",     label: "Update Description" },
     { value: "UpdateBrand",           label: "Update Brand" },
+    { value: "UpdateLastPingedOn",    label: "Update Last Pinged On" },
 ];
 
-const NO_VALUE_ACTIONS = new Set(["DisableItem", "EnableItem"]);
+const NO_VALUE_ACTIONS = new Set(["DisableItem", "EnableItem", "UpdateLastPingedOn"]);
 
 // Action types that should render a Link field instead of a text input
 const ACTION_LINK_MAP = {
