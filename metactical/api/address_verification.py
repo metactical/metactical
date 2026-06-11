@@ -11,34 +11,46 @@
 #             useful for testing. Defaults to None (all Canadian addresses).
 #   verbose - print the request payload sent and the response received for each
 #             address; useful for testing. Defaults to False.
+#   log_unverified - write each unverified address to a log file in the bench
+#             logs folder (logs/address_verification_unverified.log). Any log
+#             from a previous run is deleted first. Defaults to False.
 #
 # Example:
 #   bench --site <site> execute "metactical.api.address_verification.verify_addresses" \
-#       --kwargs "{'limit': 5, 'verbose': True}"
+#       --kwargs "{'limit': 5, 'verbose': True, 'log_unverified': True}"
 
 from __future__ import unicode_literals
 import json
+import os
 import frappe
 import requests
 from tqdm import tqdm
 
+# Unverified addresses are logged here, relative to the bench logs folder.
+UNVERIFIED_LOG_NAME = "address_verification_unverified.log"
 
-def build_address_string(address):
-	"""Build a single address string from the ERPNext Address fields.
 
-	Format: address line 1, address line 2, City/Town, State/Province, Postal Code
+def build_address_payload(address):
+	"""Build the structured request payload from the ERPNext Address fields.
+
+	Maps the ERPNext fields to the API's structured input format. Empty fields
+	are omitted. Returns None when address_line_1 is missing, since the API
+	requires it for the structured format.
 	"""
-	parts = [
-		address.get("address_line1"),
-		address.get("address_line2"),
-		address.get("city"),
-		address.get("state"),
-		address.get("pincode"),
-	]
-	return ", ".join(part for part in parts if part)
+	field_map = {
+		"address_line_1": address.get("address_line1"),
+		"address_line_2": address.get("address_line2"),
+		"city": address.get("city"),
+		"province": address.get("state"),
+		"postal_code": address.get("pincode"),
+	}
+	payload = {key: value for key, value in field_map.items() if value}
+	if not payload.get("address_line_1"):
+		return None
+	return payload
 
 
-def verify_addresses(limit=None, verbose=False):
+def verify_addresses(limit=None, verbose=False, log_unverified=False):
 	"""Loop over Canadian addresses, verify each via the API and report results.
 
 	Report only -- no Address records are modified. Returns a dict with the
@@ -47,13 +59,16 @@ def verify_addresses(limit=None, verbose=False):
 
 	Pass ``limit`` to only verify the first N addresses -- useful for testing
 	without hitting the whole database. Pass ``verbose`` to print the request
-	and response payload for each address, e.g.:
+	and response payload for each address. Pass ``log_unverified`` to write each
+	unverified address to logs/address_verification_unverified.log (any log from
+	a previous run is deleted first), e.g.:
 	    bench --site <site> execute \\
 	        "metactical.api.address_verification.verify_addresses" \\
-	        --kwargs "{'limit': 10, 'verbose': True}"
+	        --kwargs "{'limit': 10, 'verbose': True, 'log_unverified': True}"
 	"""
 	limit = int(limit) if limit else None
 	verbose = bool(verbose)
+	log_unverified = bool(log_unverified)
 	settings = frappe.get_single("Address Verification Settings")
 	base_url = (settings.base_url or "").rstrip("/")
 	api_key = settings.get_password("api_key")
@@ -74,6 +89,16 @@ def verify_addresses(limit=None, verbose=False):
 		limit=limit,
 	)
 
+	# Set up the unverified-address log: delete any log from a previous run so
+	# the file always reflects the latest run only.
+	log_file = None
+	log_path = None
+	if log_unverified:
+		log_path = os.path.join(frappe.utils.get_bench_path(), "logs", UNVERIFIED_LOG_NAME)
+		if os.path.exists(log_path):
+			os.remove(log_path)
+		log_file = open(log_path, "w")
+
 	total_checked = 0
 	verified_count = 0
 	weak_matches = 0
@@ -87,12 +112,11 @@ def verify_addresses(limit=None, verbose=False):
 	}
 
 	for address in tqdm(addresses, desc="Verifying addresses", unit="address"):
-		address_string = build_address_string(address)
-		if not address_string:
+		payload = build_address_payload(address)
+		if not payload:
 			continue
 
 		total_checked += 1
-		payload = {"address": address_string}
 		if verbose:
 			tqdm.write("\n>>> {0}".format(address.get("name")))
 			tqdm.write("    sent    : {0}".format(json.dumps(payload)))
@@ -123,10 +147,14 @@ def verify_addresses(limit=None, verbose=False):
 			verified_count += 1
 
 		match_level = data.get("match_level")
-		if match_level in match_levels:
-			match_levels[match_level] += 1
-		else:
-			match_levels["unverified"] += 1
+		if match_level not in match_levels:
+			match_level = "unverified"
+		match_levels[match_level] += 1
+
+		if log_file and match_level == "unverified":
+			log_file.write(
+				"{0}\t{1}\n".format(address.get("name"), json.dumps(payload))
+			)
 
 		confidence = data.get("confidence")
 		if confidence is not None:
@@ -134,6 +162,9 @@ def verify_addresses(limit=None, verbose=False):
 			confidence_count += 1
 			if confidence < weak_threshold:
 				weak_matches += 1
+
+	if log_file:
+		log_file.close()
 
 	average_confidence = (
 		round(confidence_sum / confidence_count, 4) if confidence_count else 0.0
@@ -162,5 +193,8 @@ def verify_addresses(limit=None, verbose=False):
 		"    postal_verified : {postal_verified}\n"
 		"    unverified      : {unverified}".format(**result)
 	)
+
+	if log_path:
+		print("  Unverified addresses logged to: {0}".format(log_path))
 
 	return result
