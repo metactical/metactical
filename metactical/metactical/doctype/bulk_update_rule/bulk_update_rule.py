@@ -512,7 +512,7 @@ def run_bulk_update(rule_name):
 
                 if item_changed or price_changed or tag_changed:
                     updated += 1
-                    updated_item_ids.append(item_name)
+                updated_item_ids.append(item_name)
 
                 if (i + 1) % 50 == 0:
                     frappe.db.commit()
@@ -538,14 +538,13 @@ def run_bulk_update(rule_name):
             log_lines.extend(errors[:50])
 
         doc.reload()
-        doc.db_set({
-            "execution_status": "Completed",
-            "last_executed_on": now_datetime(),
-            "last_executed_by": frappe.session.user,
-            "last_match_count": total,
-            "execution_log": "\n".join(log_lines),
-            "updated_items": ",".join(updated_item_ids),
-        })
+        doc.execution_status = "Completed"
+        doc.last_executed_on = now_datetime()
+        doc.last_executed_by = frappe.session.user
+        doc.last_match_count = total
+        doc.execution_log = "\n".join(log_lines)
+        doc.updated_items = ",".join(updated_item_ids)
+        doc.save(ignore_permissions=True)
         frappe.db.commit()
 
         # Single completion event — no progress event before this
