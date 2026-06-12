@@ -1,149 +1,157 @@
 {
-    "actions": [],
-    "allow_rename": 1,
-    "autoname": "field:rule_name",
-    "creation": "2025-01-01 00:00:00.000000",
-    "doctype": "DocType",
-    "engine": "InnoDB",
-    "field_order": [
-      "rule_name",
-      "description",
-      "target_doctype",
-      "section_conditions",
-      "conditions",
-      "section_actions",
-      "actions",
-      "section_execution",
-      "last_executed_on",
-      "column_break_exec",
-      "last_executed_by",
-      "last_match_count",
-      "execution_status",
-      "execution_log",
-      "updated_items"
-    ],
-    "fields": [
-      {
-        "fieldname": "rule_name",
-        "fieldtype": "Data",
-        "label": "Rule Name",
-        "reqd": 1,
-        "unique": 1
-      },
-      {
-        "fieldname": "description",
-        "fieldtype": "Small Text",
-        "label": "Description"
-      },
-      {
-        "default": "Item",
-        "fieldname": "target_doctype",
-        "fieldtype": "Link",
-        "label": "Target DocType",
-        "options": "DocType",
-        "reqd": 1
-      },
-      {
-        "fieldname": "section_conditions",
-        "fieldtype": "Section Break",
-        "label": "Search Conditions"
-      },
-      {
-        "fieldname": "conditions",
-        "fieldtype": "Table",
-        "label": "Conditions",
-        "options": "Bulk Update Condition",
-        "reqd": 1
-      },
-      {
-        "fieldname": "section_actions",
-        "fieldtype": "Section Break",
-        "label": "Actions"
-      },
-      {
-        "fieldname": "actions",
-        "fieldtype": "Table",
-        "label": "Actions",
-        "options": "Bulk Update Action",
-        "reqd": 1
-      },
-      {
-        "fieldname": "section_execution",
-        "fieldtype": "Section Break",
-        "label": "Execution History"
-      },
-      {
-        "fieldname": "last_executed_on",
-        "fieldtype": "Datetime",
-        "label": "Last Executed On",
-        "read_only": 1
-      },
-      {
-        "fieldname": "column_break_exec",
-        "fieldtype": "Column Break"
-      },
-      {
-        "fieldname": "last_executed_by",
-        "fieldtype": "Link",
-        "label": "Last Executed By",
-        "options": "User",
-        "read_only": 1
-      },
-      {
-        "fieldname": "last_match_count",
-        "fieldtype": "Int",
-        "label": "Last Match Count",
-        "read_only": 1
-      },
-      {
-        "fieldname": "execution_status",
-        "fieldtype": "Select",
-        "label": "Execution Status",
-        "options": "\nQueued\nRunning\nCompleted\nFailed",
-        "read_only": 1
-      },
-      {
-        "fieldname": "execution_log",
-        "fieldtype": "Long Text",
-        "label": "Execution Log",
-        "read_only": 1
-      },
-      {
-        "fieldname": "updated_items",
-        "fieldtype": "Long Text",
-        "label": "Updated Items",
-        "read_only": 1,
-        "description": "Comma-separated list of item names updated in the last execution"
-      }
-    ],
-    "index_web_pages_for_search": 0,
-    "links": [],
-    "modified": "2025-01-01 00:00:00.000000",
-    "modified_by": "Administrator",
-    "module": "Metactical",
-    "name": "Bulk Update Rule",
-    "naming_rule": "By fieldname",
-    "owner": "Administrator",
-    "permissions": [
-      {
-        "create": 1,
-        "delete": 1,
-        "read": 1,
-        "role": "System Manager",
-        "write": 1
-      },
-      {
-        "create": 1,
-        "delete": 0,
-        "read": 1,
-        "role": "Item Manager",
-        "write": 1
-      }
-    ],
-    "search_fields": "rule_name,description",
-    "sort_field": "modified",
-    "sort_order": "DESC",
-    "states": [],
-    "title_field": "rule_name",
-    "track_changes": 1
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:rule_name",
+ "creation": "2025-01-01 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "rule_name",
+  "description",
+  "target_doctype",
+  "section_conditions",
+  "conditions",
+  "section_actions",
+  "actions",
+  "section_execution",
+  "last_executed_by",
+  "last_executed_on",
+  "execution_status",
+  "last_match_count",
+  "column_break_exec",
+  "execution_log",
+  "updated_items",
+  "updated_retail_skus"
+ ],
+ "fields": [
+  {
+   "fieldname": "rule_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Rule Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "default": "Item",
+   "fieldname": "target_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target DocType",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_conditions",
+   "fieldtype": "Section Break",
+   "label": "Search Conditions"
+  },
+  {
+   "fieldname": "conditions",
+   "fieldtype": "Table",
+   "label": "Conditions",
+   "options": "Bulk Update Condition",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_actions",
+   "fieldtype": "Section Break",
+   "label": "Actions"
+  },
+  {
+   "fieldname": "actions",
+   "fieldtype": "Table",
+   "label": "Actions",
+   "options": "Bulk Update Action",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_execution",
+   "fieldtype": "Section Break",
+   "label": "Execution History"
+  },
+  {
+   "fieldname": "last_executed_on",
+   "fieldtype": "Datetime",
+   "label": "Last Executed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_exec",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_executed_by",
+   "fieldtype": "Link",
+   "label": "Last Executed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_match_count",
+   "fieldtype": "Int",
+   "label": "Last Match Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "execution_status",
+   "fieldtype": "Select",
+   "label": "Execution Status",
+   "options": "\nQueued\nRunning\nCompleted\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "execution_log",
+   "fieldtype": "Long Text",
+   "label": "Execution Log",
+   "read_only": 1
+  },
+  {
+   "description": "Comma-separated list of item names updated in the last execution",
+   "fieldname": "updated_items",
+   "fieldtype": "Long Text",
+   "label": "Updated Items",
+   "read_only": 1
+  },
+  {
+   "fieldname": "updated_retail_skus",
+   "fieldtype": "Long Text",
+   "label": "Updated Retail SKUs",
+   "read_only": 1
   }
+ ],
+ "links": [],
+ "modified": "2026-06-12 07:05:15.371830",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Bulk Update Rule",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Item Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "rule_name,description",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "rule_name",
+ "track_changes": 1
+}

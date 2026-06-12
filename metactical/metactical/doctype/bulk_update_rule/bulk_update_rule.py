@@ -537,6 +537,18 @@ def run_bulk_update(rule_name):
             log_lines.append(f"Errors ({len(errors)}):")
             log_lines.extend(errors[:50])
 
+        retail_skus = []
+        if updated_item_ids:
+            sku_map = {
+                r.name: r.ifw_retailskusuffix
+                for r in frappe.get_all(
+                    "Item",
+                    filters={"name": ["in", updated_item_ids]},
+                    fields=["name", "ifw_retailskusuffix"],
+                )
+            }
+            retail_skus = [sku_map.get(n) or "" for n in updated_item_ids]
+
         doc.reload()
         doc.execution_status = "Completed"
         doc.last_executed_on = now_datetime()
@@ -544,6 +556,7 @@ def run_bulk_update(rule_name):
         doc.last_match_count = total
         doc.execution_log = "\n".join(log_lines)
         doc.updated_items = ",".join(updated_item_ids)
+        doc.updated_retail_skus = ",".join(retail_skus)
         doc.save(ignore_permissions=True)
         frappe.db.commit()
 
