@@ -121,11 +121,12 @@
   {
    "fieldname": "updated_retail_skus",
    "fieldtype": "Long Text",
-   "label": "Updated Retail SKUs"
+   "label": "Updated Retail SKUs",
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-06-12 06:52:38.463180",
+ "modified": "2026-06-12 07:05:15.371830",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Bulk Update Rule",
