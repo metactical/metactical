@@ -6,13 +6,24 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "enabled",
   "base_url",
   "api_key",
   "column_break_3",
   "timeout",
-  "weak_match_threshold"
+  "weak_match_threshold",
+  "melissa_section",
+  "enable_melissa_fallback",
+  "melissa_key"
  ],
  "fields": [
+  {
+   "default": "0",
+   "description": "When enabled, Storebuilder/Melissa address verification is used for Sales Orders. Enabling this will disable the ShipStation address verification.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Address Verification"
+  },
   {
    "default": "https://address.storebuilder.com",
    "description": "Base URL of the Canadian Address Verification API",
@@ -44,6 +55,25 @@
    "fieldname": "weak_match_threshold",
    "fieldtype": "Float",
    "label": "Weak Match Threshold"
+  },
+  {
+   "fieldname": "melissa_section",
+   "fieldtype": "Section Break",
+   "label": "Melissa Fallback"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, addresses that fail primary verification are re-checked using the Melissa Global Address API",
+   "fieldname": "enable_melissa_fallback",
+   "fieldtype": "Check",
+   "label": "Enable Melissa Fallback"
+  },
+  {
+   "depends_on": "eval:doc.enable_melissa_fallback",
+   "description": "CustomerID / License Key issued by Melissa for the Global Address Verification API",
+   "fieldname": "melissa_key",
+   "fieldtype": "Password",
+   "label": "Melissa Key"
   }
  ],
  "index_web_pages_for_search": 1,
