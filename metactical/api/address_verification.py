@@ -26,8 +26,190 @@ import frappe
 import requests
 from tqdm import tqdm
 
+
+@frappe.whitelist()
+def verify_shipping_address(sales_order_name):
+	"""Verify the shipping address on a Sales Order.
+
+	Routes to the Storebuilder/Melissa API when Address Verification Settings
+	has ``enabled`` checked; otherwise delegates to the existing ShipStation
+	verification so behaviour is unchanged for sites that haven't opted in.
+	"""
+	settings = frappe.get_single("Address Verification Settings")
+
+	if not settings.enabled:
+		from metactical.api.shipstation import verify_shipping_address as _ss_verify
+		_ss_verify(sales_order_name)
+		shipping_address_name = frappe.db.get_value(
+			"Sales Order", sales_order_name, "shipping_address_name"
+		)
+		if shipping_address_name:
+			frappe.db.set_value(
+				"Address", shipping_address_name, "custom_ais_validation_entity", "Shipstation"
+			)
+		return
+
+	# --- Storebuilder / Melissa path ---
+	sales_order = frappe.get_doc("Sales Order", sales_order_name)
+	if not sales_order.shipping_address_name:
+		frappe.throw("No shipping address is set on this Sales Order.")
+
+	address = frappe.get_doc("Address", sales_order.shipping_address_name)
+	payload = build_address_payload(address)
+	if not payload:
+		frappe.throw("Shipping address is missing Address Line 1, which is required for verification.")
+
+	base_url = (settings.base_url or "").rstrip("/")
+	api_key = settings.get_password("api_key")
+	timeout = settings.timeout or 10
+
+	if not base_url or not api_key:
+		frappe.throw("Please set the Base URL and API Key in Address Verification Settings.")
+
+	validation_status = "Validation Failed"
+	validation_entity = "Storebuilder"
+	validation_warning = ""
+
+	try:
+		response = requests.post(
+			"{0}/api/verify".format(base_url),
+			json=payload,
+			headers={"X-API-Key": api_key},
+			timeout=timeout,
+		)
+		response.raise_for_status()
+		data = response.json()
+	except Exception:
+		frappe.log_error(
+			title="Address Verification - Storebuilder request failed",
+			message="Sales Order: {0}\n{1}".format(sales_order_name, frappe.get_traceback()),
+		)
+		frappe.throw("Address verification failed. See the Error Log for details.")
+
+	match_level = data.get("match_level", "unverified")
+
+	if match_level in ("fully_verified", "street_verified"):
+		validation_status = "Validated"
+		validation_entity = "Storebuilder"
+	elif match_level == "postal_verified":
+		validation_status = "Validation Warning"
+		validation_entity = "Storebuilder"
+		validation_warning = "Only postal code was verified"
+	else:
+		melissa_key = settings.get_password("melissa_key") if settings.enable_melissa_fallback else None
+		if melissa_key:
+			melissa_result = verify_with_melissa(address, melissa_key, timeout)
+			if melissa_result:
+				melissa_level, melissa_verified = melissa_result
+				validation_entity = "Melissa"
+				if melissa_verified:
+					validation_status = "Validated"
+				elif melissa_level != "unverified":
+					validation_status = "Validation Warning"
+					validation_warning = "Address partially verified by Melissa"
+
+	if validation_status in ("Validation Failed", "Validation Warning"):
+		frappe.log_error(
+			title="Address Verification - Unverified Address",
+			message="Sales Order: {so}\nAddress: {addr}\nStatus: {status}\nEntity: {entity}\nWarning: {warning}".format(
+				so=sales_order_name,
+				addr=sales_order.shipping_address_name,
+				status=validation_status,
+				entity=validation_entity,
+				warning=validation_warning,
+			),
+		)
+
+	frappe.db.set_value(
+		"Address",
+		sales_order.shipping_address_name,
+		{
+			"custom_ais_address_verified": validation_status,
+			"custom_ais_validation_entity": validation_entity,
+			"custom_ais_validation_warning": validation_warning,
+		},
+	)
+	frappe.db.set_value("Sales Order", sales_order_name, "custom_ais_address_verified", validation_status)
+	frappe.msgprint("Shipping Address {0}".format(validation_status))
+
 # Unverified addresses are logged here, relative to the bench logs folder.
 UNVERIFIED_LOG_NAME = "address_verification_unverified.log"
+
+MELISSA_API_URL = "https://address.melissadata.net/V3/WEB/GlobalAddress/doGlobalAddress"
+
+# Maps Melissa AV result codes to the internal match-level vocabulary.
+_MELISSA_AV_LEVELS = {
+	"AV11": "fully_verified",
+	"AV12": "street_verified",
+	"AV13": "postal_verified",
+	"AV14": "postal_verified",
+}
+
+
+def build_melissa_payload(address, melissa_key):
+	"""Build the Melissa Global Address API request body from an ERPNext Address.
+
+	Returns None when AddressLine1 is missing (required by the API).
+	"""
+	address_line1 = address.get("address_line1")
+	if not address_line1:
+		return None
+	record = {
+		"RecordID": address.get("name"),
+		"AddressLine1": address_line1,
+		"Locality": address.get("city") or "",
+		"AdministrativeArea": address.get("state") or "",
+		"PostalCode": address.get("pincode") or "",
+		"Country": address.get("country") or "Canada",
+	}
+	address_line2 = address.get("address_line2")
+	if address_line2:
+		record["AddressLine2"] = address_line2
+	return {
+		"CustomerID": melissa_key,
+		"TransmissionReference": address.get("name"),
+		"Records": [record],
+	}
+
+
+def verify_with_melissa(address, melissa_key, timeout):
+	"""Call the Melissa Global Address API and return (match_level, verified) or None.
+
+	Returns None on network/HTTP errors (already logged). verified is True when
+	any AV result code is present in the response.
+	"""
+	payload = build_melissa_payload(address, melissa_key)
+	if not payload:
+		return None
+	try:
+		response = requests.post(
+			MELISSA_API_URL,
+			json=payload,
+			headers={"Content-Type": "application/json", "Accept": "application/json"},
+			timeout=timeout,
+		)
+		response.raise_for_status()
+		data = response.json()
+	except Exception:
+		frappe.log_error(
+			title="Address Verification - Melissa request failed",
+			message="Address: {0}\n{1}".format(
+				address.get("name"), frappe.get_traceback()
+			),
+		)
+		return None
+
+	records = data.get("Records") or []
+	if not records:
+		return None
+
+	result_codes = [c.strip() for c in (records[0].get("Results") or "").split(",") if c.strip()]
+	for code in result_codes:
+		if code in _MELISSA_AV_LEVELS:
+			return (_MELISSA_AV_LEVELS[code], True)
+		if code.startswith("AV"):
+			return ("street_verified", True)
+	return ("unverified", False)
 
 
 def build_address_payload(address):
@@ -75,6 +257,9 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 	timeout = settings.timeout or 10
 	weak_threshold = settings.weak_match_threshold or 0.75
 
+	enable_melissa_fallback = bool(settings.enable_melissa_fallback)
+	melissa_key = settings.get_password("melissa_key") if enable_melissa_fallback else None
+
 	if not base_url or not api_key:
 		frappe.throw(
 			"Please set the Base URL and API Key in Address Verification Settings."
@@ -104,6 +289,7 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 	weak_matches = 0
 	confidence_sum = 0.0
 	confidence_count = 0
+	melissa_fallback_verified = 0
 	match_levels = {
 		"fully_verified": 0,
 		"street_verified": 0,
@@ -156,6 +342,20 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 				"{0}\t{1}\n".format(address.get("name"), json.dumps(payload))
 			)
 
+		if melissa_key and match_level == "unverified":
+			melissa_result = verify_with_melissa(address, melissa_key, timeout)
+			if melissa_result:
+				melissa_match_level, melissa_verified = melissa_result
+				if melissa_match_level != "unverified":
+					match_levels["unverified"] -= 1
+					match_levels[melissa_match_level] += 1
+					match_level = melissa_match_level
+					melissa_fallback_verified += 1
+					if melissa_verified:
+						verified_count += 1
+					if verbose:
+						tqdm.write("    melissa : {0}".format(melissa_match_level))
+
 		confidence = data.get("confidence")
 		if confidence is not None:
 			confidence_sum += confidence
@@ -175,6 +375,7 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 		"verified_count": verified_count,
 		"average_confidence": average_confidence,
 		"weak_matches": weak_matches,
+		"melissa_fallback_verified": melissa_fallback_verified,
 		"fully_verified": match_levels["fully_verified"],
 		"street_verified": match_levels["street_verified"],
 		"postal_verified": match_levels["postal_verified"],
@@ -183,15 +384,16 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 
 	print(
 		"\nAddress verification complete:\n"
-		"  Addresses checked : {total_checked}\n"
-		"  Verified          : {verified_count}\n"
-		"  Average confidence: {average_confidence}\n"
-		"  Weak matches      : {weak_matches}\n"
+		"  Addresses checked      : {total_checked}\n"
+		"  Verified               : {verified_count}\n"
+		"  Average confidence     : {average_confidence}\n"
+		"  Weak matches           : {weak_matches}\n"
+		"  Melissa fallback hits  : {melissa_fallback_verified}\n"
 		"  By match level:\n"
-		"    fully_verified  : {fully_verified}\n"
-		"    street_verified : {street_verified}\n"
-		"    postal_verified : {postal_verified}\n"
-		"    unverified      : {unverified}".format(**result)
+		"    fully_verified       : {fully_verified}\n"
+		"    street_verified      : {street_verified}\n"
+		"    postal_verified      : {postal_verified}\n"
+		"    unverified           : {unverified}".format(**result)
 	)
 
 	if log_path:
