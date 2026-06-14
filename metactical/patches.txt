@@ -26,5 +26,6 @@ metactical.patches.add_index_to_pick_list_item_sales_order v2
 execute:frappe.db.sql("UPDATE `tabPick List` SET status = 'Picked' WHERE status='Open' AND docstatus='1'")
 metactical.patches.create_non_formatted_phone
 metactical.patches.repair_item_tag_links_and_user_tags
+metactical.patches.set_validation_entity_for_validated_addresses
 
 
