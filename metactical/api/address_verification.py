@@ -257,9 +257,6 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 	timeout = settings.timeout or 10
 	weak_threshold = settings.weak_match_threshold or 0.75
 
-	enable_melissa_fallback = bool(settings.enable_melissa_fallback)
-	melissa_key = settings.get_password("melissa_key") if enable_melissa_fallback else None
-
 	if not base_url or not api_key:
 		frappe.throw(
 			"Please set the Base URL and API Key in Address Verification Settings."
@@ -289,7 +286,6 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 	weak_matches = 0
 	confidence_sum = 0.0
 	confidence_count = 0
-	melissa_fallback_verified = 0
 	match_levels = {
 		"fully_verified": 0,
 		"street_verified": 0,
@@ -342,20 +338,6 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 				"{0}\t{1}\n".format(address.get("name"), json.dumps(payload))
 			)
 
-		if melissa_key and match_level == "unverified":
-			melissa_result = verify_with_melissa(address, melissa_key, timeout)
-			if melissa_result:
-				melissa_match_level, melissa_verified = melissa_result
-				if melissa_match_level != "unverified":
-					match_levels["unverified"] -= 1
-					match_levels[melissa_match_level] += 1
-					match_level = melissa_match_level
-					melissa_fallback_verified += 1
-					if melissa_verified:
-						verified_count += 1
-					if verbose:
-						tqdm.write("    melissa : {0}".format(melissa_match_level))
-
 		confidence = data.get("confidence")
 		if confidence is not None:
 			confidence_sum += confidence
@@ -375,7 +357,6 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 		"verified_count": verified_count,
 		"average_confidence": average_confidence,
 		"weak_matches": weak_matches,
-		"melissa_fallback_verified": melissa_fallback_verified,
 		"fully_verified": match_levels["fully_verified"],
 		"street_verified": match_levels["street_verified"],
 		"postal_verified": match_levels["postal_verified"],
@@ -388,7 +369,6 @@ def verify_addresses(limit=None, verbose=False, log_unverified=False):
 		"  Verified               : {verified_count}\n"
 		"  Average confidence     : {average_confidence}\n"
 		"  Weak matches           : {weak_matches}\n"
-		"  Melissa fallback hits  : {melissa_fallback_verified}\n"
 		"  By match level:\n"
 		"    fully_verified       : {fully_verified}\n"
 		"    street_verified      : {street_verified}\n"
