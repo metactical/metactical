@@ -103,16 +103,38 @@ def upload_image(filename, role, content, content_type=None):
 
 
 @frappe.whitelist()
-def save_metadata(entries, override_full_product=0):
+def get_image(key):
+	"""Fetch a single object from S3 (via boto3) as base64 — for the loader.
+
+	Avoids the browser needing a public bucket / CORS. Returns {found, content,
+	content_type}.
+	"""
+	settings = _get_settings()
+	client = settings.get_client()
+	try:
+		obj = client.get_object(Bucket=settings.nat_bucket_name, Key=key)
+	except Exception:
+		return {"found": False}
+
+	body = obj["Body"].read()
+	return {
+		"found": True,
+		"content": base64.b64encode(body).decode("ascii"),
+		"content_type": obj.get("ContentType") or "image/jpeg",
+	}
+
+
+@frappe.whitelist()
+def save_metadata(files, override_full_product=0):
 	"""Store one upload as a single S3 Product Image Meta Data record.
 
-	`entries` is the per-SKU array produced by the uploader; sites/images are stored
-	tagged with their SKU.
+	`files` is the per-FILE array produced by the uploader; each image's sites are
+	stored tagged with that image (sku + order + role) so they restore per image.
 	"""
-	if isinstance(entries, str):
-		entries = json.loads(entries)
+	if isinstance(files, str):
+		files = json.loads(files)
 
-	name = upsert_upload(entries, override_full_product)
+	name = upsert_upload(files, override_full_product)
 	frappe.db.commit()
 	return {"success": True, "records": [name] if name else []}
 
@@ -152,27 +174,120 @@ def list_metadata(filter=None):
 	return records
 
 
-@frappe.whitelist()
-def get_metadata(name):
-	"""Return one S3 Product Image Meta Data record shaped like the uploader metadata."""
-	doc = frappe.get_doc("S3 Product Image Meta Data", name)
+def _record_products(doc, include_sku_items=False):
+	"""Rebuild the per-product list from one stored record.
 
-	return {
-		"productsku": [row.nat_sku for row in doc.nat_skus],
-		"skuItems": [{"item_code": row.nat_item_code, "sku": row.nat_sku} for row in doc.nat_skus],
-		"sites": [row.nat_site for row in doc.nat_sites],
-		"overrideFullProduct": bool(doc.nat_override_full_product),
-		"images": [
+	SKUs are stored tagged (`nat_sku`) on the site/image rows. Group by SKU, then
+	merge SKUs whose sites AND images are identical into one product. When
+	`include_sku_items` is set, each product also carries `skuItems`
+	([{item_code, sku}]) so the uploader can repopulate its SKU grid.
+	"""
+	item_by_sku = {row.nat_sku: row.nat_item_code for row in doc.nat_skus}
+
+	# Product-level sites = the SKU's sites across all its images (deduped).
+	sites_by_sku = {}
+	for row in doc.nat_sites:
+		bucket = sites_by_sku.setdefault(row.nat_sku, [])
+		if row.nat_site not in bucket:
+			bucket.append(row.nat_site)
+
+	images_by_sku = {}
+	for row in doc.nat_images:
+		images_by_sku.setdefault(row.nat_sku, []).append(
 			{
-				"order": row.nat_image_order,
+				"order": row.nat_image_order or 0,
 				"icon": row.nat_icon,
 				"small": row.nat_small,
 				"medium": row.nat_medium,
 				"large": row.nat_large,
 			}
-			for row in doc.nat_images
-		],
-	}
+		)
+
+	override = bool(doc.nat_override_full_product)
+
+	by_sig = {}
+	products = []
+	seen = set()
+	for sku_row in doc.nat_skus:
+		sku = sku_row.nat_sku
+		if not sku or sku in seen:
+			continue
+		seen.add(sku)
+
+		sites = sites_by_sku.get(sku, [])
+		images = sorted(images_by_sku.get(sku, []), key=lambda i: i["order"])
+		sig = json.dumps({"sites": sorted(sites), "images": images}, sort_keys=True)
+
+		if sig not in by_sig:
+			product = {
+				"productsku": [sku],
+				"sites": sites,
+				"overrideFullProduct": override,
+				"images": images,
+			}
+			if include_sku_items:
+				product["skuItems"] = [{"item_code": item_by_sku.get(sku), "sku": sku}]
+			by_sig[sig] = product
+			products.append(product)
+		else:
+			by_sig[sig]["productsku"].append(sku)
+			if include_sku_items:
+				by_sig[sig]["skuItems"].append({"item_code": item_by_sku.get(sku), "sku": sku})
+
+	return products
+
+
+@frappe.whitelist()
+def get_metadata(name):
+	"""Return every distinct image stored on a record, for loading into the uploader.
+
+	Loads by doc name (not by SKU): one entry per distinct (role, order, path) in the
+	images child table, each carrying the SKUs (item_code + sku) and the sites that
+	reference it.
+	"""
+	doc = frappe.get_doc("S3 Product Image Meta Data", name)
+
+	item_by_sku = {row.nat_sku: row.nat_item_code for row in doc.nat_skus}
+
+	# Sites are tagged per image: (sku, order, role) -> sites of that specific image.
+	sites_by_image = {}
+	for row in doc.nat_sites:
+		key = (row.nat_sku, row.nat_image_order or 0, row.nat_role)
+		sites_by_image.setdefault(key, []).append(row.nat_site)
+
+	# Collect distinct images keyed by (role, order, path); merge the SKUs that share it.
+	images = {}
+	for row in doc.nat_images:
+		for role in ("icon", "small", "medium", "large"):
+			path = row.get(f"nat_{role}")
+			if not path:
+				continue
+			key = (role, row.nat_image_order or 0, path)
+			entry = images.setdefault(key, {"skus": []})
+			if row.nat_sku and row.nat_sku not in entry["skus"]:
+				entry["skus"].append(row.nat_sku)
+
+	result = []
+	for (role, order, path), data in images.items():
+		skus = data["skus"]
+		# This image's own sites — collected from its (sku, order, role) tags only,
+		# so sites set on other images of the same product don't leak in.
+		sites = []
+		for sku in skus:
+			for site in sites_by_image.get((sku, order, role), []):
+				if site not in sites:
+					sites.append(site)
+		result.append(
+			{
+				"role": role,
+				"order": order,
+				"path": path,
+				"skuItems": [{"item_code": item_by_sku.get(s), "sku": s} for s in skus],
+				"sites": sites,
+			}
+		)
+
+	return {"images": result, "overrideFullProduct": bool(doc.nat_override_full_product)}
 
 
 @frappe.whitelist()
@@ -197,49 +312,7 @@ def build_export_json(names=None):
 	products = []
 	for name in record_names:
 		doc = frappe.get_doc("S3 Product Image Meta Data", name)
-
-		# Group sites/images by their SKU tag.
-		sites_by_sku = {}
-		for row in doc.nat_sites:
-			sites_by_sku.setdefault(row.nat_sku, []).append(row.nat_site)
-
-		images_by_sku = {}
-		for row in doc.nat_images:
-			images_by_sku.setdefault(row.nat_sku, []).append(
-				{
-					"order": row.nat_image_order or 0,
-					"icon": row.nat_icon,
-					"small": row.nat_small,
-					"medium": row.nat_medium,
-					"large": row.nat_large,
-				}
-			)
-
-		override = bool(doc.nat_override_full_product)
-
-		# Build a product per SKU, then merge SKUs with identical sites + images.
-		by_sig = {}
-		seen = set()
-		for sku_row in doc.nat_skus:
-			sku = sku_row.nat_sku
-			if not sku or sku in seen:
-				continue
-			seen.add(sku)
-
-			sites = sites_by_sku.get(sku, [])
-			images = sorted(images_by_sku.get(sku, []), key=lambda i: i["order"])
-			sig = json.dumps({"sites": sorted(sites), "images": images}, sort_keys=True)
-
-			if sig not in by_sig:
-				by_sig[sig] = {
-					"productsku": [sku],
-					"sites": sites,
-					"overrideFullProduct": override,
-					"images": images,
-				}
-				products.append(by_sig[sig])
-			else:
-				by_sig[sig]["productsku"].append(sku)
+		products.extend(_record_products(doc))
 
 	return {"products": products}
 
