@@ -1686,7 +1686,12 @@ const clearAllFiles = () => {
     }
   })
   files.value = []
-  
+
+  // Clear the locked template + its picker.
+  templateItem.value = null
+  templateVariants.value = []
+  if (templateControl) templateControl.set_value('')
+
   // Clear upload history
   uploadComplete.value = false
   uploadProgress.value = { completed: 0, total: 0 }
