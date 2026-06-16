@@ -125,6 +125,72 @@ def get_image(key):
 
 
 @frappe.whitelist()
+def list_s3_meta():
+	"""List the legacy metadata JSON files under images/products/meta/ (s3uploader)."""
+	settings = _get_settings()
+	client = settings.get_client()
+	prefix = f"{BASE_PREFIX}/meta/"
+
+	files = []
+	token = None
+	while True:
+		kwargs = {"Bucket": settings.nat_bucket_name, "Prefix": prefix}
+		if token:
+			kwargs["ContinuationToken"] = token
+		resp = client.list_objects_v2(**kwargs)
+		for obj in resp.get("Contents", []):
+			key = obj["Key"]
+			if key.endswith(".json"):
+				files.append(
+					{
+						"key": key,
+						"name": key.split("/")[-1],
+						"last_modified": str(obj.get("LastModified") or ""),
+					}
+				)
+		if resp.get("IsTruncated"):
+			token = resp.get("NextContinuationToken")
+		else:
+			break
+
+	files.sort(key=lambda f: f["name"])
+	return files
+
+
+@frappe.whitelist()
+def resolve_item_codes(skus):
+	"""Map SKUs (RetailSKUSuffix) back to Item codes. Returns {sku: item_code}."""
+	if isinstance(skus, str):
+		skus = json.loads(skus)
+	skus = [s for s in (skus or []) if s]
+	if not skus:
+		return {}
+
+	rows = frappe.get_all(
+		"Item",
+		filters={"ifw_retailskusuffix": ["in", skus]},
+		fields=["name", "ifw_retailskusuffix"],
+	)
+	mapping = {}
+	for row in rows:
+		mapping.setdefault(row.ifw_retailskusuffix, row.name)
+	return mapping
+
+
+@frappe.whitelist()
+def get_s3_meta(key):
+	"""Fetch and parse a legacy metadata JSON file from S3. Returns {found, metadata}."""
+	settings = _get_settings()
+	client = settings.get_client()
+	try:
+		obj = client.get_object(Bucket=settings.nat_bucket_name, Key=key)
+	except Exception:
+		return {"found": False}
+
+	return {"found": True, "metadata": json.loads(obj["Body"].read())}
+
+
+@frappe.whitelist()
 def save_metadata(files, override_full_product=0):
 	"""Store one upload as a single S3 Product Image Meta Data record.
 

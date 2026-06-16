@@ -585,7 +585,22 @@
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-gray-700">S3 Product Image Meta Data</label>
             <div ref="loadRecordRef"></div>
-            <p class="text-xs text-gray-600">Select a record; all of its images will be loaded.</p>
+            <p class="text-xs text-gray-600">Load a saved record; all of its images will be loaded.</p>
+          </div>
+
+          <div class="text-center text-xs text-gray-500">— or —</div>
+
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-gray-700">S3 metadata file (images/products/meta/)</label>
+            <select
+              v-model="selectedMeta"
+              :disabled="!!selectedRecord"
+              class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm disabled:cursor-not-allowed"
+            >
+              <option value="">Select a metadata file…</option>
+              <option v-for="m in s3MetaFiles" :key="m.key" :value="m.key">{{ m.name }}</option>
+            </select>
+            <p class="text-xs text-gray-600">Load a legacy metadata JSON exported by the original uploader.</p>
           </div>
 
           <!-- Loading Progress -->
@@ -612,8 +627,8 @@
           <div class="flex items-center gap-3">
             <button @click="showLoadFromS3Modal = false" class="btn btn-default btn-sm">Close</button>
             <button
-              @click="loadS3Metadata({ key: selectedRecord })"
-              :disabled="!selectedRecord || isLoadingFromS3"
+              @click="selectedRecord ? loadS3Metadata({ key: selectedRecord }) : loadFromS3Meta(selectedMeta)"
+              :disabled="(!selectedRecord && !selectedMeta) || isLoadingFromS3"
               class="btn btn-primary btn-sm"
             >
               {{ isLoadingFromS3 ? 'Loading…' : 'Load' }}
@@ -695,10 +710,25 @@ const loadRecordRef = ref(null)
 const selectedRecord = ref('')
 let recordControl = null
 
+// Second source: legacy metadata JSON files under images/products/meta/
+const selectedMeta = ref('')
+const s3MetaFiles = ref([])
+
+const loadS3MetaList = async () => {
+  s3MetaFiles.value = []
+  try {
+    s3MetaFiles.value = (await callBackend('list_s3_meta')) || []
+  } catch (error) {
+    console.error('Failed to list S3 metadata files:', error)
+  }
+}
+
 watch(showLoadFromS3Modal, (open) => {
   if (!open) return
   selectedRecord.value = ''
+  selectedMeta.value = ''
   s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
+  loadS3MetaList()
   nextTick(() => {
     if (!loadRecordRef.value) return
     loadRecordRef.value.innerHTML = ''
@@ -718,6 +748,13 @@ watch(showLoadFromS3Modal, (open) => {
       setTimeout(() => { selectedRecord.value = recordControl.get_value() || '' }, 0)
     })
   })
+})
+
+// Mutual exclusion: pick a record OR a legacy metadata file, not both.
+watch(selectedMeta, (val) => {
+  if (recordControl && recordControl.$input) {
+    recordControl.$input.prop('disabled', !!val)
+  }
 })
 
 // File processing state
@@ -1733,12 +1770,26 @@ const loadS3Metadata = async (metaFile) => {
       }
     })
 
-    s3LoadingProgress.value.total = allImages.length
-    s3LoadingProgress.value.completed = 0
+    await loadAllImages(allImages)
 
-    // Load each image
-    for (let i = 0; i < allImages.length; i++) {
-      const { productName, role, imageInfo, skus, skuItems, sites } = allImages[i]
+    // Close modal
+    showLoadFromS3Modal.value = false
+    s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
+  } catch (error) {
+    console.error('Failed to load metadata:', error)
+  } finally {
+    isLoadingFromS3.value = false
+  }
+}
+
+// Shared: fetch each loaded image (via the backend) and add file objects to the editor.
+const loadAllImages = async (allImages) => {
+  s3LoadingProgress.value.total = allImages.length
+  s3LoadingProgress.value.completed = 0
+
+  // Load each image
+  for (let i = 0; i < allImages.length; i++) {
+    const { role, imageInfo, skus, skuItems, sites } = allImages[i]
       
       s3LoadingProgress.value.current = `Loading ${imageInfo.filename}...`
       
@@ -1841,19 +1892,98 @@ const loadS3Metadata = async (metaFile) => {
       }
       
       s3LoadingProgress.value.completed = i + 1
+  }
+
+  autoSortFiles()
+}
+
+// Load a legacy metadata JSON file from images/products/meta/ (original s3uploader flow).
+const loadFromS3Meta = async (metaKey) => {
+  if (!metaKey || !isS3Configured.value) return
+
+  isLoadingFromS3.value = true
+  s3LoadingProgress.value = { completed: 0, total: 0, current: 'Loading metadata…' }
+
+  try {
+    const res = await callBackend('get_s3_meta', { key: metaKey })
+    if (!res || !res.found) {
+      frappe.show_alert({ message: 'Metadata file not found in S3', indicator: 'red' })
+      return
     }
 
-    // Auto-sort loaded files
-    autoSortFiles()
-    
-    // Close modal
+    const metadata = res.metadata || {}
+    clearAllFiles()
+
+    const ROLES = ['icon', 'small', 'medium', 'large']
+
+    // Dedupe images by (role, order, filename); combine the SKUs and sites of every
+    // product that references the same physical image (the JSON lists one image file
+    // under several products since it's named by the first SKU).
+    const byKey = {}
+    const addImage = (role, order, filename, skus, sites) => {
+      if (!filename) return
+      const fn = normalizeFilename(filename)
+      const key = `${role}|${order}|${fn}`
+      if (!byKey[key]) byKey[key] = { role, order, filename: fn, skus: new Set(), sites: new Set() }
+      skus.forEach(s => s && byKey[key].skus.add(s))
+      sites.forEach(s => s && byKey[key].sites.add(s))
+    }
+
+    if (Array.isArray(metadata.products)) {
+      metadata.products.forEach(product => {
+        const skus = Array.isArray(product.productsku)
+          ? product.productsku
+          : [product.productsku].filter(Boolean)
+        const sites = product.sites || []
+        ;(product.images || []).forEach(imageSet => {
+          ROLES.forEach(role => {
+            if (imageSet[role]) {
+              addImage(role, imageSet.order || 0, String(imageSet[role]).split('/').pop(), skus, sites)
+            }
+          })
+        })
+      })
+    } else if (metadata.products && typeof metadata.products === 'object') {
+      // Old object-based structure (backward compatibility)
+      Object.entries(metadata.products).forEach(([, productData]) => {
+        const skus = productData.skus || []
+        const sites = productData.sites || []
+        Object.entries(productData.images || {}).forEach(([role, imgs]) => {
+          ;(imgs || []).forEach(imageInfo => {
+            addImage(role, imageInfo.order || 0, imageInfo.filename, skus, sites)
+          })
+        })
+      })
+    }
+
+    // Resolve item codes for all the SKUs (the JSON only carries SKUs).
+    const allSkus = [...new Set(Object.values(byKey).flatMap(v => [...v.skus]))]
+    let itemBySku = {}
+    if (allSkus.length) {
+      try {
+        itemBySku = (await callBackend('resolve_item_codes', { skus: JSON.stringify(allSkus) })) || {}
+      } catch (e) {
+        console.error('Failed to resolve item codes:', e)
+      }
+    }
+
+    const allImages = Object.values(byKey).map(v => {
+      const skus = [...v.skus]
+      return {
+        role: v.role,
+        imageInfo: { filename: v.filename, order: v.order },
+        skus,
+        skuItems: skus.map(s => ({ item_code: itemBySku[s] || null, sku: s })),
+        sites: [...v.sites].filter(s => siteNames.value.includes(s))
+      }
+    })
+
+    await loadAllImages(allImages)
+
     showLoadFromS3Modal.value = false
     s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
-    
-    console.log(`Loaded ${files.value.length} images from S3`)
-    
   } catch (error) {
-    console.error('Failed to load metadata:', error)
+    console.error('Failed to load S3 metadata file:', error)
   } finally {
     isLoadingFromS3.value = false
   }
