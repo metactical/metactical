@@ -7,6 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "nat_sku",
+  "nat_image_order",
+  "nat_role",
   "nat_site"
  ],
  "fields": [
@@ -22,6 +24,18 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "SKU"
+  },
+  {
+   "fieldname": "nat_image_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Image Order"
+  },
+  {
+   "fieldname": "nat_role",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Role"
   }
  ],
  "grid_page_length": 50,

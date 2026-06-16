@@ -16,13 +16,27 @@
           </svg>
           Settings
         </button>
-        
+
+        <!-- Load from S3 (loads images/metadata from a saved record) -->
+        <button
+          v-if="isS3Configured"
+          @click="showLoadFromS3Modal = true"
+          :disabled="isLoadingFromS3"
+          class="btn btn-default btn-sm flex items-center gap-2"
+          title="Load from S3"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 21H7a2 2 0 01-2-2V5a2 2 0 012-2h6l2 2h6a2 2 0 012 2v7"/>
+          </svg>
+          {{ isLoadingFromS3 ? 'Loading…' : 'Load from S3' }}
+        </button>
+
         <!-- Control buttons (only shown when images are selected) -->
         <div v-if="files.length" class="flex gap-3">
           <button
             v-if="files.length"
             @click="exportData"
-            :disabled="!allFilesValid"
+            :disabled="!allFilesValid || !productValid"
             class="btn btn-default btn-sm"
           >
             Export JSON
@@ -51,10 +65,37 @@
       </div>
     </div>
 
+    <!-- Product template (locks the whole upload to one template's variants) -->
+    <div class="border rounded-lg p-4 shadow-sm"
+         :class="templateItem ? 'bg-green-50 border-green-300' : 'border-yellow-300'">
+      <div class="flex items-center gap-4">
+        <div class="flex-1">
+          <label class="block text-sm font-bold mb-1"
+                 :class="templateItem ? 'text-green-800' : ''">
+            Product Template
+          </label>
+          <div ref="templateRef"></div>
+          <p class="text-xs mt-1" :class="templateItem ? 'text-green-700' : ''">
+            <template v-if="templateItem">
+              {{ templateVariants.length }} variant{{ templateVariants.length === 1 ? '' : 's' }} —
+              every variant must have all 4 size images.
+            </template>
+            <template v-else>
+              Select a product template first. Each image can then only use this template's variants.
+            </template>
+          </p>
+        </div>
+        <span v-if="templateItem"
+              class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-200 text-green-800 border border-green-300">
+          🔒 {{ templateItem }}
+        </span>
+      </div>
+    </div>
+
     <!-- Stats bar -->
     <div v-if="files.length" class="bg-gray-50 border rounded-lg p-4">
       <div class="flex items-center justify-between text-sm text-gray-600">
-        <span>{{ files.length }} images uploaded</span>
+        <span>{{ files.filter(f => f.file || f.isOnServer).length }} / {{ files.length }} images added</span>
         <span>{{ groupFilesByProduct().length }} products detected</span>
         <span>Roles: {{ [...new Set(files.map(f => f.role))].filter(r => r).join(', ') }}</span>
       </div>
@@ -108,7 +149,7 @@
       <div class="space-y-3">
         <h3 class="text-lg font-semibold text-gray-800">Validation Status</h3>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <!-- File Validation Status -->
           <div class="bg-gray-50 p-4 rounded-lg">
             <div class="flex items-center justify-between mb-2">
@@ -141,6 +182,20 @@
             </div>
           </div>
 
+          <!-- Variant Completeness Status -->
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">Variants Complete</span>
+              <span :class="productValid ? 'text-green-600' : 'text-red-600'"
+                    class="text-sm font-bold">
+                {{ templateItem ? `${templateVariants.length - variantImageIssues.length}/${templateVariants.length}` : '—' }}
+              </span>
+            </div>
+            <div class="text-xs text-gray-500">
+              {{ templateItem ? 'Every variant needs all 4 size images' : 'Select a template' }}
+            </div>
+          </div>
+
           <!-- Upload Ready Status -->
           <div class="bg-gray-50 p-4 rounded-lg">
             <div class="flex items-center justify-between mb-2">
@@ -157,14 +212,28 @@
         </div>
 
         <!-- Missing Fields Summary -->
-        <div v-if="!allFilesValid" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div v-if="!allFilesValid" class="mt-4 p-3 border border-yellow-200 rounded-lg">
           <h4 class="text-sm font-medium text-yellow-800 mb-2">Missing Required Fields:</h4>
-          <ul class="text-xs text-yellow-700 space-y-1">
+          <ul class="text-xs space-y-1">
+            <li v-if="files.some(f => !f.file && !f.isOnServer)">• Some slots still need an image uploaded</li>
             <li v-if="files.some(f => !f.role)">• Some images are missing role assignments</li>
             <li v-if="files.some(f => !f.skus || !f.skus.trim())">• Some images are missing SKU information</li>
             <li v-if="files.some(f => !f.sites || f.sites.length === 0)">• Some images have no sites selected</li>
             <li v-if="files.some(f => f.imageOrder === undefined || f.imageOrder === null)">• Some images are missing image order</li>
             <li v-if="files.some(f => f.isBroken && !f.file)">• Some images are broken and need replacement files</li>
+          </ul>
+        </div>
+
+        <!-- Template / Variant Completeness Messages -->
+        <div v-if="!templateItem" class="mt-4 p-3 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">• Select a product template — uploads must be tied to one template.</p>
+        </div>
+        <div v-else-if="variantImageIssues.length > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <h4 class="text-sm font-medium text-red-800 mb-2">Variants missing size images:</h4>
+          <ul class="text-xs text-red-700 space-y-1">
+            <li v-for="v in variantImageIssues" :key="v.sku">
+              • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) missing {{ v.missing.join(', ') }}
+            </li>
           </ul>
         </div>
 
@@ -452,6 +521,33 @@
               </p>
             </div>
 
+            <!-- Add Image (scaffolded slot awaiting an upload) -->
+            <div v-else-if="!file.file" class="space-y-3">
+              <label class="block text-sm font-medium text-gray-700">Image</label>
+              <div class="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  @change="addImageToPlaceholder(file, $event)"
+                  class="hidden"
+                  :ref="`addImg-${idx}`"
+                />
+                <button
+                  @click="$refs[`addImg-${idx}`][0].click()"
+                  class="btn btn-primary btn-sm flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                  </svg>
+                  Add Image
+                </button>
+                <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Needs image</span>
+              </div>
+              <p class="text-xs text-gray-500">
+                Upload the <strong>{{ file.role }}</strong> image for <strong>{{ file.skus }}</strong>
+              </p>
+            </div>
+
             <!-- Form inputs in stacked layout -->
             <div class="space-y-12 max-w-lg">
             <!-- Role selector -->
@@ -505,6 +601,8 @@
               </div>
               <SkuManager
                 :sku-items="file.skuItems"
+                :template="templateItem"
+                :allowed-variants="templateVariants"
                 @update="(items) => updateSkuItems(file, items)"
               />
             </div>
@@ -544,130 +642,82 @@
     </div>
 
     <!-- Load from S3 Modal -->
-    <div v-if="showLoadFromS3Modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showLoadFromS3Modal = false">
-      <div class="rounded-lg shadow-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto" @click.stop>
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-xl font-semibold text-gray-800">Load from S3</h3>
-          <button @click="showLoadFromS3Modal = false" class="text-gray-500 hover:text-gray-700">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <div v-if="showLoadFromS3Modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style="z-index: 9999;" @click="showLoadFromS3Modal = false">
+      <div class="bg-gray-50 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100" @click.stop>
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shadow-lg">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 21H7a2 2 0 01-2-2V5a2 2 0 012-2h6l2 2h6a2 2 0 012 2v7"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-bold text-gray-800">Load from S3</h3>
+              <p class="text-sm text-gray-600">Load a saved record by its name</p>
+            </div>
+          </div>
+          <button @click="showLoadFromS3Modal = false" class="btn btn-default btn-sm" title="Close">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
 
-        <!-- Search and Filter -->
-        <div class="mb-6">
-          <div class="flex gap-4 mb-4">
-            <div class="flex-1">
-              <input
-                v-model="s3MetadataFilter"
-                @input="filterS3Metadata"
-                @keyup.enter="loadS3MetadataFiles"
-                placeholder="Search by SKU prefix for server-side filtering, or any text for client-side... (Press Enter to refresh)"
-                class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <p class="text-xs text-gray-500 mt-1">
-                💡 Tip: SKU prefixes (e.g., "ABC" or "ABC-DEF") use fast server-side S3 filtering. Other searches filter locally.
-                <span v-if="canUseServerSideFiltering" class="ml-2 text-green-600 font-medium">
-                  ⚡ Server-side filtering active
-                </span>
-                <span v-else-if="s3MetadataFilter.trim()" class="ml-2 text-blue-600 font-medium">
-                  🔍 Client-side filtering active
-                </span>
-              </p>
-            </div>
-            <button 
-              @click="loadS3MetadataFiles"
-              :disabled="isLoadingFromS3"
-              class="bg-blue-500 px-4 py-2 rounded-lg shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+        <!-- Content -->
+        <div class="p-6 space-y-6">
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-gray-700">S3 Product Image Meta Data</label>
+            <div ref="loadRecordRef"></div>
+            <p class="text-xs text-gray-600">Load a saved record; all of its images will be loaded.</p>
+          </div>
+
+          <div class="text-center text-xs text-gray-500">— or —</div>
+
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-gray-700">S3 metadata file (images/products/meta/)</label>
+            <select
+              v-model="selectedMeta"
+              :disabled="!!selectedRecord"
+              class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm disabled:cursor-not-allowed"
             >
-              {{ isLoadingFromS3 ? 'Loading...' : 'Refresh List' }}
+              <option value="">Select a metadata file…</option>
+              <option v-for="m in s3MetaFiles" :key="m.key" :value="m.key">{{ m.name }}</option>
+            </select>
+            <p class="text-xs text-gray-600">Load a legacy metadata JSON exported by the original uploader.</p>
+          </div>
+
+          <!-- Loading Progress -->
+          <div v-if="s3LoadingProgress.total > 0" class="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-blue-900">Loading images from S3</span>
+              <span class="text-sm text-blue-600">{{ s3LoadingProgress.completed }} / {{ s3LoadingProgress.total }}</span>
+            </div>
+            <div class="w-full bg-blue-200 rounded-full h-2">
+              <div
+                class="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                :style="{ width: `${(s3LoadingProgress.completed / s3LoadingProgress.total) * 100}%` }"
+              ></div>
+            </div>
+            <div v-if="s3LoadingProgress.current" class="text-xs text-blue-600 mt-1">
+              {{ s3LoadingProgress.current }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+          <span class="text-sm text-gray-600">{{ isLoadingFromS3 ? 'Loading…' : '' }}</span>
+          <div class="flex items-center gap-3">
+            <button @click="showLoadFromS3Modal = false" class="btn btn-default btn-sm">Close</button>
+            <button
+              @click="selectedRecord ? loadS3Metadata({ key: selectedRecord }) : loadFromS3Meta(selectedMeta)"
+              :disabled="(!selectedRecord && !selectedMeta) || isLoadingFromS3"
+              class="btn btn-primary btn-sm"
+            >
+              {{ isLoadingFromS3 ? 'Loading…' : 'Load' }}
             </button>
           </div>
-          
-          <!-- Filtering Information -->
-          <div v-if="s3MetadataFilter.trim()" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div class="flex items-start gap-2">
-              <svg class="w-4 h-4 text-blue-600 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              <div class="text-sm text-blue-800">
-                <span v-if="canUseServerSideFiltering">
-                  <strong>Server-side filtering:</strong> S3 is searching for files starting with "{{ s3MetadataFilter.trim() }}" directly on the server. This is fast and efficient.
-                </span>
-                <span v-else>
-                  <strong>Client-side filtering:</strong> Searching through loaded metadata files for "{{ s3MetadataFilter.trim() }}". 
-                  <span class="text-blue-600">Use alphanumeric SKU prefixes for faster server-side filtering.</span>
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Metadata Files List -->
-          <div v-if="s3MetadataFiles.length > 0" class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
-            <div v-for="metaFile in filteredS3MetadataFiles" :key="metaFile.key" 
-                 class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
-                 @click="loadS3Metadata(metaFile)">
-              <div class="flex-1">
-                <div class="font-medium text-gray-800">{{ metaFile.filename }}</div>
-                <div class="text-sm text-gray-600">
-                  SKUs: {{ metaFile.skus.join(', ') }} | 
-                  Last Modified: {{ new Date(metaFile.lastModified).toLocaleDateString() }}
-                </div>
-              </div>
-              <button class="bg-green-500 px-3 py-1 rounded text-sm hover:bg-green-600">
-                Load
-              </button>
-            </div>
-          </div>
-          
-          <div v-else-if="!isLoadingFromS3" class="text-center py-8 text-gray-500">
-            <div v-if="s3MetadataFilter.trim()">
-              <p v-if="canUseServerSideFiltering">
-                No metadata files found with SKU prefix "{{ s3MetadataFilter.trim() }}" on S3 server.
-              </p>
-              <p v-else>
-                No metadata files match "{{ s3MetadataFilter.trim() }}" in loaded results.
-              </p>
-              <p class="text-xs mt-2">Try a different search term or clear the filter.</p>
-            </div>
-            <div v-else>
-              No metadata files found. Click "Refresh List" to load from S3.
-            </div>
-          </div>
-          
-          <div v-if="isLoadingFromS3" class="text-center py-8">
-            <div class="inline-flex items-center text-blue-600">
-              <svg class="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              Loading metadata files from S3...
-            </div>
-          </div>
-        </div>
-
-        <!-- Loading Progress -->
-        <div v-if="s3LoadingProgress.total > 0" class="mb-6 bg-blue-50 rounded-lg p-4">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-blue-900">Loading Images from S3</span>
-            <span class="text-sm text-blue-600">{{ s3LoadingProgress.completed }} / {{ s3LoadingProgress.total }}</span>
-          </div>
-          <div class="w-full bg-blue-200 rounded-full h-2">
-            <div 
-              class="bg-blue-500 h-2 rounded-full transition-all duration-300"
-              :style="{ width: `${(s3LoadingProgress.completed / s3LoadingProgress.total) * 100}%` }"
-            ></div>
-          </div>
-          <div v-if="s3LoadingProgress.current" class="text-xs text-blue-600 mt-1">
-            {{ s3LoadingProgress.current }}
-          </div>
-        </div>
-
-        <!-- Close Button -->
-        <div class="flex justify-end">
-          <button @click="showLoadFromS3Modal = false" class="bg-gray-500 px-4 py-2 rounded-lg hover:bg-gray-600">
-            Close
-          </button>
         </div>
       </div>
     </div>
@@ -682,7 +732,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import Settings from './Settings.vue'
 import SkuManager from './SkuManager.vue'
 
@@ -713,10 +763,116 @@ const fileToBase64 = (file) =>
     reader.readAsDataURL(file)
   })
 
+// Convert a base64 string (from the backend) into a Blob.
+const base64ToBlob = (b64, type) => {
+  const chars = atob(b64)
+  const bytes = new Uint8Array(chars.length)
+  for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i)
+  return new Blob([bytes], { type: type || 'application/octet-stream' })
+}
+
 const fileInput = ref(null)
 const files = ref([])
 const showSettings = ref(false)
 const overrideFullProduct = ref(false) // Default to true
+
+// One product template per upload. All per-image SKU pickers are limited to this
+// template's variants, and every variant must have all 4 images before upload/export.
+const templateItem = ref(null)            // resolved template Item name
+const templateVariants = ref([])          // [{ item_code, sku }] — the allowed variants
+const templateRef = ref(null)             // DOM node for the native Link control
+let templateControl = null
+const ROLES = ['icon', 'small', 'medium', 'large']
+
+// Build one empty upload card per (variant × role): N variants → N×4 cards, each
+// pre-assigned to its variant's SKU. The user just drops the image into each.
+const scaffoldVariantCards = () => {
+  const cards = []
+  templateVariants.value.forEach(v => {
+    ROLES.forEach(role => {
+      cards.push({
+        name: `${v.sku}_${role}.jpg`,
+        type: null,
+        file: null,
+        role,
+        width: 0,
+        height: 0,
+        skus: v.sku,
+        skuItems: [{ item_code: v.item_code, sku: v.sku }],
+        newItemCode: '',
+        skuError: '',
+        resolvingItem: false,
+        sites: [],
+        imageOrder: 0,
+        preview: null,
+        isOnServer: false,
+        serverPath: null,
+        isModified: false,
+        isPlaceholder: true, // awaiting an image upload
+      })
+    })
+  })
+  files.value.push(...cards)
+}
+
+// Resolve the picked Item to its template + variant set and lock the page to it.
+const applyTemplateFromItem = async (itemCode) => {
+  if (!itemCode) {
+    templateItem.value = null
+    templateVariants.value = []
+    return
+  }
+  try {
+    const res = await callBackend('get_item_family', { item_code: itemCode })
+    templateItem.value = (res && (res.template || itemCode)) || null
+    templateVariants.value = (res && res.items) || []
+  } catch (e) {
+    console.error('Failed to resolve template:', e)
+    frappe.show_alert({ message: `Failed to resolve ${itemCode}`, indicator: 'red' })
+    return
+  }
+
+  // Discard any stale scaffold cards from a previous template.
+  const hadRealFiles = files.value.some(f => !f.isPlaceholder)
+  files.value = files.value.filter(f => !f.isPlaceholder)
+
+  // Drop any already-assigned SKUs that aren't variants of the new template
+  // (applies to real/loaded files that we keep).
+  const allowed = new Set(templateVariants.value.map(v => v.sku))
+  let removed = 0
+  files.value.forEach(file => {
+    const kept = (file.skuItems || []).filter(i => allowed.has(i.sku))
+    if (kept.length !== (file.skuItems || []).length) removed += 1
+    file.skuItems = kept
+    file.skus = kept.filter(i => i.sku).map(i => i.sku).join(', ')
+  })
+  if (removed > 0) {
+    frappe.show_alert({ message: `Cleared incompatible SKUs on ${removed} image${removed > 1 ? 's' : ''}`, indicator: 'orange' })
+  }
+
+  // With no real images yet, scaffold one upload card per variant × role.
+  if (!hadRealFiles && templateVariants.value.length) {
+    scaffoldVariantCards()
+    frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
+  }
+
+  // Reflect the resolved template back into the picker input.
+  if (templateControl && templateItem.value && templateControl.get_value() !== templateItem.value) {
+    templateControl.set_value(templateItem.value)
+  }
+}
+
+// After loading images, lock the page to the template of the first resolved item,
+// so a loaded record/JSON is immediately editable under the same template constraint.
+const setTemplateFromLoadedImages = async (allImages) => {
+  for (const im of (allImages || [])) {
+    const withCode = (im.skuItems || []).find(i => i.item_code)
+    if (withCode) {
+      await applyTemplateFromItem(withCode.item_code)
+      return
+    }
+  }
+}
 
 // Upload state
 const isUploading = ref(false)
@@ -729,10 +885,59 @@ const uploadedFiles = ref([])
 // S3 Load state
 const showLoadFromS3Modal = ref(false)
 const isLoadingFromS3 = ref(false)
-const s3MetadataFiles = ref([])
-const filteredS3MetadataFiles = ref([])
-const s3MetadataFilter = ref('')
 const s3LoadingProgress = ref({ completed: 0, total: 0, current: '' })
+
+// Record picker (native Frappe Link to S3 Product Image Meta Data, by doc name)
+const loadRecordRef = ref(null)
+const selectedRecord = ref('')
+let recordControl = null
+
+// Second source: legacy metadata JSON files under images/products/meta/
+const selectedMeta = ref('')
+const s3MetaFiles = ref([])
+
+const loadS3MetaList = async () => {
+  s3MetaFiles.value = []
+  try {
+    s3MetaFiles.value = (await callBackend('list_s3_meta')) || []
+  } catch (error) {
+    console.error('Failed to list S3 metadata files:', error)
+  }
+}
+
+watch(showLoadFromS3Modal, (open) => {
+  if (!open) return
+  selectedRecord.value = ''
+  selectedMeta.value = ''
+  s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
+  loadS3MetaList()
+  nextTick(() => {
+    if (!loadRecordRef.value) return
+    loadRecordRef.value.innerHTML = ''
+    recordControl = frappe.ui.form.make_control({
+      parent: loadRecordRef.value,
+      render_input: true,
+      df: {
+        fieldtype: 'Link',
+        options: 'S3 Product Image Meta Data',
+        label: 'Record',
+        placeholder: 'Search by record name…',
+        get_query: () => ({ filters: { docstatus: 1 } }),
+      },
+    })
+    recordControl.refresh()
+    recordControl.$input.on('change awesomplete-selectcomplete', () => {
+      setTimeout(() => { selectedRecord.value = recordControl.get_value() || '' }, 0)
+    })
+  })
+})
+
+// Mutual exclusion: pick a record OR a legacy metadata file, not both.
+watch(selectedMeta, (val) => {
+  if (recordControl && recordControl.$input) {
+    recordControl.$input.prop('disabled', !!val)
+  }
+})
 
 // File processing state
 const isProcessingFiles = ref(false)
@@ -762,36 +967,60 @@ const allFilesValid = computed(() => {
            file.skus && file.skus.trim() && // Has SKUs
            file.sites && file.sites.length > 0 && // Has sites selected
            (file.imageOrder >= 0) && // Has image order (including 0)
+           (file.file || file.isOnServer) && // Has an actual image (scaffold slots need an upload)
            (!file.isBroken || file.file) // Not broken OR has replacement file
   })
 })
+
+// Product-level rule: every variant of the locked template must have all 4 size
+// images. Returns the variants that are missing one or more roles.
+const variantImageIssues = computed(() => {
+  if (!templateItem.value) return []
+  // For each variant sku, the roles that are present across all images.
+  const rolesBySku = {}
+  templateVariants.value.forEach(v => { rolesBySku[v.sku] = new Set() })
+  files.value.forEach(file => {
+    // A role only counts once the slot actually has an image.
+    if (!file.role || !(file.file || file.isOnServer)) return
+    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
+    skuList.forEach(sku => {
+      if (rolesBySku[sku]) rolesBySku[sku].add(file.role)
+    })
+  })
+  return templateVariants.value
+    .map(v => ({ sku: v.sku, item_code: v.item_code, missing: ROLES.filter(r => !rolesBySku[v.sku].has(r)) }))
+    .filter(v => v.missing.length > 0)
+})
+
+// Product-level validity: a template is chosen, there are files, and every variant
+// has all 4 images.
+const productValid = computed(() =>
+  !!templateItem.value && files.value.length > 0 && variantImageIssues.value.length === 0
+)
 
 // Computed property to check if upload is possible
 const canUpload = computed(() => {
   // Allow upload if S3 is configured and either:
   // 1. There are no files (metadata-only upload)
-  // 2. All files are valid
-  return isS3Configured.value && (files.value.length === 0 || allFilesValid.value)
+  // 2. All files are valid AND the product (every variant) is complete
+  if (!isS3Configured.value) return false
+  if (files.value.length === 0) return true
+  return allFilesValid.value && productValid.value
 })
 
 // Computed property to get validation summary
 const validationSummary = computed(() => {
   const total = files.value.length
   const valid = files.value.filter(file => 
-    file.role && 
-    file.skus && file.skus.trim() && 
-    file.sites && file.sites.length > 0 && 
+    file.role &&
+    file.skus && file.skus.trim() &&
+    file.sites && file.sites.length > 0 &&
     (file.imageOrder >= 0) &&
+    (file.file || file.isOnServer) && // Scaffold slots need an uploaded image
     (!file.isBroken || file.file) // Include broken images as invalid unless they have a replacement file
   ).length
   
   return { total, valid, invalid: total - valid }
-})
-
-// Computed property to check if current filter can use server-side S3 filtering
-const canUseServerSideFiltering = computed(() => {
-  const filter = s3MetadataFilter.value.trim()
-  return filter && /^[a-zA-Z0-9\-]+$/.test(filter)
 })
 
 // Selectable sites — Lead Sources that have a Lead Source Domain set.
@@ -1041,7 +1270,10 @@ const cascade = (field, changedFile) => {
 
 // Copy a field's value from the changed file to every file AFTER it (not before).
 const cascadeForward = (field, changedFile) => {
-  const index = files.value.findIndex(f => f.name === changedFile.name)
+  // Match by object identity, not name — loaded files can share a (SKU-based) name,
+  // which would otherwise make the cascade start above the changed image.
+  const index = files.value.indexOf(changedFile)
+  if (index === -1) return
   for (let i = index + 1; i < files.value.length; i++) {
     files.value[i][field] = JSON.parse(JSON.stringify(changedFile[field])) // clone per file
   }
@@ -1141,6 +1373,20 @@ const aggregatePerSku = () => {
     sites: [...bySku[sku].sites],
     images: Object.values(bySku[sku].images).sort((a, b) => a.order - b.order)
   }))
+}
+
+// Per-FILE records for saving — keeps each image's own sites so they can be
+// restored per image (not unioned per product). One entry per uploaded image.
+const perFileEntries = () => {
+  return files.value
+    .filter(file => file.role && file.skus && file.skus.trim())
+    .map(file => ({
+      role: file.role,
+      order: file.imageOrder !== undefined ? file.imageOrder : 0,
+      path: `products/${file.role}/${generateS3Filename(file)}`,
+      skuItems: (file.skuItems || []).filter(i => i.sku).map(i => ({ item_code: i.item_code || null, sku: i.sku })),
+      sites: [...file.sites]
+    }))
 }
 
 // Merge per-SKU entries that share identical sites AND identical images into a
@@ -1440,7 +1686,12 @@ const clearAllFiles = () => {
     }
   })
   files.value = []
-  
+
+  // Clear the locked template + its picker.
+  templateItem.value = null
+  templateVariants.value = []
+  if (templateControl) templateControl.set_value('')
+
   // Clear upload history
   uploadComplete.value = false
   uploadProgress.value = { completed: 0, total: 0 }
@@ -1538,6 +1789,30 @@ const updateServerFile = async (file, event) => {
   }
   
   // Clear the input value so the same file can be selected again
+  event.target.value = ''
+}
+
+// Add an image to a scaffolded (placeholder) card. Keeps the card's preset role
+// and SKU; just attaches the uploaded image and turns it into a real file.
+const addImageToPlaceholder = async (file, event) => {
+  const newFile = event.target.files[0]
+  if (!newFile || !newFile.type.startsWith('image/')) return
+  try {
+    const img = await loadImage(newFile)
+    file.file = newFile
+    file.width = img.width
+    file.height = img.height
+    file.type = newFile.type
+    const ext = (newFile.name.split('.').pop() || 'jpg').toLowerCase()
+    const sku = (file.skus || '').split(',')[0].trim()
+    file.name = `${sku}_${file.role}.${ext}`
+    if (file.preview) URL.revokeObjectURL(file.preview)
+    file.preview = URL.createObjectURL(newFile)
+    file.isPlaceholder = false
+    file.isModified = true
+  } catch (error) {
+    console.error('Failed to add placeholder image:', error)
+  }
   event.target.value = ''
 }
 
@@ -1653,12 +1928,12 @@ const startUpload = async () => {
       }
 
       try {
-        // Save the atomic per-SKU view (one record per upload). The backend stores
-        // each SKU's sites/images tagged with the SKU; products are re-merged when
-        // building the JSON back out.
+        // Save one record per upload from the per-FILE view, so each image keeps
+        // its own sites (restored per image on load).
         await callBackend('save_metadata', {
-          entries: JSON.stringify(aggregatePerSku()),
-          override_full_product: overrideFullProduct.value ? 1 : 0
+          files: JSON.stringify(perFileEntries()),
+          override_full_product: overrideFullProduct.value ? 1 : 0,
+          template_item: templateItem.value || ''
         })
 
         // Reset all modification flags since metadata is now synced
@@ -1709,55 +1984,7 @@ const startUpload = async () => {
   }
 }
 
-// S3 Load functionality
-const loadS3MetadataFiles = async () => {
-  if (!isS3Configured.value) {
-    console.error('S3 not configured')
-    return
-  }
-
-  isLoadingFromS3.value = true
-  s3MetadataFiles.value = []
-  
-  try {
-    const filter = s3MetadataFilter.value.trim()
-
-    // Backend returns submitted S3 Product Image Meta Data records.
-    const records = await callBackend('list_metadata', { filter: filter || null })
-
-    s3MetadataFiles.value = (records || []).map(record => ({
-      key: record.name,                  // doctype record name (used by loadS3Metadata)
-      filename: record.product_sku,      // shown in the list
-      skus: record.skus || [record.product_sku],
-      lastModified: record.modified,
-      size: null
-    }))
-
-    // Apply client-side filtering to the loaded results
-    filterS3Metadata()
-
-  } catch (error) {
-    console.error('Failed to load metadata records:', error)
-  } finally {
-    isLoadingFromS3.value = false
-  }
-}
-
-const filterS3Metadata = () => {
-  const filter = s3MetadataFilter.value.toLowerCase().trim()
-  if (!filter) {
-    filteredS3MetadataFiles.value = s3MetadataFiles.value
-    return
-  }
-  
-  // Always apply client-side filtering to whatever results we have
-  // (whether they came from server-side filtering or not)
-  filteredS3MetadataFiles.value = s3MetadataFiles.value.filter(file => 
-    file.filename.toLowerCase().includes(filter) ||
-    file.skus.some(sku => sku.toLowerCase().includes(filter))
-  )
-}
-
+// S3 Load functionality — load every image stored on the selected record.
 const loadS3Metadata = async (metaFile) => {
   if (!isS3Configured.value) return
 
@@ -1765,77 +1992,47 @@ const loadS3Metadata = async (metaFile) => {
   s3LoadingProgress.value = { completed: 0, total: 0, current: 'Loading metadata...' }
   
   try {
-    // Fetch the single S3 Product Image Meta Data record, shaped as one product.
-    const product = await callBackend('get_metadata', { name: metaFile.key })
-    const metadata = { products: [product] }
+    // Load EVERY image stored on this record (by doc name), straight from its
+    // images child table. Each entry already carries its SKUs and sites.
+    const metadata = await callBackend('get_metadata', { name: metaFile.key })
 
     // Clear existing files
     clearAllFiles()
 
-    // Process metadata and load images - handle both old and new structures
-    const allImages = []
-    
-    // Check if it's the new array-based structure or old object-based structure
-    if (Array.isArray(metadata.products)) {
-      // New array-based structure
-      metadata.products.forEach(product => {
-        product.images.forEach(imageSet => {
-          // Extract images from each role in the image set
-          const roles = ['icon', 'small', 'medium', 'large']
-          roles.forEach(role => {
-            if (imageSet[role]) {
-              // Parse the image path to get filename
-              const imagePath = imageSet[role]
-              const filename = normalizeFilename(imagePath.split('/').pop()) // Normalize extension to lowercase
-              
-              // Filter sites to only include valid ones from siteList (remove legacy domains)
-              const validSites = product.sites.filter(site => siteNames.value.includes(site))
+    const allImages = (metadata.images || []).map(im => {
+      const filename = normalizeFilename(im.path.split('/').pop())
+      const skuItems = im.skuItems || []
+      return {
+        productName: (skuItems[0] && skuItems[0].sku) || '',
+        role: im.role,
+        imageInfo: { filename, order: im.order || 0 },
+        skus: skuItems.map(i => i.sku),
+        skuItems,
+        sites: (im.sites || []).filter(site => siteNames.value.includes(site))
+      }
+    })
 
-              // Handle both array and string productsku formats
-              const skus = Array.isArray(product.productsku) ? product.productsku : [product.productsku]
+    await loadAllImages(allImages)
+    await setTemplateFromLoadedImages(allImages)
 
-              allImages.push({
-                productName: skus[0], // Use first SKU as product name
-                role,
-                imageInfo: {
-                  filename,
-                  order: imageSet.order
-                },
-                skus: skus,
-                skuItems: product.skuItems || skus.map(s => ({ sku: s })),
-                sites: validSites
-              })
-            }
-          })
-        })
-      })
-    } else {
-      // Old object-based structure (for backward compatibility)
-      Object.entries(metadata.products).forEach(([productName, productData]) => {
-        Object.entries(productData.images).forEach(([role, images]) => {
-          images.forEach(imageInfo => {
-            // Filter sites to only include valid ones from siteList (remove legacy domains)
-            const validSites = productData.sites.filter(site => siteNames.value.includes(site))
+    // Close modal
+    showLoadFromS3Modal.value = false
+    s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
+  } catch (error) {
+    console.error('Failed to load metadata:', error)
+  } finally {
+    isLoadingFromS3.value = false
+  }
+}
 
-            allImages.push({
-              productName,
-              role,
-              imageInfo,
-              skus: productData.skus,
-              skuItems: (productData.skus || []).map(s => ({ sku: s })),
-              sites: validSites
-            })
-          })
-        })
-      })
-    }
+// Shared: fetch each loaded image (via the backend) and add file objects to the editor.
+const loadAllImages = async (allImages) => {
+  s3LoadingProgress.value.total = allImages.length
+  s3LoadingProgress.value.completed = 0
 
-    s3LoadingProgress.value.total = allImages.length
-    s3LoadingProgress.value.completed = 0
-
-    // Load each image
-    for (let i = 0; i < allImages.length; i++) {
-      const { productName, role, imageInfo, skus, skuItems, sites } = allImages[i]
+  // Load each image
+  for (let i = 0; i < allImages.length; i++) {
+    const { role, imageInfo, skus, skuItems, sites } = allImages[i]
       
       s3LoadingProgress.value.current = `Loading ${imageInfo.filename}...`
       
@@ -1844,62 +2041,55 @@ const loadS3Metadata = async (metaFile) => {
       
       try {
         const normalizedImageFilename = normalizeFilename(imageInfo.filename)
-        const imageUrl = `${s3Config.value.public_url_base}/${s3Config.value.base_prefix}/${role}/${normalizedImageFilename}`
-        
-        // Check if image exists
-        const headResponse = await fetch(imageUrl, { method: 'HEAD' })
-        if (!headResponse.ok) {
-          console.warn(`Image not found: ${imageUrl}`)
+        // Full S3 key, e.g. images/products/icon/GEN99989-0002.jpg
+        const key = `${s3Config.value.base_prefix}/${role}/${normalizedImageFilename}`
+
+        // Fetch the image bytes through the backend (boto3) — no public bucket / CORS needed.
+        const result = await callBackend('get_image', { key })
+        if (!result || !result.found) {
+          console.warn(`Image not found in S3: ${key}`)
           isImageBroken = true
         } else {
-          // Fetch the image
-          const imageResponse = await fetch(imageUrl)
-          if (!imageResponse.ok) {
-            console.warn(`Failed to fetch image: ${imageUrl}`)
-            isImageBroken = true
-          } else {
-            const imageBlob = await imageResponse.blob()
-            const normalizedFilename = normalizeFilename(imageInfo.originalName || imageInfo.filename)
-            const imageFile = new File([imageBlob], normalizedFilename, {
-              type: imageBlob.type || 'image/jpeg'
-            })
+          const contentType = result.content_type || 'image/jpeg'
+          const imageBlob = base64ToBlob(result.content, contentType)
+          const normalizedFilename = normalizeFilename(imageInfo.originalName || imageInfo.filename)
+          const imageFile = new File([imageBlob], normalizedFilename, { type: contentType })
 
-            // Load image to get dimensions
-            try {
-              const img = await loadImage(imageFile)
-              
-              // Create file object with working image
-              fileObj = {
-                name: normalizedFilename,
-                type: imageFile.type,
-                file: imageFile,
-                role: role,
-                width: imageInfo.dimensions?.width || img.width,
-                height: imageInfo.dimensions?.height || img.height,
-                skus: skus.join(', '),
-                skuItems: (skuItems || []).map(i => ({ ...i })),
-                newItemCode: '',
-                skuError: '',
-                resolvingItem: false,
+          // Load image to get dimensions
+          try {
+            const img = await loadImage(imageFile)
+
+            // Create file object with working image
+            fileObj = {
+              name: normalizedFilename,
+              type: imageFile.type,
+              file: imageFile,
+              role: role,
+              width: imageInfo.dimensions?.width || img.width,
+              height: imageInfo.dimensions?.height || img.height,
+              skus: skus.join(', '),
+              skuItems: (skuItems || []).map(i => ({ ...i })),
+              newItemCode: '',
+              skuError: '',
+              resolvingItem: false,
+              sites: [...sites],
+              imageOrder: imageInfo.order || 0,
+              preview: URL.createObjectURL(imageFile),
+              isOnServer: true,
+              serverPath: `images/products/${role}/${normalizeFilename(imageInfo.filename)}`, // Use normalized filename for server path too
+              isModified: false,
+              isBroken: false,
+              originalServerData: {
+                role,
+                skus: [...skus],
                 sites: [...sites],
                 imageOrder: imageInfo.order || 0,
-                preview: URL.createObjectURL(imageFile),
-                isOnServer: true,
-                serverPath: `images/products/${role}/${normalizeFilename(imageInfo.filename)}`, // Use normalized filename for server path too
-                isModified: false,
-                isBroken: false,
-                originalServerData: {
-                  role,
-                  skus: [...skus],
-                  sites: [...sites],
-                  imageOrder: imageInfo.order || 0,
-                  filename: normalizeFilename(imageInfo.filename) // Store normalized filename
-                }
+                filename: normalizeFilename(imageInfo.filename) // Store normalized filename
               }
-            } catch (imgError) {
-              console.error(`Failed to load image dimensions for ${imageInfo.filename}:`, imgError)
-              isImageBroken = true
             }
+          } catch (imgError) {
+            console.error(`Failed to load image dimensions for ${imageInfo.filename}:`, imgError)
+            isImageBroken = true
           }
         }
       } catch (error) {
@@ -1945,19 +2135,99 @@ const loadS3Metadata = async (metaFile) => {
       }
       
       s3LoadingProgress.value.completed = i + 1
+  }
+
+  autoSortFiles()
+}
+
+// Load a legacy metadata JSON file from images/products/meta/ (original s3uploader flow).
+const loadFromS3Meta = async (metaKey) => {
+  if (!metaKey || !isS3Configured.value) return
+
+  isLoadingFromS3.value = true
+  s3LoadingProgress.value = { completed: 0, total: 0, current: 'Loading metadata…' }
+
+  try {
+    const res = await callBackend('get_s3_meta', { key: metaKey })
+    if (!res || !res.found) {
+      frappe.show_alert({ message: 'Metadata file not found in S3', indicator: 'red' })
+      return
     }
 
-    // Auto-sort loaded files
-    autoSortFiles()
-    
-    // Close modal
+    const metadata = res.metadata || {}
+    clearAllFiles()
+
+    const ROLES = ['icon', 'small', 'medium', 'large']
+
+    // Dedupe images by (role, order, filename); combine the SKUs and sites of every
+    // product that references the same physical image (the JSON lists one image file
+    // under several products since it's named by the first SKU).
+    const byKey = {}
+    const addImage = (role, order, filename, skus, sites) => {
+      if (!filename) return
+      const fn = normalizeFilename(filename)
+      const key = `${role}|${order}|${fn}`
+      if (!byKey[key]) byKey[key] = { role, order, filename: fn, skus: new Set(), sites: new Set() }
+      skus.forEach(s => s && byKey[key].skus.add(s))
+      sites.forEach(s => s && byKey[key].sites.add(s))
+    }
+
+    if (Array.isArray(metadata.products)) {
+      metadata.products.forEach(product => {
+        const skus = Array.isArray(product.productsku)
+          ? product.productsku
+          : [product.productsku].filter(Boolean)
+        const sites = product.sites || []
+        ;(product.images || []).forEach(imageSet => {
+          ROLES.forEach(role => {
+            if (imageSet[role]) {
+              addImage(role, imageSet.order || 0, String(imageSet[role]).split('/').pop(), skus, sites)
+            }
+          })
+        })
+      })
+    } else if (metadata.products && typeof metadata.products === 'object') {
+      // Old object-based structure (backward compatibility)
+      Object.entries(metadata.products).forEach(([, productData]) => {
+        const skus = productData.skus || []
+        const sites = productData.sites || []
+        Object.entries(productData.images || {}).forEach(([role, imgs]) => {
+          ;(imgs || []).forEach(imageInfo => {
+            addImage(role, imageInfo.order || 0, imageInfo.filename, skus, sites)
+          })
+        })
+      })
+    }
+
+    // Resolve item codes for all the SKUs (the JSON only carries SKUs).
+    const allSkus = [...new Set(Object.values(byKey).flatMap(v => [...v.skus]))]
+    let itemBySku = {}
+    if (allSkus.length) {
+      try {
+        itemBySku = (await callBackend('resolve_item_codes', { skus: JSON.stringify(allSkus) })) || {}
+      } catch (e) {
+        console.error('Failed to resolve item codes:', e)
+      }
+    }
+
+    const allImages = Object.values(byKey).map(v => {
+      const skus = [...v.skus]
+      return {
+        role: v.role,
+        imageInfo: { filename: v.filename, order: v.order },
+        skus,
+        skuItems: skus.map(s => ({ item_code: itemBySku[s] || null, sku: s })),
+        sites: [...v.sites].filter(s => siteNames.value.includes(s))
+      }
+    })
+
+    await loadAllImages(allImages)
+    await setTemplateFromLoadedImages(allImages)
+
     showLoadFromS3Modal.value = false
     s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
-    
-    console.log(`Loaded ${files.value.length} images from S3`)
-    
   } catch (error) {
-    console.error('Failed to load metadata:', error)
+    console.error('Failed to load S3 metadata file:', error)
   } finally {
     isLoadingFromS3.value = false
   }
@@ -1983,10 +2253,33 @@ const isFileModified = (file) => {
   )
 }
 
+// Build the top-level template picker (native Frappe Link to Item).
+const buildTemplateControl = () => {
+  if (!templateRef.value) return
+  templateRef.value.innerHTML = ''
+  templateControl = frappe.ui.form.make_control({
+    parent: templateRef.value,
+    render_input: true,
+    df: {
+      fieldtype: 'Link',
+      options: 'Item',
+      placeholder: 'Select a product template…',
+    },
+  })
+  templateControl.refresh()
+  templateControl.$input.on('change awesomplete-selectcomplete', () => {
+    setTimeout(() => {
+      const val = templateControl.get_value() || ''
+      if (val !== templateItem.value) applyTemplateFromItem(val)
+    }, 0)
+  })
+}
+
 // Load S3 config + selectable sites on mount
 onMounted(() => {
   loadS3Config()
   loadSites()
+  nextTick(buildTemplateControl)
 })
 
 // Reload config (used by the page's "refresh" toolbar action)
