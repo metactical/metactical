@@ -178,6 +178,50 @@ def resolve_item_codes(skus):
 
 
 @frappe.whitelist()
+def get_item_family(item_code):
+	"""Expand an Item to its full variant family (template + every variant).
+
+	If the item is a variant, the family is its template plus all that template's
+	variants. If the item is a template (has_variants), it's the template plus its
+	own variants. A standalone item is just itself. Returns
+	{"items": [{item_code, sku}], "template": <name or None>} — only members that
+	have a RetailSKUSuffix are included (a SKU is required for a grid row).
+	"""
+	item = frappe.db.get_value(
+		"Item", item_code, ["name", "variant_of", "has_variants"], as_dict=True
+	)
+	if not item:
+		return {"items": [], "template": None}
+
+	if item.variant_of:
+		template = item.variant_of
+	elif item.has_variants:
+		template = item.name
+	else:
+		template = None
+
+	if template:
+		names = [template] + frappe.get_all(
+			"Item", filters={"variant_of": template}, order_by="name", pluck="name"
+		)
+	else:
+		names = [item.name]
+
+	rows = frappe.get_all(
+		"Item",
+		filters={"name": ["in", names]},
+		fields=["name", "ifw_retailskusuffix"],
+		order_by="name",
+	)
+	items = [
+		{"item_code": r.name, "sku": r.ifw_retailskusuffix}
+		for r in rows
+		if r.ifw_retailskusuffix
+	]
+	return {"items": items, "template": template}
+
+
+@frappe.whitelist()
 def get_s3_meta(key):
 	"""Fetch and parse a legacy metadata JSON file from S3. Returns {found, metadata}."""
 	settings = _get_settings()

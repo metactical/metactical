@@ -7,7 +7,11 @@
 import { ref, onMounted, watch } from 'vue'
 
 const props = defineProps({
-  skuItems: { type: Array, default: () => [] }
+  skuItems: { type: Array, default: () => [] },
+  // The locked-in product template (null until one is chosen at the top of the page).
+  template: { type: String, default: null },
+  // Allowed variants for the template: [{ item_code, sku }]. The picker is limited to these.
+  allowedVariants: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update'])
 
@@ -32,7 +36,16 @@ const syncToParent = () => {
   if (!seeding) emit('update', committed())
 }
 
-// When an Item Code is picked in a row, auto-load its retail SKU.
+const clearRow = (row) => {
+  row.nat_item_code = ''
+  row.nat_sku = ''
+  control.grid.refresh()
+  syncToParent()
+}
+
+// When an Item Code is picked in a row: it must be a variant of the locked template,
+// and only that single variant is added (no family auto-add). Its SKU comes from the
+// allowed-variants list passed down from the template selection.
 const resolveSku = (field) => {
   const row = field.doc
   const code = field.value
@@ -41,18 +54,35 @@ const resolveSku = (field) => {
     syncToParent()
     return
   }
-  frappe.db.get_value('Item', code, 'ifw_retailskusuffix').then((r) => {
-    const sku = r && r.message && r.message.ifw_retailskusuffix
-    if (!sku) {
-      frappe.show_alert({ message: `No RetailSKUSuffix for ${code}`, indicator: 'red' })
-      row.nat_item_code = ''
-      row.nat_sku = ''
-    } else {
-      row.nat_sku = sku
-    }
-    control.grid.refresh()
-    syncToParent()
-  })
+
+  // A template must be chosen first.
+  if (!props.template) {
+    frappe.show_alert({ message: 'Select a product template first', indicator: 'orange' })
+    clearRow(row)
+    return
+  }
+
+  // Must be a variant of the selected template.
+  const match = (props.allowedVariants || []).find((v) => v.item_code === code)
+  if (!match) {
+    frappe.show_alert({ message: `${code} is not a variant of ${props.template}`, indicator: 'red' })
+    clearRow(row)
+    return
+  }
+
+  // Already selected in another row? Don't add it again.
+  const otherCodes = new Set(
+    (control.grid.df.data || []).filter((r) => r !== row && r.nat_item_code).map((r) => r.nat_item_code)
+  )
+  if (otherCodes.has(code)) {
+    frappe.show_alert({ message: `${code} is already selected`, indicator: 'orange' })
+    clearRow(row)
+    return
+  }
+
+  row.nat_sku = match.sku
+  control.grid.refresh()
+  syncToParent()
 }
 
 const buildGrid = () => {
@@ -73,7 +103,11 @@ const buildGrid = () => {
           label: 'Item Code',
           in_list_view: 1,
           columns: 6,
-          get_query: () => ({ filters: { disabled: 0 } }),
+          // Limit the picker to the selected template's variants only. With no
+          // template chosen, the empty name list resolves to nothing.
+          get_query: () => ({
+            filters: { name: ['in', (props.allowedVariants || []).map((v) => v.item_code)] },
+          }),
           onchange: function () {
             resolveSku(this)
           },
