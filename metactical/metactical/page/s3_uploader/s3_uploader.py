@@ -235,16 +235,17 @@ def get_s3_meta(key):
 
 
 @frappe.whitelist()
-def save_metadata(files, override_full_product=0):
+def save_metadata(files, override_full_product=0, template_item=None):
 	"""Store one upload as a single S3 Product Image Meta Data record.
 
 	`files` is the per-FILE array produced by the uploader; each image's sites are
 	stored tagged with that image (sku + order + role) so they restore per image.
+	`template_item` names the record (`<template> <timestamp>`).
 	"""
 	if isinstance(files, str):
 		files = json.loads(files)
 
-	name = upsert_upload(files, override_full_product)
+	name = upsert_upload(files, override_full_product, template_item)
 	frappe.db.commit()
 	return {"success": True, "records": [name] if name else []}
 

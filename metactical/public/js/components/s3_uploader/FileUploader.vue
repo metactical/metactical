@@ -67,15 +67,15 @@
 
     <!-- Product template (locks the whole upload to one template's variants) -->
     <div class="border rounded-lg p-4 shadow-sm"
-         :class="templateItem ? 'bg-green-50 border-green-300' : 'bg-yellow-50 border-yellow-300'">
+         :class="templateItem ? 'bg-green-50 border-green-300' : 'border-yellow-300'">
       <div class="flex items-center gap-4">
         <div class="flex-1">
           <label class="block text-sm font-bold mb-1"
-                 :class="templateItem ? 'text-green-800' : 'text-yellow-800'">
+                 :class="templateItem ? 'text-green-800' : ''">
             Product Template
           </label>
           <div ref="templateRef"></div>
-          <p class="text-xs mt-1" :class="templateItem ? 'text-green-700' : 'text-yellow-700'">
+          <p class="text-xs mt-1" :class="templateItem ? 'text-green-700' : ''">
             <template v-if="templateItem">
               {{ templateVariants.length }} variant{{ templateVariants.length === 1 ? '' : 's' }} —
               every variant must have all 4 size images.
@@ -212,9 +212,9 @@
         </div>
 
         <!-- Missing Fields Summary -->
-        <div v-if="!allFilesValid" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div v-if="!allFilesValid" class="mt-4 p-3 border border-yellow-200 rounded-lg">
           <h4 class="text-sm font-medium text-yellow-800 mb-2">Missing Required Fields:</h4>
-          <ul class="text-xs text-yellow-700 space-y-1">
+          <ul class="text-xs space-y-1">
             <li v-if="files.some(f => !f.file && !f.isOnServer)">• Some slots still need an image uploaded</li>
             <li v-if="files.some(f => !f.role)">• Some images are missing role assignments</li>
             <li v-if="files.some(f => !f.skus || !f.skus.trim())">• Some images are missing SKU information</li>
@@ -225,7 +225,7 @@
         </div>
 
         <!-- Template / Variant Completeness Messages -->
-        <div v-if="!templateItem" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div v-if="!templateItem" class="mt-4 p-3 border border-yellow-200 rounded-lg">
           <p class="text-sm text-yellow-800">• Select a product template — uploads must be tied to one template.</p>
         </div>
         <div v-else-if="variantImageIssues.length > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1927,7 +1927,8 @@ const startUpload = async () => {
         // its own sites (restored per image on load).
         await callBackend('save_metadata', {
           files: JSON.stringify(perFileEntries()),
-          override_full_product: overrideFullProduct.value ? 1 : 0
+          override_full_product: overrideFullProduct.value ? 1 : 0,
+          template_item: templateItem.value || ''
         })
 
         // Reset all modification flags since metadata is now synced
@@ -2257,7 +2258,6 @@ const buildTemplateControl = () => {
     df: {
       fieldtype: 'Link',
       options: 'Item',
-      label: 'Product Template',
       placeholder: 'Select a product template…',
     },
   })
