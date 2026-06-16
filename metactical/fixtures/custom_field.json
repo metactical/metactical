@@ -16559,7 +16559,7 @@
   "insert_after": "disable_rounded_total",
   "is_system_generated": 0,
   "is_virtual": 0,
-  "label": "First Priority Price List",
+  "label": "Primary Price List (For Franchise Branches)",
   "length": 0,
   "link_filters": null,
   "mandatory_depends_on": null,
