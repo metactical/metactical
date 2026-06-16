@@ -36,7 +36,7 @@
           <button
             v-if="files.length"
             @click="exportData"
-            :disabled="!allFilesValid"
+            :disabled="!allFilesValid || !productValid"
             class="btn btn-default btn-sm"
           >
             Export JSON
@@ -65,10 +65,37 @@
       </div>
     </div>
 
+    <!-- Product template (locks the whole upload to one template's variants) -->
+    <div class="border rounded-lg p-4 shadow-sm"
+         :class="templateItem ? 'bg-green-50 border-green-300' : 'bg-yellow-50 border-yellow-300'">
+      <div class="flex items-center gap-4">
+        <div class="flex-1">
+          <label class="block text-sm font-bold mb-1"
+                 :class="templateItem ? 'text-green-800' : 'text-yellow-800'">
+            Product Template
+          </label>
+          <div ref="templateRef"></div>
+          <p class="text-xs mt-1" :class="templateItem ? 'text-green-700' : 'text-yellow-700'">
+            <template v-if="templateItem">
+              {{ templateVariants.length }} variant{{ templateVariants.length === 1 ? '' : 's' }} —
+              every variant must have all 4 size images.
+            </template>
+            <template v-else>
+              Select a product template first. Each image can then only use this template's variants.
+            </template>
+          </p>
+        </div>
+        <span v-if="templateItem"
+              class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-200 text-green-800 border border-green-300">
+          🔒 {{ templateItem }}
+        </span>
+      </div>
+    </div>
+
     <!-- Stats bar -->
     <div v-if="files.length" class="bg-gray-50 border rounded-lg p-4">
       <div class="flex items-center justify-between text-sm text-gray-600">
-        <span>{{ files.length }} images uploaded</span>
+        <span>{{ files.filter(f => f.file || f.isOnServer).length }} / {{ files.length }} images added</span>
         <span>{{ groupFilesByProduct().length }} products detected</span>
         <span>Roles: {{ [...new Set(files.map(f => f.role))].filter(r => r).join(', ') }}</span>
       </div>
@@ -122,7 +149,7 @@
       <div class="space-y-3">
         <h3 class="text-lg font-semibold text-gray-800">Validation Status</h3>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <!-- File Validation Status -->
           <div class="bg-gray-50 p-4 rounded-lg">
             <div class="flex items-center justify-between mb-2">
@@ -155,6 +182,20 @@
             </div>
           </div>
 
+          <!-- Variant Completeness Status -->
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-700">Variants Complete</span>
+              <span :class="productValid ? 'text-green-600' : 'text-red-600'"
+                    class="text-sm font-bold">
+                {{ templateItem ? `${templateVariants.length - variantImageIssues.length}/${templateVariants.length}` : '—' }}
+              </span>
+            </div>
+            <div class="text-xs text-gray-500">
+              {{ templateItem ? 'Every variant needs all 4 size images' : 'Select a template' }}
+            </div>
+          </div>
+
           <!-- Upload Ready Status -->
           <div class="bg-gray-50 p-4 rounded-lg">
             <div class="flex items-center justify-between mb-2">
@@ -174,11 +215,25 @@
         <div v-if="!allFilesValid" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <h4 class="text-sm font-medium text-yellow-800 mb-2">Missing Required Fields:</h4>
           <ul class="text-xs text-yellow-700 space-y-1">
+            <li v-if="files.some(f => !f.file && !f.isOnServer)">• Some slots still need an image uploaded</li>
             <li v-if="files.some(f => !f.role)">• Some images are missing role assignments</li>
             <li v-if="files.some(f => !f.skus || !f.skus.trim())">• Some images are missing SKU information</li>
             <li v-if="files.some(f => !f.sites || f.sites.length === 0)">• Some images have no sites selected</li>
             <li v-if="files.some(f => f.imageOrder === undefined || f.imageOrder === null)">• Some images are missing image order</li>
             <li v-if="files.some(f => f.isBroken && !f.file)">• Some images are broken and need replacement files</li>
+          </ul>
+        </div>
+
+        <!-- Template / Variant Completeness Messages -->
+        <div v-if="!templateItem" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">• Select a product template — uploads must be tied to one template.</p>
+        </div>
+        <div v-else-if="variantImageIssues.length > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <h4 class="text-sm font-medium text-red-800 mb-2">Variants missing size images:</h4>
+          <ul class="text-xs text-red-700 space-y-1">
+            <li v-for="v in variantImageIssues" :key="v.sku">
+              • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) missing {{ v.missing.join(', ') }}
+            </li>
           </ul>
         </div>
 
@@ -466,6 +521,33 @@
               </p>
             </div>
 
+            <!-- Add Image (scaffolded slot awaiting an upload) -->
+            <div v-else-if="!file.file" class="space-y-3">
+              <label class="block text-sm font-medium text-gray-700">Image</label>
+              <div class="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  @change="addImageToPlaceholder(file, $event)"
+                  class="hidden"
+                  :ref="`addImg-${idx}`"
+                />
+                <button
+                  @click="$refs[`addImg-${idx}`][0].click()"
+                  class="btn btn-primary btn-sm flex items-center gap-2"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                  </svg>
+                  Add Image
+                </button>
+                <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Needs image</span>
+              </div>
+              <p class="text-xs text-gray-500">
+                Upload the <strong>{{ file.role }}</strong> image for <strong>{{ file.skus }}</strong>
+              </p>
+            </div>
+
             <!-- Form inputs in stacked layout -->
             <div class="space-y-12 max-w-lg">
             <!-- Role selector -->
@@ -519,6 +601,8 @@
               </div>
               <SkuManager
                 :sku-items="file.skuItems"
+                :template="templateItem"
+                :allowed-variants="templateVariants"
                 @update="(items) => updateSkuItems(file, items)"
               />
             </div>
@@ -692,6 +776,104 @@ const files = ref([])
 const showSettings = ref(false)
 const overrideFullProduct = ref(false) // Default to true
 
+// One product template per upload. All per-image SKU pickers are limited to this
+// template's variants, and every variant must have all 4 images before upload/export.
+const templateItem = ref(null)            // resolved template Item name
+const templateVariants = ref([])          // [{ item_code, sku }] — the allowed variants
+const templateRef = ref(null)             // DOM node for the native Link control
+let templateControl = null
+const ROLES = ['icon', 'small', 'medium', 'large']
+
+// Build one empty upload card per (variant × role): N variants → N×4 cards, each
+// pre-assigned to its variant's SKU. The user just drops the image into each.
+const scaffoldVariantCards = () => {
+  const cards = []
+  templateVariants.value.forEach(v => {
+    ROLES.forEach(role => {
+      cards.push({
+        name: `${v.sku}_${role}.jpg`,
+        type: null,
+        file: null,
+        role,
+        width: 0,
+        height: 0,
+        skus: v.sku,
+        skuItems: [{ item_code: v.item_code, sku: v.sku }],
+        newItemCode: '',
+        skuError: '',
+        resolvingItem: false,
+        sites: [],
+        imageOrder: 0,
+        preview: null,
+        isOnServer: false,
+        serverPath: null,
+        isModified: false,
+        isPlaceholder: true, // awaiting an image upload
+      })
+    })
+  })
+  files.value.push(...cards)
+}
+
+// Resolve the picked Item to its template + variant set and lock the page to it.
+const applyTemplateFromItem = async (itemCode) => {
+  if (!itemCode) {
+    templateItem.value = null
+    templateVariants.value = []
+    return
+  }
+  try {
+    const res = await callBackend('get_item_family', { item_code: itemCode })
+    templateItem.value = (res && (res.template || itemCode)) || null
+    templateVariants.value = (res && res.items) || []
+  } catch (e) {
+    console.error('Failed to resolve template:', e)
+    frappe.show_alert({ message: `Failed to resolve ${itemCode}`, indicator: 'red' })
+    return
+  }
+
+  // Discard any stale scaffold cards from a previous template.
+  const hadRealFiles = files.value.some(f => !f.isPlaceholder)
+  files.value = files.value.filter(f => !f.isPlaceholder)
+
+  // Drop any already-assigned SKUs that aren't variants of the new template
+  // (applies to real/loaded files that we keep).
+  const allowed = new Set(templateVariants.value.map(v => v.sku))
+  let removed = 0
+  files.value.forEach(file => {
+    const kept = (file.skuItems || []).filter(i => allowed.has(i.sku))
+    if (kept.length !== (file.skuItems || []).length) removed += 1
+    file.skuItems = kept
+    file.skus = kept.filter(i => i.sku).map(i => i.sku).join(', ')
+  })
+  if (removed > 0) {
+    frappe.show_alert({ message: `Cleared incompatible SKUs on ${removed} image${removed > 1 ? 's' : ''}`, indicator: 'orange' })
+  }
+
+  // With no real images yet, scaffold one upload card per variant × role.
+  if (!hadRealFiles && templateVariants.value.length) {
+    scaffoldVariantCards()
+    frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
+  }
+
+  // Reflect the resolved template back into the picker input.
+  if (templateControl && templateItem.value && templateControl.get_value() !== templateItem.value) {
+    templateControl.set_value(templateItem.value)
+  }
+}
+
+// After loading images, lock the page to the template of the first resolved item,
+// so a loaded record/JSON is immediately editable under the same template constraint.
+const setTemplateFromLoadedImages = async (allImages) => {
+  for (const im of (allImages || [])) {
+    const withCode = (im.skuItems || []).find(i => i.item_code)
+    if (withCode) {
+      await applyTemplateFromItem(withCode.item_code)
+      return
+    }
+  }
+}
+
 // Upload state
 const isUploading = ref(false)
 const uploadComplete = ref(false)
@@ -785,26 +967,56 @@ const allFilesValid = computed(() => {
            file.skus && file.skus.trim() && // Has SKUs
            file.sites && file.sites.length > 0 && // Has sites selected
            (file.imageOrder >= 0) && // Has image order (including 0)
+           (file.file || file.isOnServer) && // Has an actual image (scaffold slots need an upload)
            (!file.isBroken || file.file) // Not broken OR has replacement file
   })
 })
+
+// Product-level rule: every variant of the locked template must have all 4 size
+// images. Returns the variants that are missing one or more roles.
+const variantImageIssues = computed(() => {
+  if (!templateItem.value) return []
+  // For each variant sku, the roles that are present across all images.
+  const rolesBySku = {}
+  templateVariants.value.forEach(v => { rolesBySku[v.sku] = new Set() })
+  files.value.forEach(file => {
+    // A role only counts once the slot actually has an image.
+    if (!file.role || !(file.file || file.isOnServer)) return
+    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
+    skuList.forEach(sku => {
+      if (rolesBySku[sku]) rolesBySku[sku].add(file.role)
+    })
+  })
+  return templateVariants.value
+    .map(v => ({ sku: v.sku, item_code: v.item_code, missing: ROLES.filter(r => !rolesBySku[v.sku].has(r)) }))
+    .filter(v => v.missing.length > 0)
+})
+
+// Product-level validity: a template is chosen, there are files, and every variant
+// has all 4 images.
+const productValid = computed(() =>
+  !!templateItem.value && files.value.length > 0 && variantImageIssues.value.length === 0
+)
 
 // Computed property to check if upload is possible
 const canUpload = computed(() => {
   // Allow upload if S3 is configured and either:
   // 1. There are no files (metadata-only upload)
-  // 2. All files are valid
-  return isS3Configured.value && (files.value.length === 0 || allFilesValid.value)
+  // 2. All files are valid AND the product (every variant) is complete
+  if (!isS3Configured.value) return false
+  if (files.value.length === 0) return true
+  return allFilesValid.value && productValid.value
 })
 
 // Computed property to get validation summary
 const validationSummary = computed(() => {
   const total = files.value.length
   const valid = files.value.filter(file => 
-    file.role && 
-    file.skus && file.skus.trim() && 
-    file.sites && file.sites.length > 0 && 
+    file.role &&
+    file.skus && file.skus.trim() &&
+    file.sites && file.sites.length > 0 &&
     (file.imageOrder >= 0) &&
+    (file.file || file.isOnServer) && // Scaffold slots need an uploaded image
     (!file.isBroken || file.file) // Include broken images as invalid unless they have a replacement file
   ).length
   
@@ -1575,6 +1787,30 @@ const updateServerFile = async (file, event) => {
   event.target.value = ''
 }
 
+// Add an image to a scaffolded (placeholder) card. Keeps the card's preset role
+// and SKU; just attaches the uploaded image and turns it into a real file.
+const addImageToPlaceholder = async (file, event) => {
+  const newFile = event.target.files[0]
+  if (!newFile || !newFile.type.startsWith('image/')) return
+  try {
+    const img = await loadImage(newFile)
+    file.file = newFile
+    file.width = img.width
+    file.height = img.height
+    file.type = newFile.type
+    const ext = (newFile.name.split('.').pop() || 'jpg').toLowerCase()
+    const sku = (file.skus || '').split(',')[0].trim()
+    file.name = `${sku}_${file.role}.${ext}`
+    if (file.preview) URL.revokeObjectURL(file.preview)
+    file.preview = URL.createObjectURL(newFile)
+    file.isPlaceholder = false
+    file.isModified = true
+  } catch (error) {
+    console.error('Failed to add placeholder image:', error)
+  }
+  event.target.value = ''
+}
+
 // Modified upload functionality
 const startUpload = async () => {
   if (!canUpload.value) {
@@ -1771,6 +2007,7 @@ const loadS3Metadata = async (metaFile) => {
     })
 
     await loadAllImages(allImages)
+    await setTemplateFromLoadedImages(allImages)
 
     // Close modal
     showLoadFromS3Modal.value = false
@@ -1979,6 +2216,7 @@ const loadFromS3Meta = async (metaKey) => {
     })
 
     await loadAllImages(allImages)
+    await setTemplateFromLoadedImages(allImages)
 
     showLoadFromS3Modal.value = false
     s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
@@ -2009,10 +2247,34 @@ const isFileModified = (file) => {
   )
 }
 
+// Build the top-level template picker (native Frappe Link to Item).
+const buildTemplateControl = () => {
+  if (!templateRef.value) return
+  templateRef.value.innerHTML = ''
+  templateControl = frappe.ui.form.make_control({
+    parent: templateRef.value,
+    render_input: true,
+    df: {
+      fieldtype: 'Link',
+      options: 'Item',
+      label: 'Product Template',
+      placeholder: 'Select a product template…',
+    },
+  })
+  templateControl.refresh()
+  templateControl.$input.on('change awesomplete-selectcomplete', () => {
+    setTimeout(() => {
+      const val = templateControl.get_value() || ''
+      if (val !== templateItem.value) applyTemplateFromItem(val)
+    }, 0)
+  })
+}
+
 // Load S3 config + selectable sites on mount
 onMounted(() => {
   loadS3Config()
   loadSites()
+  nextTick(buildTemplateControl)
 })
 
 // Reload config (used by the page's "refresh" toolbar action)
