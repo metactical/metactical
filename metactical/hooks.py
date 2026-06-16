@@ -211,7 +211,7 @@ scheduler_events = {
 #	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty",
-		# "metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
+		"metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
 	],
 #	"hourly": [
 #		"metactical.api.shipstation.sync_shipping_status"
@@ -906,7 +906,8 @@ fixtures = [{
 			"Item Attribute Value-short_name",
 			"Website Specification Label-custom_show_in_table",
 			"Item Attribute-custom__nat_show_in_table",
-			"Item Attribute-custom_is_search_filter"
+			"Item Attribute-custom_is_search_filter",
+			"POS Profile-custom_fist_priority_price_list"
 		]]]
 	},
 	{
