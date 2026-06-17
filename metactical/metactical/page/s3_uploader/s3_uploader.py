@@ -236,6 +236,77 @@ def find_template_record(template_item):
 	return {"name": rows[0]} if rows else {}
 
 
+def _meta_skus(meta):
+	"""All productsku values referenced by a legacy metadata JSON."""
+	found = set()
+	products = meta.get("products")
+	if isinstance(products, list):
+		for p in products:
+			ps = p.get("productsku")
+			if isinstance(ps, list):
+				found.update(x for x in ps if x)
+			elif ps:
+				found.add(ps)
+	elif isinstance(products, dict):
+		for p in products.values():
+			found.update(x for x in (p.get("skus") or []) if x)
+	return found
+
+
+@frappe.whitelist()
+def find_legacy_meta(skus):
+	"""Find the old system's metadata JSON for a product without scanning the folder.
+
+	Legacy meta files are named `<sku1>-<sku2>-..._metadata.json`, always starting with one
+	of the product's SKUs. So a prefix LIST per variant SKU narrows to a handful of candidates
+	server-side — fast on a bucket of any size — and each candidate is then content-confirmed
+	against the SKUs (handles SKUs that themselves contain "-"). Returns
+	{"found": True, "key", "name"} or {"found": False}.
+	"""
+	if isinstance(skus, str):
+		skus = json.loads(skus)
+	sku_set = {s for s in (skus or []) if s}
+	if not sku_set:
+		return {"found": False}
+
+	settings = _get_settings()
+	client = settings.get_client()
+	meta_prefix = f"{BASE_PREFIX}/meta/"
+
+	# Candidate keys via a SKU-prefixed LIST (server-side filtered, ~one call per SKU).
+	candidates = []
+	seen = set()
+	for sku in sku_set:
+		token = None
+		while True:
+			kwargs = {"Bucket": settings.nat_bucket_name, "Prefix": f"{meta_prefix}{sku}"}
+			if token:
+				kwargs["ContinuationToken"] = token
+			resp = client.list_objects_v2(**kwargs)
+			for obj in resp.get("Contents", []):
+				key = obj["Key"]
+				if key.endswith(".json") and key not in seen:
+					seen.add(key)
+					candidates.append(key)
+			if resp.get("IsTruncated"):
+				token = resp.get("NextContinuationToken")
+			else:
+				break
+
+	# Confirm by content — a prefix can over-match (e.g. "96670" vs "966700"), so the
+	# productsku list is the source of truth. Candidates are few, so this is cheap.
+	for key in candidates[:50]:
+		try:
+			body = client.get_object(Bucket=settings.nat_bucket_name, Key=key)["Body"].read()
+			meta = json.loads(body)
+		except Exception:
+			continue
+		if sku_set & _meta_skus(meta):
+			return {"found": True, "key": key, "name": key.split("/")[-1]}
+
+	return {"found": False}
+
+
 @frappe.whitelist()
 def get_s3_meta(key):
 	"""Fetch and parse a legacy metadata JSON file from S3. Returns {found, metadata}."""
