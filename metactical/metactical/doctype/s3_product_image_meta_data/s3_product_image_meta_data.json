@@ -6,27 +6,16 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_3fll",
-  "amended_from",
   "nat_override_full_product",
+  "nat_product_template",
   "nat_skus",
   "nat_sites",
-  "nat_images",
-  "nat_uploaded_by"
+  "nat_images"
  ],
  "fields": [
   {
    "fieldname": "section_break_3fll",
    "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "S3 Product Image Meta Data",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
   },
   {
    "default": "0",
@@ -57,18 +46,17 @@
    "reqd": 1
   },
   {
-   "fieldname": "nat_uploaded_by",
+   "fieldname": "nat_product_template",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Uploaded By",
-   "options": "User"
+   "label": "Product Template",
+   "options": "Item",
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "is_submittable": 1,
  "links": [],
- "modified": "2026-06-03 14:22:37.314673",
+ "modified": "2026-06-17 07:20:12.365804",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Meta Data",

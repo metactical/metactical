@@ -222,6 +222,21 @@ def get_item_family(item_code):
 
 
 @frappe.whitelist()
+def find_template_record(template_item):
+	"""Return the existing record for a product template, if any: {"name": ...} or {}."""
+	if not template_item:
+		return {}
+	rows = frappe.get_all(
+		"S3 Product Image Meta Data",
+		filters={"nat_product_template": template_item},
+		order_by="modified desc",
+		limit=1,
+		pluck="name",
+	)
+	return {"name": rows[0]} if rows else {}
+
+
+@frappe.whitelist()
 def get_s3_meta(key):
 	"""Fetch and parse a legacy metadata JSON file from S3. Returns {found, metadata}."""
 	settings = _get_settings()
@@ -252,8 +267,8 @@ def save_metadata(files, override_full_product=0, template_item=None):
 
 @frappe.whitelist()
 def list_metadata(filter=None):
-	"""List submitted S3 Product Image Meta Data records (optionally by SKU)."""
-	record_filters = {"docstatus": 1}
+	"""List S3 Product Image Meta Data records (optionally by SKU)."""
+	record_filters = {}
 	if filter:
 		# SKUs live on the child table now; find parents with a matching SKU.
 		parents = frappe.get_all(
@@ -407,12 +422,12 @@ def build_export_json(names=None):
 
 	Each record holds one upload, stored per-SKU. SKUs whose sites AND images are
 	identical are merged into one product (productsku lists all of them). Pass `names`
-	(a JSON list or single name) to limit records; otherwise all submitted records.
+	(a JSON list or single name) to limit records; otherwise all records.
 	"""
 	if isinstance(names, str):
 		names = json.loads(names) if names.strip().startswith("[") else [names]
 
-	filters = {"docstatus": 1}
+	filters = {}
 	if names:
 		filters["name"] = ["in", names]
 
