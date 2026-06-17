@@ -85,7 +85,7 @@ def create_sales_order(*args, **kwargs):
         for idx, item in enumerate(so.items, start=1):
             packing_slips.append({
                 "parcel_template": f"BOX 1",
-                "dimensions": {"height": 1, "width": 2, "length": 10},
+                "dimensions": {"height": 1, "width": 2, "length": 3},
                 "weight": 1,
                 "items": [{
                     "item_code": item.item_code,
@@ -179,15 +179,119 @@ def pack_order(*args, **kwargs):
             "packing_slips": packing_slip_docs,
         }
         
-        frappe.db.set_value("PPS API Log", log, "response", json.dumps(response))
+        frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
         frappe.db.commit()
-        
+
         return response
 
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title=f"Error packing order {order_id}")
         if log:
-            frappe.db.set_value("PPS API Log", log, "error", json.dumps(_error(str(e))))
+            frappe.db.set_value("PPS API Log", log, "error", frappe.as_json(_error(str(e))))
+        frappe.db.commit()
+        return _error(str(e))
+
+@frappe.whitelist()
+def create_label(*args, **kwargs):
+    """
+    Submit a shipment and create a shipping label using the selected rate
+    option(s) returned from `pack_order` (the `canada_post` / `purolator`
+    rate groups).
+
+    Required params:
+        shipment    - Shipment docname (e.g. "SHIPMENT-05598")
+        provider    - "Canada Post" or "Purolator"
+        selections  - dict keyed by parcel name (the "name" field of each
+                      rate group from pack_order) -> the chosen rate item,
+                      e.g.:
+                      {
+                        "drugqpvo7h": {
+                            "carrier_service": "PurolatorExpress",
+                            "service_name": "PurolatorExpress",
+                            "shipment_amount": 115.57
+                        }
+                      }
+                      For a single-parcel shipment, a flat dict with one
+                      entry is fine too.
+
+    Optional params:
+        submit_shipment  - submit the Shipment doc before creating the
+                            label if it is still in draft (default true)
+    """
+    form_data = dict(frappe.form_dict)
+    log = create_log(form_data, "Create Label")
+    user = 
+
+    shipment = form_data.get("shipment")
+    provider = form_data.get("provider")
+    selections = form_data.get("selections")
+    submit_shipment = form_data.get("submit_shipment", True)
+    if isinstance(submit_shipment, str):
+        submit_shipment = submit_shipment.lower() not in ("0", "false", "no")
+
+    try:
+        if not shipment:
+            return _fail_with_log(log, "shipment is required.")
+        if not frappe.db.exists("Shipment", shipment):
+            return _fail_with_log(log, f"Shipment {shipment} does not exist.")
+        if not provider:
+            return _fail_with_log(log, "provider is required.")
+        if provider not in ("Canada Post", "Purolator"):
+            return _fail_with_log(log, f"Unsupported provider: {provider}. Use 'Canada Post' or 'Purolator'.")
+        if not selections:
+            return _fail_with_log(log, "selections is required (chosen rate per parcel).")
+
+        if isinstance(selections, str):
+            try:
+                selections = json.loads(selections)
+            except ValueError:
+                return _fail_with_log(log, "selections must be valid JSON.")
+
+        carrier_service = {}
+        service_name = {}
+        shipment_amount = 0.0
+
+        for parcel_name, choice in selections.items():
+            carrier_service[parcel_name] = choice.get("carrier_service")
+            service_name[parcel_name] = choice.get("service_name")
+            shipment_amount += float(choice.get("shipment_amount") or 0)
+
+        # --- Submit the shipment first, if required ---
+        shipment_doc = frappe.get_doc("Shipment", shipment)
+        if submit_shipment and shipment_doc.docstatus == 0:
+            shipment_doc.submit()
+            frappe.db.commit()
+
+        from metactical.utils.shipping.shipping import create_shipping
+        
+        result = create_shipping(
+            name=shipment,
+            provider=provider,
+            carrier_service=carrier_service,
+            service_name=service_name,
+            shipment_amount=shipment_amount,
+        )
+
+        if not result or not result.get("labels"):
+            return _fail_with_log(log, f"No labels returned from {provider}.")
+
+        response = {
+            "status": "success",
+            "shipment": shipment,
+            "provider": provider,
+            "labels": result.get("labels"),
+            "printing_disabled": result.get("printing_disabled"),
+        }
+
+        frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
+        frappe.db.commit()
+
+        return response
+
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error creating label for shipment {shipment}")
+        if log:
+            frappe.db.set_value("PPS API Log", log, "error", frappe.as_json(_error(str(e))))
         frappe.db.commit()
         return _error(str(e))
 
@@ -229,9 +333,9 @@ def _error(message: str) -> dict:
     return {"status": "error", "message": message}
 
 def _fail_with_log(log, message: str) -> dict:
-    frappe.db.rollback()
     if log:
         frappe.db.set_value("PPS API Log", log, "error", json.dumps(_error(message)))
+        frappe.db.commit()
     return _error(message)
 
 
