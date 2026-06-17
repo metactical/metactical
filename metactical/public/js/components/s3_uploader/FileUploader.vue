@@ -792,13 +792,127 @@ const applyTemplateFromItem = async (itemCode) => {
       s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
     }
   } else if (templateVariants.value.length) {
-    scaffoldVariantCards()
-    frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
+    // No new-system record yet — check the OLD S3 system before scaffolding.
+    let legacy = null
+    try {
+      legacy = await callBackend('find_legacy_meta', { skus: JSON.stringify(templateVariants.value.map(v => v.sku)) })
+    } catch (e) {
+      console.error('Failed to check the old system:', e)
+    }
+    if (legacy && legacy.found) {
+      promptMigrateOrCreate(legacy.key)
+    } else {
+      scaffoldAndNotify()
+    }
   }
 
   // Reflect the resolved template back into the picker input.
   if (templateControl && templateItem.value && templateControl.get_value() !== templateItem.value) {
     templateControl.set_value(templateItem.value)
+  }
+}
+
+// Build the empty per-variant upload slots and announce it.
+const scaffoldAndNotify = () => {
+  resetFiles()
+  scaffoldVariantCards()
+  frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
+}
+
+// Small popup when old-system data exists: migrate it, or start fresh.
+const promptMigrateOrCreate = (metaKey) => {
+  const d = new frappe.ui.Dialog({
+    title: __('Found in old system'),
+    primary_action_label: __('Migrate'),
+    primary_action: () => { d.hide(); migrateFromLegacy(metaKey) },
+  })
+  d.$body.html(
+    `<div style="padding:6px 0 12px">This product already has data in the old S3 system. ` +
+    `Do you want to <b>migrate</b> that data, or <b>create a new</b> upload?</div>`
+  )
+  d.set_secondary_action_label(__('Create new'))
+  d.set_secondary_action(() => { d.hide(); scaffoldAndNotify() })
+  d.show()
+}
+
+// Migrate a product from the old system: load its legacy metadata JSON + images.
+const migrateFromLegacy = async (metaKey) => {
+  isLoadingFromS3.value = true
+  s3LoadingProgress.value = { completed: 0, total: 0, current: 'Migrating from old system…' }
+  try {
+    const res = await callBackend('get_s3_meta', { key: metaKey })
+    if (!res || !res.found) {
+      frappe.show_alert({ message: 'Old metadata not found; creating new', indicator: 'orange' })
+      scaffoldAndNotify()
+      return
+    }
+    const metadata = res.metadata || {}
+    resetFiles()
+
+    const LEGACY_ROLES = ['icon', 'small', 'medium', 'large']
+    // Dedupe by (role, order, filename); combine SKUs + sites of each referencing product.
+    const byKey = {}
+    const addImage = (role, order, filename, skus, sites) => {
+      if (!filename) return
+      const fn = normalizeFilename(filename)
+      const key = `${role}|${order}|${fn}`
+      if (!byKey[key]) byKey[key] = { role, order, filename: fn, skus: new Set(), sites: new Set() }
+      skus.forEach(s => s && byKey[key].skus.add(s))
+      sites.forEach(s => s && byKey[key].sites.add(s))
+    }
+
+    if (Array.isArray(metadata.products)) {
+      metadata.products.forEach(product => {
+        const skus = Array.isArray(product.productsku) ? product.productsku : [product.productsku].filter(Boolean)
+        const sites = product.sites || []
+        ;(product.images || []).forEach(imageSet => {
+          LEGACY_ROLES.forEach(role => {
+            if (imageSet[role]) addImage(role, imageSet.order || 0, String(imageSet[role]).split('/').pop(), skus, sites)
+          })
+        })
+      })
+    } else if (metadata.products && typeof metadata.products === 'object') {
+      Object.values(metadata.products).forEach(productData => {
+        const skus = productData.skus || []
+        const sites = productData.sites || []
+        Object.entries(productData.images || {}).forEach(([role, imgs]) => {
+          ;(imgs || []).forEach(info => addImage(role, info.order || 0, info.filename, skus, sites))
+        })
+      })
+    }
+
+    // Resolve SKUs → item codes (legacy JSON only carries SKUs).
+    const allSkus = [...new Set(Object.values(byKey).flatMap(v => [...v.skus]))]
+    let itemBySku = {}
+    if (allSkus.length) {
+      try {
+        itemBySku = (await callBackend('resolve_item_codes', { skus: JSON.stringify(allSkus) })) || {}
+      } catch (e) {
+        console.error('Failed to resolve item codes:', e)
+      }
+    }
+
+    // Keep only images that belong to this template's variants.
+    const allowedSku = new Set(templateVariants.value.map(v => v.sku))
+    const allImages = Object.values(byKey).map(v => {
+      const skus = [...v.skus].filter(s => allowedSku.has(s))
+      return {
+        role: v.role,
+        imageInfo: { filename: v.filename, order: v.order },
+        skus,
+        skuItems: skus.map(s => ({ item_code: itemBySku[s] || null, sku: s })),
+        sites: [...v.sites].filter(s => siteNames.value.includes(s))
+      }
+    }).filter(im => im.skus.length)
+
+    await loadAllImages(allImages)
+    frappe.show_alert({ message: 'Migrated data from the old system. Review and Upload to Save', indicator: 'green' })
+  } catch (e) {
+    console.error('Migration failed:', e)
+    frappe.show_alert({ message: 'Migration failed', indicator: 'red' })
+  } finally {
+    isLoadingFromS3.value = false
+    s3LoadingProgress.value = { completed: 0, total: 0, current: '' }
   }
 }
 
