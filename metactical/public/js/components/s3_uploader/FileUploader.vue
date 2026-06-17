@@ -73,6 +73,24 @@
       </div>
     </div>
 
+    <!-- Image Orders (check to add a whole order's 4 sizes for every variant; uncheck to remove) -->
+    <div v-if="templateItem" class="border rounded-lg p-4 shadow-sm">
+      <label class="block text-sm font-bold mb-2">Image Orders</label>
+      <div class="flex flex-wrap gap-x-5 gap-y-2">
+        <label v-for="n in ORDER_OPTIONS" :key="n" class="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            :checked="existingOrders.has(n)"
+            @change="toggleOrder(n, $event.target.checked)"
+          />
+          Order {{ n }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        </label>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Check an order to add icon/small/medium/large slots for every variant; uncheck to remove that order.
+      </p>
+    </div>
+
     <!-- Stats bar -->
     <div v-if="files.length" class="bg-gray-50 border rounded-lg p-4">
       <div class="flex items-center justify-between text-sm text-gray-600">
@@ -684,35 +702,63 @@ const templateRef = ref(null)             // DOM node for the native Link contro
 let templateControl = null
 const ROLES = ['icon', 'small', 'medium', 'large']
 
-// Build one empty upload card per (variant × role): N variants → N×4 cards, each
-// pre-assigned to its variant's SKU. The user just drops the image into each.
-const scaffoldVariantCards = () => {
+// One empty placeholder card for a (variant, role, order) — awaiting an image upload.
+const buildVariantCard = (v, role, order) => ({
+  name: order ? `${v.sku}_${order}_${role}.jpg` : `${v.sku}_${role}.jpg`,
+  type: null,
+  file: null,
+  role,
+  width: 0,
+  height: 0,
+  skus: v.sku,
+  skuItems: [{ item_code: v.item_code, sku: v.sku }],
+  newItemCode: '',
+  skuError: '',
+  resolvingItem: false,
+  sites: [],
+  imageOrder: order,
+  preview: null,
+  isOnServer: false,
+  serverPath: null,
+  isModified: false,
+  isPlaceholder: true,
+})
+
+// Scaffold one image order: a card per (variant × role) at `order`.
+const scaffoldOrder = (order) => {
   const cards = []
   templateVariants.value.forEach(v => {
-    ROLES.forEach(role => {
-      cards.push({
-        name: `${v.sku}_${role}.jpg`,
-        type: null,
-        file: null,
-        role,
-        width: 0,
-        height: 0,
-        skus: v.sku,
-        skuItems: [{ item_code: v.item_code, sku: v.sku }],
-        newItemCode: '',
-        skuError: '',
-        resolvingItem: false,
-        sites: [],
-        imageOrder: 0,
-        preview: null,
-        isOnServer: false,
-        serverPath: null,
-        isModified: false,
-        isPlaceholder: true, // awaiting an image upload
-      })
-    })
+    ROLES.forEach(role => cards.push(buildVariantCard(v, role, order)))
   })
   files.value.push(...cards)
+}
+
+// Build the default (order 0) upload slots for every variant.
+const scaffoldVariantCards = () => scaffoldOrder(0)
+
+// Fixed image-order checkboxes (Order 0…Order 10). Display number = internal imageOrder.
+const ORDER_OPTIONS = Array.from({ length: 11 }, (_, n) => n)
+
+// Which orders currently have cards — drives the checked state of the boxes.
+const existingOrders = computed(() => new Set(files.value.map(f => f.imageOrder)))
+
+// Add an order's empty 4-size slots for every variant (no-op if it already exists).
+const addOrderSlots = (order) => {
+  if (existingOrders.value.has(order)) return
+  scaffoldOrder(order)
+}
+
+// Remove every card of an order (revoking previews) — drops it from the working set.
+const removeOrder = (order) => {
+  files.value.forEach(f => {
+    if (f.imageOrder === order && f.preview) URL.revokeObjectURL(f.preview)
+  })
+  files.value = files.value.filter(f => f.imageOrder !== order)
+}
+
+const toggleOrder = (order, checked) => {
+  if (checked) addOrderSlots(order)
+  else removeOrder(order)
 }
 
 // Clear the file cards (and upload history) without touching the chosen template.
