@@ -514,6 +514,19 @@ def build_export_json(names=None):
 	return {"products": products}
 
 
+def s3_product_payload(name):
+	"""JSON string of a record's products ({"products": [...]}), for the RabbitMQ webhook.
+
+	Exposed to Jinja via hooks (`jinja.methods`) so the webhook body can embed the metadata
+	inline — the webhook renders `doc` as a plain dict, so a controller method can't be used.
+
+	Uses plain `json.dumps` (not `frappe.as_json`, which sorts keys) so the output matches the
+	"Download JSON" button byte-for-byte in key order.
+	"""
+	doc = frappe.get_doc("S3 Product Image Meta Data", name)
+	return json.dumps({"products": _record_products(doc)})
+
+
 def _strip_data_url(content):
 	"""Accept either a bare base64 string or a `data:<type>;base64,<data>` URL."""
 	if content and content.startswith("data:") and "," in content:
