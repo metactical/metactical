@@ -27,7 +27,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Field",
-   "options": "item_code\nitem_name\nitem_group\nstock_uom\nis_trashed\nhas_variants\ndisabled\nvaluation_rate\nstandard_rate\nprice_list_rate\ndiscounted_price\ncustom_field\nifw_retailskusuffix\nbrand\nsupplier\ndefault_supplier\nhas_inventory\nvariant_of\nvariants_have_no_inventory",
+   "options": "item_code\nitem_name\nitem_group\nstock_uom\nis_trashed\nhas_variants\ndisabled\nvaluation_rate\nstandard_rate\nprice_list_rate\ndiscounted_price\ncustom_field\nifw_retailskusuffix\nbrand\nsupplier\ndefault_supplier\nhas_inventory\nvariant_of\nvariants_have_no_inventory\nneb_variantavailabilityrule",
    "reqd": 1
   },
   {

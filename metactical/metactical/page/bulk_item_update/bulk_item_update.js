@@ -33,7 +33,8 @@ const FIELD_OPTIONS = [
     { value: "discounted_price", label: "Discounted Price" },
     { value: "standard_rate",    label: "Standard Rate (Item Price)" },
     { value: "price_list_rate",  label: "Price List Rate (Item Price)" },
-    { value: 'variant_of',      label: 'Variant Of' },
+    { value: 'variant_of',                label: 'Variant Of' },
+    { value: 'neb_variantavailabilityrule', label: 'Variant Availability Rule' },
 ];
 
 const OPERATOR_OPTIONS = [
@@ -46,28 +47,28 @@ const OPERATOR_OPTIONS = [
 
 // ─── Action types ───
 const ACTION_TYPE_OPTIONS = [
-    { value: "UpdateItemGroup",       label: "Update Item Group" },
-    { value: "AddTag",                label: "Add Tag" },
-    { value: "RemoveTag",             label: "Remove Tag" },
-    { value: "UpdateUOM",             label: "Update UOM" },
-    { value: "DisableItem",           label: "Disable Item" },
-    { value: "EnableItem",            label: "Enable Item" },
-    { value: "UpdateValuationRate",   label: "Update Valuation Rate" },
-    { value: "UpdateDescription",     label: "Update Description" },
-    { value: "UpdateBrand",           label: "Update Brand" },
-    { value: "UpdateLastPingedOn",    label: "Update Last Pinged On" },
+    { value: "UpdateItemGroup",              label: "Update Item Group" },
+    { value: "AddTag",                       label: "Add Tag" },
+    { value: "RemoveTag",                    label: "Remove Tag" },
+    { value: "DisableItem",                  label: "Disable Item" },
+    { value: "EnableItem",                   label: "Enable Item" },
+    { value: "UpdateValuationRate",          label: "Update Valuation Rate" },
+    { value: "UpdateBrand",                  label: "Update Brand" },
+    { value: "UpdateLastPingedOn",           label: "Update Last Pinged On" },
+    { value: "UpdateVariantAvailabilityRule", label: "Update Variant Availability Rule" },
 ];
 
 const NO_VALUE_ACTIONS = new Set(["DisableItem", "EnableItem", "UpdateLastPingedOn"]);
+const OPTIONAL_VALUE_ACTIONS = new Set(["UpdateVariantAvailabilityRule"]);
 
 // Action types that should render a Link field instead of a text input
 const ACTION_LINK_MAP = {
-    "UpdateItemGroup": "Item Group",
-    "UpdateBrand": "Brand",
-    "UpdateUOM": "UOM",
-    "UpdateDefaultWarehouse": "Warehouse",
-    "AddTag": "Tag",
-    "RemoveTag": "Tag",
+    "UpdateItemGroup":               "Item Group",
+    "UpdateBrand":                   "Brand",
+    "UpdateDefaultWarehouse":        "Warehouse",
+    "AddTag":                        "Tag",
+    "RemoveTag":                     "Tag",
+    "UpdateVariantAvailabilityRule": "Variant Availability Rule",
 };
 
 const PRICE_FIELDS = new Set(["price_list_rate", "standard_rate"]);
@@ -223,7 +224,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     }
 
     function default_action() {
-        return { action_type: "UpdatePrice", action_value: "" };
+        return { action_type: "UpdateItemGroup", action_value: "" };
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -243,7 +244,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 </div>
 
                 <div class="biu-price-note">
-                    <kbd>Ctrl+B</kbd> add row to both Rules and Actions
+                    <kbd>Ctrl+B</kbd> add row to filters
                     <kbd>Ctrl+S</kbd> save
                 </div>
 
@@ -336,16 +337,13 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 }
             }
 
-            // CTRL+B → add row to BOTH sections
+            // CTRL+B → add row to filters only
             if (e.key === "b") {
                 e.preventDefault();
                 e.stopPropagation();
                 state.conditions.push(default_condition());
                 render_condition_rows();
                 render_conditions_summary();
-                state.actions.push(default_action());
-                render_action_rows();
-                render_actions_summary();
                 $app.find("#biu-cond-rows .biu-row:last select:first").focus();
             }
 
@@ -391,7 +389,9 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         $wrap.empty();
 
         state.conditions.forEach((c, idx) => {
-            const logic_sel = build_select("cond-logic-" + idx, ["And", "Or"], c.logic_operator);
+            const logic_sel = idx === 0
+                ? `<select class="form-control form-control-sm biu-logic-select" disabled style="visibility:hidden;"></select>`
+                : build_select("cond-logic-" + idx, ["And", "Or"], c.logic_operator).replace('biu-select', 'biu-select biu-logic-select');
             const field_sel = build_select("cond-field-" + idx, FIELD_OPTIONS, c.field_name);
             const op_sel = build_select("cond-op-" + idx, OPERATOR_OPTIONS, c.operator);
 
@@ -561,7 +561,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             return false;
         }
         for (const a of state.actions) {
-            if (!NO_VALUE_ACTIONS.has(a.action_type) && !a.action_value) {
+            if (!NO_VALUE_ACTIONS.has(a.action_type) && !OPTIONAL_VALUE_ACTIONS.has(a.action_type) && !a.action_value) {
                 frappe.show_alert({ message: "All actions need a value.", indicator: "orange" });
                 return false;
             }
@@ -700,8 +700,11 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                         <button class="btn btn-default btn-xs biu-btn-save-changes">Save Rule</button>
                         ${exceeds_max
                             ? `<span class="biu-exceeds-warning">
-                                ⚠ ${total.toLocaleString()} items exceeds the limit of ${max_allowed.toLocaleString()}. Refine your filters.
-                            </span>`
+                                ⚠ ${total.toLocaleString()} items exceeds the limit of ${max_allowed.toLocaleString()}.
+                            </span>
+                            <button class="btn btn-warning btn-sm biu-btn-execute biu-btn-execute-capped ${!is_saved ? "disabled" : ""}">
+                                Execute First ${max_allowed.toLocaleString()}
+                            </button>`
                             : `<button class="btn btn-primary btn-sm biu-btn-execute ${!is_saved ? "disabled" : ""}">
                                 Execute Update
                             </button>`
@@ -730,13 +733,16 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 <!-- Execute bar BOTTOM -->
                 <div class="biu-execute-bar biu-execute-bar-bottom">
                     <div class="biu-match-count">
-                        <strong>${total}</strong> items will be updated
+                        <strong>${exceeds_max ? max_allowed.toLocaleString() : total}</strong> items will be updated
                     </div>
                     <div class="biu-execute-buttons">
                         ${exceeds_max
                             ? `<span class="biu-exceeds-warning">
-                                ⚠ ${total.toLocaleString()} items exceeds the limit of ${max_allowed.toLocaleString()}. Refine your filters.
-                            </span>`
+                                ⚠ ${total.toLocaleString()} items exceeds the limit of ${max_allowed.toLocaleString()}.
+                            </span>
+                            <button class="btn btn-warning btn-sm biu-btn-execute biu-btn-execute-capped ${!is_saved ? "disabled" : ""}">
+                                Execute First ${max_allowed.toLocaleString()}
+                            </button>`
                             : `<button class="btn btn-primary btn-sm biu-btn-execute ${!is_saved ? "disabled" : ""}">
                                 Execute Update
                             </button>`
@@ -798,23 +804,25 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 frappe.show_alert({ message: "Save the rule first before executing.", indicator: "orange" });
                 return;
             }
-            frappe.confirm(
-                `This will update <strong>${total}</strong> matching items in the background.<br>Are you sure?`,
-                () => {
-                    frappe.call({
-                        method: API + ".execute_rule",
-                        args: { rule_name: state.existing_rule },
-                        callback(r) {
-                            if (r.message && r.message.status === "queued") {
-                                frappe.show_alert({
-                                    message: "Bulk update queued. You'll be notified when it completes.",
-                                    indicator: "blue",
-                                });
-                            }
-                        },
-                    });
-                }
-            );
+            const is_capped = $(this).hasClass("biu-btn-execute-capped");
+            const confirm_msg = is_capped
+                ? `This will update the first <strong>${max_allowed.toLocaleString()}</strong> of ${total.toLocaleString()} matching items in the background.<br>Are you sure?`
+                : `This will update <strong>${total.toLocaleString()}</strong> matching items in the background.<br>Are you sure?`;
+
+            frappe.confirm(confirm_msg, () => {
+                frappe.call({
+                    method: API + ".execute_rule",
+                    args: { rule_name: state.existing_rule },
+                    callback(r) {
+                        if (r.message && r.message.status === "queued") {
+                            frappe.show_alert({
+                                message: "Bulk update queued. You'll be notified when it completes.",
+                                indicator: "blue",
+                            });
+                        }
+                    },
+                });
+            });
         });
 
         // Realtime progress
@@ -862,130 +870,6 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         });
         html += "</select>";
         return html;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  STYLES
-    // ═══════════════════════════════════════════════════════════════════
-    if (!document.getElementById("biu-styles")) {
-        const style = document.createElement("style");
-        style.id = "biu-styles";
-        style.textContent = `
-            #bulk-update-app { max-width: 1200px; margin: 0 auto; padding: 15px; }
-
-            .biu-initial { max-width: 600px; margin: 0 auto; }
-            .biu-intro { color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; }
-            .biu-selector-row { display: flex; gap: 8px; align-items: center; }
-            .biu-selector-row select { flex: 1; }
-            .biu-section-label {
-                font-weight: 600; font-size: 11px; text-transform: uppercase;
-                letter-spacing: 0.6px; color: var(--text-muted);
-                margin: 28px 0 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;
-            }
-            .biu-rule-card {
-                padding: 10px 14px; border: 1px solid var(--border-color);
-                border-radius: var(--border-radius); margin-bottom: 6px; cursor: pointer;
-                transition: background 0.15s;
-            }
-            .biu-rule-card:hover { background: var(--bg-light-gray); }
-            .biu-rule-link { font-weight: 600; font-size: 13px; color: var(--primary); cursor: pointer; }
-
-            .biu-topbar {
-                display: flex; gap: 12px; align-items: center;
-                margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
-            }
-            .biu-rule-name-wrap { flex: 1; }
-            .biu-rule-name-wrap input { font-weight: 600; font-size: 15px; }
-
-            .biu-price-note {
-                font-size: 12px; color: var(--text-muted);
-                background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fde68a);
-                border-radius: var(--border-radius); padding: 8px 12px; margin-bottom: 14px;
-            }
-            .biu-price-note kbd {
-                background: var(--bg-dark-gray, #374151); color: #fff;
-                padding: 1px 5px; border-radius: 3px; font-size: 11px;
-            }
-
-            .biu-section {
-                border: 1px solid var(--border-color); border-radius: var(--border-radius);
-                padding: 16px; margin-bottom: 16px; background: var(--fg-color);
-            }
-            .biu-section-header {
-                display: flex; justify-content: space-between; align-items: center;
-                margin-bottom: 10px;
-            }
-            .biu-section-header h5 { margin: 0; font-size: 16px; font-weight: 700; }
-
-            .biu-pill {
-                display: inline-block; padding: 3px 10px; margin: 2px 4px 2px 0;
-                background: var(--bg-light-gray); border-radius: 20px;
-                font-size: 12px; color: var(--text-color);
-            }
-            .biu-pill-action { background: var(--blue-50, #eef2ff); }
-
-            .biu-row {
-                display: flex; gap: 6px; align-items: center;
-                margin-bottom: 6px; flex-wrap: wrap;
-            }
-            .biu-select { min-width: 100px; max-width: 220px; font-size: 12px; }
-            .biu-input { min-width: 80px; max-width: 200px; font-size: 12px; }
-
-            .biu-editor-buttons {
-                display: flex; gap: 10px; justify-content: flex-end;
-                padding-top: 16px; border-top: 1px solid var(--border-color);
-            }
-
-            .biu-preview-topbar {
-                display: flex; justify-content: space-between; align-items: center;
-                margin-bottom: 14px;
-            }
-            .biu-link { color: var(--primary); cursor: pointer; font-size: 13px; font-weight: 600; }
-            .biu-link:hover { text-decoration: underline; }
-
-            .biu-execute-bar {
-                display: flex; justify-content: space-between; align-items: center;
-                padding: 10px 14px; margin-bottom: 12px;
-                background: var(--fg-color); border: 1px solid var(--border-color);
-                border-radius: var(--border-radius);
-            }
-            .biu-execute-bar-bottom { margin-top: 12px; margin-bottom: 0; }
-            .biu-execute-buttons { display: flex; gap: 8px; align-items: center; }
-            .biu-match-count { font-size: 13px; }
-
-            .biu-table-wrap { overflow-x: auto; }
-            .biu-table { font-size: 12px; }
-            .biu-table thead { background: var(--bg-light-gray); }
-            .biu-th { font-weight: 600; font-size: 11px; text-transform: uppercase; white-space: nowrap; }
-            .biu-changed { color: var(--green-600, #16a34a); font-weight: 700; background: var(--green-50, #f0fdf4); }
-
-            .biu-pagination {
-                display: flex; justify-content: space-between; align-items: center;
-                margin-top: 10px;
-            }
-
-            .biu-rules-summary {
-                margin-top: 20px; padding: 14px;
-                background: var(--fg-color); border: 1px solid var(--border-color);
-                border-radius: var(--border-radius);
-            }
-            .biu-summary-list { margin: 0; padding-left: 18px; font-size: 13px; }
-            .biu-summary-list li { margin-bottom: 3px; }
-            .biu-action-li { color: var(--primary); }
-
-            .btn.disabled { opacity: 0.5; cursor: not-allowed; }
-
-            .biu-exceeds-warning {
-                color: var(--red-600, #dc2626);
-                font-size: 12px;
-                font-weight: 600;
-                padding: 4px 8px;
-                background: var(--red-50, #fef2f2);
-                border: 1px solid var(--red-200, #fecaca);
-                border-radius: var(--border-radius);
-            }
-        `;
-        document.head.appendChild(style);
     }
 
     render();
