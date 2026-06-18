@@ -1,0 +1,114 @@
+#bulk-update-app { max-width: 1200px; margin: 0 auto; padding: 15px; }
+
+.biu-initial { max-width: 600px; margin: 0 auto; }
+.biu-intro { color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; }
+.biu-selector-row { display: flex; gap: 8px; align-items: center; }
+.biu-selector-row select { flex: 1; }
+.biu-section-label {
+    font-weight: 600; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--text-muted);
+    margin: 28px 0 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;
+}
+.biu-rule-card {
+    padding: 10px 14px; border: 1px solid var(--border-color);
+    border-radius: var(--border-radius); margin-bottom: 6px; cursor: pointer;
+    transition: background 0.15s;
+}
+.biu-rule-card:hover { background: var(--bg-light-gray); }
+.biu-rule-link { font-weight: 600; font-size: 13px; color: var(--primary); cursor: pointer; }
+
+.biu-topbar {
+    display: flex; gap: 12px; align-items: center;
+    margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);
+}
+.biu-rule-name-wrap { flex: 1; }
+.biu-rule-name-wrap input { font-weight: 600; font-size: 15px; }
+
+.biu-price-note {
+    font-size: 12px; color: var(--text-muted);
+    background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fde68a);
+    border-radius: var(--border-radius); padding: 8px 12px; margin-bottom: 14px;
+}
+.biu-price-note kbd {
+    background: var(--bg-dark-gray, #374151); color: #fff;
+    padding: 1px 5px; border-radius: 3px; font-size: 11px;
+}
+
+.biu-section {
+    border: 1px solid var(--border-color); border-radius: var(--border-radius);
+    padding: 16px; margin-bottom: 16px; background: var(--fg-color);
+}
+.biu-section-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+}
+.biu-section-header h5 { margin: 0; font-size: 16px; font-weight: 700; }
+
+.biu-pill {
+    display: inline-block; padding: 3px 10px; margin: 2px 4px 2px 0;
+    background: var(--bg-light-gray); border-radius: 20px;
+    font-size: 12px; color: var(--text-color);
+}
+.biu-pill-action { background: var(--blue-50, #eef2ff); }
+
+.biu-row {
+    display: flex; gap: 6px; align-items: center;
+    margin-bottom: 6px; flex-wrap: wrap;
+}
+.biu-select { min-width: 100px; max-width: 220px; font-size: 12px; }
+.biu-logic-select { min-width: 30px; max-width: 40px; font-size: 12px; }
+.biu-input { min-width: 80px; max-width: 200px; font-size: 12px; }
+
+.biu-editor-buttons {
+    display: flex; gap: 10px; justify-content: flex-end;
+    padding-top: 16px; border-top: 1px solid var(--border-color);
+}
+
+.biu-preview-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+}
+.biu-link { color: var(--primary); cursor: pointer; font-size: 13px; font-weight: 600; }
+.biu-link:hover { text-decoration: underline; }
+
+.biu-execute-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; margin-bottom: 12px;
+    background: var(--fg-color); border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+.biu-execute-bar-bottom { margin-top: 12px; margin-bottom: 0; }
+.biu-execute-buttons { display: flex; gap: 8px; align-items: center; }
+.biu-match-count { font-size: 13px; }
+
+.biu-table-wrap { overflow-x: auto; }
+.biu-table { font-size: 12px; }
+.biu-table thead { background: var(--bg-light-gray); }
+.biu-th { font-weight: 600; font-size: 11px; text-transform: uppercase; white-space: nowrap; }
+.biu-changed { color: var(--green-600, #16a34a); font-weight: 700; background: var(--green-50, #f0fdf4); }
+
+.biu-pagination {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 10px;
+}
+
+.biu-rules-summary {
+    margin-top: 20px; padding: 14px;
+    background: var(--fg-color); border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+.biu-summary-list { margin: 0; padding-left: 18px; font-size: 13px; }
+.biu-summary-list li { margin-bottom: 3px; }
+.biu-action-li { color: var(--primary); }
+
+.btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
+.biu-exceeds-warning {
+    color: var(--red-600, #dc2626);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    background: var(--red-50, #fef2f2);
+    border: 1px solid var(--red-200, #fecaca);
+    border-radius: var(--border-radius);
+}

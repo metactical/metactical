@@ -29,16 +29,15 @@ ITEM_SUPPLIER_FIELDS = {"supplier"}
 # action_type → (doc_source, fieldname)
 #   doc_source: "item" = tabItem, "price" = tabItem Price
 ACTION_TYPE_MAP = {
-    "UpdateItemGroup":       ("item",  "item_group"),
-    "AddTag":                ("item",  "_user_tags"),
-    "RemoveTag":             ("item",  "_user_tags"),
-    "UpdateUOM":             ("item",  "stock_uom"),
-    "DisableItem":           ("item",  "disabled"),
-    "EnableItem":            ("item",  "disabled"),
-    "UpdateValuationRate":   ("item",  "valuation_rate"),
-    "UpdateDescription":     ("item",  "description"),
-    "UpdateBrand":           ("item",  "brand"),
-    "UpdateLastPingedOn":    ("item",  "last_pinged_on"),
+    "UpdateItemGroup":               ("item",  "item_group"),
+    "AddTag":                        ("item",  "_user_tags"),
+    "RemoveTag":                     ("item",  "_user_tags"),
+    "DisableItem":                   ("item",  "disabled"),
+    "EnableItem":                    ("item",  "disabled"),
+    "UpdateValuationRate":           ("item",  "valuation_rate"),
+    "UpdateBrand":                   ("item",  "brand"),
+    "UpdateLastPingedOn":            ("item",  "last_pinged_on"),
+    "UpdateVariantAvailabilityRule": ("item",  "neb_variantavailabilityrule"),
 }
 
 OPERATOR_MAP = {
@@ -412,10 +411,14 @@ def run_bulk_update(rule_name):
     errors = []
     updated_item_ids = []
 
+    max_allowed = cint(frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_bulk_update"))
+
     try:
-        result = doc.get_matched_items(limit_page_length=0)
+        result = doc.get_matched_items(limit_page_length=max_allowed if max_allowed else 0)
         total = result["total"]
         items = result["items"]
+        if max_allowed and len(items) > max_allowed:
+            items = items[:max_allowed]
 
         _, price_action_fields = doc._classify_action_fields()
 
@@ -694,18 +697,6 @@ def save_rule_from_page(rule_name, conditions, actions, target_doctype="Item",
         })
         doc.insert()
 
-    # ── Check max BEFORE committing ──
-    max_allowed = frappe.db.get_single_value("Metactical Settings", "max_number_of_items_to_bulk_update")
-    if max_allowed:
-        total_matched = doc.get_matched_items(limit_page_length=0, for_update=True)
-        if total_matched > cint(max_allowed):
-            frappe.db.rollback()
-            frappe.throw(
-                f"This rule matches <b>{total_matched:,}</b> items, which exceeds the maximum "
-                f"of <b>{cint(max_allowed):,}</b>. Please refine your search conditions.",
-                title="Too Many Items"
-            )
-
     frappe.db.commit()
     return {"name": doc.name, "rule_name": doc.rule_name}
 
@@ -773,10 +764,10 @@ def get_doctype_fields(doctype="Item"):
 def get_action_link_map():
     """Return a map of action_type -> Link DocType for the JS to render Link fields."""
     return {
-        "UpdateItemGroup": "Item Group",
-        "UpdateBrand": "Brand",
-        "UpdateUOM": "UOM",
-        "UpdateDefaultWarehouse": "Warehouse",
-        "AddTag": "Tag",
-        "RemoveTag": "Tag",
+        "UpdateItemGroup":               "Item Group",
+        "UpdateBrand":                   "Brand",
+        "UpdateDefaultWarehouse":        "Warehouse",
+        "AddTag":                        "Tag",
+        "RemoveTag":                     "Tag",
+        "UpdateVariantAvailabilityRule": "Variant Availability Rule",
     }
