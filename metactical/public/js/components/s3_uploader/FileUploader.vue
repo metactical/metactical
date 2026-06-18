@@ -4,19 +4,6 @@
       <h2 class="text-2xl font-bold">S3 SB Upload Manager</h2>
       
       <div class="flex items-center gap-3">
-        <!-- Settings button -->
-        <button
-          @click="showSettings = true"
-          class="btn btn-default btn-sm flex items-center gap-2"
-          title="S3 Settings"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-          Settings
-        </button>
-
         <!-- Control buttons (only shown when images are selected) -->
         <div v-if="files.length" class="flex gap-3">
           <button
@@ -73,31 +60,27 @@
       </div>
     </div>
 
-    <!-- Image Orders (check to add a whole order's 4 sizes for every variant; uncheck to remove) -->
+    <!-- Image Orders (set how many image sets each variant should have) -->
     <div v-if="templateItem" class="border rounded-lg p-4 shadow-sm">
       <label class="block text-sm font-bold mb-2">Image Orders</label>
-      <div class="flex flex-wrap gap-x-5 gap-y-2">
-        <label v-for="n in ORDER_OPTIONS" :key="n" class="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            :checked="existingOrders.has(n)"
-            @change="toggleOrder(n, $event.target.checked)"
-          />
-          Order {{ n }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        </label>
+      <div class="flex items-center gap-3">
+        <input
+          v-model.number="orderCount"
+          type="number"
+          min="1"
+          class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center"
+          @keyup.enter="applyOrderCount"
+        />
+        <button @click="applyOrderCount" class="btn btn-default btn-sm">Add Orders</button>
+        <span class="text-xs text-gray-500">
+          = {{ templateVariants.length }} variants × 4 sizes × {{ Math.max(orderCount || 1, 1) }} orders
+          = <strong>{{ templateVariants.length * 4 * Math.max(orderCount || 1, 1) }}</strong> upload slots
+        </span>
       </div>
       <p class="text-xs text-gray-500 mt-2">
-        Check an order to add icon/small/medium/large slots for every variant; uncheck to remove that order.
+        Sets each variant to this many image sets. Increasing adds empty icon/small/medium/large slots;
+        decreasing removes the extra orders.
       </p>
-    </div>
-
-    <!-- Stats bar -->
-    <div v-if="files.length" class="bg-gray-50 border rounded-lg p-4">
-      <div class="flex items-center justify-between text-sm text-gray-600">
-        <span>{{ files.filter(f => f.file || f.isOnServer).length }} / {{ files.length }} images added</span>
-        <span>{{ groupFilesByProduct().length }} products detected</span>
-        <span>Roles: {{ [...new Set(files.map(f => f.role))].filter(r => r).join(', ') }}</span>
-      </div>
     </div>
 
     <!-- Override Options -->
@@ -153,31 +136,17 @@
           <div class="bg-gray-50 p-4 rounded-lg">
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium text-gray-700">Files Complete</span>
-              <span :class="validationSummary.valid === validationSummary.total ? 'text-green-600' : 'text-red-600'" 
+              <span :class="validationSummary.valid >= expectedImageCount ? 'text-green-600' : 'text-red-600'"
                     class="text-sm font-bold">
-                {{ validationSummary.valid }}/{{ validationSummary.total }}
+                {{ validationSummary.valid }}/{{ expectedImageCount }}
               </span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2">
-              <div 
+              <div
                 class="h-2 rounded-full transition-all duration-300"
-                :class="validationSummary.valid === validationSummary.total ? 'bg-green-500' : 'bg-red-500'"
-                :style="{ width: `${(validationSummary.valid / validationSummary.total) * 100}%` }"
+                :class="validationSummary.valid >= expectedImageCount ? 'bg-green-500' : 'bg-red-500'"
+                :style="{ width: `${Math.min(100, (validationSummary.valid / Math.max(expectedImageCount, 1)) * 100)}%` }"
               ></div>
-            </div>
-          </div>
-
-          <!-- S3 Configuration Status -->
-          <div class="bg-gray-50 p-4 rounded-lg">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-gray-700">S3 Config</span>
-              <span :class="isS3Configured ? 'text-green-600' : 'text-red-600'" 
-                    class="text-sm font-bold">
-                {{ isS3Configured ? '✓ Ready' : '✗ Missing' }}
-              </span>
-            </div>
-            <div class="text-xs text-gray-500">
-              {{ isS3Configured ? 'Credentials configured' : 'Click Settings to configure' }}
             </div>
           </div>
 
@@ -390,13 +359,15 @@
       </div>
     </div>
 
-    <!-- Drop zone -->
+    <!-- Drop zone (disabled when S3 is off / not configured) -->
     <div
-      class="border-4 border-dashed rounded-md p-6 text-center transition-all duration-200 cursor-pointer"
-      :class="{ 'border-blue-500 bg-blue-50': isDragOver, 'hover:shadow-lg': !isDragOver }"
-      @dragover.prevent="onDragOver"
+      class="border-4 border-dashed rounded-md p-6 text-center transition-all duration-200"
+      :class="!isS3Configured
+        ? 'opacity-50 cursor-not-allowed'
+        : (isDragOver ? 'border-blue-500 bg-blue-50 cursor-pointer' : 'hover:shadow-lg cursor-pointer')"
+      @dragover.prevent="isS3Configured ? onDragOver($event) : null"
       @dragleave.prevent="onDragLeave"
-      @drop.prevent="onDrop"
+      @drop.prevent="isS3Configured ? onDrop($event) : null"
     >
       <div class="flex flex-col items-center gap-3">
         <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -405,11 +376,15 @@
         <div>
           <p class="text-gray-600 font-medium">Drag & drop images or folders here</p>
           <p class="text-sm text-gray-500">Supports individual files, folders, and nested subfolders</p>
+          <p v-if="!isS3Configured" class="text-sm text-red-600 font-medium mt-1">
+            S3 is currently disabled. Please contact the administrator.
+          </p>
         </div>
-        <input type="file" multiple accept="image/*" @change="onSelect" class="hidden" ref="fileInput" />
-        <button 
-          class="bg-blue-500 px-4 py-2 rounded shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
-          @click="$refs.fileInput.click()"
+        <input type="file" multiple accept="image/*" @change="onSelect" class="hidden" ref="fileInput" :disabled="!isS3Configured" />
+        <button
+          :disabled="!isS3Configured"
+          class="bg-blue-500 px-4 py-2 rounded shadow hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500"
+          @click="isS3Configured && $refs.fileInput.click()"
         >
           Browse Files
         </button>
@@ -640,18 +615,11 @@
       </div>
     </div>
 
-    <!-- Settings Component -->
-    <Settings
-      :show="showSettings"
-      :config="s3Config"
-      @close="showSettings = false"
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import Settings from './Settings.vue'
 import SkuManager from './SkuManager.vue'
 
 // Dotted path to the whitelisted backend endpoints for this page.
@@ -691,7 +659,6 @@ const base64ToBlob = (b64, type) => {
 
 const fileInput = ref(null)
 const files = ref([])
-const showSettings = ref(false)
 const overrideFullProduct = ref(false) // Default to true
 
 // One product template per upload. All per-image SKU pickers are limited to this
@@ -736,10 +703,13 @@ const scaffoldOrder = (order) => {
 // Build the default (order 0) upload slots for every variant.
 const scaffoldVariantCards = () => scaffoldOrder(0)
 
-// Fixed image-order checkboxes (Order 0…Order 10). Display number = internal imageOrder.
-const ORDER_OPTIONS = Array.from({ length: 11 }, (_, n) => n)
+// `orderCount` = the live number in the input (drives only the info hint).
+// `appliedOrderCount` = the orders actually committed (set on "Add Orders" / scaffold / load);
+// this is what the Files Complete denominator uses, so typing alone doesn't change it.
+const orderCount = ref(1)
+const appliedOrderCount = ref(1)
 
-// Which orders currently have cards — drives the checked state of the boxes.
+// Which orders currently have cards.
 const existingOrders = computed(() => new Set(files.value.map(f => f.imageOrder)))
 
 // Add an order's empty 4-size slots for every variant (no-op if it already exists).
@@ -756,10 +726,24 @@ const removeOrder = (order) => {
   files.value = files.value.filter(f => f.imageOrder !== order)
 }
 
-const toggleOrder = (order, checked) => {
-  if (checked) addOrderSlots(order)
-  else removeOrder(order)
+// Set the product to exactly `n` orders: keep/create orders 0..n-1 for every variant,
+// and remove any order >= n. e.g. 2 variants × 5 orders × 4 roles = 40 upload slots.
+const applyOrderCount = () => {
+  const n = Math.max(1, Math.floor(orderCount.value || 1))
+  orderCount.value = n
+  appliedOrderCount.value = n
+  ;[...existingOrders.value].filter(o => o >= n).forEach(o => removeOrder(o))
+  for (let o = 0; o < n; o++) addOrderSlots(o)
 }
+
+// Expected number of images = variants × 4 sizes × orders. Drives the "x / total" display.
+// Uses the *applied* order count (not the live input) so the denominator only changes when
+// "Add Orders" is pressed; never drops below the orders already present.
+const expectedImageCount = computed(() => {
+  if (!templateItem.value) return files.value.length
+  const orders = Math.max(appliedOrderCount.value || 1, existingOrders.value.size, 1)
+  return templateVariants.value.length * ROLES.length * orders
+})
 
 // Clear the file cards (and upload history) without touching the chosen template.
 const resetFiles = () => {
@@ -791,6 +775,9 @@ const loadRecordImages = async (recordName) => {
       sites: (im.sites || []).filter(site => siteNames.value.includes(site))
     }
   })
+  // Fix the order count up-front (from the data) so the x/total denominator doesn't
+  // change while images stream in below.
+  orderCount.value = appliedOrderCount.value = Math.max(new Set(allImages.map(i => i.imageInfo?.order || 0)).size, 1)
   await loadAllImages(allImages)
 }
 
@@ -803,6 +790,21 @@ const applyTemplateFromItem = async (itemCode) => {
     resetFiles()
     return
   }
+
+  // S3 must be enabled to start a product. Keep the picker usable but block selection.
+  if (!isS3Configured.value) {
+    frappe.msgprint({
+      title: __('S3 is disabled'),
+      message: __('S3 is currently disabled. Please contact the administrator.'),
+      indicator: 'red',
+    })
+    templateItem.value = null
+    templateVariants.value = []
+    resetFiles()
+    if (templateControl) templateControl.set_value('')
+    return
+  }
+
   try {
     const res = await callBackend('get_item_family', { item_code: itemCode })
     templateItem.value = (res && (res.template || itemCode)) || null
@@ -862,6 +864,8 @@ const applyTemplateFromItem = async (itemCode) => {
 const scaffoldAndNotify = () => {
   resetFiles()
   scaffoldVariantCards()
+  orderCount.value = 1
+  appliedOrderCount.value = 1
   frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
 }
 
@@ -951,6 +955,7 @@ const migrateFromLegacy = async (metaKey) => {
       }
     }).filter(im => im.skus.length)
 
+    orderCount.value = appliedOrderCount.value = Math.max(new Set(allImages.map(i => i.imageInfo?.order || 0)).size, 1)
     await loadAllImages(allImages)
     frappe.show_alert({ message: 'Migrated data from the old system. Review and Upload to Save', indicator: 'green' })
   } catch (e) {
@@ -1027,10 +1032,14 @@ const variantImageIssues = computed(() => {
     .filter(v => v.missing.length > 0)
 })
 
-// Product-level validity: a template is chosen, there are files, and every variant
-// has all 4 images.
+// Product-level validity: a template is chosen, every variant has all 4 images, AND
+// every order is fully filled (valid image count covers all expected slots — so it isn't
+// "ready" after just the first order while later orders are still empty/loading).
 const productValid = computed(() =>
-  !!templateItem.value && files.value.length > 0 && variantImageIssues.value.length === 0
+  !!templateItem.value &&
+  files.value.length > 0 &&
+  variantImageIssues.value.length === 0 &&
+  validationSummary.value.valid >= expectedImageCount.value
 )
 
 // Computed property to check if upload is possible
@@ -1158,8 +1167,9 @@ const onDragLeave = (e) => {
 }
 
 const processFiles = async (incomingFiles) => {
+  if (!isS3Configured.value) return // S3 disabled — no uploading
   if (incomingFiles.length === 0) return
-  
+
   isProcessingFiles.value = true
   processingProgress.value = { current: 0, total: incomingFiles.length, filename: '' }
   
@@ -1697,6 +1707,10 @@ const groupFilesByProduct = () => {
 // Clear all files
 const clearAllFiles = () => {
   resetFiles()
+
+  // Reset the order count.
+  orderCount.value = 1
+  appliedOrderCount.value = 1
 
   // Clear the locked template + its picker.
   templateItem.value = null
