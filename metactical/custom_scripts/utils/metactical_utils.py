@@ -62,7 +62,9 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment
 				'X-User-Id': rocket_chat_settings.user_id
 			}
 			base_url = rocket_chat_settings.url
-			upload_url = f"{base_url}/api/v1/rooms.upload/{rocket_chat_settings.pr_room_id}"
+			rid = rocket_chat_settings.pr_room_id
+
+			upload_url = f"{base_url}/api/v1/rooms.media/{rid}"
 
 			files = {
 				'file': (filename, attachment, 'application/pdf'),
@@ -73,10 +75,19 @@ def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment
 				headers=headers,
 				files=files
 			)
-			if response.status_code == 200:
-				pass
+			if response.status_code != 200:
+				frappe.log_error(title='Rocket Chat Error', message=response.text)
 			else:
-				frappe.log_error(title='Rocket Chat Error', message=response.json())
+				file_id = response.json().get('file', {}).get('_id')
+				confirm_url = f"{base_url}/api/v1/rooms.mediaConfirm/{rid}/{file_id}"
+				confirm_headers = {**headers, 'Content-type': 'application/json'}
+				confirm_response = requests.post(
+					confirm_url,
+					headers=confirm_headers,
+					data=json.dumps({})
+				)
+				if confirm_response.status_code != 200:
+					frappe.log_error(title='Rocket Chat Error', message=confirm_response.text)
 		else:
 			channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
       

@@ -50,9 +50,16 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		
 def post_rc_message(doc):
 	if not doc.is_return and doc.company == "International Camouflage Ltd":
-		warehouse = frappe.get_doc("Purchase Order", doc.purchase_order).set_warehouse
-  
-		if warehouse == "W01-WHS-Active Stock - ICL":
+		active_warehouse = "W01-WHS-Active Stock - ICL"
+		po = frappe.get_doc("Purchase Order", doc.purchase_order)
+
+		# Some POs don't have set_warehouse set on the header, so fall back to
+		# checking each item's Target Warehouse.
+		is_active = po.set_warehouse == active_warehouse
+		if not po.set_warehouse:
+			is_active = any(item.warehouse == active_warehouse for item in po.items)
+
+		if is_active:
 			frappe.enqueue(
 				send_pdf_to_rocket_chat,
 				name=doc.name
