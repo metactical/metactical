@@ -138,11 +138,32 @@ UNVERIFIED_LOG_NAME = "address_verification_unverified.log"
 MELISSA_API_URL = "https://address.melissadata.net/V3/WEB/GlobalAddress/doGlobalAddress"
 
 # Maps Melissa AV result codes to the internal match-level vocabulary.
+# Per Melissa's code definitions: AV11/AV21/AV22 only confirm state/city level,
+# AV13/AV23 confirm the street name, AV14 confirms the street number, and
+# AV24/AV25 confirm the premise (house/unit) - i.e. a full match. AV11-AV13
+# and AV21-AV22 are partial matches and must NOT be treated as fully verified.
 _MELISSA_AV_LEVELS = {
-	"AV11": "fully_verified",
-	"AV12": "street_verified",
-	"AV13": "postal_verified",
-	"AV14": "postal_verified",
+	"AV11": "postal_verified",  # state level only
+	"AV12": "postal_verified",  # city level only
+	"AV13": "street_verified",  # street name confirmed, no number
+	"AV14": "street_verified",  # street number confirmed
+	"AV21": "postal_verified",  # state level only
+	"AV22": "postal_verified",  # city level only
+	"AV23": "street_verified",  # street level confirmed
+	"AV24": "fully_verified",  # premise (house/building) confirmed
+	"AV25": "fully_verified",  # premise unit confirmed
+}
+
+# Only these levels represent a genuine full/street-level match. Anything else
+# (postal_verified, or no AV code at all) must not be reported as verified.
+_MELISSA_VERIFIED_LEVELS = {"fully_verified", "street_verified"}
+
+# Used to pick the strongest match level when a response contains multiple AV codes.
+_MELISSA_LEVEL_RANK = {
+	"unverified": 0,
+	"postal_verified": 1,
+	"street_verified": 2,
+	"fully_verified": 3,
 }
 
 
@@ -175,8 +196,10 @@ def build_melissa_payload(address, melissa_key):
 def verify_with_melissa(address, melissa_key, timeout):
 	"""Call the Melissa Global Address API and return (match_level, verified) or None.
 
-	Returns None on network/HTTP errors (already logged). verified is True when
-	any AV result code is present in the response.
+	Returns None on network/HTTP errors (already logged). verified is True only
+	when the strongest AV code in the response confirms street level or better
+	(fully_verified/street_verified); state/city-only matches (e.g. AV11, AV12)
+	are reported as postal_verified and are not considered verified.
 	"""
 	payload = build_melissa_payload(address, melissa_key)
 	if not payload:
@@ -204,12 +227,16 @@ def verify_with_melissa(address, melissa_key, timeout):
 		return None
 
 	result_codes = [c.strip() for c in (records[0].get("Results") or "").split(",") if c.strip()]
+
+	best_level = "unverified"
 	for code in result_codes:
-		if code in _MELISSA_AV_LEVELS:
-			return (_MELISSA_AV_LEVELS[code], True)
-		if code.startswith("AV"):
-			return ("street_verified", True)
-	return ("unverified", False)
+		level = _MELISSA_AV_LEVELS.get(code)
+		if level is None and code.startswith("AV"):
+			level = "postal_verified"
+		if level and _MELISSA_LEVEL_RANK[level] > _MELISSA_LEVEL_RANK[best_level]:
+			best_level = level
+
+	return (best_level, best_level in _MELISSA_VERIFIED_LEVELS)
 
 
 def build_address_payload(address):
