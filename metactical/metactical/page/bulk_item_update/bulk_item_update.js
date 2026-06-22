@@ -600,7 +600,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     }
 
     // ── Preview ──
-    function do_preview(start) {
+    function do_preview(start, exclude_unchanged) {
         state.preview_start = start || 0;
         frappe.call({
             method: API + ".preview_from_data",
@@ -610,6 +610,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 target_doctype: state.target_doctype,
                 limit: state.preview_limit,
                 start: state.preview_start,
+                exclude_unchanged: exclude_unchanged ? 1 : 0,
             },
             callback(r) {
                 if (r.message) {
@@ -687,7 +688,10 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             <div class="biu-preview">
                 <div class="biu-preview-topbar">
                     <a class="biu-link biu-edit-link">← Edit Rules &amp; Actions</a>
-                    <button class="btn btn-default btn-xs biu-btn-new-from-preview">New Rule Set</button>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-default btn-xs biu-btn-refresh">↻ Refresh</button>
+                        <button class="btn btn-default btn-xs biu-btn-new-from-preview">New Rule Set</button>
+                    </div>
                 </div>
 
                 <!-- Execute bar TOP -->
@@ -753,6 +757,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         `);
 
         // ── Events ──
+        $app.find(".biu-btn-refresh").on("click", () => do_preview(state.preview_start, true));
         $app.find(".biu-edit-link").on("click", () => { state.view = "editor"; render(); });
         $app.find(".biu-btn-new-from-preview").on("click", () => {
             state.existing_rule = null;

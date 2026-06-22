@@ -328,10 +328,11 @@ class BulkUpdateRule(Document):
     #  Preview / action computation
     # ──────────────────────────────────────────────────────────────────
 
-    def compute_preview(self, items):
+    def compute_preview(self, items, exclude_unchanged=False):
         preview = []
         for item in items:
             row = {"name": item.get("name") or item.get("item_code")}
+            any_change = False
             for action in self.actions:
                 mapping = ACTION_TYPE_MAP.get(action.action_type)
                 if not mapping or not mapping[1]:
@@ -341,12 +342,18 @@ class BulkUpdateRule(Document):
                     tag_val = (action.action_value or "").strip()
                     row[f"{action.action_type}_before"] = ""
                     row[f"{action.action_type}_after"] = tag_val
+                    any_change = True
                     continue
-                
+
                 before_val = item.get(fieldname)
                 after_val = self._compute_action_value(action, item)
                 row[f"{fieldname}_before"] = before_val
                 row[f"{fieldname}_after"] = after_val
+                if cstr(before_val) != cstr(after_val):
+                    any_change = True
+
+            if exclude_unchanged and not any_change:
+                continue
             preview.append(row)
         return preview
 
@@ -642,7 +649,7 @@ def export_preview(rule_name):
 
 
 @frappe.whitelist()
-def preview_from_data(conditions, actions, target_doctype="Item", limit=20, start=0):
+def preview_from_data(conditions, actions, target_doctype="Item", limit=20, start=0, exclude_unchanged=0):
     if isinstance(conditions, str):
         conditions = json.loads(conditions)
     if isinstance(actions, str):
@@ -657,7 +664,7 @@ def preview_from_data(conditions, actions, target_doctype="Item", limit=20, star
     })
 
     result = doc.get_matched_items(limit_page_length=cint(limit), start=cint(start))
-    result["preview"] = doc.compute_preview(result["items"])
+    result["preview"] = doc.compute_preview(result["items"], exclude_unchanged=cint(exclude_unchanged))
     result["action_columns"] = doc._get_action_columns()
 
     # ── Fetch max allowed and attach to result so JS can react ──
