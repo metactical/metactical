@@ -121,10 +121,10 @@ class CustomStockEntry(StockEntry):
 				t_warehouses.append(row.warehouse)
 			
 			for row in self.items:
-				if row.s_warehouse and row.s_warehouse not in s_warehouses:
+				if s_warehouses and row.s_warehouse and row.s_warehouse not in s_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, frappe.session.user))
-					
-				if row.t_warehouse and row.t_warehouse not in t_warehouses:
+
+				if t_warehouses and row.t_warehouse and row.t_warehouse not in t_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
 				
 	def on_submit(self):
@@ -215,10 +215,8 @@ def get_permitted_source(doctype, txt, searchfield, start, page_len, filters):
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
 							})
-			'''settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
-			for row in settings.source_warehouse:
-				warehouses.append([row.warehouse])'''
-		else:
+
+		if not setting_exists or not warehouses:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
@@ -237,10 +235,8 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
 							})
-			'''settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
-			for row in settings.target_warehouse:
-				warehouses.append([row.warehouse])'''
-		else:
+
+		if not setting_exists or not warehouses:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses

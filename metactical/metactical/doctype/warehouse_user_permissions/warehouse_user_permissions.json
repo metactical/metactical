@@ -14,7 +14,9 @@
   "target_warehouse",
   "cycle_count_warehouse",
   "material_request_tab",
-  "material_request_target_warehouse"
+  "material_request_target_warehouse",
+  "purchase_receipt_tab",
+  "purchase_receipt_accepted_warehouse"
  ],
  "fields": [
   {
@@ -73,6 +75,17 @@
    "fieldtype": "Table",
    "label": "Permitted Target Warehouse",
    "options": "Material Request Permitted Warehouse"
+  },
+  {
+   "fieldname": "purchase_receipt_tab",
+   "fieldtype": "Tab Break",
+   "label": "Purchase Receipt"
+  },
+  {
+   "fieldname": "purchase_receipt_accepted_warehouse",
+   "fieldtype": "Table",
+   "label": "Permitted Accepted Warehouse",
+   "options": "User Permitted Warehouse"
   }
  ],
  "links": [],

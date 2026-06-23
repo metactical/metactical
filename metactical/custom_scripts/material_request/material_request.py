@@ -58,7 +58,8 @@ def get_target_warehouse(doctype, txt, searchfield, start, page_len, filters):
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
 							})
-		else:
+
+		if not setting_exists or not warehouses:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
