@@ -109,11 +109,11 @@ class CustomStockEntry(StockEntry):
 		super(CustomStockEntry, self).validate()
 		# Metactical Customization: Validate that user has permission to make stock entry against warehouse
 		user = frappe.session.user
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
 			s_warehouses = []
 			t_warehouses = []
-			settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
+			settings = frappe.get_doc("Warehouse User Permissions", setting_exists)
 			for row in settings.source_warehouse:
 				s_warehouses.append(row.warehouse)
 				
@@ -206,11 +206,11 @@ def get_permitted_source(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
 	warehouses = []
 	if user:
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
-			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
 							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
-							AND parentfield='source_warehouse'""", 
+							AND parentfield='source_warehouse'""",
 							{
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
@@ -228,11 +228,11 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
 	warehouses = []
 	if user:
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
-			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
 							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
-							AND parentfield='target_warehouse'""", 
+							AND parentfield='target_warehouse'""",
 							{
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
@@ -247,7 +247,7 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 	
 @frappe.whitelist()
 def get_default_transit(user):
-	return frappe.db.get_value('Stock Entry User Permissions', user, 'add_to_transit')
+	return frappe.db.get_value('Warehouse User Permissions', user, 'add_to_transit')
 
 @frappe.whitelist()
 def recalculate_available_qty(items):

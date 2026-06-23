@@ -531,9 +531,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Material Request User Permission",
+   "label": "Warehouse User Permissions",
    "link_count": 0,
-   "link_to": "Material Request User Permission",
+   "link_to": "Warehouse User Permissions",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -996,16 +996,6 @@
    "label": "Cycle Count V2",
    "link_count": 0,
    "link_to": "Cycle Count V2",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Entry User Permissions",
-   "link_count": 0,
-   "link_to": "Stock Entry User Permissions",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
