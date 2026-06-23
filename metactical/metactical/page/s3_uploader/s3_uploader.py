@@ -179,13 +179,13 @@ def resolve_item_codes(skus):
 
 @frappe.whitelist()
 def get_item_family(item_code):
-	"""Expand an Item to its full variant family (template + every variant).
+	"""Expand an Item to its variant family — the variants only, never the template.
 
-	If the item is a variant, the family is its template plus all that template's
-	variants. If the item is a template (has_variants), it's the template plus its
-	own variants. A standalone item is just itself. Returns
-	{"items": [{item_code, sku}], "template": <name or None>} — only members that
-	have a RetailSKUSuffix are included (a SKU is required for a grid row).
+	If the item is a variant, the family is all of its template's variants. If the item
+	is a template (has_variants), it's that template's variants. A standalone item is just
+	itself. Returns {"items": [{item_code, sku}], "template": <name or None>} — the template
+	is excluded from `items` (images upload to variants only); only members with a
+	RetailSKUSuffix are included (a SKU is required for a grid row).
 	"""
 	item = frappe.db.get_value(
 		"Item", item_code, ["name", "variant_of", "has_variants"], as_dict=True
@@ -201,7 +201,8 @@ def get_item_family(item_code):
 		template = None
 
 	if template:
-		names = [template] + frappe.get_all(
+		# Variants only — the template itself is never an upload target.
+		names = frappe.get_all(
 			"Item", filters={"variant_of": template}, order_by="name", pluck="name"
 		)
 	else:
