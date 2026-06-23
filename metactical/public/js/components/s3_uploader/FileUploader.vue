@@ -73,13 +73,14 @@
         />
         <button @click="applyOrderCount" class="btn btn-default btn-sm">Add Orders</button>
         <span class="text-xs text-gray-500">
-          = {{ templateVariants.length }} variants × 4 sizes × {{ Math.max(orderCount || 1, 1) }} orders
-          = <strong>{{ templateVariants.length * 4 * Math.max(orderCount || 1, 1) }}</strong> upload slots
+          = 4 sizes × {{ Math.max(orderCount || 1, 1) }} orders
+          = <strong>{{ 4 * Math.max(orderCount || 1, 1) }}</strong> upload slots
+          ({{ templateVariants.length }} variant{{ templateVariants.length === 1 ? '' : 's' }} share each image)
         </span>
       </div>
       <p class="text-xs text-gray-500 mt-2">
-        Sets each variant to this many image sets. Increasing adds empty icon/small/medium/large slots;
-        decreasing removes the extra orders.
+        Sets this many image sets. Increasing adds empty icon/small/medium/large slots;
+        decreasing removes the extra orders. All variants share each image.
       </p>
     </div>
 
@@ -669,38 +670,39 @@ const templateRef = ref(null)             // DOM node for the native Link contro
 let templateControl = null
 const ROLES = ['icon', 'small', 'medium', 'large']
 
-// One empty placeholder card for a (variant, role, order) — awaiting an image upload.
-const buildVariantCard = (v, role, order) => ({
-  name: order ? `${v.sku}_${order}_${role}.jpg` : `${v.sku}_${role}.jpg`,
-  type: null,
-  file: null,
-  role,
-  width: 0,
-  height: 0,
-  skus: v.sku,
-  skuItems: [{ item_code: v.item_code, sku: v.sku }],
-  newItemCode: '',
-  skuError: '',
-  resolvingItem: false,
-  sites: [],
-  imageOrder: order,
-  preview: null,
-  isOnServer: false,
-  serverPath: null,
-  isModified: false,
-  isPlaceholder: true,
-})
-
-// Scaffold one image order: a card per (variant × role) at `order`.
-const scaffoldOrder = (order) => {
-  const cards = []
-  templateVariants.value.forEach(v => {
-    ROLES.forEach(role => cards.push(buildVariantCard(v, role, order)))
-  })
-  files.value.push(...cards)
+// One empty placeholder card for a (role, order) holding ALL the template's variants —
+// awaiting an image upload. The image is shared by every variant in its SKU grid.
+const buildRoleCard = (role, order) => {
+  const firstSku = (templateVariants.value[0] && templateVariants.value[0].sku) || ''
+  return {
+    name: order ? `${firstSku}_${order}_${role}.jpg` : `${firstSku}_${role}.jpg`,
+    type: null,
+    file: null,
+    role,
+    width: 0,
+    height: 0,
+    skus: templateVariants.value.map(v => v.sku).join(', '),
+    skuItems: templateVariants.value.map(v => ({ item_code: v.item_code, sku: v.sku })),
+    newItemCode: '',
+    skuError: '',
+    resolvingItem: false,
+    sites: [],
+    imageOrder: order,
+    preview: null,
+    isOnServer: false,
+    serverPath: null,
+    isModified: false,
+    isPlaceholder: true,
+  }
 }
 
-// Build the default (order 0) upload slots for every variant.
+// Scaffold one image order: just the 4 size cards (icon/small/medium/large), each
+// carrying every variant — so any number of variants still produces only 4 uploads.
+const scaffoldOrder = (order) => {
+  files.value.push(...ROLES.map(role => buildRoleCard(role, order)))
+}
+
+// Build the default order 0 slots (4 sizes; all variants share each image).
 const scaffoldVariantCards = () => scaffoldOrder(0)
 
 // `orderCount` = the live number in the input (drives only the info hint).
@@ -726,8 +728,8 @@ const removeOrder = (order) => {
   files.value = files.value.filter(f => f.imageOrder !== order)
 }
 
-// Set the product to exactly `n` orders: keep/create orders 0..n-1 for every variant,
-// and remove any order >= n. e.g. 2 variants × 5 orders × 4 roles = 40 upload slots.
+// Set the product to exactly `n` orders: keep/create orders 0..n-1 (4 size slots each),
+// and remove any order >= n. e.g. 5 orders × 4 sizes = 20 upload slots (any # of variants).
 const applyOrderCount = () => {
   const n = Math.max(1, Math.floor(orderCount.value || 1))
   orderCount.value = n
@@ -736,13 +738,13 @@ const applyOrderCount = () => {
   for (let o = 0; o < n; o++) addOrderSlots(o)
 }
 
-// Expected number of images = variants × 4 sizes × orders. Drives the "x / total" display.
-// Uses the *applied* order count (not the live input) so the denominator only changes when
-// "Add Orders" is pressed; never drops below the orders already present.
+// Expected number of images = 4 sizes × orders (variants share each image, so the count
+// is independent of how many variants there are). Uses the *applied* order count so the
+// denominator only changes on "Add Orders"; never drops below the orders already present.
 const expectedImageCount = computed(() => {
   if (!templateItem.value) return files.value.length
   const orders = Math.max(appliedOrderCount.value || 1, existingOrders.value.size, 1)
-  return templateVariants.value.length * ROLES.length * orders
+  return ROLES.length * orders
 })
 
 // Clear the file cards (and upload history) without touching the chosen template.
@@ -860,13 +862,13 @@ const applyTemplateFromItem = async (itemCode) => {
   }
 }
 
-// Build the empty per-variant upload slots and announce it.
+// Build the 4 size slots (all variants share each) and announce it.
 const scaffoldAndNotify = () => {
   resetFiles()
   scaffoldVariantCards()
   orderCount.value = 1
   appliedOrderCount.value = 1
-  frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
+  frappe.show_alert({ message: `Created ${ROLES.length} upload slots (4 sizes) for ${templateVariants.value.length} variant${templateVariants.value.length === 1 ? '' : 's'}`, indicator: 'blue' })
 }
 
 // Small popup when old-system data exists: migrate it, or start fresh.
