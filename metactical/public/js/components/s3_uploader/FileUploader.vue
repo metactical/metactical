@@ -198,10 +198,16 @@
           <p class="text-sm text-yellow-800">• Select a product template — uploads must be tied to one template.</p>
         </div>
         <div v-else-if="variantImageIssues.length > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <h4 class="text-sm font-medium text-red-800 mb-2">Variants missing size images:</h4>
+          <h4 class="text-sm font-medium text-red-800 mb-2">Variant image issues:</h4>
           <ul class="text-xs text-red-700 space-y-1">
             <li v-for="v in variantImageIssues" :key="v.sku">
-              • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) missing {{ v.missing.join(', ') }}
+              <template v-if="v.kind === 'unassigned'">
+                • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) has not been assigned images —
+                upload at least 1 image (4 sizes) or assign it to existing images.
+              </template>
+              <template v-else>
+                • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) missing {{ v.missing.join(', ') }}
+              </template>
             </li>
           </ul>
         </div>
@@ -849,10 +855,13 @@ const applyTemplateFromItem = async (itemCode) => {
     } catch (e) {
       console.error('Failed to check the old system:', e)
     }
-    if (legacy && legacy.found) {
-      promptMigrateOrCreate(legacy.key)
-    } else {
+    const matches = (legacy && legacy.matches) || []
+    if (matches.length === 0) {
       scaffoldAndNotify()
+    } else if (matches.length === 1) {
+      promptMigrateOrCreate(matches[0].key)
+    } else {
+      promptChooseLegacy(matches)
     }
   }
 
@@ -881,6 +890,43 @@ const promptMigrateOrCreate = (metaKey) => {
   d.$body.html(
     `<div style="padding:6px 0 12px">This product already has data in the old S3 system. ` +
     `Do you want to <b>migrate</b> that data, or <b>create a new</b> upload?</div>`
+  )
+  d.set_secondary_action_label(__('Create new'))
+  d.set_secondary_action(() => { d.hide(); scaffoldAndNotify() })
+  d.show()
+}
+
+// Several old-system files match this template — let the user pick which one to import.
+const promptChooseLegacy = (matches) => {
+  const byLabel = {}
+  matches.forEach(m => {
+    const label = `${m.name}  (${(m.skus || []).join(', ')})`
+    byLabel[label] = m.key
+  })
+  const labels = Object.keys(byLabel)
+  const d = new frappe.ui.Dialog({
+    title: __('Multiple matches found'),
+    fields: [
+      {
+        fieldtype: 'Select',
+        fieldname: 'meta',
+        label: __('Old-system file'),
+        options: labels.join('\n'),
+        default: labels[0],
+        reqd: 1,
+      },
+    ],
+    primary_action_label: __('Import selected'),
+    primary_action: (values) => {
+      const key = byLabel[values.meta]
+      d.hide()
+      if (key) migrateFromLegacy(key)
+    },
+  })
+  d.$wrapper.find('.modal-body').prepend(
+    `<div style="padding:6px 16px 0;font-size:12px;color:var(--text-muted)">` +
+    `Multiple files in the old system match this template. Pick one to import — going forward, ` +
+    `only the data you save into ERP will be used.</div>`
   )
   d.set_secondary_action_label(__('Create new'))
   d.set_secondary_action(() => { d.hide(); scaffoldAndNotify() })
@@ -1014,24 +1060,37 @@ const allFilesValid = computed(() => {
   })
 })
 
-// Product-level rule: every variant of the locked template must have all 4 size
-// images. Returns the variants that are missing one or more roles.
+// Product-level rule: every variant of the locked template must have all 4 size images.
+// Distinguishes a variant that's in NO image card (`unassigned`) from one that's merely
+// missing a size (`incomplete`) so each gets a clearer message.
 const variantImageIssues = computed(() => {
   if (!templateItem.value) return []
-  // For each variant sku, the roles that are present across all images.
+
+  // SKUs that appear on any card (regardless of whether the image is uploaded yet).
+  const assignedSkus = new Set()
+  // Roles present per sku, counting only cards that actually have an image.
   const rolesBySku = {}
   templateVariants.value.forEach(v => { rolesBySku[v.sku] = new Set() })
+
   files.value.forEach(file => {
-    // A role only counts once the slot actually has an image.
-    if (!file.role || !(file.file || file.isOnServer)) return
     const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
+    skuList.forEach(sku => assignedSkus.add(sku))
+    if (!file.role || !(file.file || file.isOnServer)) return
     skuList.forEach(sku => {
       if (rolesBySku[sku]) rolesBySku[sku].add(file.role)
     })
   })
-  return templateVariants.value
-    .map(v => ({ sku: v.sku, item_code: v.item_code, missing: ROLES.filter(r => !rolesBySku[v.sku].has(r)) }))
-    .filter(v => v.missing.length > 0)
+
+  const issues = []
+  templateVariants.value.forEach(v => {
+    if (!assignedSkus.has(v.sku)) {
+      issues.push({ sku: v.sku, item_code: v.item_code, kind: 'unassigned', missing: [...ROLES] })
+      return
+    }
+    const missing = ROLES.filter(r => !rolesBySku[v.sku].has(r))
+    if (missing.length) issues.push({ sku: v.sku, item_code: v.item_code, kind: 'incomplete', missing })
+  })
+  return issues
 })
 
 // Product-level validity: a template is chosen, every variant has all 4 images, AND

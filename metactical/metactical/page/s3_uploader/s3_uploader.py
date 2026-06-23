@@ -255,19 +255,19 @@ def _meta_skus(meta):
 
 @frappe.whitelist()
 def find_legacy_meta(skus):
-	"""Find the old system's metadata JSON for a product without scanning the folder.
+	"""Find the old system's metadata JSON file(s) for a product without scanning the folder.
 
 	Legacy meta files are named `<sku1>-<sku2>-..._metadata.json`, always starting with one
 	of the product's SKUs. So a prefix LIST per variant SKU narrows to a handful of candidates
 	server-side — fast on a bucket of any size — and each candidate is then content-confirmed
-	against the SKUs (handles SKUs that themselves contain "-"). Returns
-	{"found": True, "key", "name"} or {"found": False}.
+	against the SKUs (handles SKUs that themselves contain "-"). Returns every confirmed match
+	as {"matches": [{"key", "name", "skus": [...]}]} (empty list = none).
 	"""
 	if isinstance(skus, str):
 		skus = json.loads(skus)
 	sku_set = {s for s in (skus or []) if s}
 	if not sku_set:
-		return {"found": False}
+		return {"matches": []}
 
 	settings = _get_settings()
 	client = settings.get_client()
@@ -295,16 +295,18 @@ def find_legacy_meta(skus):
 
 	# Confirm by content — a prefix can over-match (e.g. "96670" vs "966700"), so the
 	# productsku list is the source of truth. Candidates are few, so this is cheap.
+	matches = []
 	for key in candidates[:50]:
 		try:
 			body = client.get_object(Bucket=settings.nat_bucket_name, Key=key)["Body"].read()
 			meta = json.loads(body)
 		except Exception:
 			continue
-		if sku_set & _meta_skus(meta):
-			return {"found": True, "key": key, "name": key.split("/")[-1]}
+		file_skus = _meta_skus(meta)
+		if sku_set & file_skus:
+			matches.append({"key": key, "name": key.split("/")[-1], "skus": sorted(file_skus)})
 
-	return {"found": False}
+	return {"matches": matches}
 
 
 @frappe.whitelist()
