@@ -58,7 +58,7 @@ def get_permitted_warehouses(doctype, txt, searchfield, start, page_len, filters
 	user = filters.get("user")
 	warehouses = []
 	if user:
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
 			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
 							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
