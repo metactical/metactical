@@ -40,13 +40,6 @@ def verify_shipping_address(sales_order_name):
 	if not settings.enabled:
 		from metactical.api.shipstation import verify_shipping_address as _ss_verify
 		_ss_verify(sales_order_name)
-		shipping_address_name = frappe.db.get_value(
-			"Sales Order", sales_order_name, "shipping_address_name"
-		)
-		if shipping_address_name:
-			frappe.db.set_value(
-				"Address", shipping_address_name, "custom_ais_validation_entity", "Shipstation"
-			)
 		return
 
 	# --- Storebuilder / Melissa path ---
@@ -100,13 +93,13 @@ def verify_shipping_address(sales_order_name):
 		if melissa_key:
 			melissa_result = verify_with_melissa(address, melissa_key, timeout)
 			if melissa_result:
-				melissa_level, melissa_verified = melissa_result
+				melissa_level, melissa_verified, melissa_detail = melissa_result
 				validation_entity = "Melissa"
 				if melissa_verified:
 					validation_status = "Validated"
 				elif melissa_level != "unverified":
 					validation_status = "Validation Warning"
-					validation_warning = "Address partially verified by Melissa"
+					validation_warning = melissa_detail
 
 	if validation_status in ("Validation Failed", "Validation Warning"):
 		frappe.log_error(
@@ -120,16 +113,13 @@ def verify_shipping_address(sales_order_name):
 			),
 		)
 
-	frappe.db.set_value(
-		"Address",
-		sales_order.shipping_address_name,
-		{
-			"custom_ais_address_verified": validation_status,
-			"custom_ais_validation_entity": validation_entity,
-			"custom_ais_validation_warning": validation_warning,
-		},
-	)
-	frappe.db.set_value("Sales Order", sales_order_name, "custom_ais_address_verified", validation_status)
+	field_values = {
+		"custom_ais_address_verified": validation_status,
+		"custom_ais_validation_entity": validation_entity,
+		"custom_ais_validation_warning": validation_warning,
+	}
+	frappe.db.set_value("Address", sales_order.shipping_address_name, field_values)
+	frappe.db.set_value("Sales Order", sales_order_name, field_values)
 	frappe.msgprint("Shipping Address {0}".format(validation_status))
 
 # Unverified addresses are logged here, relative to the bench logs folder.
@@ -166,6 +156,30 @@ _MELISSA_LEVEL_RANK = {
 	"fully_verified": 3,
 }
 
+# Human-readable summary of what was actually confirmed at each match level.
+_MELISSA_LEVEL_DESCRIPTIONS = {
+	"unverified": "Address could not be verified",
+	"postal_verified": "Only the city/postal code was verified; the street could not be confirmed",
+	"street_verified": "Only the street was verified; the premise (house/unit number) could not be confirmed",
+	"fully_verified": "Address fully verified",
+}
+
+# Human-readable reasons for Melissa AE (address error) result codes.
+_MELISSA_AE_DESCRIPTIONS = {
+	"AE01": "missing or incorrect postal code",
+	"AE02": "street name could not be matched (no match or multiple matches)",
+	"AE03": "street direction/suffix matches multiple addresses",
+	"AE05": "not enough information to match a single address",
+	"AE07": "not enough address details were provided",
+	"AE08": "premise unit number could not be found",
+	"AE09": "premise unit number is missing",
+	"AE10": "street number could not be found",
+	"AE11": "street number is missing",
+	"AE12": "PO/RR/HC box number could not be found",
+	"AE13": "PO/RR/HC box number is missing",
+	"AE14": "private mail box number is missing",
+}
+
 
 def build_melissa_payload(address, melissa_key):
 	"""Build the Melissa Global Address API request body from an ERPNext Address.
@@ -194,12 +208,14 @@ def build_melissa_payload(address, melissa_key):
 
 
 def verify_with_melissa(address, melissa_key, timeout):
-	"""Call the Melissa Global Address API and return (match_level, verified) or None.
+	"""Call the Melissa Global Address API and return (match_level, verified, detail) or None.
 
 	Returns None on network/HTTP errors (already logged). verified is True only
 	when the strongest AV code in the response confirms street level or better
 	(fully_verified/street_verified); state/city-only matches (e.g. AV11, AV12)
-	are reported as postal_verified and are not considered verified.
+	are reported as postal_verified and are not considered verified. detail is a
+	human-readable summary of what was (or wasn't) confirmed, including any AE
+	(address error) codes returned alongside the AV codes.
 	"""
 	payload = build_melissa_payload(address, melissa_key)
 	if not payload:
@@ -229,14 +245,23 @@ def verify_with_melissa(address, melissa_key, timeout):
 	result_codes = [c.strip() for c in (records[0].get("Results") or "").split(",") if c.strip()]
 
 	best_level = "unverified"
+	ae_codes = []
 	for code in result_codes:
+		if code.startswith("AE"):
+			ae_codes.append(code)
+			continue
 		level = _MELISSA_AV_LEVELS.get(code)
 		if level is None and code.startswith("AV"):
 			level = "postal_verified"
 		if level and _MELISSA_LEVEL_RANK[level] > _MELISSA_LEVEL_RANK[best_level]:
 			best_level = level
 
-	return (best_level, best_level in _MELISSA_VERIFIED_LEVELS)
+	detail = _MELISSA_LEVEL_DESCRIPTIONS[best_level]
+	ae_reasons = [_MELISSA_AE_DESCRIPTIONS.get(code, code) for code in ae_codes]
+	if ae_reasons:
+		detail = "{0} ({1})".format(detail, "; ".join(ae_reasons))
+
+	return (best_level, best_level in _MELISSA_VERIFIED_LEVELS, detail)
 
 
 def build_address_payload(address):
