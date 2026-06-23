@@ -1233,16 +1233,23 @@ const processFiles = async (incomingFiles) => {
 
   isProcessingFiles.value = true
   processingProgress.value = { current: 0, total: incomingFiles.length, filename: '' }
-  
+
   const newFiles = []
-  
+
+  // Cascade the SKUs (variants) and sites from the last existing card, so a freshly
+  // uploaded image inherits the same context. Role/size is still auto-detected per image.
+  const lastFile = files.value.length ? files.value[files.value.length - 1] : null
+  const inheritSkuItems = lastFile ? (lastFile.skuItems || []) : []
+  const inheritSkus = lastFile ? (lastFile.skus || '') : ''
+  const inheritSites = lastFile ? (lastFile.sites || []) : []
+
   try {
     for (let i = 0; i < incomingFiles.length; i++) {
       const file = incomingFiles[i]
-      
+
       processingProgress.value.current = i + 1
       processingProgress.value.filename = file.name
-      
+
       if (!file.type.startsWith('image/')) continue
 
       const img = await loadImage(file)
@@ -1258,29 +1265,28 @@ const processFiles = async (incomingFiles) => {
         role: autoRole,
         width: img.width,
         height: img.height,
-        skus: '', // derived comma list of resolved retail SKUs (kept in sync with skuItems)
-        skuItems: [], // [{ item_code, sku }]
+        skus: inheritSkus, // inherited from the last card (kept in sync with skuItems)
+        skuItems: inheritSkuItems.map(i => ({ ...i })), // clone so each card is independent
         newItemCode: '', // transient input for adding an item code
         skuError: '', // transient validation message for the SKU adder
         resolvingItem: false,
-        sites: [],
+        sites: [...inheritSites], // inherited from the last card
         imageOrder: autoOrder, // Auto-filled from filename, default 0
         preview: URL.createObjectURL(file),
         isOnServer: false, // Track if file exists on server
         serverPath: null, // S3 path if file exists on server
         isModified: false // Track if file has been modified since loading from server
       })
-      
+
       // Small delay to allow UI updates for large batches
       if (i % 10 === 0) {
         await new Promise(resolve => setTimeout(resolve, 10))
       }
     }
-    
-    // Add to files array and auto-sort
+
+    // Append at the bottom (no re-sort) so new uploads land below the existing cards.
     files.value.push(...newFiles)
-    autoSortFiles()
-    
+
     console.log(`Successfully processed ${newFiles.length} image files from ${incomingFiles.length} total files`)
     
   } finally {
