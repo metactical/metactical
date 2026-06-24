@@ -285,7 +285,7 @@ def get_website_stores_data(filters, location, sources):
 					"cash_sales": cash_sales
 				})
 	
-				end_of_day_closing = frappe.db.get_value("End of Day Closing", {"lead_source": source.name, "closing_date": filters.date}, ["mop_total_difference", "closing_notes", "name"], as_dict=1, order_by="creation desc")	
+				end_of_day_closing = frappe.db.get_value("End of Day Closing", {"lead_source": source.name, "creation": filters.date}, ["mop_total_difference", "closing_notes", "name"], as_dict=1, order_by="creation desc")	
 				if end_of_day_closing is not None:
 					row.update({
 						"difference": end_of_day_closing.mop_total_difference,
