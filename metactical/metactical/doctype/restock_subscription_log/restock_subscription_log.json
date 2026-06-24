@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:customer_email",
  "creation": "2026-06-24 08:46:07.054687",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -8,13 +9,13 @@
   "section_break_0gxe",
   "column_break_ytcq",
   "amended_from",
-  "item_code",
   "customer_email",
+  "item_code",
   "column_break_ksmy",
   "lead_source",
   "received_at",
   "section_break_cjsb",
-  "raw_payload"
+  "payload"
  ],
  "fields": [
   {
@@ -38,14 +39,14 @@
   },
   {
    "fieldname": "item_code",
-   "fieldtype": "Link",
-   "label": "Item Code",
-   "options": "Item"
+   "fieldtype": "Data",
+   "label": "Item Code"
   },
   {
    "fieldname": "customer_email",
    "fieldtype": "Data",
-   "label": "Customer Email"
+   "label": "Customer Email",
+   "unique": 1
   },
   {
    "fieldname": "column_break_ksmy",
@@ -53,11 +54,11 @@
   },
   {
    "fieldname": "lead_source",
-   "fieldtype": "Link",
-   "label": "Lead Source",
-   "options": "Lead Source"
+   "fieldtype": "Data",
+   "label": "Lead Source"
   },
   {
+   "default": "Now",
    "fieldname": "received_at",
    "fieldtype": "Datetime",
    "label": "Received At"
@@ -67,19 +68,23 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "raw_payload",
-   "fieldtype": "Long Text",
-   "label": "Raw Payload"
+   "fieldname": "payload",
+   "fieldtype": "Code",
+   "in_list_view": 1,
+   "label": "Payload",
+   "read_only": 1,
+   "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-24 08:52:00.463077",
+ "modified": "2026-06-24 09:56:31.101476",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Subscription Log",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
