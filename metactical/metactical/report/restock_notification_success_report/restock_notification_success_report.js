@@ -7,11 +7,17 @@ frappe.query_reports["Restock Notification Success Report"] = {
 			"fieldname": "from_date",
 			"label": __("From Date"),
 			"fieldtype": "Date",
+			"on_change": function () {
+				frappe.query_report.refresh();
+			},
 		},
 		{
 			"fieldname": "to_date",
 			"label": __("To Date"),
 			"fieldtype": "Date",
+			"on_change": function () {
+				frappe.query_report.refresh();
+			},
 		},
 		{
 			"fieldname": "lead_source",
