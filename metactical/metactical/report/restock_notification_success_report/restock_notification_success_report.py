@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, date_diff, get_datetime, getdate
+from frappe.utils import add_days, date_diff, getdate
 
 
 def execute(filters=None):
@@ -96,14 +96,15 @@ def find_matching_sales_order(log, conversion_window=None):
 	if not candidate_names:
 		return None
 
+	sent_date = getdate(log.sent_at)
 	so_filters = [
 		["name", "in", list(set(candidate_names))],
 		["docstatus", "=", 1],
-		["creation", ">=", log.sent_at],
+		["transaction_date", ">=", sent_date],
 	]
 	if conversion_window:
-		cutoff = add_days(get_datetime(log.sent_at), int(conversion_window))
-		so_filters.append(["creation", "<=", cutoff])
+		cutoff = add_days(sent_date, int(conversion_window))
+		so_filters.append(["transaction_date", "<=", cutoff])
 
 	candidates = frappe.get_all(
 		"Sales Order",
@@ -112,10 +113,10 @@ def find_matching_sales_order(log, conversion_window=None):
 			"name", "transaction_date", "contact_email",
 			"customer_address", "shipping_address_name", "contact_person",
 		],
-		order_by="creation asc",
+		order_by="transaction_date asc, creation asc",
 	)
 
-	# Earliest candidate (already creation-ordered) whose email matches the log.
+	# Earliest matching order (by order date) whose email matches the log.
 	for so in candidates:
 		if log.customer_email in sales_order_emails(so):
 			return so
