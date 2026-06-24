@@ -26,7 +26,24 @@ class ItemPriceFromExcel(Document):
 
 	def on_submit(self):
 		file_content = self.check_file()
-		self.create_price_entries(file_content)
+		data_rows = file_content[1:]
+		if len(data_rows) > 3000:
+			header = file_content[0]
+			for start in range(0, len(data_rows), 3000):
+				batch = data_rows[start:start + 3000]
+				frappe.enqueue(
+					"metactical.metactical.doctype.item_price_from_excel.item_price_from_excel.process_batch",
+					queue="long",
+					timeout=3600,
+					doc_name=self.name,
+					header=header,
+					batch=batch,
+					import_based_on=self.import_based_on,
+					replace_existing=self.replace_existing,
+				)
+			msgprint(_("File has more than 3000 rows. Processing in background batches."))
+		else:
+			self.create_price_entries(file_content)
 
 	def validate(self):
 		self.check_file()
@@ -73,6 +90,39 @@ class ItemPriceFromExcel(Document):
 		if price_lists == []:
 			frappe.throw("No price list found in the file")
 
+		# Pre-build lookup maps for Retail SKU import to avoid per-row DB queries
+		sku_to_item = {}
+		sku_to_existing_price = {}  # (sku, price_list) -> item_price_name
+		if self.import_based_on == "Retail SKU" and item_sku_col is not None:
+			all_skus = list({row[item_sku_col] for row in data[1:] if row[item_sku_col]})
+			if all_skus:
+				item_rows = frappe.db.sql(
+					"SELECT name, ifw_retailskusuffix FROM `tabItem` WHERE ifw_retailskusuffix IN %(skus)s",
+					{"skus": all_skus}, as_dict=1
+				)
+				sku_to_item = {r.ifw_retailskusuffix: r.name for r in item_rows}
+
+				missing_skus = [sku for sku in all_skus if sku not in sku_to_item]
+				if missing_skus:
+					frappe.msgprint(
+						_("The following Retail SKUs were not found in the system and will be skipped:<br><br>{0}").format(
+							"<br>".join(str(s) for s in missing_skus)
+						),
+						title=_("Missing Retail SKUs"),
+						indicator="red",
+					)
+
+				if sku_to_item and price_lists:
+					ip_rows = frappe.db.sql(
+						"""SELECT item_price.name, item.ifw_retailskusuffix, item_price.price_list
+						   FROM `tabItem Price` item_price
+						   LEFT JOIN `tabItem` AS item ON item.name = item_price.item_code
+						   WHERE item.ifw_retailskusuffix IN %(skus)s AND item_price.price_list IN %(lists)s""",
+						{"skus": all_skus, "lists": price_lists}, as_dict=1
+					)
+					sku_to_existing_price = {(r.ifw_retailskusuffix, r.price_list): r.name for r in ip_rows}
+
+		count = 0
 		for row in data[1:]:
 			item_code = None
 			item_sku = None
@@ -88,21 +138,9 @@ class ItemPriceFromExcel(Document):
 				if item_code is not None and item_code != "" and self.import_based_on == "ERP SKU":
 					exists = frappe.db.exists("Item Price", {"item_code": item_code, "price_list": price_list})
 				elif item_sku is not None and item_sku != "" and self.import_based_on == "Retail SKU":
-					item_code = frappe.db.get_value("Item", {"ifw_retailskusuffix": item_sku}, "name")
-					query = frappe.db.sql("""SELECT 
-						   						item_price.name
-						   					FROM 
-						   						`tabItem Price` item_price
-						   					LEFT JOIN
-						   						`tabItem` AS item ON item.name = item_price.item_code
-						   					WHERE
-						   						item.ifw_retailskusuffix = %(item_sku)s AND item_price.price_list = %(price_list)s""", 
-											{"item_sku": item_sku, "price_list": price_list}, as_dict=1)
-					if query and len(query) > 0:
-						exists = query[0]["name"]
-					else:
-						exists = False
-						
+					item_code = sku_to_item.get(item_sku)
+					exists = sku_to_existing_price.get((item_sku, price_list), False)
+
 				if not self.replace_existing and exists:
 					continue
 				elif item_code is None or item_code == "":
@@ -112,7 +150,7 @@ class ItemPriceFromExcel(Document):
 						doc = frappe.get_doc("Item Price", exists)
 					else:
 						doc = frappe.new_doc("Item Price")
-					
+
 					if not price and external_source:
 						continue
 
@@ -124,6 +162,12 @@ class ItemPriceFromExcel(Document):
 					try:
 						if price:
 							doc.save()
+							# Update cache so subsequent rows see newly created record
+							if item_sku and not exists:
+								sku_to_existing_price[(item_sku, price_list)] = doc.name
+							count += 1
+							if count % 100 == 0:
+								frappe.db.commit()
 					except Exception as e:
 						frappe.clear_last_message()
 						frappe.throw(str(e))
@@ -138,3 +182,16 @@ class ItemPriceFromExcel(Document):
 						# 	"parentfield": "error_log"
 						# })
 						# error_log.insert()
+
+		frappe.db.commit()
+
+
+def process_batch(doc_name, header, batch, import_based_on, replace_existing):
+	"""Background job entrypoint for a single batch of rows (>3000 row files)."""
+	try:
+		doc = frappe.get_doc("Item Price From Excel", doc_name)
+		doc.import_based_on = import_based_on
+		doc.replace_existing = replace_existing
+		doc.create_price_entries([header] + batch)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"ItemPriceFromExcel batch error: {doc_name}")
