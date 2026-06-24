@@ -11,8 +11,8 @@
   "amended_from",
   "customer_email",
   "item_code",
-  "column_break_ksmy",
   "lead_source",
+  "column_break_ksmy",
   "received_at",
   "section_break_cjsb",
   "payload"
@@ -40,11 +40,15 @@
   {
    "fieldname": "item_code",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Item Code"
   },
   {
    "fieldname": "customer_email",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Customer Email",
    "unique": 1
   },
@@ -55,12 +59,16 @@
   {
    "fieldname": "lead_source",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Lead Source"
   },
   {
    "default": "Now",
    "fieldname": "received_at",
    "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Received At"
   },
   {
@@ -70,7 +78,6 @@
   {
    "fieldname": "payload",
    "fieldtype": "Code",
-   "in_list_view": 1,
    "label": "Payload",
    "read_only": 1,
    "reqd": 1
@@ -80,7 +87,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-24 09:56:31.101476",
+ "modified": "2026-06-24 12:51:04.110439",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Subscription Log",

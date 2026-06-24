@@ -10,6 +10,7 @@
   "item_code",
   "lead_source",
   "email_template",
+  "column_break_pobu",
   "sent_at",
   "status"
  ],
@@ -41,11 +42,14 @@
   {
    "fieldname": "sent_at",
    "fieldtype": "Datetime",
+   "in_standard_filter": 1,
    "label": "Sent At"
   },
   {
    "fieldname": "status",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Delivery Status"
   },
   {
@@ -54,12 +58,16 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Lead Source"
+  },
+  {
+   "fieldname": "column_break_pobu",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-24 11:03:26.216195",
+ "modified": "2026-06-24 12:54:24.756974",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
