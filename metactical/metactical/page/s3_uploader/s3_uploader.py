@@ -179,13 +179,13 @@ def resolve_item_codes(skus):
 
 @frappe.whitelist()
 def get_item_family(item_code):
-	"""Expand an Item to its full variant family (template + every variant).
+	"""Expand an Item to its variant family — the variants only, never the template.
 
-	If the item is a variant, the family is its template plus all that template's
-	variants. If the item is a template (has_variants), it's the template plus its
-	own variants. A standalone item is just itself. Returns
-	{"items": [{item_code, sku}], "template": <name or None>} — only members that
-	have a RetailSKUSuffix are included (a SKU is required for a grid row).
+	If the item is a variant, the family is all of its template's variants. If the item
+	is a template (has_variants), it's that template's variants. A standalone item is just
+	itself. Returns {"items": [{item_code, sku}], "template": <name or None>} — the template
+	is excluded from `items` (images upload to variants only); only members with a
+	RetailSKUSuffix are included (a SKU is required for a grid row).
 	"""
 	item = frappe.db.get_value(
 		"Item", item_code, ["name", "variant_of", "has_variants"], as_dict=True
@@ -201,7 +201,8 @@ def get_item_family(item_code):
 		template = None
 
 	if template:
-		names = [template] + frappe.get_all(
+		# Variants only — the template itself is never an upload target.
+		names = frappe.get_all(
 			"Item", filters={"variant_of": template}, order_by="name", pluck="name"
 		)
 	else:
@@ -255,19 +256,19 @@ def _meta_skus(meta):
 
 @frappe.whitelist()
 def find_legacy_meta(skus):
-	"""Find the old system's metadata JSON for a product without scanning the folder.
+	"""Find the old system's metadata JSON file(s) for a product without scanning the folder.
 
 	Legacy meta files are named `<sku1>-<sku2>-..._metadata.json`, always starting with one
 	of the product's SKUs. So a prefix LIST per variant SKU narrows to a handful of candidates
 	server-side — fast on a bucket of any size — and each candidate is then content-confirmed
-	against the SKUs (handles SKUs that themselves contain "-"). Returns
-	{"found": True, "key", "name"} or {"found": False}.
+	against the SKUs (handles SKUs that themselves contain "-"). Returns every confirmed match
+	as {"matches": [{"key", "name", "skus": [...]}]} (empty list = none).
 	"""
 	if isinstance(skus, str):
 		skus = json.loads(skus)
 	sku_set = {s for s in (skus or []) if s}
 	if not sku_set:
-		return {"found": False}
+		return {"matches": []}
 
 	settings = _get_settings()
 	client = settings.get_client()
@@ -295,16 +296,18 @@ def find_legacy_meta(skus):
 
 	# Confirm by content — a prefix can over-match (e.g. "96670" vs "966700"), so the
 	# productsku list is the source of truth. Candidates are few, so this is cheap.
+	matches = []
 	for key in candidates[:50]:
 		try:
 			body = client.get_object(Bucket=settings.nat_bucket_name, Key=key)["Body"].read()
 			meta = json.loads(body)
 		except Exception:
 			continue
-		if sku_set & _meta_skus(meta):
-			return {"found": True, "key": key, "name": key.split("/")[-1]}
+		file_skus = _meta_skus(meta)
+		if sku_set & file_skus:
+			matches.append({"key": key, "name": key.split("/")[-1], "skus": sorted(file_skus)})
 
-	return {"found": False}
+	return {"matches": matches}
 
 
 @frappe.whitelist()

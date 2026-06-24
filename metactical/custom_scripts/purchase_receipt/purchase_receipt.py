@@ -13,7 +13,26 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 				d.purchase_order = self.purchase_order
 
 		self.validate_barcodes()
-    
+		self.validate_accepted_warehouse_permission()
+
+	def validate_accepted_warehouse_permission(self):
+		# Metactical Customization: Validate that user has permission to use the accepted warehouse
+		user = frappe.session.user
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
+		if setting_exists:
+			settings = frappe.get_doc("Warehouse User Permissions", setting_exists)
+			permitted_warehouses = [row.warehouse for row in settings.purchase_receipt_accepted_warehouse]
+
+			if permitted_warehouses:
+				if self.set_warehouse and self.set_warehouse not in permitted_warehouses:
+					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(self.set_warehouse, user))
+
+				for row in self.items:
+					# Metactical Customization: Purchase Receipt Item's "Accepted Warehouse"
+					# field's actual fieldname is "warehouse" (label is "Accepted Warehouse")
+					if row.warehouse and row.warehouse not in permitted_warehouses:
+						frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.warehouse, user))
+
 	def validate_barcodes(self):
 		for item in self.items:
 			if not item.barcode:
@@ -71,6 +90,26 @@ def validate(self, method):
 			if item.warehouse != self.set_warehouse:
 				item.warehouse = self.set_warehouse
 			
+@frappe.whitelist()
+def get_accepted_warehouse(doctype, txt, searchfield, start, page_len, filters):
+	user = filters.get("user")
+	warehouses = []
+	if user:
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
+		if setting_exists:
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
+							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
+							AND parentfield='purchase_receipt_accepted_warehouse'""",
+							{
+								'txt': "%%%s%%" % txt,
+								'parent': setting_exists
+							})
+
+		if not setting_exists or not warehouses:
+			#Retrun all warehouses
+			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
+	return warehouses
+
 @frappe.whitelist()
 def get_pr_items(docname):
 	items = []

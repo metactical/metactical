@@ -73,13 +73,14 @@
         />
         <button @click="applyOrderCount" class="btn btn-default btn-sm">Add Orders</button>
         <span class="text-xs text-gray-500">
-          = {{ templateVariants.length }} variants × 4 sizes × {{ Math.max(orderCount || 1, 1) }} orders
-          = <strong>{{ templateVariants.length * 4 * Math.max(orderCount || 1, 1) }}</strong> upload slots
+          = 4 sizes × {{ Math.max(orderCount || 1, 1) }} orders
+          = <strong>{{ 4 * Math.max(orderCount || 1, 1) }}</strong> upload slots
+          ({{ templateVariants.length }} variant{{ templateVariants.length === 1 ? '' : 's' }} share each image)
         </span>
       </div>
       <p class="text-xs text-gray-500 mt-2">
-        Sets each variant to this many image sets. Increasing adds empty icon/small/medium/large slots;
-        decreasing removes the extra orders.
+        Sets this many image sets. Increasing adds empty icon/small/medium/large slots;
+        decreasing removes the extra orders. All variants share each image.
       </p>
     </div>
 
@@ -179,65 +180,26 @@
           </div>
         </div>
 
-        <!-- Missing Fields Summary -->
-        <div v-if="!allFilesValid" class="mt-4 p-3 border border-yellow-200 rounded-lg">
-          <h4 class="text-sm font-medium text-yellow-800 mb-2">Missing Required Fields:</h4>
-          <ul class="text-xs space-y-1">
+        <!-- Validation issues (single merged panel: file-level + variant-level) -->
+        <div v-if="!templateItem" class="mt-4 p-3 border border-yellow-200 rounded-lg">
+          <p class="text-sm text-yellow-800">• Select a product template — uploads must be tied to one template.</p>
+        </div>
+        <div v-else-if="!allFilesValid || variantImageIssues.length > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <h4 class="text-sm font-medium text-red-800 mb-2">Validation issues:</h4>
+          <ul class="text-xs text-red-700 space-y-1">
             <li v-if="files.some(f => !f.file && !f.isOnServer)">• Some slots still need an image uploaded</li>
             <li v-if="files.some(f => !f.role)">• Some images are missing role assignments</li>
             <li v-if="files.some(f => !f.skus || !f.skus.trim())">• Some images are missing SKU information</li>
             <li v-if="files.some(f => !f.sites || f.sites.length === 0)">• Some images have no sites selected</li>
-            <li v-if="files.some(f => f.imageOrder === undefined || f.imageOrder === null)">• Some images are missing image order</li>
             <li v-if="files.some(f => f.isBroken && !f.file)">• Some images are broken and need replacement files</li>
-          </ul>
-        </div>
-
-        <!-- Template / Variant Completeness Messages -->
-        <div v-if="!templateItem" class="mt-4 p-3 border border-yellow-200 rounded-lg">
-          <p class="text-sm text-yellow-800">• Select a product template — uploads must be tied to one template.</p>
-        </div>
-        <div v-else-if="variantImageIssues.length > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <h4 class="text-sm font-medium text-red-800 mb-2">Variants missing size images:</h4>
-          <ul class="text-xs text-red-700 space-y-1">
             <li v-for="v in variantImageIssues" :key="v.sku">
-              • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) missing {{ v.missing.join(', ') }}
-            </li>
-          </ul>
-        </div>
-
-        <!-- Product Validation Messages -->
-        <div v-if="getValidationSummary().incomplete > 0" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <h4 class="text-sm font-medium text-red-800 mb-2">Validation Issues:</h4>
-          <ul class="text-xs text-red-700 space-y-2">
-            <li v-for="result in getValidationSummary().results.filter(r => !r.isComplete)" :key="result.productsku">
-              <div class="font-medium">{{ result.productsku }}:</div>
-              
-              <!-- Export Issues -->
-              <div v-if="result.exportIssues && result.exportIssues.length > 0" class="ml-2 mt-1">
-                <div v-for="issue in result.exportIssues" :key="issue.type" class="text-red-800">
-                  • <strong>Export Issue:</strong> {{ issue.message }}
-                  <div v-if="issue.type === 'count_mismatch'" class="ml-4 text-xs">
-                    UI has {{ issue.uiCount }} files, export has {{ issue.exportCount }} images
-                  </div>
-                  <div v-if="issue.fileName" class="ml-4 text-xs">
-                    File: {{ issue.fileName }}
-                    <span v-if="issue.expectedPath"> → Expected: {{ issue.expectedPath }}</span>
-                    <span v-if="issue.imageOrder !== undefined"> (Order: {{ issue.imageOrder }})</span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Role Issues -->
-              <div v-if="result.incompleteOrders && result.incompleteOrders.length > 0" class="ml-2 mt-1">
-                <div v-for="incomplete in result.incompleteOrders" :key="incomplete.order">
-                  • Missing {{ incomplete.missingRoles.join(', ') }} for order {{ incomplete.order }}
-                </div>
-              </div>
-              
-              <!-- Missing Roles -->
-              <div v-if="result.missingRoles && result.missingRoles.length > 0" class="ml-2 mt-1">
-                • Missing all roles: {{ result.missingRoles.join(', ') }}
-              </div>
+              <template v-if="v.kind === 'unassigned'">
+                • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) has not been assigned images —
+                upload at least 1 image (4 sizes) or assign it to existing images.
+              </template>
+              <template v-else>
+                • <strong>{{ v.sku }}</strong> ({{ v.item_code }}) missing {{ v.missing.join(', ') }}
+              </template>
             </li>
           </ul>
         </div>
@@ -495,8 +457,8 @@
               </p>
             </div>
 
-            <!-- Add Image (scaffolded slot awaiting an upload) -->
-            <div v-else-if="!file.file" class="space-y-3">
+            <!-- Add / Change Image (any non-server card: empty slot or fresh upload) -->
+            <div v-else class="space-y-3">
               <label class="block text-sm font-medium text-gray-700">Image</label>
               <div class="flex items-center gap-3">
                 <input
@@ -513,9 +475,9 @@
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                   </svg>
-                  Add Image
+                  {{ file.file ? 'Change Image' : 'Add Image' }}
                 </button>
-                <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Needs image</span>
+                <span v-if="!file.file" class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Needs image</span>
               </div>
               <p class="text-xs text-gray-500">
                 Upload the <strong>{{ file.role }}</strong> image for <strong>{{ file.skus }}</strong>
@@ -669,8 +631,35 @@ const templateRef = ref(null)             // DOM node for the native Link contro
 let templateControl = null
 const ROLES = ['icon', 'small', 'medium', 'large']
 
-// One empty placeholder card for a (variant, role, order) — awaiting an image upload.
-const buildVariantCard = (v, role, order) => ({
+// One empty placeholder card for a (role, order) holding ALL the template's variants —
+// awaiting an image upload. The image is shared by every variant in its SKU grid.
+const buildRoleCard = (role, order) => {
+  const firstSku = (templateVariants.value[0] && templateVariants.value[0].sku) || ''
+  return {
+    name: order ? `${firstSku}_${order}_${role}.jpg` : `${firstSku}_${role}.jpg`,
+    type: null,
+    file: null,
+    role,
+    width: 0,
+    height: 0,
+    skus: templateVariants.value.map(v => v.sku).join(', '),
+    skuItems: templateVariants.value.map(v => ({ item_code: v.item_code, sku: v.sku })),
+    newItemCode: '',
+    skuError: '',
+    resolvingItem: false,
+    sites: [],
+    imageOrder: order,
+    preview: null,
+    isOnServer: false,
+    serverPath: null,
+    isModified: false,
+    isPlaceholder: true,
+  }
+}
+
+// An empty placeholder for a SINGLE variant + role (used to fill a gap found when loading,
+// e.g. a variant that has no icon yet).
+const buildVariantRoleCard = (v, role, order) => ({
   name: order ? `${v.sku}_${order}_${role}.jpg` : `${v.sku}_${role}.jpg`,
   type: null,
   file: null,
@@ -691,16 +680,13 @@ const buildVariantCard = (v, role, order) => ({
   isPlaceholder: true,
 })
 
-// Scaffold one image order: a card per (variant × role) at `order`.
+// Scaffold one image order: just the 4 size cards (icon/small/medium/large), each
+// carrying every variant — so any number of variants still produces only 4 uploads.
 const scaffoldOrder = (order) => {
-  const cards = []
-  templateVariants.value.forEach(v => {
-    ROLES.forEach(role => cards.push(buildVariantCard(v, role, order)))
-  })
-  files.value.push(...cards)
+  files.value.push(...ROLES.map(role => buildRoleCard(role, order)))
 }
 
-// Build the default (order 0) upload slots for every variant.
+// Build the default order 0 slots (4 sizes; all variants share each image).
 const scaffoldVariantCards = () => scaffoldOrder(0)
 
 // `orderCount` = the live number in the input (drives only the info hint).
@@ -726,8 +712,8 @@ const removeOrder = (order) => {
   files.value = files.value.filter(f => f.imageOrder !== order)
 }
 
-// Set the product to exactly `n` orders: keep/create orders 0..n-1 for every variant,
-// and remove any order >= n. e.g. 2 variants × 5 orders × 4 roles = 40 upload slots.
+// Set the product to exactly `n` orders: keep/create orders 0..n-1 (4 size slots each),
+// and remove any order >= n. e.g. 5 orders × 4 sizes = 20 upload slots (any # of variants).
 const applyOrderCount = () => {
   const n = Math.max(1, Math.floor(orderCount.value || 1))
   orderCount.value = n
@@ -736,13 +722,18 @@ const applyOrderCount = () => {
   for (let o = 0; o < n; o++) addOrderSlots(o)
 }
 
-// Expected number of images = variants × 4 sizes × orders. Drives the "x / total" display.
-// Uses the *applied* order count (not the live input) so the denominator only changes when
-// "Add Orders" is pressed; never drops below the orders already present.
+// While loading, the final slot count (loaded images + any gap slots) is known up-front;
+// pin the denominator to it so it doesn't climb as cards stream in. 0 = not loading.
+const loadingTarget = ref(0)
+
+// Expected number of images (the "x / total" denominator). Normally 4 sizes × orders
+// (variants share each image), but a LOADED record can have any number of images — so it
+// never drops below the actual number of cards in the grid.
 const expectedImageCount = computed(() => {
   if (!templateItem.value) return files.value.length
+  if (loadingTarget.value > 0) return loadingTarget.value
   const orders = Math.max(appliedOrderCount.value || 1, existingOrders.value.size, 1)
-  return templateVariants.value.length * ROLES.length * orders
+  return Math.max(ROLES.length * orders, files.value.length)
 })
 
 // Clear the file cards (and upload history) without touching the chosen template.
@@ -756,6 +747,32 @@ const resetFiles = () => {
   currentUpload.value = null
   uploadErrors.value = []
   uploadedFiles.value = []
+}
+
+// Gaps to fill after a load: for every variant, the roles not covered by any loaded image.
+const computeMissingSlots = (allImages) => {
+  const covered = {}
+  templateVariants.value.forEach(v => { covered[v.sku] = new Set() })
+  allImages.forEach(im => {
+    const skus = im.skuItems ? im.skuItems.map(i => i.sku) : (im.skus || [])
+    skus.forEach(s => { if (covered[s]) covered[s].add(im.role) })
+  })
+  const missing = []
+  templateVariants.value.forEach(v => {
+    ROLES.forEach(role => { if (!covered[v.sku].has(role)) missing.push({ variant: v, role }) })
+  })
+  return missing
+}
+
+// Shared finish for both loaders: pin the denominator to the real slot count (loaded images
+// + gap slots), stream the images in, then add an empty slot for each missing variant size.
+const finishLoad = async (allImages) => {
+  orderCount.value = appliedOrderCount.value = Math.max(new Set(allImages.map(i => i.imageInfo?.order || 0)).size, 1)
+  const missing = computeMissingSlots(allImages)
+  loadingTarget.value = allImages.length + missing.length
+  await loadAllImages(allImages)
+  missing.forEach(({ variant, role }) => files.value.push(buildVariantRoleCard(variant, role, 0)))
+  loadingTarget.value = 0
 }
 
 // Load every image stored on a saved record (by name) into the editor.
@@ -775,10 +792,7 @@ const loadRecordImages = async (recordName) => {
       sites: (im.sites || []).filter(site => siteNames.value.includes(site))
     }
   })
-  // Fix the order count up-front (from the data) so the x/total denominator doesn't
-  // change while images stream in below.
-  orderCount.value = appliedOrderCount.value = Math.max(new Set(allImages.map(i => i.imageInfo?.order || 0)).size, 1)
-  await loadAllImages(allImages)
+  await finishLoad(allImages)
 }
 
 // Resolve the picked Item to its template + variant set, then either load the
@@ -847,10 +861,13 @@ const applyTemplateFromItem = async (itemCode) => {
     } catch (e) {
       console.error('Failed to check the old system:', e)
     }
-    if (legacy && legacy.found) {
-      promptMigrateOrCreate(legacy.key)
-    } else {
+    const matches = (legacy && legacy.matches) || []
+    if (matches.length === 0) {
       scaffoldAndNotify()
+    } else if (matches.length === 1) {
+      promptMigrateOrCreate(matches[0].key)
+    } else {
+      promptChooseLegacy(matches)
     }
   }
 
@@ -860,13 +877,13 @@ const applyTemplateFromItem = async (itemCode) => {
   }
 }
 
-// Build the empty per-variant upload slots and announce it.
+// Build the 4 size slots (all variants share each) and announce it.
 const scaffoldAndNotify = () => {
   resetFiles()
   scaffoldVariantCards()
   orderCount.value = 1
   appliedOrderCount.value = 1
-  frappe.show_alert({ message: `Created ${templateVariants.value.length * ROLES.length} upload slots (${templateVariants.value.length} variants × 4 sizes)`, indicator: 'blue' })
+  frappe.show_alert({ message: `Created ${ROLES.length} upload slots (4 sizes) for ${templateVariants.value.length} variant${templateVariants.value.length === 1 ? '' : 's'}`, indicator: 'blue' })
 }
 
 // Small popup when old-system data exists: migrate it, or start fresh.
@@ -879,6 +896,43 @@ const promptMigrateOrCreate = (metaKey) => {
   d.$body.html(
     `<div style="padding:6px 0 12px">This product already has data in the old S3 system. ` +
     `Do you want to <b>migrate</b> that data, or <b>create a new</b> upload?</div>`
+  )
+  d.set_secondary_action_label(__('Create new'))
+  d.set_secondary_action(() => { d.hide(); scaffoldAndNotify() })
+  d.show()
+}
+
+// Several old-system files match this template — let the user pick which one to import.
+const promptChooseLegacy = (matches) => {
+  const byLabel = {}
+  matches.forEach(m => {
+    const label = `${m.name}  (${(m.skus || []).join(', ')})`
+    byLabel[label] = m.key
+  })
+  const labels = Object.keys(byLabel)
+  const d = new frappe.ui.Dialog({
+    title: __('Multiple matches found'),
+    fields: [
+      {
+        fieldtype: 'Select',
+        fieldname: 'meta',
+        label: __('Old-system file'),
+        options: labels.join('\n'),
+        default: labels[0],
+        reqd: 1,
+      },
+    ],
+    primary_action_label: __('Import selected'),
+    primary_action: (values) => {
+      const key = byLabel[values.meta]
+      d.hide()
+      if (key) migrateFromLegacy(key)
+    },
+  })
+  d.$wrapper.find('.modal-body').prepend(
+    `<div style="padding:6px 16px 0;font-size:12px;color:var(--text-muted)">` +
+    `Multiple files in the old system match this template. Pick one to import — going forward, ` +
+    `only the data you save into ERP will be used.</div>`
   )
   d.set_secondary_action_label(__('Create new'))
   d.set_secondary_action(() => { d.hide(); scaffoldAndNotify() })
@@ -955,8 +1009,7 @@ const migrateFromLegacy = async (metaKey) => {
       }
     }).filter(im => im.skus.length)
 
-    orderCount.value = appliedOrderCount.value = Math.max(new Set(allImages.map(i => i.imageInfo?.order || 0)).size, 1)
-    await loadAllImages(allImages)
+    await finishLoad(allImages)
     frappe.show_alert({ message: 'Migrated data from the old system. Review and Upload to Save', indicator: 'green' })
   } catch (e) {
     console.error('Migration failed:', e)
@@ -1012,24 +1065,37 @@ const allFilesValid = computed(() => {
   })
 })
 
-// Product-level rule: every variant of the locked template must have all 4 size
-// images. Returns the variants that are missing one or more roles.
+// Product-level rule: every variant of the locked template must have all 4 size images.
+// Distinguishes a variant that's in NO image card (`unassigned`) from one that's merely
+// missing a size (`incomplete`) so each gets a clearer message.
 const variantImageIssues = computed(() => {
   if (!templateItem.value) return []
-  // For each variant sku, the roles that are present across all images.
+
+  // SKUs that appear on any card (regardless of whether the image is uploaded yet).
+  const assignedSkus = new Set()
+  // Roles present per sku, counting only cards that actually have an image.
   const rolesBySku = {}
   templateVariants.value.forEach(v => { rolesBySku[v.sku] = new Set() })
+
   files.value.forEach(file => {
-    // A role only counts once the slot actually has an image.
-    if (!file.role || !(file.file || file.isOnServer)) return
     const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
+    skuList.forEach(sku => assignedSkus.add(sku))
+    if (!file.role || !(file.file || file.isOnServer)) return
     skuList.forEach(sku => {
       if (rolesBySku[sku]) rolesBySku[sku].add(file.role)
     })
   })
-  return templateVariants.value
-    .map(v => ({ sku: v.sku, item_code: v.item_code, missing: ROLES.filter(r => !rolesBySku[v.sku].has(r)) }))
-    .filter(v => v.missing.length > 0)
+
+  const issues = []
+  templateVariants.value.forEach(v => {
+    if (!assignedSkus.has(v.sku)) {
+      issues.push({ sku: v.sku, item_code: v.item_code, kind: 'unassigned', missing: [...ROLES] })
+      return
+    }
+    const missing = ROLES.filter(r => !rolesBySku[v.sku].has(r))
+    if (missing.length) issues.push({ sku: v.sku, item_code: v.item_code, kind: 'incomplete', missing })
+  })
+  return issues
 })
 
 // Product-level validity: a template is chosen, every variant has all 4 images, AND
@@ -1172,16 +1238,23 @@ const processFiles = async (incomingFiles) => {
 
   isProcessingFiles.value = true
   processingProgress.value = { current: 0, total: incomingFiles.length, filename: '' }
-  
+
   const newFiles = []
-  
+
+  // Cascade the SKUs (variants) and sites from the last existing card, so a freshly
+  // uploaded image inherits the same context. Role/size is still auto-detected per image.
+  const lastFile = files.value.length ? files.value[files.value.length - 1] : null
+  const inheritSkuItems = lastFile ? (lastFile.skuItems || []) : []
+  const inheritSkus = lastFile ? (lastFile.skus || '') : ''
+  const inheritSites = lastFile ? (lastFile.sites || []) : []
+
   try {
     for (let i = 0; i < incomingFiles.length; i++) {
       const file = incomingFiles[i]
-      
+
       processingProgress.value.current = i + 1
       processingProgress.value.filename = file.name
-      
+
       if (!file.type.startsWith('image/')) continue
 
       const img = await loadImage(file)
@@ -1197,29 +1270,28 @@ const processFiles = async (incomingFiles) => {
         role: autoRole,
         width: img.width,
         height: img.height,
-        skus: '', // derived comma list of resolved retail SKUs (kept in sync with skuItems)
-        skuItems: [], // [{ item_code, sku }]
+        skus: inheritSkus, // inherited from the last card (kept in sync with skuItems)
+        skuItems: inheritSkuItems.map(i => ({ ...i })), // clone so each card is independent
         newItemCode: '', // transient input for adding an item code
         skuError: '', // transient validation message for the SKU adder
         resolvingItem: false,
-        sites: [],
+        sites: [...inheritSites], // inherited from the last card
         imageOrder: autoOrder, // Auto-filled from filename, default 0
         preview: URL.createObjectURL(file),
         isOnServer: false, // Track if file exists on server
         serverPath: null, // S3 path if file exists on server
         isModified: false // Track if file has been modified since loading from server
       })
-      
+
       // Small delay to allow UI updates for large batches
       if (i % 10 === 0) {
         await new Promise(resolve => setTimeout(resolve, 10))
       }
     }
-    
-    // Add to files array and auto-sort
+
+    // Append at the bottom (no re-sort) so new uploads land below the existing cards.
     files.value.push(...newFiles)
-    autoSortFiles()
-    
+
     console.log(`Successfully processed ${newFiles.length} image files from ${incomingFiles.length} total files`)
     
   } finally {
@@ -1379,47 +1451,6 @@ const autoSortFiles = () => {
   })
 }
 
-// Aggregate the upload per SKU: each SKU's item_code, the union of its sites, and
-// its images (by order + role). This is the atomic, per-SKU view that is saved to
-// the doctype; products are formed by merging these afterwards.
-const aggregatePerSku = () => {
-  const bySku = {} // sku -> { item_code, sites: Set, images: { [order]: {icon,small,medium,large} } }
-
-  // sku -> item_code (item_code is fixed per SKU)
-  const skuToItem = {}
-  files.value.forEach(f => (f.skuItems || []).forEach(i => {
-    if (i.sku) skuToItem[i.sku] = i.item_code || null
-  }))
-
-  files.value.forEach(file => {
-    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
-    if (skuList.length === 0) return
-
-    const order = file.imageOrder !== undefined ? file.imageOrder : 0
-
-    skuList.forEach(sku => {
-      if (!bySku[sku]) {
-        bySku[sku] = { item_code: skuToItem[sku] || null, sites: new Set(), images: {} }
-      }
-      file.sites.forEach(site => bySku[sku].sites.add(site))
-
-      if (file.role) {
-        if (!bySku[sku].images[order]) {
-          bySku[sku].images[order] = { order, icon: null, small: null, medium: null, large: null }
-        }
-        bySku[sku].images[order][file.role] = `products/${file.role}/${generateS3Filename(file)}`
-      }
-    })
-  })
-
-  return Object.keys(bySku).map(sku => ({
-    sku,
-    item_code: bySku[sku].item_code,
-    sites: [...bySku[sku].sites],
-    images: Object.values(bySku[sku].images).sort((a, b) => a.order - b.order)
-  }))
-}
-
 // Per-FILE records for saving — keeps each image's own sites so they can be
 // restored per image (not unioned per product). One entry per uploaded image.
 const perFileEntries = () => {
@@ -1432,234 +1463,6 @@ const perFileEntries = () => {
       skuItems: (file.skuItems || []).filter(i => i.sku).map(i => ({ item_code: i.item_code || null, sku: i.sku })),
       sites: [...file.sites]
     }))
-}
-
-// Merge per-SKU entries that share identical sites AND identical images into a
-// single product (productsku lists all those SKUs). Differing entries stay separate.
-const mergeProducts = (perSku) => {
-  const bySig = {}
-  perSku.forEach(entry => {
-    const sig = JSON.stringify({ sites: [...entry.sites].sort(), images: entry.images })
-    if (!bySig[sig]) {
-      bySig[sig] = {
-        productsku: [entry.sku],
-        sites: entry.sites,
-        overrideFullProduct: overrideFullProduct.value,
-        images: entry.images
-      }
-    } else {
-      bySig[sig].productsku.push(entry.sku)
-    }
-  })
-  return Object.values(bySig)
-}
-
-// Create the S3 metadata ({ products: [...] }) used for Export JSON and validation.
-const createS3Metadata = () => {
-  return { products: mergeProducts(aggregatePerSku()) }
-}
-
-// Validate product completeness and export accuracy
-const validateProductCompleteness = () => {
-  const metadata = createS3Metadata()
-  const validationResults = []
-  
-  // First, validate that all files are accounted for in the export
-  const exportValidation = validateExportCompleteness(metadata)
-  
-  metadata.products.forEach(product => {
-    const validation = {
-      productsku: Array.isArray(product.productsku) ? product.productsku.join(', ') : product.productsku,
-      isComplete: true,
-      missingRoles: [],
-      incompleteOrders: [],
-      hasAllSizes: true,
-      exportIssues: [] // New field for export-specific issues
-    }
-    
-    // Check if this product has export issues
-    const productExportIssues = exportValidation.productIssues.filter(issue => 
-      issue.productSku === (Array.isArray(product.productsku) ? product.productsku[0] : product.productsku)
-    )
-    
-    if (productExportIssues.length > 0) {
-      validation.exportIssues = productExportIssues
-      validation.isComplete = false
-    }
-    
-    if (product.images.length === 0) {
-      validation.isComplete = false
-      validation.hasAllSizes = false
-      validation.missingRoles = ['icon', 'small', 'medium', 'large']
-      validation.exportIssues.push({
-        type: 'no_images',
-        message: 'No images found in export for this product'
-      })
-      validationResults.push(validation)
-      return
-    }
-    
-    // Check each order for all 4 roles (icon, small, medium, large)
-    const requiredRoles = ['icon', 'small', 'medium', 'large']
-    product.images.forEach(imageSet => {
-      const missingRoles = requiredRoles.filter(role => !imageSet[role])
-      
-      if (missingRoles.length > 0) {
-        validation.incompleteOrders.push({
-          order: imageSet.order,
-          missingRoles: missingRoles
-        })
-        validation.isComplete = false
-        validation.hasAllSizes = false
-      }
-    })
-    
-    validationResults.push(validation)
-  })
-  
-  // Add overall export validation to results
-  if (exportValidation.hasIssues) {
-    validationResults.unshift({
-      productsku: '⚠️ EXPORT VALIDATION',
-      isComplete: false,
-      missingRoles: [],
-      incompleteOrders: [],
-      hasAllSizes: false,
-      exportIssues: exportValidation.globalIssues
-    })
-  }
-  
-  return validationResults
-}
-
-// New function to validate that export includes all files
-const validateExportCompleteness = (metadata) => {
-  const issues = {
-    hasIssues: false,
-    globalIssues: [],
-    productIssues: []
-  }
-  
-  // Count total files in UI vs export
-  const totalFilesInUI = files.value.length
-  const totalImagesInExport = metadata.products.reduce((total, product) => {
-    return total + product.images.reduce((imageCount, imageSet) => {
-      return imageCount + ['icon', 'small', 'medium', 'large'].filter(role => imageSet[role]).length
-    }, 0)
-  }, 0)
-  
-  if (totalFilesInUI !== totalImagesInExport) {
-    issues.hasIssues = true
-    issues.globalIssues.push({
-      type: 'count_mismatch',
-      message: `File count mismatch: ${totalFilesInUI} files in UI but only ${totalImagesInExport} in export`,
-      uiCount: totalFilesInUI,
-      exportCount: totalImagesInExport
-    })
-  }
-  
-  // Check each file to see if it appears in export
-  files.value.forEach(file => {
-    const skuList = file.skus ? file.skus.split(',').map(s => s.trim()).filter(s => s) : []
-    
-    if (skuList.length === 0) {
-      issues.hasIssues = true
-      issues.productIssues.push({
-        type: 'missing_sku',
-        productSku: 'UNKNOWN',
-        fileName: file.name,
-        message: `File "${file.name}" has no SKUs and cannot be exported`
-      })
-      return
-    }
-    
-    if (!file.role) {
-      issues.hasIssues = true
-      issues.productIssues.push({
-        type: 'missing_role',
-        productSku: skuList[0],
-        fileName: file.name,
-        message: `File "${file.name}" has no role assigned`
-      })
-      return
-    }
-    
-    // Check if this file appears in the export
-    const firstSku = skuList[0]
-    const product = metadata.products.find(p => 
-      Array.isArray(p.productsku) ? p.productsku.includes(firstSku) : p.productsku === firstSku
-    )
-    
-    if (!product) {
-      issues.hasIssues = true
-      issues.productIssues.push({
-        type: 'product_not_found',
-        productSku: firstSku,
-        fileName: file.name,
-        message: `File "${file.name}" with SKU "${firstSku}" not found in export`
-      })
-      return
-    }
-    
-    // Check if the specific image appears in any image set
-    const expectedFilename = generateS3Filename(file)
-    const expectedPath = `products/${file.role}/${expectedFilename}`
-    
-    const imageFound = product.images.some(imageSet => imageSet[file.role] === expectedPath)
-    
-    if (!imageFound) {
-      issues.hasIssues = true
-      issues.productIssues.push({
-        type: 'image_not_found',
-        productSku: firstSku,
-        fileName: file.name,
-        expectedPath: expectedPath,
-        imageOrder: file.imageOrder,
-        message: `File "${file.name}" (order: ${file.imageOrder}) not found in export for product ${firstSku}`
-      })
-    }
-  })
-  
-  // Check for duplicate orders within products
-  metadata.products.forEach(product => {
-    const orderCounts = {}
-    product.images.forEach(imageSet => {
-      const order = imageSet.order
-      if (!orderCounts[order]) {
-        orderCounts[order] = 0
-      }
-      orderCounts[order]++
-    })
-    
-    Object.entries(orderCounts).forEach(([order, count]) => {
-      if (count > 1) {
-        issues.hasIssues = true
-        issues.productIssues.push({
-          type: 'duplicate_order',
-          productSku: Array.isArray(product.productsku) ? product.productsku[0] : product.productsku,
-          message: `Product has ${count} image sets with order ${order} - orders must be unique`,
-          duplicateOrder: parseInt(order)
-        })
-      }
-    })
-  })
-  
-  return issues
-}
-
-// Get validation summary for display
-const getValidationSummary = () => {
-  const validationResults = validateProductCompleteness()
-  const total = validationResults.length
-  const complete = validationResults.filter(v => v.isComplete).length
-  const incomplete = total - complete
-  
-  return {
-    total,
-    complete,
-    incomplete,
-    results: validationResults
-  }
 }
 
 // Group files by product (base name) for export

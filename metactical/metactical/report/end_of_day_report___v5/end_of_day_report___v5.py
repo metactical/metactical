@@ -147,7 +147,7 @@ def get_us_data(filters):
 	return data
 
 def add_totals(data, total_store_data, total_web_data, currency):
-	total_stores_with_tax = total_store_data[1]
+	total_stores_with_tax = total_store_data[1] 
 	total_stores_without_tax = total_store_data[2]
 	stores_total_mtd = total_store_data[3]
 	stores_total_pmtd = total_store_data[4]
@@ -373,7 +373,7 @@ def get_cash_sales(lead_source, date):
 		SELECT COALESCE(SUM(amount), 0) - COALESCE(SUM(change_amount), 0) AS paid_amount 
 		FROM `tabSales Invoice Payment`
 		JOIN `tabSales Invoice` ON `tabSales Invoice`.name = `tabSales Invoice Payment`.parent
-		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.posting_date = %s
+		WHERE `tabSales Invoice`.source = %s AND `tabSales Invoice`.creation = %s
 		AND `tabSales Invoice`.docstatus = 1 AND `tabSales Invoice Payment`.mode_of_payment="Cash"
 	""", (lead_source, date), as_dict=1)
  
