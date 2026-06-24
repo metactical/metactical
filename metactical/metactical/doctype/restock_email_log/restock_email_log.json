@@ -1,12 +1,14 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:customer_email",
  "creation": "2026-06-24 08:57:49.998512",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "customer_email",
   "item_code",
+  "lead_source",
   "email_template",
   "sent_at",
   "status"
@@ -15,17 +17,24 @@
   {
    "fieldname": "customer_email",
    "fieldtype": "Data",
-   "label": "Customer Email"
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Email",
+   "unique": 1
   },
   {
    "fieldname": "item_code",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Item Code",
    "options": "Item"
   },
   {
    "fieldname": "email_template",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Email Template",
    "options": "Email Template"
   },
@@ -38,15 +47,23 @@
    "fieldname": "status",
    "fieldtype": "Data",
    "label": "Delivery Status"
+  },
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Lead Source"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-24 09:07:26.064044",
+ "modified": "2026-06-24 11:03:26.216195",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
