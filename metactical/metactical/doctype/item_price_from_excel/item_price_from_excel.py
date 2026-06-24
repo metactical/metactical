@@ -109,7 +109,7 @@ class ItemPriceFromExcel(Document):
 							"<br>".join(str(s) for s in missing_skus)
 						),
 						title=_("Missing Retail SKUs"),
-						indicator="orange",
+						indicator="red",
 					)
 
 				if sku_to_item and price_lists:
