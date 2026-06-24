@@ -309,7 +309,7 @@ def get_website_orders_sql(source, date, end_date=None, field="total_without_tax
 		JOIN `tabPayment Entry` ON `tabPayment Entry`.name = `tabPayment Entry Reference`.parent	
 		WHERE
 			`tabSales Order`.source = %(source)s
-			AND `tabSales Order`.creation BETWEEN %(date)s AND %(end_date)s
+			AND DATE(`tabSales Order`.creation) BETWEEN %(date)s AND %(end_date)s
 			AND `tabSales Order`.docstatus = 1
 			AND `tabPayment Entry`.docstatus = 1
 			AND `tabPayment Entry Reference`.reference_doctype = "Sales Order"
@@ -334,7 +334,7 @@ def get_website_orders_sql(source, date, end_date=None, field="total_without_tax
 			ON pe.name = per.parent
 		WHERE
 			si.source = %s
-			AND pe.creation BETWEEN %s AND %s
+			AND DATE(pe.creation) BETWEEN %s AND %s
 			AND si.docstatus = 1
 			AND pe.docstatus = 1
 			AND per.reference_doctype = "Sales Invoice"
@@ -362,7 +362,7 @@ def get_stores_sql(source, date, end_date=None, field="total_without_tax"):
 		FROM `tabSales Invoice`
 		WHERE
 			source = %(source)s
-			AND creation BETWEEN %(date)s AND %(end_date)s
+			AND DATE(creation) BETWEEN %(date)s AND %(end_date)s
 			AND `tabSales Invoice`.docstatus = 1
 	""".format(field=field)
  
@@ -390,7 +390,7 @@ def get_store_credit_payments(lead_source, start_date, end_date):
 		FROM `tabSales Invoice Payment` AS sip
 		JOIN `tabSales Invoice` AS si ON si.name = sip.parent
 		WHERE si.source = %s
-		AND si.creation BETWEEN %s AND %s
+		AND DATE(si.creation) BETWEEN %s AND %s
 		AND si.docstatus = 1
 		AND si.is_pos = 1
 		AND sip.mode_of_payment = "Gift Card"
