@@ -530,16 +530,6 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
-   "label": "Warehouse User Permissions",
-   "link_count": 0,
-   "link_to": "Warehouse User Permissions",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
    "is_query_report": 1,
    "label": "Report - Item Price Change Report",
    "link_count": 0,
@@ -932,6 +922,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Warehouse User Permissions",
+   "link_count": 0,
+   "link_to": "Warehouse User Permissions",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Warehouse",
    "link_count": 3,
    "link_type": "DocType",
@@ -1093,7 +1093,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-03-26 04:18:01.033661",
+ "modified": "2026-06-24 04:20:01.033661",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
