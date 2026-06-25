@@ -9,8 +9,6 @@
   "section_break_esjo",
   "send_notification",
   "column_break_qden",
-  "send_email_manually",
-  "column_break_pyzp",
   "send_email_automatically"
  ],
  "fields": [
@@ -25,16 +23,6 @@
   },
   {
    "fieldname": "column_break_qden",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "fieldname": "send_email_manually",
-   "fieldtype": "Check",
-   "label": "Send Email Manually"
-  },
-  {
-   "fieldname": "column_break_pyzp",
    "fieldtype": "Column Break"
   },
   {
@@ -54,7 +42,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-25 07:21:27.265458",
+ "modified": "2026-06-25 08:14:14.190548",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Notification Settings",

@@ -1,17 +1,17 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:customer_email",
- "creation": "2026-06-24 08:57:49.998512",
+ "creation": "2026-06-25 10:38:39.798880",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "customer_email",
+  "restock_subscription_log",
   "item_code",
   "lead_source",
-  "price",
   "column_break_pobu",
   "sent_at",
+  "price",
   "status"
  ],
  "fields": [
@@ -20,8 +20,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Customer Email",
-   "unique": 1
+   "label": "Customer Email"
   },
   {
    "fieldname": "item_code",
@@ -41,7 +40,6 @@
    "fieldname": "status",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "in_standard_filter": 1,
    "label": "Delivery Status"
   },
   {
@@ -59,16 +57,22 @@
    "fieldname": "price",
    "fieldtype": "Data",
    "label": "Price"
+  },
+  {
+   "fieldname": "restock_subscription_log",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Restock Subscription Log",
+   "options": "Restock Subscription Log"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-25 07:25:06.338211",
+ "modified": "2026-06-25 11:46:28.190663",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
- "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {

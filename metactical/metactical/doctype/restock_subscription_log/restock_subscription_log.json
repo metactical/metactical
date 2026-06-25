@@ -1,8 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:customer_email",
- "creation": "2026-06-24 08:46:07.054687",
+ "creation": "2026-06-25 11:04:43.894034",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -11,8 +10,8 @@
   "amended_from",
   "customer_email",
   "item_code",
-  "lead_source",
   "column_break_ksmy",
+  "lead_source",
   "received_at",
   "section_break_cjsb",
   "payload"
@@ -49,8 +48,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Customer Email",
-   "unique": 1
+   "label": "Customer Email"
   },
   {
    "fieldname": "column_break_ksmy",
@@ -79,19 +77,23 @@
    "fieldname": "payload",
    "fieldtype": "Code",
    "label": "Payload",
-   "read_only": 1,
    "reqd": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-06-24 12:51:04.110439",
+ "links": [
+  {
+   "group": "Notifications",
+   "link_doctype": "Restock Email Log",
+   "link_fieldname": "restock_subscription_log"
+  }
+ ],
+ "modified": "2026-06-25 12:13:33.625899",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Subscription Log",
- "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
