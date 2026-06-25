@@ -197,6 +197,7 @@ override_doctype_class = {
 	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
 	"Item Group": "metactical.custom_scripts.item_group.item_group.CustomItemGroup",
  	"Tag": "metactical.custom_scripts.tag.tag.CustomTag",
+	"Stock Ledger Entry": "metactical.custom_scripts.stock_ledger_entry.stock_ledger_entry.CustomStockLedgerEntry",
 }
 
 # Scheduled Tasks
