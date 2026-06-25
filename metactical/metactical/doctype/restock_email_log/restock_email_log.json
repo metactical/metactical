@@ -9,7 +9,7 @@
   "customer_email",
   "item_code",
   "lead_source",
-  "email_template",
+  "price",
   "column_break_pobu",
   "sent_at",
   "status"
@@ -30,14 +30,6 @@
    "in_standard_filter": 1,
    "label": "Item Code",
    "options": "Item"
-  },
-  {
-   "fieldname": "email_template",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Email Template",
-   "options": "Email Template"
   },
   {
    "fieldname": "sent_at",
@@ -62,12 +54,17 @@
   {
    "fieldname": "column_break_pobu",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "price",
+   "fieldtype": "Data",
+   "label": "Price"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-24 12:54:24.756974",
+ "modified": "2026-06-25 07:25:06.338211",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
