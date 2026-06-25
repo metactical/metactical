@@ -5,20 +5,56 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "table_xstz"
+  "table_xstz",
+  "section_break_esjo",
+  "send_notification",
+  "column_break_qden",
+  "send_email_manually",
+  "column_break_pyzp",
+  "send_email_automatically"
  ],
  "fields": [
   {
    "fieldname": "table_xstz",
    "fieldtype": "Table",
    "options": "Restock Notification Site Config"
+  },
+  {
+   "fieldname": "section_break_esjo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_qden",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_email_manually",
+   "fieldtype": "Check",
+   "label": "Send Email Manually"
+  },
+  {
+   "fieldname": "column_break_pyzp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_email_automatically",
+   "fieldtype": "Check",
+   "label": "Send Email Automatically"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_notification",
+   "fieldtype": "Check",
+   "label": "Send notification"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-24 08:39:43.855227",
+ "modified": "2026-06-25 07:21:27.265458",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Notification Settings",
