@@ -1,17 +1,21 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2026-06-25 10:38:39.798880",
+ "creation": "2026-06-26 06:30:23.619764",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "customer_email",
   "restock_subscription_log",
+  "section_break_xgkl",
+  "customer_email",
+  "customer_name",
   "item_code",
+  "retail_sku",
   "lead_source",
   "column_break_pobu",
   "sent_at",
   "price",
+  "delivery_status",
   "status"
  ],
  "fields": [
@@ -25,7 +29,6 @@
   {
    "fieldname": "item_code",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Item Code",
    "options": "Item"
@@ -33,14 +36,7 @@
   {
    "fieldname": "sent_at",
    "fieldtype": "Datetime",
-   "in_standard_filter": 1,
    "label": "Sent At"
-  },
-  {
-   "fieldname": "status",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Delivery Status"
   },
   {
    "fieldname": "lead_source",
@@ -64,12 +60,41 @@
    "in_standard_filter": 1,
    "label": "Restock Subscription Log",
    "options": "Restock Subscription Log"
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Retail SKU"
+  },
+  {
+   "fieldname": "delivery_status",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Delivery Status"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Sent\nPending"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name"
+  },
+  {
+   "fieldname": "section_break_xgkl",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-25 11:46:28.190663",
+ "modified": "2026-06-26 08:01:49.854681",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
