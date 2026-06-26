@@ -5,96 +5,46 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime
 
-# Restock Email Log delivery statuses we set from this flow.
-STATUS_QUEUED = "Queued"   # log created, email not sent
-STATUS_SENT = "Sent"       # email handed off to the email queue
-STATUS_FAILED = "Failed"   # send attempted but could not be completed
+STATUS_PENDING = "Pending"  # auto-send off -> awaiting a (manual) send
+STATUS_SENT = "Sent"        # auto-send on -> handed off to the mail service
 
 
-def on_sle_submit(doc, method=None):
-	"""Called from CustomStockLedgerEntry.on_submit.
-
-	For the SLE's item, create a Restock Email Log for every subscription that
-	doesn't have one yet. Wrapped so a failure here never blocks stock posting.
-	"""
-	try:
-		if not doc.get("item_code"):
-			return
-
-		subscriptions = frappe.get_all(
-			"Restock Subscription Log",
-			filters={"item_code": doc.item_code, "docstatus": ["!=", 2]},
-			pluck="name",
-		)
-		for subscription_name in subscriptions:
-			# Isolate each subscription so one failure doesn't skip the rest.
-			try:
-				process_subscription(subscription_name)
-			except Exception:
-				frappe.log_error(
-					title="Restock Notification: subscription failed",
-					message=frappe.get_traceback(),
-				)
-	except Exception:
-		frappe.log_error(
-			title="Restock Notification: SLE handler failed",
-			message=frappe.get_traceback(),
-		)
-
-
-def process_subscription(subscription_name):
-	"""Create the email log for a subscription (once), sending the email only when
-	both settings switches are enabled. Returns the email log name, or None if one
-	already existed."""
-	# Skip if this subscription already produced an email log.
-	if frappe.db.exists("Restock Email Log", {"restock_subscription_log": subscription_name}):
+def create_email_log(sub):
+	"""Create the Restock Email Log for a subscription (once). Returns the email log
+	name, or None if one already existed for this subscription."""
+	if frappe.db.exists("Restock Email Log", {"restock_subscription_log": sub.name}):
 		return None
 
-	sub = frappe.get_doc("Restock Subscription Log", subscription_name)
 	settings = frappe.get_single("Restock Notification Settings")
+	# Resolve the actual Item from the retail SKU suffix on the subscription.
+	item_code = get_item_code_from_retail_sku(sub.retail_sku)
+
+	# Auto-send OFF (not checked) -> Pending. Auto-send ON -> Sent.
+	# delivery_status stays blank; the mail service fills it in.
+	status = STATUS_SENT if settings.send_email_automatically else STATUS_PENDING
 
 	log = frappe.get_doc({
 		"doctype": "Restock Email Log",
-		"customer_email": sub.customer_email,
 		"restock_subscription_log": sub.name,
-		"item_code": sub.item_code,
+		"customer_email": sub.customer_email,
+		"customer_name": sub.customer_name,
+		"item_code": item_code,
+		"retail_sku": sub.retail_sku,
 		"lead_source": sub.lead_source,
-		"price": get_item_price(sub.item_code),  # price-list rate, or blank if none
+		"price": sub.item_price,
 		"sent_at": now_datetime(),
-		"status": STATUS_QUEUED,
+		"status": status,
 	})
 	log.insert(ignore_permissions=True)
-
-	# Send automatically only when notifications are on AND auto-send is on.
-	# In every other case we keep the log and leave it for a manual send.
-	# An auto-send failure must never break stock posting: keep the log and
-	# mark it Failed so it can be retried manually from the Send Email button.
-	if settings.send_notification and settings.send_email_automatically:
-		try:
-			send_log_email(log, settings)
-		except Exception:
-			log.db_set("status", STATUS_FAILED, update_modified=False)
-			frappe.log_error(
-				title="Restock Notification: auto-send failed",
-				message=frappe.get_traceback(),
-			)
-
 	return log.name
 
 
-def get_item_price(item_code):
-	"""Selling price-list rate for the item from the system, or None when no price is set.
-
-	Uses the default selling price list from Selling Settings when configured, otherwise
-	falls back to any selling Item Price for the item.
-	"""
-	price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
-
-	filters = {"item_code": item_code, "selling": 1}
-	if price_list:
-		filters["price_list"] = price_list
-
-	return frappe.db.get_value("Item Price", filters, "price_list_rate")
+def get_item_code_from_retail_sku(retail_sku):
+	"""Resolve the Item whose RetailSKUSuffix (`ifw_retailskusuffix`) matches, and
+	return its item code (the Item name), or None when nothing matches."""
+	if not retail_sku:
+		return None
+	return frappe.db.get_value("Item", {"ifw_retailskusuffix": retail_sku}, "name")
 
 
 def get_site_config(lead_source):
@@ -112,9 +62,13 @@ def get_site_config(lead_source):
 def render_email(log, config):
 	"""Render the configured Email Template against the email log. Returns (subject, message)."""
 	template = frappe.get_doc("Email Template", config["email_template"])
+	item_name = frappe.db.get_value("Item", log.item_code, "item_name") if log.item_code else None
 	context = {
 		"doc": log,
 		"item_code": log.item_code,
+		"item_name": item_name,
+		"retail_sku": log.retail_sku,
+		"customer_name": log.customer_name,
 		"customer_email": log.customer_email,
 		"lead_source": log.lead_source,
 		"price": log.price,

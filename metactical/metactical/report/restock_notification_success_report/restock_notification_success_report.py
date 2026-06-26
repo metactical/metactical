@@ -47,7 +47,7 @@ def get_data(filters):
 			"customer_email": log.customer_email,
 			"lead_source": log.lead_source,
 			"sent_at": log.sent_at,
-			"email_status": log.status,
+			"email_status": log.delivery_status,
 			"sales_order": so.name if so else None,
 			"order_date": order_date,
 			"days_to_convert": days_to_convert,
@@ -61,8 +61,13 @@ def get_data(filters):
 
 
 def get_email_logs(filters):
-	"""Return the Restock Email Logs in scope (Delivered/Opened/Clicked), newest first."""
-	log_filters = [["status", "in", ["Delivered", "Opened", "Clicked"]]]
+	"""Return the sent Restock Email Logs in scope, newest first.
+
+	Base population is emails that were actually sent (`status` = "Sent"). The
+	`delivery_status` field (Delivered/Opened/Clicked, set later by the mail
+	service) is shown as the Email Status column and can be filtered optionally.
+	"""
+	log_filters = [["status", "=", "Sent"]]
 
 	if filters.get("from_date"):
 		log_filters.append(["sent_at", ">=", filters.from_date])
@@ -73,12 +78,12 @@ def get_email_logs(filters):
 	if filters.get("item_code"):
 		log_filters.append(["item_code", "=", filters.item_code])
 	if filters.get("email_status"):
-		log_filters.append(["status", "=", filters.email_status])
+		log_filters.append(["delivery_status", "=", filters.email_status])
 
 	return frappe.get_all(
 		"Restock Email Log",
 		filters=log_filters,
-		fields=["name", "item_code", "customer_email", "lead_source", "sent_at", "status"],
+		fields=["name", "item_code", "customer_email", "lead_source", "sent_at", "delivery_status"],
 		order_by="sent_at desc",
 	)
 

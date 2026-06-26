@@ -9,9 +9,11 @@
   "column_break_ytcq",
   "amended_from",
   "customer_email",
-  "item_code",
-  "column_break_ksmy",
+  "customer_name",
   "lead_source",
+  "column_break_ksmy",
+  "retail_sku",
+  "item_price",
   "received_at",
   "section_break_cjsb",
   "payload"
@@ -35,13 +37,6 @@
    "fieldname": "column_break_ytcq",
    "fieldtype": "Column Break",
    "options": "Lead"
-  },
-  {
-   "fieldname": "item_code",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Item Code"
   },
   {
    "fieldname": "customer_email",
@@ -78,6 +73,25 @@
    "fieldtype": "Code",
    "label": "Payload",
    "reqd": 1
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Retail SKU"
+  },
+  {
+   "fieldname": "item_price",
+   "fieldtype": "Data",
+   "label": "Item Price"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Name"
   }
  ],
  "grid_page_length": 50,
@@ -90,7 +104,7 @@
    "link_fieldname": "restock_subscription_log"
   }
  ],
- "modified": "2026-06-25 12:13:33.625899",
+ "modified": "2026-06-26 08:11:35.843116",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Subscription Log",
