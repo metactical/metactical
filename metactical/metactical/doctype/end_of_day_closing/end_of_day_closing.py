@@ -65,7 +65,8 @@ def get_data(closing_date, user, pos_profile, source):
 	expected_cash = 0
 	order_payments = []
 	orders = []
-		
+	lead_source = frappe.db.get_value("POS Profile", pos_profile, "ifw_default_lead_source")
+  
 	invoices = frappe.db.sql("""
 				SELECT
 					payment_reference.reference_doctype, payment_reference.reference_name, 
@@ -80,8 +81,8 @@ def get_data(closing_date, user, pos_profile, source):
 				WHERE
 					payment_entry.posting_date = %(closing_date)s AND payment_entry.payment_type = 'Receive'
 					AND payment_reference.reference_doctype = "Sales Invoice" AND invoice.pos_profile = %(pos_profile)s
-					AND payment_entry.docstatus = 1
-				""", {"closing_date": closing_date, "pos_profile": pos_profile}, as_dict=1)
+					AND payment_entry.docstatus = 1 and invoice.source = %(lead_source)s
+				""", {"closing_date": closing_date, "pos_profile": pos_profile, "lead_source": lead_source}, as_dict=1)
 				
 	pos_invoices = frappe.db.sql("""
 				SELECT

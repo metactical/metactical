@@ -167,8 +167,8 @@ def get_data():
 				},
 				{
 					"type": "doctype",
-					"name": "Stock Entry User Permissions",
-					"description": _("Stock Entry User Permissions.")
+					"name": "Warehouse User Permissions",
+					"description": _("Warehouse User Permissions.")
 				},
 				{
 					"type": "doctype",

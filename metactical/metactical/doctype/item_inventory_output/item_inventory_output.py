@@ -137,6 +137,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			filters={'item_code': item_code}, 
 			pluck="price_list"
 		)
+
 		net_available_bundles = []
 		if not bundle:
 			maintain_stock = frappe.db.get_value('Item', item_code, 'is_stock_item')
@@ -171,6 +172,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'name': item_code})
 		retail_sku = frappe.db.get_value('Item', item_code, 'ifw_retailskusuffix')
 		inventory_ouput_data = []
+  
+		print(f"Lead sources for {item_code}: {lead_sources}")
 
 		# Loop through each lead source to calculate quantity to send
 		for lead_source in lead_sources:

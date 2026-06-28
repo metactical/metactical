@@ -194,7 +194,9 @@ override_doctype_class = {
 	"Website Item": "metactical.custom_scripts.website_item.website_item.CustomWebsiteItem",
 	"Item": "metactical.custom_scripts.item.item.CustomItem",
 	"Address": "metactical.custom_scripts.address.address.CustomAddress",
-	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest"
+	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
+	"Item Group": "metactical.custom_scripts.item_group.item_group.CustomItemGroup",
+ 	"Tag": "metactical.custom_scripts.tag.tag.CustomTag",
 }
 
 # Scheduled Tasks
@@ -254,7 +256,8 @@ override_whitelisted_methods = {
 	"frappe.desk.doctype.tag.tag.remove_tag": "metactical.custom_scripts.tag.tag.remove_tag",
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
 	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title",
-	"erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return": "metactical.custom_scripts.sales_invoice.sales_invoice.make_sales_return"
+	"erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return": "metactical.custom_scripts.sales_invoice.sales_invoice.make_sales_return",
+	"erpnext.stock.dashboard.item_dashboard.get_data": "metactical.custom_scripts.item_dashboard.item_dashboard.get_data"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -879,7 +882,34 @@ fixtures = [{
 			"Address-neb_mobile_not_formatted",
 			"POS Profile-custom_cash_float",
 			"Item-neb_life_cycle_recommended_action",
-			"Item-neb_life_cycle_status"
+			"Item-neb_life_cycle_status",
+			"Tag Link-autocreated",
+   			"Item-month_on_hand",
+			"Supplier-variant_available_rules",
+			"Supplier-section_break_e11nr",
+			"Supplier-column_break_ov8xt",
+			"Item-month_on_hand",
+			"Item Group-category_names",
+			"Item-first_received_on",
+			"Item-date_last_received",
+			"Item-unitsold30d",
+			"Item-unitsold60d",
+			"Item-unitsold90d",
+			"Item-grosssale12m",
+			"Item-istop20pctsale12m",
+   			"Supplier-custom_nat_shipping_address",
+			"Supplier-custom_nat_billing_address",
+			"Supplier-custom_icl_custom_fields",
+   			"Supplier-column_break_ov8xt",
+			"Tag Link-autocreated",
+			"Item Attribute Value-color",
+			"Item Attribute Value-short_name",
+			"Website Specification Label-custom_show_in_table",
+			"Item Attribute-custom__nat_show_in_table",
+			"Item Attribute-custom_is_search_filter",
+			"POS Profile-custom_fist_priority_price_list",
+			"Item-custom_display_order_in_listing__higher_is_better",
+			"Item-custom_variant_short_name"
 		]]]
 	},
 	{
@@ -1451,7 +1481,8 @@ fixtures = [{
 			"Work Order-source_warehouse-default",
 			"Sales Order-shipping_address_name-allow_on_submit",
 			"Sales Order-customer_address-allow_on_submit",
-			"Sales Order-dispatch_address_name-allow_on_submit"
+			"Sales Order-dispatch_address_name-allow_on_submit",
+			"Material Request-ais_suppliers-in_list_view"
 		]]]
 	},
   	{
@@ -1480,7 +1511,9 @@ jinja = {
  		"metactical.custom_scripts.utils.metactical_utils.get_password",
 		"metactical.custom_scripts.utils.metactical_utils.sort_items_by_location",
 		"metactical.barcode_generator.get_qr_for_print_format",
-		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json"
+		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json",
+		"metactical.custom_scripts.utils.metactical_utils.get_refund_details_for_print",
+		"metactical.metactical.page.s3_uploader.s3_uploader.s3_product_payload",
 	]
 }
 

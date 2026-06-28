@@ -50,6 +50,9 @@ def update_document_title(
 	# handle bad API usages
 	merge = sbool(merge)
 	enqueue = sbool(enqueue)
+ 
+	if doctype == "Item":
+		enqueue = False
 
 	doc = frappe.get_doc(doctype, docname)
 	doc.check_permission(permtype="write")
@@ -61,8 +64,6 @@ def update_document_title(
 
 	queue = kwargs.get("queue") or "long"
  
-	print("renaming called from the utility customization")
-
 	if name_updated:
 		if enqueue and not is_scheduler_inactive():
 			current_name = doc.name
@@ -90,7 +91,6 @@ def update_document_title(
 
 	if title_updated:
 		try:
-			doc.reload()
 			setattr(doc, title_field, updated_title)
 			doc.save()
 			frappe.msgprint(_("Saved"), alert=True, indicator="green")

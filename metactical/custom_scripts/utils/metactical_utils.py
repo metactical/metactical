@@ -41,45 +41,87 @@ def queue_action(self, action, **kwargs):
 	enqueue('metactical.custom_scripts.frappe.document.execute_action', doctype=self.doctype, name=self.name,
 		action=action, **kwargs)
 		
-def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False):
+def post_to_rocket_chat(doc, msg, failed=False, rmq=False, pos=False, attachment=None, filename=None):
 	try:
 		rocket_chat_settings = frappe.get_single('Rocket Chat Settings')
 		if not rocket_chat_settings.rocket_notification:
-			return
+			if not rocket_chat_settings.pr_rocket_notification:
+				return
+			else:
+				if not rocket_chat_settings.pr_room_id:
+					frappe.log_error(title='Rocket Chat Error', message="PR Room ID not found in settings")
+					return
 
-		channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
-		headers = {
-			'Content-type': rocket_chat_settings.content_type or 'application/json',
-			'X-Auth-Token': rocket_chat_settings.auth_token,
-			'X-User-Id': rocket_chat_settings.user_id
-		}
+		if attachment and filename:
+			headers = {
+				'X-Auth-Token': rocket_chat_settings.auth_token,
+				'X-User-Id': rocket_chat_settings.user_id
+			}
+			base_url = rocket_chat_settings.url
+			rid = rocket_chat_settings.pr_room_id
 
-		if pos:	
-			message = msg
-		elif rmq:
-			message = msg
-		else:	
-			url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
-			message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
-							administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
-			
-			if failed:
-				message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
-							\n[{0}]({1})'.format(get_url(url), get_url(url))
+			upload_url = f"{base_url}/api/v1/rooms.media/{rid}"
 
-		payload = {
-			'channel': "#"+channel_name,
-			'text': message
-		}
+			files = {
+				'file': (filename, attachment, 'application/pdf'),
+			}
 
-		response = requests.post(rocket_chat_settings.url, 
-								headers=headers, 
-								data=json.dumps(payload))
-
-		if response.status_code == 200:
-			pass
+			response = requests.post(
+				upload_url,
+				headers=headers,
+				files=files
+			)
+			if response.status_code != 200:
+				frappe.log_error(title='Rocket Chat Error', message=response.text)
+			else:
+				file_id = response.json().get('file', {}).get('_id')
+				confirm_url = f"{base_url}/api/v1/rooms.mediaConfirm/{rid}/{file_id}"
+				confirm_headers = {**headers, 'Content-type': 'application/json'}
+				confirm_response = requests.post(
+					confirm_url,
+					headers=confirm_headers,
+					data=json.dumps({})
+				)
+				if confirm_response.status_code != 200:
+					frappe.log_error(title='Rocket Chat Error', message=confirm_response.text)
 		else:
-			frappe.log_error(title='Rocket Chat Error', message=response.json())
+			channel_name = rocket_chat_settings.channel_name if not pos else rocket_chat_settings.pos_failed_invoices
+      
+			headers = {
+				'Content-type': rocket_chat_settings.content_type or 'application/json',
+				'X-Auth-Token': rocket_chat_settings.auth_token,
+				'X-User-Id': rocket_chat_settings.user_id
+			}
+
+			if pos:	
+				message = msg
+			elif rmq:
+				message = msg
+			else:	
+				url = "/app/{0}/{1}".format(doc.doctype.lower().replace(" ", "-"), doc.name)
+				message = 'A document you submitted has taken too long and has been unquequd. Please resubmit the document and notify the system \
+								administrator \n[{0}]({1})'.format(get_url(url), get_url(url))
+				
+				if failed:
+					message = 'A document you submitted has failed. Please see the error in the comment section of the document and fix it \
+								\n[{0}]({1})'.format(get_url(url), get_url(url))
+
+			payload = {
+				'channel': "#"+channel_name,
+				'text': message
+			}
+
+			base_url = rocket_chat_settings.url
+			upload_url = f"{base_url}/api/v1/chat.postMessage"
+			response = requests.post(upload_url, 
+									headers=headers, 
+									data=json.dumps(payload))
+
+			if response.status_code == 200:
+				pass
+			else:
+				frappe.log_error(title='Rocket Chat Error', message=response.text)
+
 	except Exception as e:
 		frappe.log_error(title='Rocket Chat Error', message=frappe.get_traceback())
 
@@ -138,16 +180,16 @@ def get_usaepay_account(transaction_key=None, merchant_id=None, lead_source=None
 	elif merchant_id:
 		usaepay_account = frappe.db.exists("USAePay Accounts", {"merchant_id": merchant_id, "parent":"USAePay Settings"})
 	elif transaction_key:
-		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key}, "source")
+		source = frappe.db.get_value("Sales Order", {"neb_usaepay_transaction_key": transaction_key, "docstatus": 1}, "source")
 
 		if not source:
 			source = frappe.db.get_value("SO USAePay Transaction", {"transaction_key": transaction_key}, "lead_source")
 
 		if source:
-			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source})
+			usaepay_account = frappe.db.exists("USAePay Accounts", {"lead_source": source, "parent":"USAePay Settings"})
 
 	if usaepay_account:
-		return frappe.get_doc("USAePay Accounts", usaepay_account)
+		return frappe.get_doc("USAePay Accounts", {"name":usaepay_account, "parent":"USAePay Settings"})
 
 	return None
 
@@ -606,3 +648,116 @@ def custom_parse_json(json_string, key=None):
         return data.get(key) if key else data
     except:
         return None
+    
+
+def get_refund_details_for_print(doc):
+	if doc.doctype == "Sales Invoice":
+		usaepay_refund = frappe.db.exists("USAePay Refund", {"sales_return": doc.name})
+  		
+		if usaepay_refund:
+			refund_doc = frappe.get_doc("USAePay Refund", usaepay_refund)
+			usaepay_account = get_usaepay_account(lead_source=refund_doc.lead_source)
+   
+			from metactical.custom_scripts.usaepay.usaepay_api import get_refund_transaction_detail	
+
+			transaction_id = frappe.db.get_value("Payment Entry", refund_doc.payment_entry, "reference_no")
+			transaction_detail = get_refund_transaction_detail(usaepay_account, transaction_id) if transaction_id else None
+
+			return transaction_detail		
+	
+	elif doc.doctype == "Payment Entry":
+		# Get Payment Entry
+		payment_entry = frappe.db.exists("Payment Entry", {"name": doc.name})
+		if not payment_entry:
+			return None
+
+		transaction_id = frappe.db.get_value(
+			"Payment Entry", payment_entry, "reference_no"
+		)
+		if not transaction_id:
+			return None
+
+		# Get linked Sales Order / Invoice
+		references = frappe.db.get_all(
+			"Payment Entry Reference",
+			{"parent": payment_entry},
+			["reference_doctype", "reference_name"],
+		)
+
+		linked_doc = None
+		for ref in references:
+			if ref.reference_doctype in ("Sales Order", "Sales Invoice") and ref.reference_name:
+				try:
+					linked_doc = frappe.get_doc(ref.reference_doctype, ref.reference_name)
+					break
+				except Exception:
+					frappe.log_error(
+						f"Failed to fetch {ref.reference_doctype} {ref.reference_name}",
+						"Transaction Detail Error",
+					)
+
+		if not linked_doc:
+			return None
+
+		# Get USAePay account safely
+		lead_source = getattr(linked_doc, "source", None)
+		if not lead_source:
+			return None
+
+		usaepay_account = get_usaepay_account(lead_source=lead_source)
+		if not usaepay_account:
+			return None
+
+		# Fetch transaction detail
+		from metactical.custom_scripts.usaepay.usaepay_api import get_refund_transaction_detail
+
+		try:
+			transaction_detail = get_refund_transaction_detail(
+				usaepay_account, transaction_id
+			)
+		except Exception:
+			frappe.log_error(
+				f"Failed to fetch transaction {transaction_id}",
+				"USAePay API Error",
+			)
+			return None
+
+		if not isinstance(transaction_detail, dict):
+			return None
+
+		# Copy to avoid mutating API response
+		result = dict(transaction_detail)
+
+		# Enrich data
+		result["customer"] = getattr(linked_doc, "customer", None)
+		result["name"] = linked_doc.name
+
+		if linked_doc.doctype == "Sales Order":
+			result["po_no"] = getattr(linked_doc, "po_no", None)
+			result["sales_order"] = linked_doc.name
+			result["sales_invoice"] = ""
+
+		elif linked_doc.doctype == "Sales Invoice":
+			sales_order = None
+			result["sales_invoice"] = linked_doc.name
+
+			for item in getattr(linked_doc, "items", []):
+				if item.sales_order:
+					try:
+						sales_order = frappe.get_doc("Sales Order", item.sales_order)
+						break
+					except Exception:
+						frappe.log_error(
+							f"Failed to fetch Sales Order {item.sales_order}",
+							"Transaction Detail Error",
+						)
+
+			if sales_order:
+				result["po_no"] = getattr(sales_order, "po_no", None)
+				result["sales_order"] = sales_order.name
+    
+		company_address = frappe.db.get_value("Address", linked_doc.company_address, ["city", "address_line1", "phone", "country", 'pincode', "state"], as_dict=True)
+		result['phone'] = company_address.get('phone') if company_address else None
+		result['address'] = company_address.get('city') + ", " + company_address.get('state') +" " + company_address.get('pincode') if company_address else None
+
+		return result

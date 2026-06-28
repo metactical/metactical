@@ -848,12 +848,10 @@ def get_master(conditions="", filters={}):
 				`tabItem Supplier` s 
 			inner join 
 				`tabItem` i on i.name = s.parent
-			where 1 = 1 and i.has_variants=0 and s.supplier = "ASK Sports - Pakistan"
+			where i.has_variants=0 and s.supplier = "ASK Sports - Pakistan"
    			%s
 		"""%(conditions), filters, as_dict=1)
  
-	frappe.log_error(title="get_master", message=f"conditions: {conditions}, filters: {filters}")
-
 	return data
 
 def get_conditions(filters):
@@ -943,7 +941,6 @@ def get_date_last_sold(item):
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
 							and p.company = 'Ask Sports Pvt Ltd.'
-							and p.customer <> "International Camouflage Ltd."
 		""",(item))
 
 	if data:
@@ -966,7 +963,6 @@ def get_total_sold(item):
 							c.item_code = %s and p.docstatus = 1
 							and (c.warehouse IS NULL OR c.warehouse <> 'US02-Houston - Active Stock - ICL')
 							and p.company = 'Ask Sports Pvt Ltd.'
-							and p.customer <> "International Camouflage Ltd."
 						ORDER BY p.posting_date DESC
 		""",(item), as_dict=1)
 	return data
@@ -1088,9 +1084,7 @@ def get_pr_qty( item, po_name):
 
 def get_open_po_qty(item,supplier, warehouse=None):
 	where = ''
-	if warehouse is not None:
-		where = " AND c.warehouse = '{}'".format(warehouse)
-	
+
 	if supplier is not None:
 		where += " AND p.supplier = '{}'".format(supplier)
   

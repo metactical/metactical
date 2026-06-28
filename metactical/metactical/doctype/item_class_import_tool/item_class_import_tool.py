@@ -81,6 +81,8 @@ class ItemClassImportTool(Document):
 						"asi_item_class": row[1],
 						"neb_life_cycle_status": row[2],
 						"neb_life_cycle_recommended_action": row[3],
+						"month_on_hand": row[4] if row[4] else 0,
+						"safety_stock": row[5] if row[5] else 0
 					}, update_modified=False)
 					
 				except Exception as e:

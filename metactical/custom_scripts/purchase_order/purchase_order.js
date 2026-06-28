@@ -1,19 +1,41 @@
 frappe.ui.form.on('Purchase Order', {
 	refresh: function(frm){
-		var allow_tax_edit = 1;
-		if(frm.doc.__onload && frm.doc.__onload['ais_allow_tax_edit']){
-			allow_tax_edit = 0;
-		}
-		frm.set_df_property('taxes', 'read_only', allow_tax_edit);
-		frm.doc.taxes.forEach((row)=>{
-			var tax_fields = ['charge_type', 'account_head', 'rate']
-			tax_fields.forEach((field) => {
-				frappe.meta.get_docfield(row.doctype, field, row.name).read_only = allow_tax_edit;
+		if (frm.doc.docstatus == 1) {
+			var allow_tax_edit = 1;
+
+			if(frm.doc.__onload && frm.doc.__onload['ais_allow_tax_edit']){
+				allow_tax_edit = 0;
+			}
+
+			frm.set_df_property('taxes', 'read_only', allow_tax_edit);
+			frm.doc.taxes.forEach((row)=>{
+				var tax_fields = ['charge_type', 'account_head', 'rate']
+				tax_fields.forEach((field) => {
+					frappe.meta.get_docfield(row.doctype, field, row.name).read_only = allow_tax_edit;
+				});
+				frm.refresh_field("taxes");
 			});
-			frm.refresh_field("taxes");
-		});
+		}
 	}
 });
+
+if (!erpnext.utils._metactical_purchase_order_party_details_wrapped) {
+	const original_get_party_details = erpnext.utils.get_party_details;
+
+	erpnext.utils.get_party_details = function(frm, method, args, callback) {
+		const is_purchase_order_supplier = frm?.doc?.doctype === "Purchase Order"
+			&& (args?.party_type === "Supplier" || (!args && frm.doc.supplier));
+		const uses_default_party_method = !method || method === "erpnext.accounts.party.get_party_details";
+
+		if (is_purchase_order_supplier && uses_default_party_method) {
+			method = "metactical.custom_scripts.purchase_order.purchase_order.get_party_details";
+		}
+
+		return original_get_party_details.call(this, frm, method, args, callback);
+	};
+
+	erpnext.utils._metactical_purchase_order_party_details_wrapped = true;
+}
 
 erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends erpnext.buying.PurchaseOrderController{
 	onload(doc, cdt, cdn){
@@ -61,10 +83,8 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 		}
 	}
 	
-	supplier(doc, cdt, cdn){
-		super.supplier();
-		// Metactical Customization: Remove address
-		this.frm.set_value("shipping_address", '');
+	company() {
+		return erpnext.TransactionController.prototype.company.call(this);
 	}
 	
 	add_from_mappers() {

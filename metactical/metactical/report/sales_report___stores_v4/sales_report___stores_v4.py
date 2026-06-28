@@ -252,6 +252,7 @@ def get_item_details(item, list_type="Selling"):
 	
 @frappe.whitelist()
 def create_material_request(**args):
+	from erpnext.stock.get_item_details import get_item_details, get_bin_details
 	args = frappe._dict(args)
 	filters = {}
 	if args.pos_profile != "":
@@ -274,8 +275,9 @@ def create_material_request(**args):
 	})
 
 	for row in init_data:
-		wh_actual = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "actual_qty") or 0.0
-		wh_res = frappe.db.get_value("Bin", {"warehouse": source_warehouse, "item_code": row.item_code}, "reserved_qty") or 0.0
+		bin_details = get_bin_details(row.item_code, source_warehouse)
+		wh_actual = bin_details.get("actual_qty") or 0.0
+		wh_res = bin_details.get("reserved_qty") or 0.0
 		stock_levels = wh_actual - wh_res
 		if row.pos_profile == "Edmonds Operators":
 			transit_warehouse = "R02-Edm-Active Stock - " + frappe.db.get_value("Company", row.company, "abbr")
@@ -283,16 +285,42 @@ def create_material_request(**args):
 			transit_warehouse = get_transit_warehouse(row.warehouse)
 		
 		if stock_levels > 0 and transit_warehouse != "" and row.qty > 0:
+			item_details = get_item_details(frappe._dict({
+				"item_code": row.item_code,
+				"warehouse": transit_warehouse,
+				"from_warehouse": source_warehouse,
+				"doctype": "Material Request",
+				"buying_price_list": frappe.db.get_default("buying_price_list"),
+				"currency": frappe.db.get_default("currency"),
+				"qty": row.qty,
+				"stock_qty": row.qty,
+				"company": row.company,
+				"conversion_rate": 1,
+				"material_request_type": "Material Transfer",
+				"plc_conversion_rate": 1,
+				"uom": row.uom,
+				"conversion_factor": row.conversion_factor,
+			}))
+
 			doc.append("items", {
 				"from_warehouse": source_warehouse,
 				"warehouse": transit_warehouse,
 				"item_code": row.item_code,
 				"qty": row.qty,
-				"uom": row.uom,
-				"stock_uom": row.stock_uom,
+				"uom": item_details.get("uom") or row.uom,
+				"stock_uom": item_details.get("stock_uom") or row.stock_uom,
+				"conversion_factor": item_details.get("conversion_factor") or row.conversion_factor,
+				"stock_qty": item_details.get("stock_qty") or row.qty,
+				"item_name": item_details.get("item_name"),
+				"description": item_details.get("description"),
+				"expense_account": item_details.get("expense_account"),
+				"cost_center": item_details.get("cost_center"),
+				"rate": item_details.get("rate") or 0.0,
+				"price_list_rate": item_details.get("price_list_rate") or 0.0,
+				"actual_qty": wh_actual,
+				"projected_qty": bin_details.get("projected_qty") or 0.0,
 				"ifw_location": row.ifw_location,
-				"conversion_factor": row.conversion_factor,
-				"schedule_date": schedule_date
+				"schedule_date": schedule_date,
 			})
 	doc.insert(ignore_permissions=True)
 	return doc

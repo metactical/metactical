@@ -59,7 +59,7 @@ def send_mail(entry, email_campaign):
             # Fetch recipients in chunks of fetch_limit
             members = frappe.db.get_list(
                 "Email Group Member",
-                filters={"email_group": email_campaign.get("recipient")},
+                filters={"email_group": email_campaign.get("recipient"), "unsubscribed": 0},
                 fields=["email"],
                 start=start,
                 page_length=fetch_limit,

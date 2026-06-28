@@ -67,32 +67,41 @@ def get_data(supplier, purchase_orders, sales_orders, quotation, price_lists, su
 	items = []
 
 	if supplier:
-		items = frappe.db.sql(""" SELECT item_code, variant_of, ifw_retailskusuffix, item_name, ifw_duty_rate
-									FROM `tabItem Supplier`
-									JOIN `tabItem` on item_code = `tabItem Supplier`.parent
+		items = frappe.db.sql(""" SELECT item_code, variant_of, ifw_retailskusuffix, item_name, ifw_duty_rate, is.supplier_part_no, item_group, brand, image
+									FROM `tabItem Supplier` is
+									JOIN `tabItem` i on i.name = is.parent
 									WHERE supplier = %s """, supplier, as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 	elif purchase_orders:
-		items = frappe.db.sql(""" SELECT poi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, poi.parent, i.ifw_duty_rate
-									FROM `tabPurchase Order Item` poi
-									JOIN `tabItem` i on i.name = poi.item_code
+		items = frappe.db.sql(""" SELECT poi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, poi.parent,
+									i.ifw_duty_rate, p.currency, isup.supplier_part_no, i.item_group, i.brand, i.image
+									FROM `tabItem Supplier` isup
+									JOIN `tabItem` i on i.name = isup.parent
+									JOIN `tabPurchase Order Item` poi on poi.item_code = i.name
+									JOIN `tabPurchase Order` p on p.name = poi.parent
 									WHERE poi.parent IN %s """, (purchase_orders,), as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 
 	elif sales_orders:
-		items = frappe.db.sql(""" SELECT soi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, soi.parent, i.ifw_duty_rate
-									FROM `tabSales Order Item` soi
-									JOIN `tabItem` i on i.name = soi.item_code
+		items = frappe.db.sql(""" SELECT soi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, soi.parent,
+									i.ifw_duty_rate, s.currency, isup.supplier_part_no, i.item_group, i.brand, i.image
+									FROM `tabItem Supplier` isup
+									JOIN `tabItem` i on i.name = isup.parent
+									JOIN `tabSales Order Item` soi on soi.item_code = i.name
+									JOIN `tabSales Order` s on s.name = soi.parent
 									WHERE soi.parent IN %s """, (sales_orders,), as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
 
 	elif quotation:
-		items = frappe.db.sql(""" SELECT qi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, qi.parent, i.ifw_duty_rate
-									FROM `tabQuotation Item` qi
-									JOIN `tabItem` i on i.name = qi.item_code
+		items = frappe.db.sql(""" SELECT qi.item_code, i.variant_of, i.ifw_retailskusuffix, i.item_name, qi.parent, 
+                        			i.ifw_duty_rate, q.currency, isup.supplier_part_no, i.item_group, i.brand, i.image
+                           			FROM `tabItem Supplier` isup
+									JOIN `tabItem` i on i.name = isup.parent
+									JOIN `tabQuotation Item` qi on qi.item_code = i.name
+									JOIN `tabQuotation` q on q.name = qi.parent
 									WHERE qi.parent IN %s """, (quotation,), as_dict=True)
 
 		items_list = [item["item_code"] for item in items]
@@ -127,7 +136,12 @@ def get_data(supplier, purchase_orders, sales_orders, quotation, price_lists, su
 			"item_name": item["item_name"],
 			"ifw_duty_rate": item["ifw_duty_rate"],
 			"cost": costs[item['item_code']] if item["item_code"] in costs else "",
-			"alc": ""
+			"alc": "",
+			"currency": item["currency"] if "currency" in item else "",
+			"supplier_part_number": item["supplier_part_no"] if "supplier_part_no" in item else "",
+			"image": item["image"] if "image" in item else "",
+			"item_group": item["item_group"] if "item_group" in item else "",
+			"brand": item["brand"] if "brand" in item else "",
 		})
 
 		if item["item_code"] in item_prices_dict:
@@ -179,6 +193,36 @@ def get_columns(price_lists, supplier_price_lists, sales_orders, purchase_orders
 		"label": "Item Name",
 		"fieldtype": "Data",
 		"fieldname": "item_name",
+		"width": 120
+	},
+ 	{
+		"label": "Image",
+		"fieldtype": "Attach Image",
+		"fieldname": "image",
+		"width": 120
+	},
+ 	{
+		"label": "Item Group",
+		"fieldtype": "Data",
+		"fieldname": "item_group",
+		"width": 120
+	},
+   {
+		"label": "Brand",
+		"fieldtype": "Data",
+		"fieldname": "brand",
+		"width": 120
+	},
+ 	{
+		"label": "Supplier Part Number",
+		"fieldtype": "Data",
+		"fieldname": "supplier_part_number",
+		"width": 120
+	},
+    {
+		"label": "Currency",
+		"fieldtype": "Data",
+		"fieldname": "currency",
 		"width": 120
 	},
 	{

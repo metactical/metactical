@@ -294,7 +294,7 @@ def get_manifest_shipments(manifest_shipments_url, media_type):
 		response = cp.get_response(
 			manifest_shipments_url, 
 			None, 
-			headers={'Accept': media_type}, 
+			headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, 
 			method='GET'
 		)
 		

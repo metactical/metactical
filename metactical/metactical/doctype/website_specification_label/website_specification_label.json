@@ -11,6 +11,7 @@
   "label",
   "sort_order",
   "is_a_search_filter",
+  "show_in_table",
   "section_break_0mlim",
   "descriptions"
  ],
@@ -30,22 +31,33 @@
   {
    "fieldname": "sort_order",
    "fieldtype": "Int",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Sort Order"
   },
   {
    "default": "0",
    "fieldname": "is_a_search_filter",
    "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Is A Search Filter"
   },
   {
    "fieldname": "section_break_0mlim",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_in_table",
+   "fieldtype": "Check",
+   "label": "Show In Table"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-25 07:33:20.678214",
+ "modified": "2026-04-29 09:16:31.500906",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Specification Label",
@@ -65,6 +77,8 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

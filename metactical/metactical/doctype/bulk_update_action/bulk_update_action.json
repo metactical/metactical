@@ -1,0 +1,45 @@
+{
+    "actions": [],
+    "allow_rename": 0,
+    "creation": "2025-01-01 00:00:00.000000",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+      "action_type",
+      "action_value"
+    ],
+    "fields": [
+      {
+        "fieldname": "action_type",
+        "fieldtype": "Select",
+        "in_list_view": 1,
+        "label": "Action Type",
+        "options": "UpdateItemGroup\nUpdatePrice\nUpdateDiscountedPrice\nAddTag\nRemoveTag\nDisableItem\nEnableItem\nUpdateValuationRate\nUpdateCustomField\nUpdateBrand\nSetOpeningStock\nUpdateWeightPerUnit\nUpdateDefaultWarehouse\nUpdateLastPingedOn\nUpdateVariantAvailabilityRule",
+        "reqd": 1,
+        "columns": 4
+      },
+      {
+        "fieldname": "action_value",
+        "fieldtype": "Data",
+        "in_list_view": 1,
+        "label": "Value",
+        "columns": 5,
+        "description": "The value to set. For UpdatePrice enter the new price. For UpdateItemGroup enter the group name. DisableItem/EnableItem need no value."
+      }
+    ],
+    "index_web_pages_for_search": 0,
+    "istable": 1,
+    "links": [],
+    "modified": "2025-01-01 00:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "Metactical",
+    "name": "Bulk Update Action",
+    "naming_rule": "Random",
+    "owner": "Administrator",
+    "permissions": [],
+    "sort_field": "creation",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 0
+  }

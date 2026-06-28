@@ -45,14 +45,15 @@ def get_ste_details(data):
 		while remaining_qty > 0:
 			limit = limit + 1
 			query = frappe.db.sql("""
-						SELECT
-							ste.posting_date AS date,
-							ste.name AS ste_number,
-							user.full_name AS created_by,
-							details.s_warehouse AS from_warehouse,
-							details.qty,
-							ste.sal_trackinginfo,
-							ste.sal_warehouseshipdate
+					SELECT
+						ste.posting_date AS date,
+						ste.name AS ste_number,
+						user.full_name AS created_by,
+						details.s_warehouse AS from_warehouse,
+						details.qty,
+						ste.sal_trackinginfo,
+						ste.sal_warehouseshipdate,
+						COALESCE(NULLIF(details.sales_order, ''), ste.sales_order_no) AS sales_order
 						FROM
 							`tabStock Entry` AS ste
 						LEFT JOIN 
@@ -89,6 +90,12 @@ def get_ste_details(data):
 			res.update({
 				"aging_days": age.days
 			})
+			if res.get("sales_order"):
+				set_warehouse = frappe.get_value("Sales Order", res["sales_order"], "set_warehouse")
+				if not set_warehouse:
+					set_warehouse = frappe.get_value("Sales Order Item",
+						{"parent": res["sales_order"], "idx": 1}, "warehouse")
+				res["order_warehouse"] = set_warehouse
 			result.append(dict(row, **res))
 	return result
 			
@@ -126,6 +133,13 @@ def get_columns():
 			"fieldname": "to_warehouse",
 			"fieldtype": "Link",
 			"label": _("Warehouse To"),
+			"options": "Warehouse",
+			"width": 150
+		},
+		{
+			"fieldname": "order_warehouse",
+			"fieldtype": "Link",
+			"label": _("Order Warehouse"),
 			"options": "Warehouse",
 			"width": 150
 		},

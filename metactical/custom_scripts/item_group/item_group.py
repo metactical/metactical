@@ -1,6 +1,62 @@
 import frappe
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
+from erpnext.setup.doctype.item_group.item_group import ItemGroup
 
+class CustomItemGroup(ItemGroup):
+    def after_rename(self, old_name, new_name, merge=False):
+        super().after_rename(old_name, new_name, merge)
+        
+        merge_history = frappe.get_doc({
+            'doctype': 'Item Group Merge History',
+            'old_item_group': old_name,
+            'new_item_group': new_name,
+            'action': 'Rename' if not merge else 'Merge'
+        })
+        merge_history.insert(ignore_permissions=True)
+        
+    def on_trash(self):
+        super().on_trash()
+        
+        merge_history = frappe.get_doc({
+            'doctype': 'Item Group Merge History',
+            'old_item_group': self.name,
+            'new_item_group': "",
+            'action': 'Delete'
+        })
+        merge_history.insert(ignore_permissions=True)
+        
+    def validate(self):
+        super().validate()
+        # Add any custom validation logic here
+        
+        old_doc = self.get_doc_before_save()
+        old_category_names = {}
+        new_category_names = {}
+        
+        if old_doc and old_doc.get('category_names'):
+            for category in old_doc.get('category_names'):
+                old_category_names[category.lead_source] = category.category_name
+                
+        if self.get('category_names'):
+            for category in self.get('category_names'):
+                new_category_names[category.lead_source] = category.category_name
+                
+        
+        # check if any category name has changed
+        category_updated = False
+        if len(old_category_names) != len(new_category_names):
+            self.categoy_names_updated = 1
+            category_updated = True
+        else:
+            for lead_source, category_name in new_category_names.items():
+                if lead_source in old_category_names:
+                    if category_name != old_category_names[lead_source]:
+                        self.categoy_names_updated = 1
+                        category_updated = True
+                        break
+        
+        if not category_updated:
+            self.categoy_names_updated = 0    
 
 @frappe.whitelist()
 def copy_specifications_to_items(item_group, add_missing_labels):

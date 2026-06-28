@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "creation": "2025-01-01 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "logic_operator",
+  "field_name",
+  "custom_field_name",
+  "operator",
+  "value"
+ ],
+ "fields": [
+  {
+   "columns": 1,
+   "default": "And",
+   "fieldname": "logic_operator",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Logic",
+   "options": "And\nOr"
+  },
+  {
+   "columns": 2,
+   "fieldname": "field_name",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Field",
+   "options": "item_code\nitem_name\nitem_group\nstock_uom\nis_trashed\nhas_variants\ndisabled\nvaluation_rate\nstandard_rate\nprice_list_rate\ndiscounted_price\ncustom_field\nifw_retailskusuffix\nbrand\nsupplier\ndefault_supplier\nhas_inventory\nvariant_of\nvariants_have_no_inventory\nneb_variantavailabilityrule",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.field_name=='custom_field'",
+   "description": "Enter the exact fieldname for custom fields",
+   "fieldname": "custom_field_name",
+   "fieldtype": "Data",
+   "label": "Custom Field Name"
+  },
+  {
+   "columns": 2,
+   "fieldname": "operator",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Operator",
+   "options": "Equals To\nNot Equal To\nBegins With\nEnds With\nContains\nDoes Not Contain\nGreater Than\nLess Than\nGreater Than Or Equal\nLess Than Or Equal\nIn\nNot In\nIs Set\nIs Not Set",
+   "reqd": 1
+  },
+  {
+   "columns": 3,
+   "description": "For 'In'/'Not In', use comma-separated values",
+   "fieldname": "value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Value"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-23 23:47:13.279833",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Bulk Update Condition",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

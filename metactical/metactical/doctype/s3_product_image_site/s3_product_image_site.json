@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-02 06:21:41.677054",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "nat_sku",
+  "nat_image_order",
+  "nat_role",
+  "nat_site"
+ ],
+ "fields": [
+  {
+   "fieldname": "nat_site",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Site",
+   "options": "Lead Source"
+  },
+  {
+   "fieldname": "nat_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SKU"
+  },
+  {
+   "fieldname": "nat_image_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Image Order"
+  },
+  {
+   "fieldname": "nat_role",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Role"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-04 06:08:21.023194",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "S3 Product Image Site",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

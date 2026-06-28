@@ -580,6 +580,7 @@ def make_payment(customer, amount, token, payment_entry=None):
 	if not customer:
 		frappe.throw(_("Customer is required"))
 
+	customer_cc = None
 	if token:
 		customer_cc = frappe.db.get_value("Customer CC Tokens", token, ["token", "card_holder"], as_dict=1)
 		if not customer_cc:
@@ -660,6 +661,9 @@ def handle_payment_response(response, log):
 
 		log.transaction_key = transaction.get("key")
 		frappe.response["success"] = True
+		frappe.response["transaction_key"] = transaction.get("key")
+		frappe.response["amount"] = transaction.get("auth_amount")
+		frappe.response["card_holder"] = transaction.get("creditcard", {}).get("cardholder")
 	else:
 		response = json.loads(response.text)
 		log.response = format_json_for_html(response)
@@ -1002,3 +1006,18 @@ def create_doc_comment(doc, log):
 		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(title="Comment Creation Error", message=frappe.get_traceback())
+  
+def get_refund_transaction_detail(usaepay_account, refund_transaction_key):
+	usaepay_url = usaepay_account.get("usaepay_url")
+	lead_source = usaepay_account.get("lead_source")
+	headers, usaepay_url = get_headers(lead_source=lead_source)
+ 
+	if not usaepay_url:
+		frappe.log_error(title="USAePay URL not set", message="USAePay URL is not set in USAePay Settings for the lead source {0}".format(lead_source))
+		return None
+
+	if not refund_transaction_key:
+		return None
+
+	transaction = get_transaction_from_usaepay(refund_transaction_key, headers, usaepay_account.get("merchant_id"))
+	return transaction

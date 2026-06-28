@@ -1,8 +1,8 @@
 import frappe
 from erpnext.controllers.accounts_controller import (
 	set_child_tax_template_and_map, 
-	add_taxes_from_tax_template, 
-	validate_and_delete_children
+	add_taxes_from_tax_template,
+	update_bin_on_delete
 )
 from erpnext.stock.get_item_details import (
 	get_conversion_factor,
@@ -365,3 +365,67 @@ def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, chil
 	parent.update_blanket_order()
 	parent.update_billing_percentage()
 	parent.set_status()
+ 
+ 
+def validate_and_delete_children(parent, data) -> bool:
+	deleted_children = []
+	updated_item_names = [d.get("docname") for d in data]
+	for item in parent.items:
+		if item.name not in updated_item_names:
+			deleted_children.append(item)
+
+	for d in deleted_children:
+		validate_child_on_delete(d, parent)
+		d.cancel()
+		d.delete()
+
+	if parent.doctype == "Purchase Order":
+		parent.update_ordered_qty_in_so_for_removed_items(deleted_children)
+
+	# need to update ordered qty in Material Request first
+	# bin uses Material Request Items to recalculate & update
+	parent.update_prevdoc_status()
+
+	for d in deleted_children:
+		update_bin_on_delete(d, parent.doctype)
+
+	return bool(deleted_children)
+
+def validate_child_on_delete(row, parent):
+	"""Check if partially transacted item (row) is being deleted."""
+
+	if parent.doctype == "Sales Order":
+		if flt(row.delivered_qty):
+			frappe.throw(
+				_("Row #{0}: Cannot delete item {1} which has already been delivered").format(
+					row.idx, row.item_code
+				)
+			)
+		if flt(row.work_order_qty):
+			frappe.throw(
+				_("Row #{0}: Cannot delete item {1} which has work order assigned to it.").format(
+					row.idx, row.item_code
+				)
+			)
+   
+		# if flt(row.ordered_qty):
+		# 	frappe.throw(
+		# 		_(
+		# 			"Row #{0}: Cannot delete item {1} which is already ordered against this Sales Order."
+		# 		).format(row.idx, row.item_code)
+		# 	)
+
+	if parent.doctype == "Purchase Order" and flt(row.received_qty):
+		frappe.throw(
+			_("Row #{0}: Cannot delete item {1} which has already been received").format(
+				row.idx, row.item_code
+			)
+		)
+
+	if flt(row.billed_amt):
+		frappe.throw(
+			_("Row #{0}: Cannot delete item {1} which has already been billed.").format(
+				row.idx, row.item_code
+			)
+		)
+

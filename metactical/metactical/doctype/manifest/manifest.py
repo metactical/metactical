@@ -135,13 +135,13 @@ def redownload_cp_manifest(doc):
 			continue
 		for manifest in manifest_link["manifest"]["links"]["link"]:
 			if manifest["@rel"] == "manifestShipments":
-				manifest_shipments = cp.get_response(manifest["@href"], None, headers={'Accept': manifest["@media-type"]}, method="GET")
+				manifest_shipments = cp.get_response(manifest["@href"], None, headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 				shipments.append(manifest_shipments)
 				#return manifest_shipments["shipments"]["link"]
 				for shipment in manifest_shipments["shipments"]["link"]:
 					not_shipments = ["@rel", "@href", "@media-type"]
 					if shipment not in not_shipments:
-						shipment_info = cp.get_response(shipment["@href"], None, headers={'Accept': shipment["@media-type"]}, method="GET")
+						shipment_info = cp.get_response(shipment["@href"], None, headers={'Accept': 'application/vnd.cpc.shipment-v8+xml'}, method="GET")
 						shipment_infos.append(shipment_info)
 						shipment_ids.append(shipment_info["shipment-info"]['shipment-id'])
 						if shipment_info["shipment-info"]['shipment-id'] in ref_shipments:

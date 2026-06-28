@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-20 01:52:02.777717",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "use_old_item_price",
+  "fields_to_copy",
+  "fields_to_overwrite"
+ ],
+ "fields": [
+  {
+   "fieldname": "fields_to_overwrite",
+   "fieldtype": "Table",
+   "label": "Fields to Overwrite",
+   "options": "Variant Field"
+  },
+  {
+   "default": "0",
+   "fieldname": "use_old_item_price",
+   "fieldtype": "Check",
+   "label": "Use Old Item Price"
+  },
+  {
+   "fieldname": "fields_to_copy",
+   "fieldtype": "Table",
+   "label": "Fields to Copy If Not Exist",
+   "options": "Variant Field"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-03-23 05:01:35.781314",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Merge Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

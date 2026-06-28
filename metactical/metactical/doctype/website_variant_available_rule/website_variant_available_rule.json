@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-27 06:42:59.428581",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "variant_availability_rule",
+  "lead_source"
+ ],
+ "fields": [
+  {
+   "fieldname": "variant_availability_rule",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Variant Availability Rule",
+   "options": "Variant Availability Rule",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Lead Source",
+   "options": "Lead Source",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-27 06:54:56.664270",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Website Variant Available Rule",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

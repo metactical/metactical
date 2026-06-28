@@ -63,7 +63,29 @@ frappe.ui.form.on('Sales Order', {
 		
 		cur_frm.fields_dict["section_break_48"].collapse(0);
 	},
+	plc_conversion_rate: function(frm) {
+        if (frm.doc.selling_price_list !== "RET - CamoFRN - USD") return;
+        if (!frm.doc.plc_conversion_rate) return;
 
+        let current = flt(frm.doc.plc_conversion_rate);
+
+        // store backend value once (true base)
+        if (!frm._base_plc_rate) {
+            frm._base_plc_rate = current;
+        }
+
+        let expected = frm._base_plc_rate + 0.02;
+
+        // ONLY adjust if not already adjusted
+        if (Math.abs(current - expected) > 0.0001) {
+            frm.set_value("plc_conversion_rate", expected);
+        }
+    },
+
+    selling_price_list: function(frm) {
+        // reset base when price list changes
+        frm._base_plc_rate = null;
+    },
 	onload: function(frm){
 		old_tax_template = frm.doc.taxes_and_charges;
 		base_in_words = frm.doc.base_in_words;
@@ -386,13 +408,15 @@ frappe.ui.form.on('Sales Order', {
 	},
 	verify_address(frm) {
 		frappe.call({
-			method: "metactical.api.shipstation.verify_shipping_address",
+			method: "metactical.api.address_verification.verify_shipping_address",
 			args: {
 				"sales_order_name": frm.doc.name
 			},
 			freeze: true,
 			callback: function(ret){
 				frm.refresh_field("custom_ais_address_verified");
+				frm.refresh_field("custom_ais_validation_entity");
+				frm.refresh_field("custom_ais_validation_warning");
 			}
 		});
 	}

@@ -8,7 +8,9 @@
  "field_order": [
   "description",
   "sort_order",
-  "sb_tag"
+  "sb_tag",
+  "color",
+  "short_name"
  ],
  "fields": [
   {
@@ -29,17 +31,31 @@
    "in_list_view": 1,
    "label": "SB Tag",
    "options": "SB Tag"
+  },
+  {
+   "fieldname": "short_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Short Name"
+  },
+  {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "in_list_view": 1
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-04-07 01:46:15.942140",
+ "modified": "2026-04-01 09:59:53.326666",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Spec Label Descriptions",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

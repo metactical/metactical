@@ -109,11 +109,11 @@ class CustomStockEntry(StockEntry):
 		super(CustomStockEntry, self).validate()
 		# Metactical Customization: Validate that user has permission to make stock entry against warehouse
 		user = frappe.session.user
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
 			s_warehouses = []
 			t_warehouses = []
-			settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
+			settings = frappe.get_doc("Warehouse User Permissions", setting_exists)
 			for row in settings.source_warehouse:
 				s_warehouses.append(row.warehouse)
 				
@@ -121,10 +121,10 @@ class CustomStockEntry(StockEntry):
 				t_warehouses.append(row.warehouse)
 			
 			for row in self.items:
-				if row.s_warehouse and row.s_warehouse not in s_warehouses:
+				if s_warehouses and row.s_warehouse and row.s_warehouse not in s_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, frappe.session.user))
-					
-				if row.t_warehouse and row.t_warehouse not in t_warehouses:
+
+				if t_warehouses and row.t_warehouse and row.t_warehouse not in t_warehouses:
 					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
 				
 	def on_submit(self):
@@ -167,8 +167,8 @@ class CustomStockEntry(StockEntry):
 @frappe.whitelist()
 def create_stock_entry(source_name, target_doc=None):
 	def update_item_quantity(source, target, source_parent):
-		qty = flt(flt(source.stock_qty) - flt(source.ordered_qty))/ target.conversion_factor \
-			if flt(source.stock_qty) > flt(source.ordered_qty) else 0
+		qty = flt(flt(source.stock_qty) - flt(source.delivered_qty))/ target.conversion_factor \
+			if flt(source.stock_qty) > flt(source.delivered_qty) else 0
 		target.qty = qty
 		target.transfer_qty = qty * source.conversion_factor
 		target.conversion_factor = source.conversion_factor
@@ -193,7 +193,7 @@ def create_stock_entry(source_name, target_doc=None):
 				'warehouse': 't_warehouse'
 			},
 			'postprocess': update_item_quantity,
-			'condition': lambda doc: doc.ordered_qty < doc.stock_qty
+			'condition': lambda doc: doc.delivered_qty < doc.stock_qty
 		},
 	}, target_doc)
 
@@ -206,19 +206,17 @@ def get_permitted_source(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
 	warehouses = []
 	if user:
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
-			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
 							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
-							AND parentfield='source_warehouse'""", 
+							AND parentfield='source_warehouse'""",
 							{
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
 							})
-			'''settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
-			for row in settings.source_warehouse:
-				warehouses.append([row.warehouse])'''
-		else:
+
+		if not setting_exists or not warehouses:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
@@ -228,26 +226,45 @@ def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
 	warehouses = []
 	if user:
-		setting_exists = frappe.db.get_value("Stock Entry User Permissions", filters={"user": user})
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
 		if setting_exists:
-			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse` 
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
 							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
-							AND parentfield='target_warehouse'""", 
+							AND parentfield='target_warehouse'""",
 							{
 								'txt': "%%%s%%" % txt,
 								'parent': setting_exists
 							})
-			'''settings = frappe.get_doc("Stock Entry User Permissions", setting_exists)
-			for row in settings.target_warehouse:
-				warehouses.append([row.warehouse])'''
-		else:
+
+		if not setting_exists or not warehouses:
 			#Retrun all warehouses
 			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
 	return warehouses
 	
 @frappe.whitelist()
 def get_default_transit(user):
-	return frappe.db.get_value('Stock Entry User Permissions', user, 'add_to_transit')
+	return frappe.db.get_value('Warehouse User Permissions', user, 'add_to_transit')
+
+@frappe.whitelist()
+def recalculate_available_qty(items):
+	import json
+	if isinstance(items, str):
+		items = json.loads(items)
+
+	result = {}
+	for item in items:
+		item_code = item.get("item_code")
+		s_warehouse = item.get("s_warehouse")
+		row_name = item.get("name")
+
+		if item_code and s_warehouse and row_name:
+			bin_name = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": s_warehouse})
+			if bin_name:
+				bin_doc = frappe.get_doc("Bin", bin_name)
+				bin_doc.recalculate_qty()
+				result[row_name] = bin_doc.actual_qty
+
+	return result
 	
 @frappe.whitelist()
 def move_stock(source_name, target_doc=None):
