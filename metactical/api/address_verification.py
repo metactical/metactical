@@ -80,6 +80,7 @@ def verify_shipping_address(sales_order_name):
 		frappe.throw("Address verification failed. See the Error Log for details.")
 
 	match_level = data.get("match_level", "unverified")
+	melissa_key = settings.get_password("melissa_key") if settings.enable_melissa_fallback else None
 
 	if match_level in ("fully_verified", "street_verified"):
 		validation_status = "Validated"
@@ -88,8 +89,17 @@ def verify_shipping_address(sales_order_name):
 		validation_status = "Validation Warning"
 		validation_entity = "Storebuilder"
 		validation_warning = "Only postal code was verified"
+
+		if melissa_key:
+			melissa_result = verify_with_melissa(address, melissa_key, timeout)
+			if melissa_result:
+				melissa_level, melissa_verified, melissa_detail = melissa_result
+				if melissa_verified:
+					# Melissa confirms the address despite Storebuilder's postal-only match.
+					validation_status = "Validated"
+					validation_entity = "Melissa"
+					validation_warning = ""
 	else:
-		melissa_key = settings.get_password("melissa_key") if settings.enable_melissa_fallback else None
 		if melissa_key:
 			melissa_result = verify_with_melissa(address, melissa_key, timeout)
 			if melissa_result:
