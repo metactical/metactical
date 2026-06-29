@@ -1,0 +1,84 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-02 06:25:19.066876",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_3fll",
+  "nat_override_full_product",
+  "nat_product_template",
+  "nat_skus",
+  "nat_sites",
+  "nat_images"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_3fll",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "nat_override_full_product",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Override Full Product"
+  },
+  {
+   "fieldname": "nat_skus",
+   "fieldtype": "Table",
+   "label": "SKUs",
+   "options": "S3 Product Image SKU",
+   "reqd": 1
+  },
+  {
+   "fieldname": "nat_sites",
+   "fieldtype": "Table",
+   "label": "Sites",
+   "options": "S3 Product Image Site",
+   "reqd": 1
+  },
+  {
+   "fieldname": "nat_images",
+   "fieldtype": "Table",
+   "label": "Images",
+   "options": "S3 Product Image Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "nat_product_template",
+   "fieldtype": "Link",
+   "label": "Product Template",
+   "options": "Item",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-17 07:20:12.365804",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "S3 Product Image Meta Data",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
