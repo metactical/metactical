@@ -9,6 +9,8 @@
  "engine": "InnoDB",
  "field_order": [
   "group_name",
+  "display_name",
+  "section_break_retj",
   "items"
  ],
  "fields": [
@@ -23,11 +25,20 @@
    "fieldtype": "Table",
    "label": "Items",
    "options": "UpSell Group Items"
+  },
+  {
+   "fieldname": "display_name",
+   "fieldtype": "Data",
+   "label": "Display Name"
+  },
+  {
+   "fieldname": "section_break_retj",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-07-29 06:23:21.466647",
+ "modified": "2026-06-29 05:20:11.462764",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "UpSell Group",
@@ -47,6 +58,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
