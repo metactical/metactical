@@ -13,7 +13,7 @@ from frappe.model.utils import get_fetch_values
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.accounts.party import get_party_account
 from frappe import _, msgprint
-from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output
+from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.model.docstatus import DocStatus
 from metactical.custom_scripts.utils.metactical_utils import ( 
 	queue_action, 
@@ -78,21 +78,29 @@ class SalesOrderCustom(SalesOrder):
 		super(SalesOrderCustom, self).on_submit()
 
 		# Metactical Customization: Added
-		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type="Sales Order", queue='default')
-
+		self.trigger_inventory_update()
+  
 	def on_cancel(self):
 		super(SalesOrderCustom, self).on_cancel()
 
 		# Metactical Customization: Added
-		for item in self.items:
-			update_item_inventory_output(item_code=item.item_code, voucher_type="Sales Order")
-
+		self.trigger_inventory_update()
+  
 	def on_update_after_submit(self):
 		super().on_update_after_submit()
 
+		# Metactical Customization: Added
+		self.trigger_inventory_update()		
+  
+	def trigger_inventory_update(self):
 		for item in self.items:
-			frappe.enqueue(update_item_inventory_output, item_code=item.item_code, queue='default')
+			is_product_bundle = frappe.db.exists('Product Bundle', item.item_code)
+			if is_product_bundle:
+				all_bins = get_all_bins_for_product_bundle(item.item_code)
+				update_item_inventory_output(item_code=item.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
+			else:
+				frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type=self.doctype, queue='default')
+			
    
 def get_draft_dns(sales_order):
 	draft_dn = frappe.db.sql("""
