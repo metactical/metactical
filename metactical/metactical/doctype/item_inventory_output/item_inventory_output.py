@@ -234,7 +234,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			inventory_ouput_data.append(item_inventory_output_data)
 
 		# Save changes to Item Inventory Output
-		total_available_qty = sum(net_available_bins.values()) if not bundle else min(net_available_bundles)
+  
+		total_available_qty = sum(net_available_bins.values()) if not bundle else (min(net_available_bundles) if net_available_bundles else 0)
 		inventories_by_country = get_inventory_by_country(item_code, last_sle, net_available_bins, doc)
 
 		if not item_inventory_output_doc:
