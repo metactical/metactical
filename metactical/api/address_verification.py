@@ -91,7 +91,7 @@ def verify_shipping_address(sales_order_name):
 		validation_warning = "Only postal code was verified"
 
 		if melissa_key:
-			melissa_result = verify_with_melissa(address, melissa_key, timeout)
+			melissa_result = verify_with_melissa(address, melissa_key, timeout, sales_order_name)
 			if melissa_result:
 				melissa_level, melissa_verified, melissa_detail = melissa_result
 				if melissa_verified:
@@ -101,7 +101,7 @@ def verify_shipping_address(sales_order_name):
 					validation_warning = ""
 	else:
 		if melissa_key:
-			melissa_result = verify_with_melissa(address, melissa_key, timeout)
+			melissa_result = verify_with_melissa(address, melissa_key, timeout, sales_order_name)
 			if melissa_result:
 				melissa_level, melissa_verified, melissa_detail = melissa_result
 				validation_entity = "Melissa"
@@ -111,12 +111,22 @@ def verify_shipping_address(sales_order_name):
 					validation_status = "Validation Warning"
 					validation_warning = melissa_detail
 
-	if validation_status in ("Validation Failed", "Validation Warning"):
+	# Logged on Storebuilder's own match_level, not the final validation_status --
+	# Melissa can rescue a weak/failed Storebuilder match into a final "Validated"
+	# outcome, and we still want a record of Storebuilder's original miss so this
+	# data can be used to improve Storebuilder's matching.
+	if match_level not in ("fully_verified", "street_verified"):
 		frappe.log_error(
 			title="Address Verification - Unverified Address",
-			message="Sales Order: {so}\nAddress: {addr}\nStatus: {status}\nEntity: {entity}\nWarning: {warning}".format(
+			message=(
+				"Sales Order: {so}\nAddress: {addr}\n"
+				"Storebuilder Match Level: {level}\nStorebuilder Response: {data}\n"
+				"Final Status: {status}\nFinal Entity: {entity}\nFinal Warning: {warning}"
+			).format(
 				so=sales_order_name,
 				addr=sales_order.shipping_address_name,
+				level=match_level,
+				data=json.dumps(data),
 				status=validation_status,
 				entity=validation_entity,
 				warning=validation_warning,
@@ -217,19 +227,42 @@ def build_melissa_payload(address, melissa_key):
 	}
 
 
-def verify_with_melissa(address, melissa_key, timeout):
+def verify_with_melissa(address, melissa_key, timeout, sales_order_name=None):
 	"""Call the Melissa Global Address API and return (match_level, verified, detail) or None.
 
-	Returns None on network/HTTP errors (already logged). verified is True only
-	when the strongest AV code in the response confirms street level or better
-	(fully_verified/street_verified); state/city-only matches (e.g. AV11, AV12)
-	are reported as postal_verified and are not considered verified. detail is a
-	human-readable summary of what was (or wasn't) confirmed, including any AE
-	(address error) codes returned alongside the AV codes.
+	Returns None on network/HTTP errors (already logged), and also None when
+	there is nothing to send (no credit consumed, so nothing is logged in that
+	case either). Every actual outbound attempt -- success or failure -- is
+	recorded in a Melissa Log doc so credit usage can be audited independently
+	of frappe.log_error(), which only captures failures.
+
+	verified is True only when the strongest AV code in the response confirms
+	street level or better (fully_verified/street_verified); state/city-only
+	matches (e.g. AV11, AV12) are reported as postal_verified and are not
+	considered verified. detail is a human-readable summary of what was (or
+	wasn't) confirmed, including any AE (address error) codes returned
+	alongside the AV codes.
 	"""
 	payload = build_melissa_payload(address, melissa_key)
 	if not payload:
 		return None
+
+	log = frappe.new_doc("Melissa Log")
+	log.date = frappe.utils.now()
+	log.sales_order = sales_order_name
+	log.address = address.get("name")
+	log.request = frappe.as_json(payload)
+
+	def _save_log():
+		try:
+			log.insert(ignore_permissions=True)
+		except Exception:
+			frappe.log_error(
+				title="Address Verification - Melissa Log save failed",
+				message="Address: {0}\n{1}".format(address.get("name"), frappe.get_traceback()),
+			)
+
+	response = None
 	try:
 		response = requests.post(
 			MELISSA_API_URL,
@@ -237,9 +270,15 @@ def verify_with_melissa(address, melissa_key, timeout):
 			headers={"Content-Type": "application/json", "Accept": "application/json"},
 			timeout=timeout,
 		)
+		log.http_status_code = response.status_code
 		response.raise_for_status()
 		data = response.json()
 	except Exception:
+		log.status = "Error"
+		log.response = response.text if response is not None else None
+		log.error = frappe.get_traceback()
+		_save_log()
+
 		frappe.log_error(
 			title="Address Verification - Melissa request failed",
 			message="Address: {0}\n{1}".format(
@@ -248,8 +287,14 @@ def verify_with_melissa(address, melissa_key, timeout):
 		)
 		return None
 
+	log.status = "Success"
+	log.response = response.text
+
 	records = data.get("Records") or []
 	if not records:
+		log.match_level = "unverified"
+		log.detail = "No records returned by Melissa"
+		_save_log()
 		return None
 
 	result_codes = [c.strip() for c in (records[0].get("Results") or "").split(",") if c.strip()]
@@ -271,7 +316,14 @@ def verify_with_melissa(address, melissa_key, timeout):
 	if ae_reasons:
 		detail = "{0} ({1})".format(detail, "; ".join(ae_reasons))
 
-	return (best_level, best_level in _MELISSA_VERIFIED_LEVELS, detail)
+	verified = best_level in _MELISSA_VERIFIED_LEVELS
+
+	log.match_level = best_level
+	log.verified = 1 if verified else 0
+	log.detail = detail
+	_save_log()
+
+	return (best_level, verified, detail)
 
 
 def build_address_payload(address):
