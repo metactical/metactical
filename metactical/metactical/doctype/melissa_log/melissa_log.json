@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-07-02 12:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "status",
+  "sales_order",
+  "address",
+  "column_break_1",
+  "match_level",
+  "verified",
+  "http_status_code",
+  "detail",
+  "section_break_2",
+  "request",
+  "column_break_3",
+  "response",
+  "section_break_4",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Success\nError",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Address",
+   "options": "Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "match_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Match Level",
+   "options": "\nunverified\npostal_verified\nstreet_verified\nfully_verified",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "verified",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Verified",
+   "read_only": 1
+  },
+  {
+   "fieldname": "http_status_code",
+   "fieldtype": "Int",
+   "label": "HTTP Status Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail",
+   "fieldtype": "Small Text",
+   "label": "Detail",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Payload"
+  },
+  {
+   "fieldname": "request",
+   "fieldtype": "Code",
+   "label": "Request",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "response",
+   "fieldtype": "Code",
+   "label": "Response",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.status==\"Error\"",
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Code",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-02 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Melissa Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
