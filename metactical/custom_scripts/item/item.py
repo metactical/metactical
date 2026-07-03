@@ -360,7 +360,17 @@ class CustomItem(Item):
                 if row.item_group
             }
 
-            if self.item_group not in tag_item_groups:
+            tag_brands = {
+                row.brand
+                for row in tag_doc.nat_brands or []
+                if row.brand
+            }
+
+            # Map the tag if the item matches on item group OR on brand
+            matches_item_group = self.item_group in tag_item_groups
+            matches_brand = self.brand in tag_brands
+
+            if not (matches_item_group or matches_brand):
                 continue
 
             if not tag_specs.issubset(item_specs):

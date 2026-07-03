@@ -7,11 +7,11 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "item_group"
+  "brand"
  ],
  "fields": [
   {
-   "fieldname": "item_group",
+   "fieldname": "brand",
    "fieldtype": "Link",
    "label": "Brand",
    "options": "Brand"
@@ -20,7 +20,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-07-03 05:52:56.515262",
+ "modified": "2026-07-03 06:08:23.310437",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Brands List",
