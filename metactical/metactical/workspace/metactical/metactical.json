@@ -125,7 +125,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Developer ONLY",
-   "link_count": 3,
+   "link_count": 2,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -146,16 +146,6 @@
    "label": "Shipstation Settings",
    "link_count": 0,
    "link_to": "Shipstation Settings",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Melissa Log",
-   "link_count": 0,
-   "link_to": "Melissa Log",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -485,6 +475,7 @@
    "link_to": "Pricing Rule Report - V1",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Pricing Rule",
    "type": "Link"
   },
   {
@@ -495,6 +486,7 @@
    "link_to": "Item Price Excel - V3",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Item Price",
    "type": "Link"
   },
   {
@@ -539,9 +531,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Warehouse User Permissions",
+   "label": "Material Request User Permission",
    "link_count": 0,
-   "link_to": "Warehouse User Permissions",
+   "link_to": "Material Request User Permission",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -740,6 +732,7 @@
    "link_to": "Stock Reconciliation Report - Positive",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Stock Reconciliation",
    "type": "Link"
   },
   {
@@ -750,6 +743,7 @@
    "link_to": "Stock Reconciliation Report - Negative",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Stock Reconciliation",
    "type": "Link"
   },
   {
@@ -760,6 +754,7 @@
    "link_to": "End of Day Report - V4",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -770,6 +765,7 @@
    "link_to": "End of Day Report - V4 Franchise",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -780,6 +776,7 @@
    "link_to": "Dead Stock Report",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -790,6 +787,7 @@
    "link_to": "POS Discount Report",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -809,6 +807,7 @@
    "link_to": "Item-Wise Sales Invoice Report",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -877,6 +876,7 @@
    "link_to": "Returns and Store Credits - POS",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -887,6 +887,7 @@
    "link_to": "Returns and Store Credits - Non POS",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -945,6 +946,7 @@
    "link_to": "Sales Report by Location",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -955,6 +957,7 @@
    "link_to": "Item Locations",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Item",
    "type": "Link"
   },
   {
@@ -965,6 +968,7 @@
    "link_to": "Sales Report - Stores Restocking V1",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Sales Invoice",
    "type": "Link"
   },
   {
@@ -992,6 +996,16 @@
    "label": "Cycle Count V2",
    "link_count": 0,
    "link_to": "Cycle Count V2",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Stock Entry User Permissions",
+   "link_count": 0,
+   "link_to": "Stock Entry User Permissions",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -1074,15 +1088,22 @@
    "link_to": "Stock Balance Totals - Purchase Rates",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Bin",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Report -  Item Attribute Error Report",
+   "link_count": 0,
+   "link_to": "Item Attribute Error Report",
+   "link_type": "Report",
+   "onboard": 0,
    "type": "Link"
   }
  ],
-<<<<<<< HEAD
- "modified": "2025-12-23 07:26:36.708218",
-=======
- "modified": "2026-07-03 12:50:58.907963",
->>>>>>> a73a1fb2 (chore: Added Melissa Address Verification Log and fixed logging unverified addresses)
- "modified_by": "Administrator",
+ "modified": "2026-07-03 06:43:20.217236",
+ "modified_by": "nebyie@metactical.com",
  "module": "Metactical",
  "name": "Metactical",
  "number_cards": [],
