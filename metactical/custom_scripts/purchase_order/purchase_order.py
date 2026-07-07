@@ -48,6 +48,32 @@ class CustomPurchaseOrder(PurchaseOrder):
 			else:
 				self.set_onload("ais_allow_tax_edit", False)
 
+	def validate(self):
+		super().validate()
+		self.validate_case_pack_on_moq()
+
+	def validate_case_pack_on_moq(self):
+		for item in self.items:
+			if not item.item_code:
+				continue
+
+			item_doc = frappe.get_doc("Item", item.item_code)
+
+			if not item_doc.nat_enforce_case_pack_on_moq:
+				continue
+
+			min_order_qty = flt(item_doc.min_order_qty)
+			if min_order_qty <= 0:
+				continue
+
+			# Ordered qty must be a positive multiple of the minimum order qty
+			qty = flt(item.qty)
+			if qty <= 0 or flt(qty % min_order_qty, item.precision("qty")) != 0:
+				frappe.throw(_(
+					"Row #{0}: Quantity for item {1} must be a multiple of the "
+					"minimum order quantity ({2})."
+				).format(item.idx, frappe.bold(item.item_code), min_order_qty))
+
 	def before_submit(self):
 		self.barcode_check()
 
