@@ -35,6 +35,8 @@ const FIELD_OPTIONS = [
     { value: "price_list_rate",  label: "Price List Rate (Item Price)" },
     { value: 'variant_of',                label: 'Variant Of' },
     { value: 'neb_variantavailabilityrule', label: 'Variant Availability Rule' },
+    { value: 'sb_tag',                    label: 'SB Tag' },
+    { value: 'website_specification_label', label: 'Website Specification Label' },
 ];
 
 const OPERATOR_OPTIONS = [
@@ -50,6 +52,8 @@ const ACTION_TYPE_OPTIONS = [
     { value: "UpdateItemGroup",              label: "Update Item Group" },
     { value: "AddTag",                       label: "Add Tag" },
     { value: "RemoveTag",                    label: "Remove Tag" },
+    { value: "AddSBTag",                     label: "Add SB Tag" },
+    { value: "RemoveSBTag",                  label: "Remove SB Tag" },
     { value: "DisableItem",                  label: "Disable Item" },
     { value: "EnableItem",                   label: "Enable Item" },
     { value: "UpdateValuationRate",          label: "Update Valuation Rate" },
@@ -68,6 +72,8 @@ const ACTION_LINK_MAP = {
     "UpdateDefaultWarehouse":        "Warehouse",
     "AddTag":                        "Tag",
     "RemoveTag":                     "Tag",
+    "AddSBTag":                      "SB Tag",
+    "RemoveSBTag":                   "SB Tag",
     "UpdateVariantAvailabilityRule": "Variant Availability Rule",
 };
 

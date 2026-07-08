@@ -32,6 +32,8 @@ ACTION_TYPE_MAP = {
     "UpdateItemGroup":               ("item",  "item_group"),
     "AddTag":                        ("item",  "_user_tags"),
     "RemoveTag":                     ("item",  "_user_tags"),
+    "AddSBTag":                      ("item",  "sb_tags"),
+    "RemoveSBTag":                   ("item",  "sb_tags"),
     "DisableItem":                   ("item",  "disabled"),
     "EnableItem":                    ("item",  "disabled"),
     "UpdateValuationRate":           ("item",  "valuation_rate"),
@@ -73,6 +75,10 @@ def _is_item_default_field(fieldname):
 def _is_item_supplier_field(fieldname):
     return fieldname in ITEM_SUPPLIER_FIELDS
 
+# Child-table virtual condition fields
+SB_TAG_FIELD = "sb_tag"
+WEBSITE_SPEC_LABEL_FIELD = "website_specification_label"
+
 class BulkUpdateRule(Document):
 
     def validate(self):
@@ -91,7 +97,9 @@ class BulkUpdateRule(Document):
         item_default_conds = []
         item_supplier_conds = []
         inventory_conds = []
-        variant_inventory_conds = []       # ← ADD THIS
+        variant_inventory_conds = []
+        sb_tag_conds = []
+        website_spec_label_conds = []
 
         for c in self.conditions:
             fn = _resolve_field(c.field_name, c.custom_field_name)
@@ -103,12 +111,16 @@ class BulkUpdateRule(Document):
                 item_supplier_conds.append(c)
             elif fn == "has_inventory":
                 inventory_conds.append(c)
-            elif fn == "variants_have_no_inventory":    # ← ADD THIS
-                variant_inventory_conds.append(c)       # ← ADD THIS
+            elif fn == "variants_have_no_inventory":
+                variant_inventory_conds.append(c)
+            elif fn == SB_TAG_FIELD:
+                sb_tag_conds.append(c)
+            elif fn == WEBSITE_SPEC_LABEL_FIELD:
+                website_spec_label_conds.append(c)
             else:
                 item_conds.append(c)
 
-        return item_conds, price_conds, item_default_conds, item_supplier_conds, inventory_conds, variant_inventory_conds
+        return item_conds, price_conds, item_default_conds, item_supplier_conds, inventory_conds, variant_inventory_conds, sb_tag_conds, website_spec_label_conds
 
     def _classify_action_fields(self):
         item_fields = set()
@@ -172,7 +184,7 @@ class BulkUpdateRule(Document):
     # ──────────────────────────────────────────────────────────────────
 
     def get_matched_items(self, limit_page_length=10, start=0, for_update=False):
-        item_conds, price_conds, item_default_conds, item_supplier_conds, inventory_conds, variant_inventory_conds = self._classify_conditions()
+        item_conds, price_conds, item_default_conds, item_supplier_conds, inventory_conds, variant_inventory_conds, sb_tag_conds, website_spec_label_conds = self._classify_conditions()
         item_action_fields, price_action_fields = self._classify_action_fields()
 
         needs_price = bool(price_conds) or bool(price_action_fields)
@@ -195,11 +207,11 @@ class BulkUpdateRule(Document):
             if not mapping:
                 continue
             doc_type, fieldname = mapping
-            if doc_type == "item" and fieldname and fieldname not in ("name", "item_code", "item_name", "item_group"):
+            if doc_type == "item" and fieldname and fieldname not in ("name", "item_code", "item_name", "item_group", "_user_tags", "sb_tags"):
                 extra_item.add(fieldname)
 
         # Condition fields for display
-        VIRTUAL_FIELDS = {"has_inventory", "supplier", "default_supplier", "variants_have_no_inventory"}
+        VIRTUAL_FIELDS = {"has_inventory", "supplier", "default_supplier", "variants_have_no_inventory", SB_TAG_FIELD, WEBSITE_SPEC_LABEL_FIELD}
         for c in self.conditions:
             fn = _resolve_field(c.field_name, c.custom_field_name)
             if not _is_price_field(fn) and fn not in ("name", "item_code", "item_name", "item_group") and fn not in VIRTUAL_FIELDS:
@@ -298,6 +310,68 @@ class BulkUpdateRule(Document):
                 )
             """)
 
+        for c in sb_tag_conds:
+            val = (c.value or "").strip()
+            op = c.operator
+            vals = [v.strip() for v in val.split(",") if v.strip()]
+            if op == "Is Set":
+                where_parts.append("EXISTS (SELECT 1 FROM `tabItem SB Tag` WHERE `tabItem SB Tag`.`parent` = `i`.`name`)")
+            elif op == "Is Not Set":
+                where_parts.append("NOT EXISTS (SELECT 1 FROM `tabItem SB Tag` WHERE `tabItem SB Tag`.`parent` = `i`.`name`)")
+            elif op == "In":
+                if vals:
+                    placeholders = ", ".join(["%s"] * len(vals))
+                    where_parts.append(f"EXISTS (SELECT 1 FROM `tabItem SB Tag` WHERE `tabItem SB Tag`.`parent` = `i`.`name` AND `tabItem SB Tag`.`sb_tag` IN ({placeholders}))")
+                    params.extend(vals)
+                else:
+                    where_parts.append("1=0")
+            elif op == "Not In":
+                if vals:
+                    placeholders = ", ".join(["%s"] * len(vals))
+                    where_parts.append(f"NOT EXISTS (SELECT 1 FROM `tabItem SB Tag` WHERE `tabItem SB Tag`.`parent` = `i`.`name` AND `tabItem SB Tag`.`sb_tag` IN ({placeholders}))")
+                    params.extend(vals)
+            elif op in ("Equals To", "Contains", "Begins With", "Ends With"):
+                like_val = {"Contains": f"%{val}%", "Begins With": f"{val}%", "Ends With": f"%{val}"}.get(op, val)
+                sql_op = "LIKE" if op != "Equals To" else "="
+                where_parts.append(f"EXISTS (SELECT 1 FROM `tabItem SB Tag` WHERE `tabItem SB Tag`.`parent` = `i`.`name` AND `tabItem SB Tag`.`sb_tag` {sql_op} %s)")
+                params.append(like_val)
+            elif op in ("Not Equal To", "Does Not Contain"):
+                like_val = f"%{val}%" if op == "Does Not Contain" else val
+                sql_op = "NOT LIKE" if op == "Does Not Contain" else "!="
+                where_parts.append(f"NOT EXISTS (SELECT 1 FROM `tabItem SB Tag` WHERE `tabItem SB Tag`.`parent` = `i`.`name` AND `tabItem SB Tag`.`sb_tag` {sql_op} %s)")
+                params.append(like_val)
+
+        for c in website_spec_label_conds:
+            val = (c.value or "").strip()
+            op = c.operator
+            vals = [v.strip() for v in val.split(",") if v.strip()]
+            if op == "Is Set":
+                where_parts.append("EXISTS (SELECT 1 FROM `tabMT Item Website Specification` WHERE `tabMT Item Website Specification`.`parent` = `i`.`name`)")
+            elif op == "Is Not Set":
+                where_parts.append("NOT EXISTS (SELECT 1 FROM `tabMT Item Website Specification` WHERE `tabMT Item Website Specification`.`parent` = `i`.`name`)")
+            elif op == "In":
+                if vals:
+                    placeholders = ", ".join(["%s"] * len(vals))
+                    where_parts.append(f"EXISTS (SELECT 1 FROM `tabMT Item Website Specification` WHERE `tabMT Item Website Specification`.`parent` = `i`.`name` AND `tabMT Item Website Specification`.`label` IN ({placeholders}))")
+                    params.extend(vals)
+                else:
+                    where_parts.append("1=0")
+            elif op == "Not In":
+                if vals:
+                    placeholders = ", ".join(["%s"] * len(vals))
+                    where_parts.append(f"NOT EXISTS (SELECT 1 FROM `tabMT Item Website Specification` WHERE `tabMT Item Website Specification`.`parent` = `i`.`name` AND `tabMT Item Website Specification`.`label` IN ({placeholders}))")
+                    params.extend(vals)
+            elif op in ("Equals To", "Contains", "Begins With", "Ends With"):
+                like_val = {"Contains": f"%{val}%", "Begins With": f"{val}%", "Ends With": f"%{val}"}.get(op, val)
+                sql_op = "LIKE" if op != "Equals To" else "="
+                where_parts.append(f"EXISTS (SELECT 1 FROM `tabMT Item Website Specification` WHERE `tabMT Item Website Specification`.`parent` = `i`.`name` AND `tabMT Item Website Specification`.`label` {sql_op} %s)")
+                params.append(like_val)
+            elif op in ("Not Equal To", "Does Not Contain"):
+                like_val = f"%{val}%" if op == "Does Not Contain" else val
+                sql_op = "NOT LIKE" if op == "Does Not Contain" else "!="
+                where_parts.append(f"NOT EXISTS (SELECT 1 FROM `tabMT Item Website Specification` WHERE `tabMT Item Website Specification`.`parent` = `i`.`name` AND `tabMT Item Website Specification`.`label` {sql_op} %s)")
+                params.append(like_val)
+
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
 
         # ── COUNT ──
@@ -338,7 +412,7 @@ class BulkUpdateRule(Document):
                 if not mapping or not mapping[1]:
                     continue
                 _, fieldname = mapping
-                if fieldname == "_user_tags":
+                if fieldname in ("_user_tags", "sb_tags"):
                     tag_val = (action.action_value or "").strip()
                     row[f"{action.action_type}_before"] = ""
                     row[f"{action.action_type}_after"] = tag_val
@@ -368,7 +442,7 @@ class BulkUpdateRule(Document):
             if atype == "UpdateLastPingedOn":
                 return frappe.utils.today()
 
-            if atype in ("AddTag", "RemoveTag"):
+            if atype in ("AddTag", "RemoveTag", "AddSBTag", "RemoveSBTag"):
                 return aval  # handled separately in run_bulk_update
 
             return self._cast_value(aval)
@@ -397,8 +471,8 @@ class BulkUpdateRule(Document):
             mapping = ACTION_TYPE_MAP.get(action.action_type)
             if not mapping or not mapping[1]:
                 continue
-            if mapping[1] == "_user_tags":
-                col = action.action_type  # "AddTag" or "RemoveTag"
+            if mapping[1] in ("_user_tags", "sb_tags"):
+                col = action.action_type  # "AddTag", "RemoveTag", "AddSBTag", "RemoveSBTag"
                 if col not in columns:
                     columns.append(col)
             elif mapping[1] not in columns:
@@ -434,6 +508,7 @@ def run_bulk_update(rule_name):
                 item_updates = {}
                 price_updates = {}
                 tag_actions = []
+                sb_tag_actions = []
 
                 for action in doc.actions:
                     mapping = ACTION_TYPE_MAP.get(action.action_type)
@@ -445,6 +520,12 @@ def run_bulk_update(rule_name):
                         tag_val = (action.action_value or "").strip()
                         if tag_val:
                             tag_actions.append((action.action_type, tag_val))
+                        continue
+
+                    if fieldname == "sb_tags":
+                        tag_val = (action.action_value or "").strip()
+                        if tag_val:
+                            sb_tag_actions.append((action.action_type, tag_val))
                         continue
 
                     if not fieldname:
@@ -512,7 +593,34 @@ def run_bulk_update(rule_name):
                     except Exception:
                         frappe.throw(f"Error processing tag action '{tag_action}' for tag '{tag_val}' on item '{item_name}'")
 
-                if item_changed or price_changed or tag_changed:
+                # Apply SB Tag child table actions
+                sb_tag_changed = False
+                for sb_action, sb_val in sb_tag_actions:
+                    try:
+                        existing = frappe.db.get_list(
+                            "Item SB Tag",
+                            filters={"parent": item_name, "parenttype": "Item", "sb_tag": sb_val},
+                            pluck="name"
+                        )
+                        if sb_action == "AddSBTag":
+                            if not existing:
+                                frappe.get_doc({
+                                    "doctype": "Item SB Tag",
+                                    "parent": item_name,
+                                    "parenttype": "Item",
+                                    "parentfield": "sb_tags",
+                                    "sb_tag": sb_val,
+                                    "manual_selection": 1,
+                                }).insert(ignore_permissions=True)
+                                sb_tag_changed = True
+                        elif sb_action == "RemoveSBTag":
+                            if existing:
+                                frappe.db.delete("Item SB Tag", {"name": ["in", existing]})
+                                sb_tag_changed = True
+                    except Exception:
+                        frappe.throw(f"Error processing SB tag action '{sb_action}' for tag '{sb_val}' on item '{item_name}'")
+
+                if item_changed or price_changed or tag_changed or sb_tag_changed:
                     updated += 1
                 updated_item_ids.append(item_name)
 
@@ -776,5 +884,7 @@ def get_action_link_map():
         "UpdateDefaultWarehouse":        "Warehouse",
         "AddTag":                        "Tag",
         "RemoveTag":                     "Tag",
+        "AddSBTag":                      "SB Tag",
+        "RemoveSBTag":                   "SB Tag",
         "UpdateVariantAvailabilityRule": "Variant Availability Rule",
     }
