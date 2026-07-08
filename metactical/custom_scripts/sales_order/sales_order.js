@@ -408,13 +408,15 @@ frappe.ui.form.on('Sales Order', {
 	},
 	verify_address(frm) {
 		frappe.call({
-			method: "metactical.api.shipstation.verify_shipping_address",
+			method: "metactical.api.address_verification.verify_shipping_address",
 			args: {
 				"sales_order_name": frm.doc.name
 			},
 			freeze: true,
 			callback: function(ret){
 				frm.refresh_field("custom_ais_address_verified");
+				frm.refresh_field("custom_ais_validation_entity");
+				frm.refresh_field("custom_ais_validation_warning");
 			}
 		});
 	}

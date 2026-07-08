@@ -3,9 +3,17 @@ import pika
 import json
 
 def publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message, username, password, queue_name):
+    connection = None
     try:
         credentials = pika.PlainCredentials(username, password)
-        parameters = pika.ConnectionParameters(host=server_ip, credentials=credentials)
+        parameters = pika.ConnectionParameters(
+            host=server_ip,
+            credentials=credentials,
+            connection_attempts=2,
+            retry_delay=1,
+            socket_timeout=10,
+            blocked_connection_timeout=10,
+        )
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         
@@ -25,16 +33,20 @@ def publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message
         channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
-            body=json.dumps(message),  # Convert message dictionary to JSON string
+            body=json.dumps(message),
             properties=pika.BasicProperties(
                 delivery_mode=2,  # Make message persistent
             ))
         frappe.logger().info(f"RabbitMQProxy: Message published to exchange: {exchange} (routing key: {routing_key})")
-        
-        connection.close()
     except Exception as e:
         frappe.logger().error(f"RabbitMQProxy: Error publishing message: {str(e)}")
         raise e
+    finally:
+        if connection is not None and not connection.is_closed:
+            try:
+                connection.close()
+            except BaseException:
+                pass
 
 @frappe.whitelist(allow_guest=True)
 def webhook():

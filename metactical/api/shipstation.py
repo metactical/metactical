@@ -582,8 +582,13 @@ def verify_shipping_address(sales_order_name="SAL-ORD-2025-00016"):
 				verification_status = "Partially Validated"
 
 			if verification_status is not None:
-				frappe.db.set_value("Address", sales_order.shipping_address_name, "custom_ais_address_verified", verification_status)
-				frappe.db.set_value("Sales Order", sales_order_name, "custom_ais_address_verified", verification_status)
+				field_values = {
+					"custom_ais_address_verified": verification_status,
+					"custom_ais_validation_entity": "Shipstation",
+					"custom_ais_validation_warning": "" if verification_status == "Validated" else address_verified,
+				}
+				frappe.db.set_value("Address", sales_order.shipping_address_name, field_values)
+				frappe.db.set_value("Sales Order", sales_order_name, field_values)
 				frappe.msgprint(f"Shipping Address {verification_status}")
 
 				if verification_status == "Validated":

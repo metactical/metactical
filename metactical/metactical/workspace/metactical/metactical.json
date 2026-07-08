@@ -125,7 +125,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Developer ONLY",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -146,6 +146,16 @@
    "label": "Shipstation Settings",
    "link_count": 0,
    "link_to": "Shipstation Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Melissa Log",
+   "link_count": 0,
+   "link_to": "Melissa Log",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -524,16 +534,6 @@
    "label": "City Symbol",
    "link_count": 0,
    "link_to": "City Symbol",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Material Request User Permission",
-   "link_count": 0,
-   "link_to": "Material Request User Permission",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -932,6 +932,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Warehouse User Permissions",
+   "link_count": 0,
+   "link_to": "Warehouse User Permissions",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Warehouse",
    "link_count": 3,
    "link_type": "DocType",
@@ -996,16 +1006,6 @@
    "label": "Cycle Count V2",
    "link_count": 0,
    "link_to": "Cycle Count V2",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Stock Entry User Permissions",
-   "link_count": 0,
-   "link_to": "Stock Entry User Permissions",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -1103,7 +1103,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-03-26 04:18:01.033661",
+ "modified": "2026-07-03 12:50:58.907963",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Metactical",
