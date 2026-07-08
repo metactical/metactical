@@ -7,13 +7,11 @@ from frappe.model.document import Document
 class SBTag(Document):
 	def on_update(self):
 		# When an SB Tag is disabled, unlink it from every item that references it.
-		# Done in a background job so disabling a widely-used tag doesn't block the save.
 		if self.disabled:
 			count = frappe.db.count("Item SB Tag", {"sb_tag": self.name})
 			if count:
 				frappe.enqueue(
 					remove_sb_tag_from_items,
-					queue="long",
 					enqueue_after_commit=True,
 					sb_tag=self.name,
 				)

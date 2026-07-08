@@ -383,10 +383,6 @@ class CustomItem(Item):
                 "sb_tag": tag_doc.name
             })
 
-        # update_sb_tags runs from on_update, after the child tables have already
-        # been written. Persist the recomputed rows with Frappe's own child-table
-        # sync: it deletes removed rows and inserts new ones, so the in-memory doc
-        # (self.sb_tags) and the DB stay consistent.
         self.update_child_table("sb_tags")
 
     def update_item_inventory_output(self):
