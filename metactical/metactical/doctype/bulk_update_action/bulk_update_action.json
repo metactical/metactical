@@ -15,7 +15,7 @@
         "fieldtype": "Select",
         "in_list_view": 1,
         "label": "Action Type",
-        "options": "UpdateItemGroup\nUpdatePrice\nUpdateDiscountedPrice\nAddTag\nRemoveTag\nDisableItem\nEnableItem\nUpdateValuationRate\nUpdateCustomField\nUpdateBrand\nSetOpeningStock\nUpdateWeightPerUnit\nUpdateDefaultWarehouse\nUpdateLastPingedOn\nUpdateVariantAvailabilityRule",
+        "options": "UpdateItemGroup\nUpdatePrice\nUpdateDiscountedPrice\nAddTag\nRemoveTag\nAddSBTag\nRemoveSBTag\nDisableItem\nEnableItem\nUpdateValuationRate\nUpdateCustomField\nUpdateBrand\nSetOpeningStock\nUpdateWeightPerUnit\nUpdateDefaultWarehouse\nUpdateLastPingedOn\nUpdateVariantAvailabilityRule",
         "reqd": 1,
         "columns": 4
       },

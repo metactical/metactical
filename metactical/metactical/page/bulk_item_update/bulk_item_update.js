@@ -19,7 +19,6 @@ const FIELD_OPTIONS = [
     { value: "item_code",        label: "Item Code" },
     { value: "item_name",        label: "Item Name" },
     { value: "item_group",       label: "Item Group" },
-    { value: "stock_uom",        label: "Stock UOM" },
     { value: "is_trashed",       label: "Is Trashed" },
     { value: "has_variants",     label: "Has Variants" },
     { value: "disabled",         label: "Disabled" },
@@ -28,13 +27,13 @@ const FIELD_OPTIONS = [
     { value: "supplier",        label: "Supplier (Item Supplier)" },
     { value: "default_supplier", label: "Default Supplier (Item Default)" },
     { value: "has_inventory",   label: "Has Inventory" },
-    { value: "variants_have_no_inventory", label: "All Variants Have No Inventory" },  // ← ADD
-    { value: "valuation_rate",   label: "Valuation Rate" },
-    { value: "discounted_price", label: "Discounted Price" },
+    { value: "variants_have_no_inventory", label: "All Variants Have No Inventory" },
     { value: "standard_rate",    label: "Standard Rate (Item Price)" },
     { value: "price_list_rate",  label: "Price List Rate (Item Price)" },
     { value: 'variant_of',                label: 'Variant Of' },
     { value: 'neb_variantavailabilityrule', label: 'Variant Availability Rule' },
+    { value: 'sb_tag',                    label: 'SB Tag' },
+    { value: 'website_specification_label', label: 'Website Specification Label' },
 ];
 
 const OPERATOR_OPTIONS = [
@@ -50,6 +49,8 @@ const ACTION_TYPE_OPTIONS = [
     { value: "UpdateItemGroup",              label: "Update Item Group" },
     { value: "AddTag",                       label: "Add Tag" },
     { value: "RemoveTag",                    label: "Remove Tag" },
+    { value: "AddSBTag",                     label: "Add SB Tag" },
+    { value: "RemoveSBTag",                  label: "Remove SB Tag" },
     { value: "DisableItem",                  label: "Disable Item" },
     { value: "EnableItem",                   label: "Enable Item" },
     { value: "UpdateValuationRate",          label: "Update Valuation Rate" },
@@ -68,6 +69,8 @@ const ACTION_LINK_MAP = {
     "UpdateDefaultWarehouse":        "Warehouse",
     "AddTag":                        "Tag",
     "RemoveTag":                     "Tag",
+    "AddSBTag":                      "SB Tag",
+    "RemoveSBTag":                   "SB Tag",
     "UpdateVariantAvailabilityRule": "Variant Availability Rule",
 };
 
@@ -600,7 +603,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
     }
 
     // ── Preview ──
-    function do_preview(start) {
+    function do_preview(start, exclude_unchanged) {
         state.preview_start = start || 0;
         frappe.call({
             method: API + ".preview_from_data",
@@ -610,6 +613,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
                 target_doctype: state.target_doctype,
                 limit: state.preview_limit,
                 start: state.preview_start,
+                exclude_unchanged: exclude_unchanged ? 1 : 0,
             },
             callback(r) {
                 if (r.message) {
@@ -687,7 +691,10 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
             <div class="biu-preview">
                 <div class="biu-preview-topbar">
                     <a class="biu-link biu-edit-link">← Edit Rules &amp; Actions</a>
-                    <button class="btn btn-default btn-xs biu-btn-new-from-preview">New Rule Set</button>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-default btn-xs biu-btn-refresh">↻ Refresh</button>
+                        <button class="btn btn-default btn-xs biu-btn-new-from-preview">New Rule Set</button>
+                    </div>
                 </div>
 
                 <!-- Execute bar TOP -->
@@ -753,6 +760,7 @@ frappe.pages["bulk-item-update"].on_page_load = function (wrapper) {
         `);
 
         // ── Events ──
+        $app.find(".biu-btn-refresh").on("click", () => do_preview(state.preview_start, true));
         $app.find(".biu-edit-link").on("click", () => { state.view = "editor"; render(); });
         $app.find(".biu-btn-new-from-preview").on("click", () => {
             state.existing_rule = null;
