@@ -80,12 +80,33 @@ class SalesOrderCustom(SalesOrder):
 		# Metactical Customization: Added
 		self.trigger_inventory_update()
   
+		coupon_codes = frappe.db.get_values("Coupon Code", {"neb_redeemed_in": self.name, "used": 0}, "name")
+		if coupon_codes:
+			for coupon_code in coupon_codes:
+				frappe.db.set_value("Coupon Code", coupon_code[0], {
+					"used": 1
+				})
+
 	def on_cancel(self):
 		super(SalesOrderCustom, self).on_cancel()
 
 		# Metactical Customization: Added
-		self.trigger_inventory_update()
-  
+		self.trigger_inventory_update()  
+		self.clean_up_coupon_codes()
+	
+	def on_trash(self):
+		super(SalesOrderCustom, self).on_trash()
+		self.clean_up_coupon_codes()
+	
+	def clean_up_coupon_codes(self):
+		coupon_codes = frappe.db.get_values("Coupon Code", {"neb_redeemed_in": self.name}, "name")
+		if coupon_codes:
+			for coupon_code in coupon_codes:
+				frappe.db.set_value("Coupon Code", coupon_code[0], {
+					"used": 0, 
+					"neb_redeemed_in": None
+				})
+	
 	def on_update_after_submit(self):
 		super().on_update_after_submit()
 

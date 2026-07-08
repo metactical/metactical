@@ -73,6 +73,13 @@ def create_manual_order(*args, **kwargs):
 				msg=message,
 				pos=True
 			)
+   
+			frappe.enqueue(
+				create_comments,
+				queue="default", # one of short, default, long
+				form_data=form_data,
+				sales_order=sales_order.name
+			)
 			
 			comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
 			comment = {"comment_by": form_data['SalesPerson'], "comment": comment}
@@ -118,6 +125,14 @@ def create_manual_order(*args, **kwargs):
 		frappe.response["InvoiceId"] = None
 		frappe.response["Total"] = 0.0
 		
+def update_coupon_code_redeemed_in(sales_order, coupon_codes):
+    if not sales_order:
+        return
+    
+    for coupon_code in coupon_codes:
+        frappe.db.set_value('Coupon Code', coupon_code, {
+            "neb_redeemed_in": sales_order.name
+        })
 
 def submit_sales_manual_order(sales_order, form_data, log):
 	frappe.set_user(form_data["SalesPerson"])
@@ -150,7 +165,7 @@ def submit_sales_manual_order(sales_order, form_data, log):
 			sales_order = frappe.get_doc('Sales Order', sales_order)
 		
 		# add comment to sales order
-		comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}    
+		comment = {"comment_by": form_data['SalesPerson'], "comment": str(e)}
 		create_comment(comment, form_data['SalesPerson'], sales_order.name)
 		
 		url = "/app/{0}/{1}".format(sales_order.doctype.lower().replace(" ", "-"), sales_order.name)
@@ -262,6 +277,13 @@ def process_order(form_data):
 					doc=sales_order["sales_order"],
 					msg=message,
 					pos=True
+				)
+
+				frappe.enqueue(
+					create_comments,
+					queue="default", # one of short, default, long
+					form_data=form_data,
+					sales_order=sales_order["sales_order"].name
 				)
 				
 				comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])
@@ -511,10 +533,11 @@ def create_sales_order(form_data, customer, company=None):
 	frappe.set_user(form_data['SalesPerson'])
 	sales_order = frappe.get_doc(so_data)
 	
-	check_coupon_code(sales_order, form_data)
+	coupon_codes = check_coupon_code(sales_order, form_data)
   
 	try:
 		sales_order.insert(ignore_permissions=True)
+		update_coupon_code_redeemed_in(sales_order, coupon_codes)
 	except Exception as e:
 		
 		so_data['items'] = [{
@@ -594,42 +617,69 @@ def get_shipping_address(form_data, customer):
 
 def check_coupon_code(sales_order, form_data):
     total_restock_fee = 0.0
-    for payment in form_data['Payment']:
-        if payment['ModeOfPayment'] == "Gift Card" and not payment['CouponCode']:
+    gift_card_payments = [p for p in form_data['Payment'] if p['ModeOfPayment'] == "Gift Card"]
+
+    # Validate all coupons before making any changes
+    validated = []
+    coupon_codes_used = set()
+    for payment in gift_card_payments:
+        if not payment.get('CouponCode'):
             frappe.throw("Coupon Code is required for Gift Card payment")
+
+        coupon_name = frappe.db.exists("Coupon Code", {"coupon_code": payment['CouponCode'], "used": 0})
+        if not coupon_name:
+            frappe.throw("Coupon Code {0} is not valid".format(payment['CouponCode']))
+
+        rows = frappe.db.sql(get_coupon_code_sql(coupon_name), as_dict=True)
+        if not rows:
+            frappe.throw("Coupon Code {0} is not valid".format(payment['CouponCode']))
+
+        coupon_data = rows[0]
+        if coupon_data["discount_amount"] < payment['Amount']:
+            frappe.throw(
+                "Coupon Code {0} has a balance of {1} which is less than the payment amount of {2}".format(
+                    payment['CouponCode'], coupon_data["discount_amount"], payment['Amount']
+                )
+            )
+
+        validated.append((payment, coupon_data))
+
+    # Process each coupon now that all are confirmed valid
+    last_coupon_name = None
+    so_name = sales_order.name if not form_data.get("InvoiceId") else form_data["InvoiceId"]
+
+    for payment, coupon_data in validated:
+        if coupon_data["discount_amount"] == payment['Amount']:
+            # Fully consumed: ERPNext sets used=1 only for the coupon on sales_order.coupon_code,
+            # so we set it manually here for all fully consumed coupons.
+            last_coupon_name = coupon_data["coupon_name"]
+            coupon_codes_used.add(coupon_data["coupon_name"])
+        else:
+            # Partially consumed: create a new gift card for the amount used,
+            # then reduce the original's balance to the remainder.
+            doc = frappe._dict({
+                "name": coupon_data["custom_sales_invoice"],
+                "grand_total": -1 * payment['Amount'],
+                "customer": sales_order.customer
+            })
+            payment_form_data = dict(form_data)
+
+            new_gift_card = create_gift_card(doc, payment_form_data, total_restock_fee, coupon_data["coupon_name"])
+            remaining_amount = coupon_data["discount_amount"] - payment['Amount']
+
+            frappe.db.set_value('Pricing Rule', coupon_data.pricing_rule, 'discount_amount', remaining_amount)
+            frappe.db.commit()
+            coupon_codes_used.add(new_gift_card.name)
+
+            last_coupon_name = new_gift_card.name
+
+    if last_coupon_name:
+        if form_data.get("InvoiceId"):
+            frappe.db.set_value('Sales Order', sales_order.name, 'coupon_code', last_coupon_name)
+        else:
+            sales_order.coupon_code = last_coupon_name
             
-        if payment['ModeOfPayment'] == "Gift Card" and payment['CouponCode']:
-            coupon_code = frappe.db.exists("Coupon Code", {"coupon_code": payment['CouponCode'], "used": 0})
-            sql = get_coupon_code_sql(coupon_code)
-            gift_card = frappe.db.sql(sql, as_dict=True)
-                        
-            if gift_card:
-                coupon_code = gift_card[0]
-                if coupon_code["discount_amount"] == payment['Amount']:
-                    sales_order.coupon_code = coupon_code["coupon_name"]
-                    continue
-                else:
-                    if coupon_code["discount_amount"] > payment['Amount']:
-                        doc = frappe._dict({
-                            "name": coupon_code["custom_sales_invoice"],
-                            "grand_total": -1*payment['Amount'],
-                            "customer": sales_order.customer
-                        })
-                            
-                        new_gift_card = create_gift_card(doc, form_data, total_restock_fee, coupon_code["coupon_name"])
-                        remaining_amount = coupon_code["discount_amount"] - payment['Amount']
-                        
-                        frappe.db.set_value('Pricing Rule', coupon_code.pricing_rule, 'discount_amount', remaining_amount)
-                        frappe.db.commit()
-                        
-                        if form_data["InvoiceId"]:
-                            frappe.db.set_value('Sales Order', sales_order.name, 'coupon_code', new_gift_card.name)
-                        else:
-                            sales_order.coupon_code = new_gift_card.name
-                    else:
-                        frappe.throw("Coupon Code {0} has a discount amount of {1} which is less than the payment amount of {2}".format(coupon_code.coupon_code, coupon_code.discount_amount, payment['Amount']))
-            else:
-                frappe.throw("Coupon Code {0} is not valid".format(payment['CouponCode']))
+    return coupon_codes_used
                         
 def update_sales_order(sales_order, form_data):
     items = get_items(form_data)
@@ -665,7 +715,6 @@ def update_sales_order(sales_order, form_data):
         trans_items = json.dumps(items)
         
         update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, child_docname)
-        check_coupon_code(sales_order, form_data)
         frappe.db.commit()
         return {"success": True, "message": ""}
     except Exception as e:
@@ -931,7 +980,7 @@ def get_customer(form_data):
 	frappe.set_user(form_data['SalesPerson'])
 	try:
 		customer = frappe.db.exists('Customer', form_data['Customer']['id'])
-		if customer:			
+		if customer:
 			return {"error": "", "success": True, "customer": customer}
 
 		if not form_data['Customer']['FirstName']:
@@ -1578,6 +1627,7 @@ def get_coupon_code_sql(coupon_code):
         WHERE
             cc.name = {frappe.db.escape(coupon_code)}
             AND used = 0
+            AND cc.neb_redeemed_in is NULL
             AND (cc.valid_upto >= CURDATE() or cc.valid_upto is NULL)
             AND cc.valid_from <= CURDATE()
             AND pr.disable = 0
