@@ -10,6 +10,7 @@
  "field_order": [
   "hide_in_filters",
   "published",
+  "disabled",
   "neb_website_specifications",
   "section_break_mzif",
   "nat_item_groups",
@@ -69,12 +70,18 @@
    "fieldtype": "Table MultiSelect",
    "label": "Brands",
    "options": "Brands List"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-03 05:54:14.181200",
+ "modified": "2026-07-08 06:36:38.805640",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SB Tag",
