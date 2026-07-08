@@ -19,14 +19,14 @@ frappe.ui.form.on('Material Request', {
 		if (frm.doc.material_request_type == "Purchase" ) {
 			frm.set_query("set_warehouse", function(doc){
 				return {
-					query: "metactical.custom_scripts.material_request.material_request.get_source_warehouse",
+					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse_for_purchase",
 					filters: {"user": frappe.session.user}
 				}
 			});
 
 			frm.set_query( "warehouse", "items", function(){
 				return {
-					query: "metactical.custom_scripts.material_request.material_request.get_source_warehouse",
+					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse_for_purchase",
 					filters: {"user": frappe.session.user}
 				}
 			});

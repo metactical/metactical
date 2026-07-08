@@ -65,7 +65,7 @@ def get_target_warehouse(doctype, txt, searchfield, start, page_len, filters):
 	return warehouses
 
 @frappe.whitelist()
-def get_source_warehouse(doctype, txt, searchfield, start, page_len, filters):
+def get_target_warehouse_for_purchase(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
 	warehouses = []
 	if user:
