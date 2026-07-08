@@ -65,6 +65,26 @@ def get_target_warehouse(doctype, txt, searchfield, start, page_len, filters):
 	return warehouses
 
 @frappe.whitelist()
+def get_target_warehouse_for_purchase(doctype, txt, searchfield, start, page_len, filters):
+	user = filters.get("user")
+	warehouses = []
+	if user:
+		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
+		if setting_exists:
+			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabMaterial Request Permitted Warehouse`
+							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
+							AND parentfield='material_request_target_warehouse_purchase'""",
+							{
+								'txt': "%%%s%%" % txt,
+								'parent': setting_exists
+							})
+
+		if not setting_exists or not warehouses:
+			#Retrun all warehouses
+			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
+	return warehouses
+
+@frappe.whitelist()
 def get_qoh(filters):
 	filters = json.loads(filters)
 	updated_qty = []
