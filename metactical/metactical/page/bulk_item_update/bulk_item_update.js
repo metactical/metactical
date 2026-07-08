@@ -19,7 +19,6 @@ const FIELD_OPTIONS = [
     { value: "item_code",        label: "Item Code" },
     { value: "item_name",        label: "Item Name" },
     { value: "item_group",       label: "Item Group" },
-    { value: "stock_uom",        label: "Stock UOM" },
     { value: "is_trashed",       label: "Is Trashed" },
     { value: "has_variants",     label: "Has Variants" },
     { value: "disabled",         label: "Disabled" },
@@ -28,9 +27,7 @@ const FIELD_OPTIONS = [
     { value: "supplier",        label: "Supplier (Item Supplier)" },
     { value: "default_supplier", label: "Default Supplier (Item Default)" },
     { value: "has_inventory",   label: "Has Inventory" },
-    { value: "variants_have_no_inventory", label: "All Variants Have No Inventory" },  // ← ADD
-    { value: "valuation_rate",   label: "Valuation Rate" },
-    { value: "discounted_price", label: "Discounted Price" },
+    { value: "variants_have_no_inventory", label: "All Variants Have No Inventory" },
     { value: "standard_rate",    label: "Standard Rate (Item Price)" },
     { value: "price_list_rate",  label: "Price List Rate (Item Price)" },
     { value: 'variant_of',                label: 'Variant Of' },
