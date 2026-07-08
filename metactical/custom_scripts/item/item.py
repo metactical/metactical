@@ -346,7 +346,7 @@ class CustomItem(Item):
 
         self.set("sb_tags", manual_rows)
         
-        sb_tags = frappe.get_all("SB Tag", pluck="name")
+        sb_tags = frappe.get_all("SB Tag", filters={"disabled": 0}, pluck="name")
         for tag_name in sb_tags:
             tag_doc = frappe.get_doc("SB Tag", tag_name)
             tag_specs = {
@@ -382,6 +382,12 @@ class CustomItem(Item):
             self.append("sb_tags", {
                 "sb_tag": tag_doc.name
             })
+
+        # update_sb_tags runs from on_update, after the child tables have already
+        # been written. Persist the recomputed rows with Frappe's own child-table
+        # sync: it deletes removed rows and inserts new ones, so the in-memory doc
+        # (self.sb_tags) and the DB stay consistent.
+        self.update_child_table("sb_tags")
 
     def update_item_inventory_output(self):
         # Trigger update for item inventory output if deduct_qty has been updated
