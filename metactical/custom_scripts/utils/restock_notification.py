@@ -53,7 +53,7 @@ def get_site_config(lead_source):
 	rows = frappe.get_all(
 		"Restock Notification Site Config",
 		filters={"parenttype": "Restock Notification Settings", "lead_source": lead_source},
-		fields=["email", "email_template"],
+		fields=["email", "email_template", "replay_email_address"],
 		limit=1,
 	)
 	return rows[0] if rows else None
@@ -99,16 +99,23 @@ def send_log_email(log, settings=None):
 	)
 	subject, message = render_email(log, config)
 
-	frappe.sendmail(
+	# sendmail returns the Email Queue doc; its message_id is the Message-Id header
+	# (stored without angle brackets) that SendGrid reports back as `smtp-id`.
+	queue = frappe.sendmail(
 		recipients=[log.customer_email],
 		sender=sender,
+		reply_to=config.get("replay_email_address") or None,
 		subject=subject,
 		message=message,
 		reference_doctype="Restock Email Log",
 		reference_name=log.name,
 	)
 
-	log.db_set({"status": STATUS_SENT, "sent_at": now_datetime()}, update_modified=False)
+	values = {"status": STATUS_SENT, "sent_at": now_datetime()}
+	message_id = getattr(queue, "message_id", None) if queue else None
+	if message_id:
+		values["message_id"] = message_id
+	log.db_set(values, update_modified=False)
 	return True
 
 
