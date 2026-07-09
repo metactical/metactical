@@ -784,7 +784,7 @@ def get_validation_configs():
 	validation_configs = frappe.get_all(
 		"Item Import Validation",
 		filters={"enabled": 1, "parentfield": "validation_apis"},
-		fields=["name", "api_url", "api_key", "price_list"]
+		fields=["name", "api_url", "api_key", "price_list", "custom_header"]
 	)
 	
 	if not validation_configs:
@@ -967,10 +967,14 @@ def call_validation_api(config, payload, price_list_name):
 		dict: Result with payload, response, and status
 	"""
 	try:
+		custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header") if config.get("custom_header") else None
 		headers = {
 			"Content-Type": "application/json",
-			"Authorization": f"Bearer {config.api_key}"
+			"Authorization": f"Bearer {config.api_key}",
 		}
+  
+		if custom_header:
+			headers.update({"X-Origin-Verify": custom_header})
 		
 		response = requests.post(
 			config.api_url,
