@@ -967,12 +967,12 @@ def call_validation_api(config, payload, price_list_name):
 		dict: Result with payload, response, and status
 	"""
 	try:
-		custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header") if config.get("custom_header") else None
 		headers = {
 			"Content-Type": "application/json",
 			"Authorization": f"Bearer {config.api_key}",
 		}
-  
+		
+		custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header") if config.get("custom_header") else None
 		if custom_header:
 			headers.update({"X-Origin-Verify": custom_header})
 		
