@@ -597,7 +597,7 @@ def run_bulk_update(rule_name):
                 sb_tag_changed = False
                 for sb_action, sb_val in sb_tag_actions:
                     try:
-                        existing = frappe.db.get_list(
+                        existing = frappe.db.get_all(
                             "Item SB Tag",
                             filters={"parent": item_name, "parenttype": "Item", "sb_tag": sb_val},
                             pluck="name"
@@ -636,8 +636,8 @@ def run_bulk_update(rule_name):
             except Exception as e:
                 errors.append(f"{item.get('name', '?')}: {cstr(e)}")
                 frappe.log_error(
-                    f"Bulk Update error on {item.get('name', '?')}: {e}",
-                    "Bulk Update Rule",
+                    message=frappe.get_traceback(),
+                    title=f"Bulk Update error on {item.get('name', '?')}"
                 )
 
         frappe.db.commit()
