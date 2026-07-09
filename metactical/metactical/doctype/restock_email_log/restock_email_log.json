@@ -13,8 +13,9 @@
   "retail_sku",
   "lead_source",
   "column_break_pobu",
-  "sent_at",
   "price",
+  "sent_at",
+  "message_id",
   "delivery_status",
   "status"
  ],
@@ -79,7 +80,8 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Sent\nPending"
+   "options": "Sent\nPending",
+   "read_only": 1
   },
   {
    "fieldname": "customer_name",
@@ -89,12 +91,17 @@
   {
    "fieldname": "section_break_xgkl",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "message_id",
+   "fieldtype": "Data",
+   "label": "Message ID"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-26 08:01:49.854681",
+ "modified": "2026-07-09 11:09:29.521385",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",

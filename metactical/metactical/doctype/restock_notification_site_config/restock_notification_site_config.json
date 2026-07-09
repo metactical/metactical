@@ -8,7 +8,8 @@
  "field_order": [
   "lead_source",
   "email",
-  "email_template"
+  "email_template",
+  "replay_email_address"
  ],
  "fields": [
   {
@@ -31,13 +32,20 @@
    "in_list_view": 1,
    "label": "Email Template",
    "options": "Email Template"
+  },
+  {
+   "description": "For Multiple Reply Email Address separate By Comma",
+   "fieldname": "replay_email_address",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Replay Email Address"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-24 08:39:36.801569",
+ "modified": "2026-07-09 09:59:48.698902",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Notification Site Config",

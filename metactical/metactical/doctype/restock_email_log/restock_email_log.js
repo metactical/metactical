@@ -7,13 +7,15 @@ frappe.ui.form.on("Restock Email Log", {
 			return;
 		}
 
-		// Add the "Send Email" button. Disable it when notifications are turned
-		// off in Restock Notification Settings.
+		// Add the "Send Email" button. Disable it when this email has already been
+		// sent, or when notifications are turned off in Restock Notification Settings.
 		frappe.db
 			.get_single_value("Restock Notification Settings", "send_notification")
 			.then((send_notification) => {
 				const btn = frm.add_custom_button(__("Send Email"), () => open_send_dialog(frm));
-				if (!send_notification) {
+				if (frm.doc.status === "Sent") {
+					btn.prop("disabled", true).attr("title", __("This email has already been sent"));
+				} else if (!send_notification) {
 					btn.prop("disabled", true).attr(
 						"title",
 						__("Sending notifications is disabled in Restock Notification Settings")
