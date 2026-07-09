@@ -7,7 +7,6 @@
  "field_order": [
   "section_break_0gxe",
   "column_break_ytcq",
-  "amended_from",
   "customer_email",
   "customer_name",
   "lead_source",
@@ -24,16 +23,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Restock Subscription Log",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
-  },
-  {
    "fieldname": "column_break_ytcq",
    "fieldtype": "Column Break",
    "options": "Lead"
@@ -43,7 +32,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Customer Email"
+   "label": "Customer Email",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_ksmy",
@@ -54,7 +44,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Lead Source"
+   "label": "Lead Source",
+   "read_only": 1
   },
   {
    "default": "Now",
@@ -62,7 +53,8 @@
    "fieldtype": "Datetime",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Received At"
+   "label": "Received At",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_cjsb",
@@ -72,6 +64,7 @@
    "fieldname": "payload",
    "fieldtype": "Code",
    "label": "Payload",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -79,24 +72,26 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Retail SKU"
+   "label": "Retail SKU",
+   "read_only": 1
   },
   {
    "fieldname": "item_price",
    "fieldtype": "Data",
-   "label": "Item Price"
+   "label": "Item Price",
+   "read_only": 1
   },
   {
    "fieldname": "customer_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Customer Name"
+   "label": "Customer Name",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "is_submittable": 1,
  "links": [
   {
    "group": "Notifications",
@@ -104,7 +99,7 @@
    "link_fieldname": "restock_subscription_log"
   }
  ],
- "modified": "2026-06-26 08:11:35.843116",
+ "modified": "2026-07-09 13:08:49.536454",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Subscription Log",
@@ -120,7 +115,6 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
-   "submit": 1,
    "write": 1
   }
  ],

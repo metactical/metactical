@@ -24,7 +24,6 @@ def create_rmq_log(parsedContent):
 		})
 
 		rmq_log.insert()
-		rmq_log.submit()
 		frappe.db.commit()
 
 	except Exception as e:
