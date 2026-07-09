@@ -588,14 +588,14 @@ def get_item_details(item_code):
                     setting_found = True
                     url =item_detail_api.api_url + "?slug=" + item_detail.slug
                     
-                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
                     headers = {
 						"Authorization": "Bearer " + item_detail_api.api_key,
 					}
                     
+                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
                     if custom_header:
                         headers["X-Origin-Verify"] = custom_header
-                    
+                                            
                     response = requests.get(url, headers=headers)                    
                     if response.status_code == 200:
                         data = response.json()
