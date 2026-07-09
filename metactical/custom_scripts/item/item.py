@@ -588,7 +588,15 @@ def get_item_details(item_code):
                     setting_found = True
                     url =item_detail_api.api_url + "?slug=" + item_detail.slug
                     
-                    response = requests.get(url, headers={"Authorization": "Bearer " + item_detail_api.api_key})
+                    headers = {
+						"Authorization": "Bearer " + item_detail_api.api_key,
+					}
+                    
+                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
+                    if custom_header:
+                        headers["X-Origin-Verify"] = custom_header
+                                            
+                    response = requests.get(url, headers=headers)                    
                     if response.status_code == 200:
                         data = response.json()
                         
@@ -596,7 +604,10 @@ def get_item_details(item_code):
                             failed_slugs.append({
                                 "message": f"<span class='text-danger'>Slug {item_detail.slug} not found in {site_name}</span>"
                             })
-                                                
+                        elif "error" in data:
+                            failed_slugs.append({
+								"message": f"<span class='text-danger'>Error fetching details for slug {item_detail.slug} from {site_name}: {data.get('error')}</span>"
+							})            
                         else:
                             item_detail_doc = frappe.get_doc("Item Detail", item_detail.name)
                             item_detail_doc.item_name = data.get("Name", "")

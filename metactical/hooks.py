@@ -911,7 +911,8 @@ fixtures = [{
 			"Item-custom_display_order_in_listing__higher_is_better",
 			"Item-custom_variant_short_name",
 			"Coupon Code-amount",
-			"Coupon Code-redeemed_in"
+			"Coupon Code-redeemed_in",
+			"Item-custom_enforce_case_pack_on_moq"
 		]]]
 	},
 	{

@@ -407,13 +407,13 @@
   "doctype_or_field": "DocField",
   "field_name": "disabled",
   "is_system_generated": 0,
-  "modified": "2026-06-11 04:28:41.004398",
+  "modified": "2026-07-09 03:58:44.295374",
   "module": null,
   "name": "Item-disabled-permlevel",
   "property": "permlevel",
   "property_type": "Int",
   "row_name": null,
-  "value": "4"
+  "value": "5"
  },
  {
   "default_value": null,

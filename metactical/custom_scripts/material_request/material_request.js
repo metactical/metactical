@@ -5,9 +5,33 @@ frappe.ui.form.on('Material Request', {
 			//frm.events.clear_price_list(frm);
 		}
 	},
-
 	onload: function(frm) {
 		frappe.after_ajax(function(){
+			frm.events.apply_filter_to_warehouse(frm);
+		});
+
+		frm.doc.buying_price_list = "";
+	},
+	material_request_type: function(frm) {
+		frm.events.apply_filter_to_warehouse(frm);
+	},
+	apply_filter_to_warehouse: function(frm) {
+		if (frm.doc.material_request_type == "Purchase" ) {
+			frm.set_query("set_warehouse", function(doc){
+				return {
+					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse_for_purchase",
+					filters: {"user": frappe.session.user}
+				}
+			});
+
+			frm.set_query( "warehouse", "items", function(){
+				return {
+					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse_for_purchase",
+					filters: {"user": frappe.session.user}
+				}
+			});
+		}
+		else{
 			frm.set_query("set_warehouse", function(doc){
 				return {
 					query: "metactical.custom_scripts.material_request.material_request.get_target_warehouse",
@@ -21,10 +45,8 @@ frappe.ui.form.on('Material Request', {
 					filters: {"user": frappe.session.user}
 				}
 			});
-		});
-		frm.doc.buying_price_list = "";
+		}
 	},
-	
 	clear_price_list: function(frm) {
 		setTimeout(function(){
 			frappe.after_ajax(function(){
