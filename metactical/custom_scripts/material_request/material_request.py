@@ -7,6 +7,7 @@ class CustomMaterialRequest(MaterialRequest):
 	def validate(self):
 		# Metactical Customization: reomve automatic loading of price list
 		self.buying_price_list = None
+		validate_target_warehouse(self)
 
 def before_save(self, method):
 	self.set_status(update=True)	
@@ -43,6 +44,47 @@ def set_default_supplier(self):
 			for defaults in doc.item_defaults:
 				if defaults.company == self.company:
 					item.ais_default_supplier = defaults.default_supplier
+
+	
+@frappe.whitelist()
+def validate_target_warehouse(doc):
+	if isinstance(doc, str):
+		doc = frappe._dict(json.loads(doc))
+
+	user = frappe.session.user
+	setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
+	if not setting_exists:
+		return
+
+	parentfield = "material_request_target_warehouse_purchase" \
+		if doc.get("material_request_type") == "Purchase" \
+		else "material_request_target_warehouse"
+
+	permitted = frappe.db.sql("""
+		SELECT warehouse FROM `tabMaterial Request Permitted Warehouse`
+		WHERE parent = %s AND parentfield = %s
+	""", (setting_exists, parentfield), pluck="warehouse")
+
+	if not permitted:
+		return
+
+	invalid = []
+
+	# Validate header-level set_warehouse
+	set_warehouse = doc.get("set_warehouse")
+	if set_warehouse and set_warehouse not in permitted:
+		invalid.append(f"Set Warehouse <b>{set_warehouse}</b> is not permitted for {user}")
+
+	# Validate each item's warehouse and t_warehouse
+	for item in doc.get("items") or []:
+		for field in ("warehouse", "t_warehouse"):
+			warehouse = item.get(field)
+			if warehouse and warehouse not in permitted:
+				invalid.append(f"Row #{item.get('idx', '')}: <b>{field}</b> <b>{warehouse}</b> is not permitted for {user}")
+
+	if invalid:
+		frappe.throw("<br>".join(invalid))
+
 
 @frappe.whitelist()
 def get_target_warehouse(doctype, txt, searchfield, start, page_len, filters):
