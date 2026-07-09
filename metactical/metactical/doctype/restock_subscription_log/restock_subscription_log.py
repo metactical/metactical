@@ -6,6 +6,6 @@ from frappe.model.document import Document
 from metactical.custom_scripts.utils.restock_notification import create_email_log
 
 class RestockSubscriptionLog(Document):
-	def on_submit(self):
-		"""On submit, create a Restock Email Log for this subscription (if one doesn't already exist)."""
+	def after_insert(self):
+		"""On insert, create a Restock Email Log for this subscription (if one doesn't already exist)."""
 		create_email_log(self)
