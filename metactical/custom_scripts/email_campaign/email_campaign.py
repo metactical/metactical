@@ -11,7 +11,7 @@ import random
 MAX_RETRIES = 3
 
 # called through hooks to send campaign mails to leads
-def send_email_to_leads_or_contacts():
+def send_email_to_leads_or_contacts_auto():
 	email_campaigns = frappe.get_all(
 		"Email Campaign", filters={"status": ("not in", ["Unsubscribed", "Completed", "Scheduled"])}
 	)
@@ -22,7 +22,6 @@ def send_email_to_leads_or_contacts():
 		for entry in campaign.get("campaign_schedules"):
 			scheduled_date = add_days(email_campaign.get("start_date"), entry.get("send_after_days"))
 			if scheduled_date == getdate(today()):
-				print(f"Sending email for campaign: {email_campaign.name} on {scheduled_date}")
 				send_mail(entry, email_campaign)
     
 # called through hooks to send campaign mails to leads
