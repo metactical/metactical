@@ -279,10 +279,7 @@ def create_material_request(**args):
 		wh_actual = bin_details.get("actual_qty") or 0.0
 		wh_res = bin_details.get("reserved_qty") or 0.0
 		stock_levels = wh_actual - wh_res
-		if row.pos_profile == "Edmonds Operators":
-			transit_warehouse = "R02-Edm-Active Stock - " + frappe.db.get_value("Company", row.company, "abbr")
-		else:
-			transit_warehouse = get_transit_warehouse(row.warehouse)
+		transit_warehouse = get_transit_warehouse(row.warehouse)
 		
 		if stock_levels > 0 and transit_warehouse != "" and row.qty > 0:
 			item_details = get_item_details(frappe._dict({
