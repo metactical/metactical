@@ -19,10 +19,9 @@ def create_email_log(sub):
 	# Resolve the actual Item from the retail SKU suffix on the subscription.
 	item_code = get_item_code_from_retail_sku(sub.retail_sku)
 
-	# Auto-send OFF (not checked) -> Pending. Auto-send ON -> Sent.
-	# delivery_status stays blank; the mail service fills it in.
-	status = STATUS_SENT if settings.send_email_automatically else STATUS_PENDING
-
+	# Created as Pending. If auto-send is on we send it right away through the same
+	# path as the manual "Send Email" button, which flips it to Sent and stores the
+	# Message-Id. delivery_status stays blank; the mail service fills it in.
 	log = frappe.get_doc({
 		"doctype": "Restock Email Log",
 		"restock_subscription_log": sub.name,
@@ -33,9 +32,20 @@ def create_email_log(sub):
 		"lead_source": sub.lead_source,
 		"price": sub.item_price,
 		"sent_at": now_datetime(),
-		"status": status,
+		"status": STATUS_PENDING,
 	})
 	log.insert(ignore_permissions=True)
+
+	if settings.send_email_automatically:
+
+		try:
+			send_email(log.name)
+		except Exception:
+			frappe.log_error(
+				title="Restock Notification: auto-send failed",
+				message=frappe.get_traceback(),
+			)
+
 	return log.name
 
 
