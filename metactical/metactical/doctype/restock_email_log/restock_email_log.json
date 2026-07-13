@@ -12,10 +12,11 @@
   "item_code",
   "retail_sku",
   "lead_source",
-  "column_break_pobu",
   "price",
+  "column_break_pobu",
   "sent_at",
   "message_id",
+  "sg_message_id",
   "delivery_status",
   "status"
  ],
@@ -25,26 +26,30 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Customer Email"
+   "label": "Customer Email",
+   "read_only": 1
   },
   {
    "fieldname": "item_code",
    "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Item Code",
-   "options": "Item"
+   "options": "Item",
+   "read_only": 1
   },
   {
    "fieldname": "sent_at",
    "fieldtype": "Datetime",
-   "label": "Sent At"
+   "label": "Sent At",
+   "read_only": 1
   },
   {
    "fieldname": "lead_source",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Lead Source"
+   "label": "Lead Source",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_pobu",
@@ -67,13 +72,15 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Retail SKU"
+   "label": "Retail SKU",
+   "read_only": 1
   },
   {
    "fieldname": "delivery_status",
    "fieldtype": "Data",
    "in_standard_filter": 1,
-   "label": "Delivery Status"
+   "label": "Delivery Status",
+   "read_only": 1
   },
   {
    "fieldname": "status",
@@ -86,7 +93,8 @@
   {
    "fieldname": "customer_name",
    "fieldtype": "Data",
-   "label": "Customer Name"
+   "label": "Customer Name",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_xgkl",
@@ -95,13 +103,20 @@
   {
    "fieldname": "message_id",
    "fieldtype": "Data",
-   "label": "Message ID"
+   "label": "Message ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sg_message_id",
+   "fieldtype": "Data",
+   "label": "SG Message ID",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-09 13:47:57.846660",
+ "modified": "2026-07-13 12:10:43.999499",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
