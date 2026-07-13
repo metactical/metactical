@@ -232,7 +232,6 @@ var refund_payment_button = function (
             },
             callback: function (r) {
                 if (r.message) {
-                    console.log("can be refunded");
                     frm.add_custom_button(
                         __("Request Refund"),
                         function () {
