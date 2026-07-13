@@ -375,6 +375,11 @@ def check_if_payment_can_be_refunded(doc, ref, making_refund=False):
 			sales_order = item.sales_order
 			break
 	
+	if not making_refund:
+		existing_refund_doc = frappe.db.get_value("USAePay Refund", {"payment_entry": doc.name}, ["name", "status"])
+		if existing_refund_doc:
+			return False, "", ""
+
 	if sales_invoice.is_return and sales_order and doc.payment_type == "Pay":
 		return True, sales_order, sales_invoice
 	
