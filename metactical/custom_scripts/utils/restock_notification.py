@@ -9,6 +9,68 @@ STATUS_PENDING = "Pending"  # auto-send off -> awaiting a (manual) send
 STATUS_SENT = "Sent"        # auto-send on -> handed off to the mail service
 
 
+def on_item_inventory_output_update(doc, method=None):
+	try:
+		process_inventory_output(doc)
+	except Exception:
+		frappe.log_error(
+			title="Restock Notification: inventory output handler failed",
+			message=frappe.get_traceback(),
+		)
+
+
+def process_inventory_output(iio):
+	# 1. Must actually have stock in the active warehouses.
+	if not (iio.get("qoh") or 0) > 0:
+		return
+
+	# 2. Lead sources that have stock available for this item.
+	lead_sources_with_stock = {
+		row.lead_source
+		for row in (iio.get("item_inventory_output_list") or [])
+		if row.lead_source and (row.qty or 0) > 0
+	}
+	if not lead_sources_with_stock:
+		return
+
+	# The subscriptions are keyed by the retail SKU suffix.
+	retail_sku = iio.get("ifw_retailskusuffix") or frappe.db.get_value(
+		"Item", iio.get("item_code"), "ifw_retailskusuffix"
+	)
+	if not retail_sku:
+		return
+
+	# Subscriptions for this item, on a website that actually has stock.
+	subscriptions = frappe.get_all(
+		"Restock Subscription Log",
+		filters={
+			"retail_sku": retail_sku,
+			"lead_source": ["in", list(lead_sources_with_stock)],
+		},
+		pluck="name",
+	)
+	if not subscriptions:
+		return
+
+	already_notified = set(frappe.get_all(
+		"Restock Email Log",
+		filters={"restock_subscription_log": ["in", subscriptions]},
+		pluck="restock_subscription_log",
+	))
+
+	for name in subscriptions:
+		if name in already_notified:
+			continue
+
+		try:
+			create_email_log(frappe.get_doc("Restock Subscription Log", name))
+		except Exception:
+			frappe.log_error(
+				title="Restock Notification: email log creation failed",
+				message=frappe.get_traceback(),
+			)
+
+
 def create_email_log(sub):
 	"""Create the Restock Email Log for a subscription (once). Returns the email log
 	name, or None if one already existed for this subscription."""
