@@ -11,10 +11,27 @@ STATUS_SENT = "Sent"        # auto-send on -> handed off to the mail service
 
 def on_item_inventory_output_update(doc, method=None):
 	try:
-		process_inventory_output(doc)
+		frappe.enqueue(
+			process_inventory_output_job,
+			item_inventory_output=doc.name,
+			queue="default",
+		)
+	except Exception:
+		# A queueing failure must never roll back the inventory-output save.
+		frappe.log_error(
+			title="Restock Notification: could not enqueue inventory output job",
+			message=frappe.get_traceback(),
+		)
+
+
+def process_inventory_output_job(item_inventory_output):
+	"""Background job: notify the subscribers waiting on this item."""
+	try:
+		iio = frappe.get_doc("Item Inventory Output", item_inventory_output)
+		process_inventory_output(iio)
 	except Exception:
 		frappe.log_error(
-			title="Restock Notification: inventory output handler failed",
+			title="Restock Notification: inventory output job failed",
 			message=frappe.get_traceback(),
 		)
 
@@ -40,28 +57,21 @@ def process_inventory_output(iio):
 	if not retail_sku:
 		return
 
-	# Subscriptions for this item, on a website that actually has stock.
+	# Subscriptions for this item, on a website that actually has stock, that haven't
+	# been notified yet. `sent` is checked when the email log is created, so it filters
+	# out everyone already notified without a second query.
 	subscriptions = frappe.get_all(
 		"Restock Subscription Log",
 		filters={
 			"retail_sku": retail_sku,
 			"lead_source": ["in", list(lead_sources_with_stock)],
+			"sent": 0,
 		},
 		pluck="name",
 	)
-	if not subscriptions:
-		return
-
-	already_notified = set(frappe.get_all(
-		"Restock Email Log",
-		filters={"restock_subscription_log": ["in", subscriptions]},
-		pluck="restock_subscription_log",
-	))
 
 	for name in subscriptions:
-		if name in already_notified:
-			continue
-
+		# Isolate each subscription so one failure doesn't skip the rest.
 		try:
 			create_email_log(frappe.get_doc("Restock Subscription Log", name))
 		except Exception:
@@ -97,6 +107,9 @@ def create_email_log(sub):
 		"status": STATUS_PENDING,
 	})
 	log.insert(ignore_permissions=True)
+
+	# Mark the subscription as notified so it's filtered out of future runs.
+	sub.db_set("sent", 1, update_modified=False)
 
 	if settings.send_email_automatically:
 

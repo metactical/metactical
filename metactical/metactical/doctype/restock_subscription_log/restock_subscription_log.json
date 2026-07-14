@@ -10,6 +10,7 @@
   "customer_email",
   "customer_name",
   "lead_source",
+  "sent",
   "column_break_ksmy",
   "retail_sku",
   "item_price",
@@ -88,6 +89,15 @@
    "in_standard_filter": 1,
    "label": "Customer Name",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sent",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sent",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -99,7 +109,7 @@
    "link_fieldname": "restock_subscription_log"
   }
  ],
- "modified": "2026-07-09 13:08:49.536454",
+ "modified": "2026-07-14 09:37:42.399298",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Subscription Log",
