@@ -10,8 +10,14 @@ from erpnext.stock.stock_ledger import get_previous_sle
 from frappe.utils import flt
 from datetime import datetime, timedelta, time
 
+from metactical.custom_scripts.utils import restock_notification
+
 class ItemInventoryOutput(Document):
-	pass
+	def on_update(self):
+		# Metactical Customization: the item is back in stock, so create Restock Email
+		# Logs for the matching subscriptions. Fires on both create and update. All
+		# logic (and its error handling) lives in restock_notification.py.
+		restock_notification.on_item_inventory_output_update(self)
 
 def on_sle_update(doc, method):
 	# Fetch bins and calculate net available quantities per warehouse
