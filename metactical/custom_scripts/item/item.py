@@ -346,7 +346,7 @@ class CustomItem(Item):
 
         self.set("sb_tags", manual_rows)
         
-        sb_tags = frappe.get_all("SB Tag", pluck="name")
+        sb_tags = frappe.get_all("SB Tag", filters={"disabled": 0}, pluck="name")
         for tag_name in sb_tags:
             tag_doc = frappe.get_doc("SB Tag", tag_name)
             tag_specs = {
@@ -360,7 +360,17 @@ class CustomItem(Item):
                 if row.item_group
             }
 
-            if self.item_group not in tag_item_groups:
+            tag_brands = {
+                row.brand
+                for row in tag_doc.nat_brands or []
+                if row.brand
+            }
+
+            # Map the tag if the item matches on item group OR on brand
+            matches_item_group = self.item_group in tag_item_groups
+            matches_brand = self.brand in tag_brands
+
+            if not (matches_item_group or matches_brand):
                 continue
 
             if not tag_specs.issubset(item_specs):
@@ -372,6 +382,8 @@ class CustomItem(Item):
             self.append("sb_tags", {
                 "sb_tag": tag_doc.name
             })
+
+        self.update_child_table("sb_tags")
 
     def update_item_inventory_output(self):
         # Trigger update for item inventory output if deduct_qty has been updated
