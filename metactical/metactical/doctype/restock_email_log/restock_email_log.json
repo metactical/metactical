@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-26 06:30:23.619764",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "restock_subscription_log",
+  "section_break_xgkl",
+  "customer_email",
+  "customer_name",
+  "item_code",
+  "retail_sku",
+  "lead_source",
+  "price",
+  "column_break_pobu",
+  "sent_at",
+  "message_id",
+  "sg_message_id",
+  "delivery_status",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer_email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_at",
+   "fieldtype": "Datetime",
+   "label": "Sent At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Lead Source",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_pobu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "price",
+   "fieldtype": "Data",
+   "label": "Price"
+  },
+  {
+   "fieldname": "restock_subscription_log",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Restock Subscription Log",
+   "options": "Restock Subscription Log"
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Retail SKU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_status",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Delivery Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Sent\nPending",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_xgkl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "message_id",
+   "fieldtype": "Data",
+   "label": "Message ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sg_message_id",
+   "fieldtype": "Data",
+   "label": "SG Message ID",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-13 12:10:43.999499",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Restock Email Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,136 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-25 11:04:43.894034",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_0gxe",
+  "column_break_ytcq",
+  "customer_email",
+  "customer_name",
+  "lead_source",
+  "sent",
+  "column_break_ksmy",
+  "retail_sku",
+  "item_price",
+  "received_at",
+  "section_break_cjsb",
+  "payload"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_0gxe",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ytcq",
+   "fieldtype": "Column Break",
+   "options": "Lead"
+  },
+  {
+   "fieldname": "customer_email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ksmy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Lead Source",
+   "read_only": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Received At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_cjsb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "Code",
+   "label": "Payload",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Retail SKU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_price",
+   "fieldtype": "Data",
+   "label": "Item Price",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Name",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sent",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sent",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Notifications",
+   "link_doctype": "Restock Email Log",
+   "link_fieldname": "restock_subscription_log"
+  }
+ ],
+ "modified": "2026-07-14 09:37:42.399298",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Restock Subscription Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
