@@ -220,7 +220,6 @@ def create_label(*args, **kwargs):
     """
     form_data = dict(frappe.form_dict)
     log = create_log(form_data, "Create Label")
-    user = 
 
     shipment = form_data.get("shipment")
     provider = form_data.get("provider")
