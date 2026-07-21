@@ -5,10 +5,34 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_a
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_details
 import logging
 import json, ast, os, sys, pathlib, subprocess
+import time, random
 from metactical.custom_scripts.controllers.accounts_controller import update_child_qty_rate
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = frappe.logger("rmq_log", allow_site=True, file_count=100)
+
+def _save_with_retry(doc, max_attempts=5):
+	"""Save a document, retrying on MySQL lock wait timeout (errno 1205).
+
+	Concurrent RMQ workers compete for the naming-series row lock in tabSeries.
+	Committing before save closes any open transaction on this connection so we
+	don't hold other locks while waiting to acquire the series lock. A random
+	backoff between attempts spreads the retries and avoids thundering herd.
+	"""
+	for attempt in range(1, max_attempts + 1):
+		try:
+			# Commit any open transaction so this connection holds no locks
+			# when it competes for the tabSeries FOR UPDATE lock.
+			frappe.db.commit()
+			doc.save()
+			return
+		except frappe.QueryTimeoutError:
+			frappe.db.rollback()
+			if attempt == max_attempts:
+				raise
+			wait = random.uniform(1.0, 4.0) * attempt
+			logger.warning(f"Lock wait timeout on attempt {attempt}/{max_attempts}, retrying in {wait:.1f}s")
+			time.sleep(wait)
 
 def get_bench_path():
 	# Start from current directory and move upward until we find `sites` folder
@@ -431,14 +455,14 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 	new_order = frappe.get_doc(order_data)
 
 	# set the missing values for the order and submit it if the gateway is not "interacetransfer"
-	new_order.set_missing_values()	
-	new_order.save()
- 
+	new_order.set_missing_values()
+	_save_with_retry(new_order)
+
 	difference = 0
 	if "grand_total" in order_detail and order_detail["grand_total"] < new_order.grand_total:
 		difference = new_order.grand_total - order_detail["grand_total"]
 		new_order.discount_amount += difference
-		new_order.save()
+		_save_with_retry(new_order)
 		logger.error(f"Adjusted discount amount by {difference} for order {new_order.name} to match grand total from RMQ.")
  
 	logger.error(f"New Order Created: {new_order.name} shipping address: {shipping_address_doc.name}, billing address: {billing_address_doc.name}")
