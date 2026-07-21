@@ -74,6 +74,13 @@ class CustomPurchaseOrder(PurchaseOrder):
 					"minimum order quantity ({2})."
 				).format(item.idx, frappe.bold(item.item_code), min_order_qty))
 
+	def on_workflow_action(self, workflow_action):
+		if workflow_action == "Mark as Sent":
+			frappe.db.set_value("Purchase Order", self.name, {
+				"custom_sent_on": frappe.utils.now_datetime(),
+				"custom_sent_by": frappe.session.user,
+			})
+
 	def before_submit(self):
 		self.barcode_check()
 

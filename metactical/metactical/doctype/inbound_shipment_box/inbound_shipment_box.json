@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "creation": "2026-07-17 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "box_no",
+  "tracking_no",
+  "carrier",
+  "col_b",
+  "weight",
+  "dimensions",
+  "item_count",
+  "received"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "box_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Box / Carton ID (SSCC)",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "tracking_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tracking No"
+  },
+  {
+   "fieldname": "carrier",
+   "fieldtype": "Data",
+   "label": "Carrier"
+  },
+  {
+   "fieldname": "col_b",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "weight",
+   "fieldtype": "Float",
+   "label": "Weight (kg)"
+  },
+  {
+   "fieldname": "dimensions",
+   "fieldtype": "Data",
+   "label": "Dimensions (LxWxH cm)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "item_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Item Count"
+  },
+  {
+   "columns": 1,
+   "fieldname": "received",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Received",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Inbound Shipment Box",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
