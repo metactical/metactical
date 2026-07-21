@@ -11,7 +11,7 @@ from metactical.custom_scripts.controllers.accounts_controller import update_chi
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = frappe.logger("rmq_log", allow_site=True, file_count=100)
 
-def _save_with_retry(doc, max_attempts=10):
+def _save_with_retry(doc, max_attempts=5):
 	"""Save a document, retrying on MySQL lock wait timeout (errno 1205).
 
 	Concurrent RMQ workers compete for the naming-series row lock in tabSeries.
