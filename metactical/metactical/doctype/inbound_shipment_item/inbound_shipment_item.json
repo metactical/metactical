@@ -1,0 +1,84 @@
+{
+ "actions": [],
+ "creation": "2026-07-17 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "po_detail",
+  "soc_detail",
+  "shipped_qty",
+  "col_b",
+  "box_no",
+  "received_flag",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "po_detail",
+   "fieldtype": "Data",
+   "label": "PO Detail (row name)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "soc_detail",
+   "fieldtype": "Data",
+   "label": "SOC Detail (row name)",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "shipped_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Shipped Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_b",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "box_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Box No"
+  },
+  {
+   "columns": 1,
+   "fieldname": "received_flag",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Received",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Inbound Shipment Item",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

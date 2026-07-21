@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "creation": "2026-07-17 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "po_detail",
+  "ordered_qty",
+  "confirmed_qty",
+  "col_b",
+  "line_status",
+  "backorder_eta",
+  "substitute_item_code",
+  "confirmed_rate",
+  "received_flag",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "po_detail",
+   "fieldtype": "Data",
+   "label": "PO Detail (row name)",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "ordered_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Ordered Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "confirmed_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Confirmed Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_b",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "line_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Line Status",
+   "options": "Confirmed\nPartial\nOut of Stock\nBack-ordered\nDiscontinued\nSubstituted",
+   "reqd": 1
+  },
+  {
+   "fieldname": "backorder_eta",
+   "fieldtype": "Date",
+   "label": "Back-order ETA",
+   "depends_on": "eval:doc.line_status=='Back-ordered'"
+  },
+  {
+   "fieldname": "substitute_item_code",
+   "fieldtype": "Link",
+   "label": "Substitute Item",
+   "options": "Item",
+   "depends_on": "eval:doc.line_status=='Substituted'"
+  },
+  {
+   "fieldname": "confirmed_rate",
+   "fieldtype": "Currency",
+   "label": "Confirmed Rate"
+  },
+  {
+   "fieldname": "received_flag",
+   "fieldtype": "Check",
+   "label": "Received",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Order Confirmation Item",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
