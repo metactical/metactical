@@ -11,22 +11,26 @@ from metactical.custom_scripts.controllers.accounts_controller import update_chi
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = frappe.logger("rmq_log", allow_site=True, file_count=100)
 
-def _save_with_retry(doc, max_attempts=5):
+def _save_with_retry(doc, max_attempts=10):
 	"""Save a document, retrying on MySQL lock wait timeout (errno 1205).
 
 	Concurrent RMQ workers compete for the naming-series row lock in tabSeries.
-	A short random backoff between attempts spreads the load and avoids a
-	thundering-herd retry storm.
+	Committing before save closes any open transaction on this connection so we
+	don't hold other locks while waiting to acquire the series lock. A random
+	backoff between attempts spreads the retries and avoids thundering herd.
 	"""
 	for attempt in range(1, max_attempts + 1):
 		try:
+			# Commit any open transaction so this connection holds no locks
+			# when it competes for the tabSeries FOR UPDATE lock.
+			frappe.db.commit()
 			doc.save()
 			return
-		except frappe.QueryTimeoutError as e:
+		except frappe.QueryTimeoutError:
 			frappe.db.rollback()
 			if attempt == max_attempts:
 				raise
-			wait = random.uniform(0.5, 2.0) * attempt
+			wait = random.uniform(1.0, 4.0) * attempt
 			logger.warning(f"Lock wait timeout on attempt {attempt}/{max_attempts}, retrying in {wait:.1f}s")
 			time.sleep(wait)
 
