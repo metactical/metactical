@@ -10,9 +10,12 @@
  "field_order": [
   "hide_in_filters",
   "published",
+  "disabled",
   "neb_website_specifications",
   "section_break_mzif",
   "nat_item_groups",
+  "column_break_bdtu",
+  "nat_brands",
   "section_break_sbxf",
   "description"
  ],
@@ -47,7 +50,7 @@
    "columns": 2,
    "fieldname": "nat_item_groups",
    "fieldtype": "Table MultiSelect",
-   "label": "Item Group",
+   "label": "Item Groups",
    "options": "Item Groups List"
   },
   {
@@ -55,12 +58,30 @@
    "fieldname": "published",
    "fieldtype": "Check",
    "label": "Published"
+  },
+  {
+   "fieldname": "column_break_bdtu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_bulk_edit": 1,
+   "columns": 2,
+   "fieldname": "nat_brands",
+   "fieldtype": "Table MultiSelect",
+   "label": "Brands",
+   "options": "Brands List"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-20 13:13:39.047867",
+ "modified": "2026-07-08 06:36:38.805640",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "SB Tag",
