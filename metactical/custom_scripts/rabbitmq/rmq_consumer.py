@@ -333,10 +333,10 @@ class RMQConsumer(object):
         
         # Process the message
         message = json.loads(body)
-        self.acknowledge_message(basic_deliver.delivery_tag)
-
         self.process_message(message)
 
+        self.acknowledge_message(basic_deliver.delivery_tag)
+        
     def process_message(self, message):
         # Retrieve the RabbitMQ Mapping doctype
         connect_to_frappe(self.site)
