@@ -278,8 +278,11 @@
   {
    "fieldname": "image",
    "fieldtype": "Attach Image",
+   "hidden": 1,
+   "in_preview": 1,
    "label": "Image",
-   "options": "image"
+   "options": "image",
+   "print_hide": 1
   },
   {
    "default": "0",
@@ -1382,6 +1385,7 @@
   }
  ],
  "grid_page_length": 50,
+ "image_field": "image",
  "index_web_pages_for_search": 1,
  "links": [
   {
