@@ -944,7 +944,19 @@ fixtures = [{
 			"Item-custom_column_break_emksm",
 			"Item-custom_manufacturing",
 			"Item-custom_quality_inspection",
-			"Item-custom_variant_attributes"
+			"Item-custom_variant_attributes",
+			"Item-custom_section_break_hzwnj",
+			"Item-custom_column_break_22avz",
+			"Item-custom_column_break_iqyli",
+			"Item-custom_opening__rates",
+			"Item-custom_column_break_5p0yk",
+			"Item-custom_column_break_2xw8j",
+			"Item-custom_column_break_jloyu",
+			"Item-custom_gpd__ordering",
+			"Item-custom_item_defaults",
+			"Item-custom_column_break_jbo41",
+			"Item-custom_tax",
+			"Item-custom_column_break_zxgjb"
 		]]]
 	},
 	{
