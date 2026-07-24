@@ -956,7 +956,7 @@ fixtures = [{
 			"Item-custom_item_defaults",
 			"Item-custom_column_break_jbo41",
 			"Item-custom_tax",
-			"Item-custom_column_break_zxgjb"
+			"Item-custom_column_break_zxgjb",
 		]]]
 	},
 	{
@@ -1542,7 +1542,10 @@ fixtures = [{
 			"Item-section_break_11-collapsible",
 			"Item-foreign_trade_details-label",
 			"Item-foreign_trade_details-collapsible",
-			"Item-details-label"
+			"Item-details-label",
+			"Item-ifw_retailskusuffix-in_list_view",
+			"Item-item_group-in_list_view",
+			"Item-weight_uom-default",
 		]]]
 	},
   	{
