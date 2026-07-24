@@ -1529,7 +1529,20 @@ fixtures = [{
 			"Sales Order-shipping_address_name-allow_on_submit",
 			"Sales Order-customer_address-allow_on_submit",
 			"Sales Order-dispatch_address_name-allow_on_submit",
-			"Material Request-ais_suppliers-in_list_view"
+			"Material Request-ais_suppliers-in_list_view",
+			"Item-item_tax_section_break-hidden",
+			"Item-quality_tab-hidden",
+			"Item-is_zero_rated-description",
+			"Item-is_exempt-description",
+			"Item-section_break_avcp-collapsible",
+			"Item-section_break_avcp-label",
+			"Item-reorder_section-label",
+			"Item-inventory_settings_section-label",
+			"Item-unit_of_measure_conversion-collapsible",
+			"Item-section_break_11-collapsible",
+			"Item-foreign_trade_details-label",
+			"Item-foreign_trade_details-collapsible",
+			"Item-details-label"
 		]]]
 	},
   	{
