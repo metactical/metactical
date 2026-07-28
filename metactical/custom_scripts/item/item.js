@@ -93,6 +93,9 @@ frappe.ui.form.on("Item", {
 });
 
 frappe.ui.form.on("MT Item Website Specification", {
+    label: function(frm, cdt, cdn) {
+        metactical.utils.load_website_specifications_options(frm);
+    },
     description: function (frm, cdt, cdn) {
         var row = locals[cdt][cdn];
         frappe.call({
