@@ -466,7 +466,7 @@ def validate_item_group(doc):
 @frappe.whitelist()
 def get_website_specification_description_options(labels):
     labels = json.loads(labels)
-    return frappe.db.get_all("Website Spec Label Descriptions", filters={"parent": ["in", labels]}, fields=["description", "parent"])
+    return frappe.db.get_all("Website Spec Label Descriptions", filters={"parent": ["in", labels]}, fields=["description", "parent"], order_by="description asc")
         
 @frappe.whitelist()
 def copy_specification_from_item_group(item_group):
