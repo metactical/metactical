@@ -13,6 +13,9 @@ def get_context(context):
 	
 	if frappe.session.user == "Guest":
 		raise frappe.PermissionError
+
+	frappe.local.flags.redirect_location = "/404"
+	raise frappe.Redirect
 		
 	context.no_cache = True
 	if frappe.request.args:
