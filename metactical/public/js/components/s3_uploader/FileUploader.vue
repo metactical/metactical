@@ -52,6 +52,21 @@
               Select a product template first. Each image can then only use this template's variants.
             </template>
           </p>
+
+          <!-- Skip the auto-created empty slots so all images can be dropped in one go -->
+          <div class="flex items-center mt-3">
+            <!-- No size/border classes: the desk stylesheet sizes and paints checkboxes
+                 itself (and forces the right margin), so utilities here only fight it. -->
+            <input
+              type="checkbox"
+              id="skipDefaultSlots"
+              v-model="skipDefaultSlots"
+            />
+            <label for="skipDefaultSlots" class="text-xs cursor-pointer"
+                   :class="templateItem ? 'text-green-800' : 'text-gray-700'">
+              Don't create empty upload slots — drop all images at once
+            </label>
+          </div>
         </div>
         <span v-if="templateItem"
               class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-200 text-green-800 border border-green-300">
@@ -61,7 +76,7 @@
     </div>
 
     <!-- Image Orders (set how many image sets each variant should have) -->
-    <div v-if="templateItem" class="border rounded-lg p-4 shadow-sm">
+    <div v-if="templateItem && !skipDefaultSlots" class="border rounded-lg p-4 shadow-sm">
       <label class="block text-sm font-bold mb-2">Image Orders</label>
       <div class="flex items-center gap-3">
         <input
@@ -88,15 +103,14 @@
     <div v-if="files.length" class="border rounded-lg p-4 shadow-sm transition-colors"
          :class="overrideFullProduct ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'">
       <div class="flex items-center gap-4">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center">
+          <!-- No size/border/background classes: the desk stylesheet sizes and paints
+               checkboxes itself (and forces the right margin). The mode is already
+               signalled by the label, the badge and the panel colour. -->
           <input
             type="checkbox"
             id="overrideFullProduct"
             v-model="overrideFullProduct"
-            class="h-5 w-5 focus:ring-2 focus:ring-offset-2 border-2 rounded transition-colors"
-            :class="overrideFullProduct ? 
-              'text-red-600 focus:ring-red-500 border-red-400 bg-red-100' : 
-              'text-green-600 focus:ring-green-500 border-green-400 bg-green-100'"
           />
           <label for="overrideFullProduct" class="text-sm font-bold cursor-pointer transition-colors"
                  :class="overrideFullProduct ? 'text-red-800' : 'text-green-800'">
@@ -689,11 +703,39 @@ const scaffoldOrder = (order) => {
 // Build the default order 0 slots (4 sizes; all variants share each image).
 const scaffoldVariantCards = () => scaffoldOrder(0)
 
+// When on, no empty slots are ever created (not on template select, not to fill gaps in a
+// loaded record) — the user just drops every image at once instead of filling slots 1 by 1.
+// Remembered across visits since it's a per-user way of working.
+const SKIP_SLOTS_KEY = 's3_uploader_skip_default_slots'
+const skipDefaultSlots = ref(localStorage.getItem(SKIP_SLOTS_KEY) === '1')
+
+// Drop every empty slot (a placeholder card that never got an image); cards with a real
+// image — uploaded or already on the server — are left alone.
+const removeEmptySlots = () => {
+  files.value = files.value.filter(f => {
+    const isEmptySlot = f.isPlaceholder && !f.file && !f.isOnServer
+    if (isEmptySlot && f.preview) URL.revokeObjectURL(f.preview)
+    return !isEmptySlot
+  })
+}
+
 // `orderCount` = the live number in the input (drives only the info hint).
 // `appliedOrderCount` = the orders actually committed (set on "Add Orders" / scaffold / load);
 // this is what the Files Complete denominator uses, so typing alone doesn't change it.
 const orderCount = ref(1)
 const appliedOrderCount = ref(1)
+
+watch(skipDefaultSlots, (skip) => {
+  localStorage.setItem(SKIP_SLOTS_KEY, skip ? '1' : '0')
+  if (skip) {
+    // Ticking it clears the slots already sitting in the grid.
+    removeEmptySlots()
+  } else if (templateItem.value && files.value.length === 0) {
+    // Unticking on an empty grid puts the default slots back.
+    scaffoldVariantCards()
+    orderCount.value = appliedOrderCount.value = 1
+  }
+})
 
 // Which orders currently have cards.
 const existingOrders = computed(() => new Set(files.value.map(f => f.imageOrder)))
@@ -732,6 +774,8 @@ const loadingTarget = ref(0)
 const expectedImageCount = computed(() => {
   if (!templateItem.value) return files.value.length
   if (loadingTarget.value > 0) return loadingTarget.value
+  // No slots are scaffolded in this mode, so the cards on screen are the whole expectation.
+  if (skipDefaultSlots.value) return files.value.length
   const orders = Math.max(appliedOrderCount.value || 1, existingOrders.value.size, 1)
   return Math.max(ROLES.length * orders, files.value.length)
 })
@@ -768,7 +812,7 @@ const computeMissingSlots = (allImages) => {
 // + gap slots), stream the images in, then add an empty slot for each missing variant size.
 const finishLoad = async (allImages) => {
   orderCount.value = appliedOrderCount.value = Math.max(new Set(allImages.map(i => i.imageInfo?.order || 0)).size, 1)
-  const missing = computeMissingSlots(allImages)
+  const missing = skipDefaultSlots.value ? [] : computeMissingSlots(allImages)
   loadingTarget.value = allImages.length + missing.length
   await loadAllImages(allImages)
   missing.forEach(({ variant, role }) => files.value.push(buildVariantRoleCard(variant, role, 0)))
@@ -880,10 +924,15 @@ const applyTemplateFromItem = async (itemCode) => {
 // Build the 4 size slots (all variants share each) and announce it.
 const scaffoldAndNotify = () => {
   resetFiles()
-  scaffoldVariantCards()
   orderCount.value = 1
   appliedOrderCount.value = 1
-  frappe.show_alert({ message: `Created ${ROLES.length} upload slots (4 sizes) for ${templateVariants.value.length} variant${templateVariants.value.length === 1 ? '' : 's'}`, indicator: 'blue' })
+  const variantLabel = `${templateVariants.value.length} variant${templateVariants.value.length === 1 ? '' : 's'}`
+  if (skipDefaultSlots.value) {
+    frappe.show_alert({ message: `Ready for ${variantLabel} — drop or browse all images at once`, indicator: 'blue' })
+    return
+  }
+  scaffoldVariantCards()
+  frappe.show_alert({ message: `Created ${ROLES.length} upload slots (4 sizes) for ${variantLabel}`, indicator: 'blue' })
 }
 
 // Small popup when old-system data exists: migrate it, or start fresh.
@@ -1243,9 +1292,15 @@ const processFiles = async (incomingFiles) => {
 
   // Cascade the SKUs (variants) and sites from the last existing card, so a freshly
   // uploaded image inherits the same context. Role/size is still auto-detected per image.
+  // With an empty grid (e.g. slots are switched off) there is nothing to inherit from, so
+  // fall back to the locked template's variants — the same set a scaffolded slot would carry.
   const lastFile = files.value.length ? files.value[files.value.length - 1] : null
-  const inheritSkuItems = lastFile ? (lastFile.skuItems || []) : []
-  const inheritSkus = lastFile ? (lastFile.skus || '') : ''
+  const inheritSkuItems = lastFile
+    ? (lastFile.skuItems || [])
+    : templateVariants.value.map(v => ({ item_code: v.item_code, sku: v.sku }))
+  const inheritSkus = lastFile
+    ? (lastFile.skus || '')
+    : templateVariants.value.map(v => v.sku).join(', ')
   const inheritSites = lastFile ? (lastFile.sites || []) : []
 
   try {
