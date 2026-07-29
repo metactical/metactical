@@ -1344,8 +1344,10 @@ const processFiles = async (incomingFiles) => {
       }
     }
 
-    // Append at the bottom (no re-sort) so new uploads land below the existing cards.
     files.value.push(...newFiles)
+    // Re-sort the whole grid, not just this batch, so images dropped in several goes
+    // (e.g. one folder per size) still end up grouped per product.
+    autoSortFiles()
 
     console.log(`Successfully processed ${newFiles.length} image files from ${incomingFiles.length} total files`)
     
@@ -1490,19 +1492,30 @@ const generateS3Filename = (file) => {
   }
 }
 
-// Auto-sort files based on image order and product grouping
+// Order the grid by filename so every size of one product sits together, instead of
+// leaving images in the arbitrary order the OS handed them over (all the larges, then
+// all the mediums…). Within a product: image order first, then icon → small → medium →
+// large, matching the order scaffolded slots are built in.
 const autoSortFiles = () => {
+  const roleRank = (f) => {
+    const i = ROLES.indexOf(f.role)
+    return i === -1 ? ROLES.length : i // unknown/unset role sorts last
+  }
+
   files.value.sort((a, b) => {
-    const baseA = getBaseName(a.name)
-    const baseB = getBaseName(b.name)
-    
-    // First sort by product name (base name)
-    if (baseA !== baseB) {
-      return baseA.localeCompare(baseB)
-    }
-    
-    // Then sort by image order within the same product
-    return (a.imageOrder || 999) - (b.imageOrder || 999)
+    // `getBaseName` drops the extension and any _icon/_small/_medium/_large suffix, so
+    // "sku1_large.jpg" and "sku1_medium.jpg" — or the same name in per-size folders —
+    // share a base and group together. Numeric-aware so img2 comes before img10.
+    const byBase = getBaseName(a.name).localeCompare(getBaseName(b.name), undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    })
+    if (byBase !== 0) return byBase
+
+    const orderDiff = (a.imageOrder || 0) - (b.imageOrder || 0)
+    if (orderDiff !== 0) return orderDiff
+
+    return roleRank(a) - roleRank(b)
   })
 }
 
