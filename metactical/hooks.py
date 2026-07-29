@@ -1541,6 +1541,8 @@ fixtures = [{
 			"Item-ifw_retailskusuffix-in_list_view",
 			"Item-item_group-in_list_view",
 			"Item-weight_uom-default",
+			"Item-barcodes-depends_on",
+			"Item-supplier_items-depends_on",
 		]]]
 	},
   	{
