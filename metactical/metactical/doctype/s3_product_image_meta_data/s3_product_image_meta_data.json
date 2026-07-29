@@ -10,7 +10,8 @@
   "nat_product_template",
   "nat_skus",
   "nat_sites",
-  "nat_images"
+  "nat_images",
+  "nat_metadata"
  ],
  "fields": [
   {
@@ -22,7 +23,8 @@
    "fieldname": "nat_override_full_product",
    "fieldtype": "Check",
    "in_list_view": 1,
-   "label": "Override Full Product"
+   "label": "Override Full Product",
+   "read_only": 1
   },
   {
    "fieldname": "nat_skus",
@@ -50,13 +52,20 @@
    "fieldtype": "Link",
    "label": "Product Template",
    "options": "Item",
+   "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "nat_metadata",
+   "fieldtype": "Code",
+   "label": "Metadata",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-17 07:20:12.365804",
+ "modified": "2026-07-29 13:03:24.592596",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Product Image Meta Data",
@@ -72,7 +81,6 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
-   "submit": 1,
    "write": 1
   }
  ],
