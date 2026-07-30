@@ -2,6 +2,7 @@ import frappe
 import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
+from frappe.utils import get_link_to_form
 from erpnext.stock.doctype.item.item import Item
 import datetime
 import requests
@@ -445,9 +446,50 @@ class CustomItem(Item):
             item_deletion_log.slug = source.slug.rstrip("\r\n")
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
-            
+
+        self.sync_s3_images()
+
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
         self.reload()
+
+    def sync_s3_images(self):
+        """Re-save the S3 record so its on_update webhook re-pushes this product's images.
+
+        Nothing on the record changes — the save exists only to fire the webhook, which runs
+        on every on_update regardless of what was modified.
+        """
+        if not self.has_variants:
+            return
+
+        s3_record = frappe.db.get_value(
+            "S3 Product Image Meta Data", {"nat_product_template": self.item_code}, "name"
+        )
+        if s3_record:
+            try:
+                s3_doc = frappe.get_doc("S3 Product Image Meta Data", s3_record)
+                s3_doc.save(ignore_permissions=True)
+                # Say why the record was touched — the save changes nothing on it, so the
+                # timeline would otherwise show an unexplained version bump.
+                s3_doc.add_comment(
+                    "Comment",
+                    "Triggered from Drop and Create in Websites on {0}.".format(
+                        get_link_to_form("Item", self.item_code)
+                    )
+                )
+            except Exception as e:
+                # Never let an image re-sync failure roll back the item's own save.
+                frappe.log_error(
+                    title="Failed to re-sync S3 images for {0}".format(self.item_code),
+                    message=frappe.get_traceback()
+                )
+        else:
+            # Reached when the user confirmed the warning on the form, or on the paths that
+            # never see it — API, bulk edit, imports.
+            frappe.msgprint(
+                "We don't have an S3 Uploader record for <b>{0}</b>, so the images were not synced.".format(self.item_code),
+                title="Images not synced",
+                indicator="orange"
+            )
 
 def validate_website_specifications(doc):
     for spec in doc.neb_website_specifications:
@@ -456,6 +498,16 @@ def validate_website_specifications(doc):
         if spec.mandatory and not spec.description:
             frappe.throw("<b>Description</b> is required for Website Specification at row <b>{0}</b>".format(spec.idx))
     
+@frappe.whitelist()
+def has_s3_image_record(item_code):
+    """
+        Is there an S3 Uploader record whose images a drop and create could re-sync?
+    """
+    if not frappe.db.get_value("Item", item_code, "has_variants"):
+        return True
+
+    return bool(frappe.db.exists("S3 Product Image Meta Data", {"nat_product_template": item_code}))
+
 def validate_item_group(doc):
     if doc.item_group and not frappe.flags.renaming:
         is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
