@@ -951,7 +951,7 @@ fixtures = [{
 			"Item-custom_item_defaults",
 			"Item-custom_column_break_jbo41",
 			"Item-custom_tax",
-			"Item-custom_column_break_zxgjb"
+			"Item-custom_column_break_zxgjb",
 		]]]
 	},
 	{

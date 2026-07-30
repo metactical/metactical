@@ -1,3 +1,4 @@
+import base64
 import random
 import frappe
 from frappe.utils import add_days, nowdate
@@ -278,11 +279,12 @@ def create_label(*args, **kwargs):
             "status": "success",
             "shipment": shipment,
             "provider": provider,
-            "labels": result.get("labels"),
+            "label_files": _encode_files_as_base64(result.get("labels")),
             "printing_disabled": result.get("printing_disabled"),
+            "message": f"Labels created successfully for shipment {shipment} using {provider}.",
         }
 
-        frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
+        # frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
         frappe.db.commit()
 
         return response
@@ -337,6 +339,42 @@ def _fail_with_log(log, message: str) -> dict:
         frappe.db.commit()
     return _error(message)
 
+
+def _encode_files_as_base64(file_urls: list, dpi: int = 150) -> list:
+    """
+    Render each label PDF (by its site `file_url`) to PNG image(s) and
+    return them base64-encoded, one entry per page, so the frontend
+    (JS/Vue) can decode and display them directly (e.g. as an
+    `<img :src="data_uri">`) without needing a PDF viewer/library or an
+    extra authenticated request to fetch the file.
+    """
+    import fitz  # PyMuPDF
+
+    encoded_files = []
+    for file_url in file_urls or []:
+        try:
+            file_path = frappe.get_site_path(file_url.lstrip("/"))
+            base_name = file_url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+
+            pdf = fitz.open(file_path)
+            zoom = dpi / 72
+            matrix = fitz.Matrix(zoom, zoom)
+            for page_number, page in enumerate(pdf, start=1):
+                pixmap = page.get_pixmap(matrix=matrix)
+                encoded = base64.b64encode(pixmap.tobytes("png")).decode("utf-8")
+                encoded_files.append({
+                    "file_name": f"{base_name}_page{page_number}.png",
+                    "file_url": file_url,
+                    "page": page_number,
+                    "content_type": "image/png",
+                    "base64": encoded,
+                    "data_uri": f"data:image/png;base64,{encoded}",
+                })
+            pdf.close()
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), f"Error encoding label file {file_url}")
+
+    return encoded_files
 
 def _get_shipment_for_delivery_note(dn: str) -> str | None:
     rows = frappe.db.sql(
