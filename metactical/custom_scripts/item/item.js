@@ -86,6 +86,50 @@ frappe.ui.form.on("Item", {
             });
         }
     },
+    validate: function (frm) {
+        // A drop and create re-pushes this product's images from its S3 Uploader record, so
+        // confirm on save when there is no record to push from.
+        //
+        // The save is held here rather than server side: returning a promise from `validate`
+        // and clearing `frappe.validated` stops it before any request goes out, so nothing is
+        // written, nothing is rolled back, and the form keeps every change the user made.
+        // "Continue anyway" then just saves again.
+        if (!frm.doc.drop_and_create_in_websites || !frm.doc.item_code) return;
+
+        // Set only by "Continue anyway", and consumed by the save it lets through — so the
+        // next save asks again.
+        if (frm.__s3_sync_confirmed) {
+            frm.__s3_sync_confirmed = false;
+            return;
+        }
+
+        return frm
+            .call({
+                method: "metactical.custom_scripts.item.item.has_s3_image_record",
+                args: { item_code: frm.doc.item_code },
+            })
+            .then((r) => {
+                if (r.message) return;
+
+                frappe.validated = false;   // hold the save — the document stays unsaved
+
+                const d = new frappe.ui.Dialog({
+                    title: __("No S3 Uploader record"),
+                    primary_action_label: __("Continue anyway"),
+                    primary_action: () => {
+                        d.hide();
+                        frm.__s3_sync_confirmed = true;
+                        frm.save();
+                    },
+                });
+                d.$body.html(
+                    `<div style="padding:6px 0 12px">${__(
+                        "We don't have an S3 Uploader record for this item so we can't sync the image. Do you want to continue?"
+                    )}</div>`
+                );
+                d.show();
+            });
+    },
     neb_copy_from_item_group: function (frm) {
         if (!frm.doc.item_group) {
             frappe.msgprint(__("Please set Item Group first"));

@@ -1,5 +1,45 @@
 import frappe
+from frappe.utils import get_link_to_form
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
+
+
+def sync_s3_images(item_code, user=None):
+    """Re-push the product's images by re-saving its S3 Uploader record.
+
+    Nothing on the record changes — the save exists only to fire its on_update webhook, which
+    runs on every save regardless of what was modified.
+    """
+    s3_record = frappe.db.get_value(
+        "S3 Product Image Meta Data", {"nat_product_template": item_code}, "name"
+    )
+
+    if not s3_record:
+        message = f"We don't have an S3 Uploader record for {item_code}, so its images were not synced."
+        frappe.log_error(title="SB-Item Image Sync Skipped", message=message)
+        if user:
+            frappe.publish_realtime("msgprint", message=message, user=user)
+        return
+
+    try:
+        s3_doc = frappe.get_doc("S3 Product Image Meta Data", s3_record)
+        s3_doc.save(ignore_permissions=True)
+
+        # Say why the record was touched — the save changes nothing on it, so the timeline
+        # would otherwise show an unexplained version bump.
+        s3_doc.add_comment(
+            "Comment",
+            "Triggered from Drop and Create in Websites on {0}.".format(
+                get_link_to_form("Item", item_code)
+            )
+        )
+
+        frappe.db.commit()
+    except Exception as e:
+        frappe.log_error(
+            title="SB-Item Image Sync Error",
+            message=f"Failed to re-sync S3 images for {item_code}: {str(e)} \n{frappe.get_traceback()}"
+        )
+
 
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
@@ -82,7 +122,9 @@ def receive_deletion_message(parsedContent):
                         update_item_inventory_output(item_code=item.item_code, net_available_bins=all_bins, bundle=True, voucher_type=item.doctype)
                     else:
                         frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type=item.doctype, queue='default')
-                        
+
+                sync_s3_images(item_code, user=user)
+
                 all_logs = frappe.get_all(
                     "Item Drop and Create Log",
                     filters={"product": item_code, "status": "Issued", "deleted": 1},
