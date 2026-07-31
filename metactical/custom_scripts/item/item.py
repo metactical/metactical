@@ -445,7 +445,8 @@ class CustomItem(Item):
             item_deletion_log.slug = source.slug.rstrip("\r\n")
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
-            
+
+
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
         self.reload()
 
@@ -456,6 +457,16 @@ def validate_website_specifications(doc):
         if spec.mandatory and not spec.description:
             frappe.throw("<b>Description</b> is required for Website Specification at row <b>{0}</b>".format(spec.idx))
     
+@frappe.whitelist()
+def has_s3_image_record(item_code):
+    """
+        Is there an S3 Uploader record whose images a drop and create could re-sync?
+    """
+    if not frappe.db.get_value("Item", item_code, "has_variants"):
+        return True
+
+    return bool(frappe.db.exists("S3 Product Image Meta Data", {"nat_product_template": item_code}))
+
 def validate_item_group(doc):
     if doc.item_group and not frappe.flags.renaming:
         is_item_group = frappe.db.get_value("Item Group", doc.item_group, "is_group")
