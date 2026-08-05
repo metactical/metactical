@@ -283,6 +283,12 @@
 	border-color: var(--border-color);
 }
 
+/* Bootstrap gives every bare <label> `margin-bottom: 0.5rem`. In a `flex items-center`
+ * row that extra box below the text pushes the text off the row's centre, so a label
+ * next to a checkbox sits ~4px high. Reset it for inline labels only — the `block`
+ * labels above inputs still want their spacing. */
+#s3_uploader_ui label:not(.block) { margin-bottom: 0; }
+
 /* ---- misc ---- */
 #s3_uploader_ui .cursor-pointer { cursor: pointer; }
 #s3_uploader_ui .transform { transform: translateZ(0); }
