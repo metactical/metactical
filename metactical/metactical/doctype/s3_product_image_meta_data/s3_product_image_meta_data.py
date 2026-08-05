@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.model.document import Document
 from frappe.model.naming import append_number_if_name_exists
@@ -10,7 +12,25 @@ ROLES = ("icon", "small", "medium", "large")
 
 
 class S3ProductImageMetaData(Document):
-	pass
+	def validate(self):
+		self.set_metadata()
+
+	def set_metadata(self):
+		"""Store the export JSON on the record, identical to the "Download JSON" button.
+
+		Built from the child tables as they stand in memory, so the field always matches
+		the rows it was saved with — whether the save came from the uploader page or a
+		manual edit of the child tables. Runs in `validate`, which Frappe calls before the
+		mandatory-field check, so the read-only reqd field is filled in by then.
+
+		Imported inside the method: the page module imports `upsert_upload` from this file,
+		so a module-level import would be circular.
+		"""
+		from metactical.metactical.page.s3_uploader.s3_uploader import _record_products
+
+		# `indent=2` and plain json.dumps (not frappe.as_json, which sorts keys) to match
+		# what the button downloads — JSON.stringify(payload, null, 2) — byte for byte.
+		self.nat_metadata = json.dumps({"products": _record_products(self)}, indent=2)
 
 
 def _build_record_name(template_item):
