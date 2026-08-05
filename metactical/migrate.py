@@ -4,7 +4,12 @@ def after_migrate():
 	reset_po_naming_series()
 	reset_customer_naming_series()
 	set_app_logo()
-
+	add_index()
+ 
+def add_index():
+    frappe.db.add_index('Item', ['ifw_retailskusuffix'])
+    frappe.db.add_index('Stock Reconciliation Item', ['item_code', 'warehouse', 'creation'])
+                                 
 def reset_customer_naming_series():
 	exists = frappe.db.exists('Property Setter', {'doctype_or_field': 'DocField', 'doc_type': 'Customer',
 					'field_name': 'naming_series', 'property': 'options'})
