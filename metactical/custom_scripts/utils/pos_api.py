@@ -1635,10 +1635,15 @@ def get_coupon_code_sql(coupon_code):
     """
     
 @frappe.whitelist()
-def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
+def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, warehouse=None):
     page = int(page or 1)
     limit = int(page_size or 10)
     offset = (page - 1) * limit
+    
+    if warehouse:
+        # frontend sends the short warehouse code (e.g. "DTN") - map it to the full warehouse name
+        short_to_warehouse = {short: full for full, short in warehouses_display_name_mapping().items()}
+        warehouse = short_to_warehouse.get(warehouse, warehouse)
 
     # search by retail_sku the filter is less than 12 characters. otherwise, it is a barcode
     filter = f'tabItem.ifw_retailskusuffix LIKE {frappe.db.escape(f"{retail_sku}%")}'
@@ -1649,9 +1654,54 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             WHERE parent = tabItem.name AND barcode LIKE {frappe.db.escape(f"{retail_sku}%")}
         )
         """
-        
-    # Fetch matching items
-    items = frappe.db.sql(f"""
+
+    # Rank+paginate item codes first (cheap), then hydrate full details only for
+    # that page - avoids loading barcodes/tags/stock for the whole match set,
+    # which can be 10k+ items.
+    if warehouse:
+        # Join Bin for just the requested warehouse so the highest-stock match
+        # lands on page 1, without touching stock for every other warehouse.
+        code_rows = frappe.db.sql(f"""
+            SELECT tabItem.name AS item_code,
+                COUNT(*) OVER() AS total_records
+            FROM `tabItem`
+            LEFT JOIN `tabBin` bin
+                ON bin.item_code = tabItem.name AND bin.warehouse = %(warehouse)s
+            WHERE
+                tabItem.disabled = 0
+                AND tabItem.is_sales_item = 1
+                AND tabItem.has_variants = 0
+                AND {filter}
+            ORDER BY COALESCE(bin.actual_qty, 0) - COALESCE(bin.reserved_qty, 0) DESC
+            LIMIT {limit} OFFSET {offset}
+        """, {"warehouse": warehouse}, as_dict=True)
+    else:
+        code_rows = frappe.db.sql(f"""
+            SELECT tabItem.name AS item_code,
+                COUNT(*) OVER() AS total_records
+            FROM `tabItem`
+            WHERE
+                tabItem.disabled = 0
+                AND tabItem.is_sales_item = 1
+                AND tabItem.has_variants = 0
+                AND {filter}
+            LIMIT {limit} OFFSET {offset}
+        """, as_dict=True)
+
+    item_codes = [row.item_code for row in code_rows]
+    total_records = code_rows[0].total_records if code_rows else 0
+
+    if not item_codes:
+        frappe.response.update({
+            "Status": 404,
+            "Message": "Item not found",
+            "Items": [],
+            "Total": 0
+        })
+        return
+
+    # Fetch full details for just this page's items
+    items = frappe.db.sql("""
         SELECT
             tabItem.name AS item_code, item_name, ifw_retailskusuffix, ifw_discontinued,
             variant_of, asi_item_class, ifw_location,
@@ -1664,22 +1714,27 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             (
                 SELECT GROUP_CONCAT(DISTINCT tag SEPARATOR ', ')
                 FROM `tabTag Link`
-                WHERE document_name = tabItem.name
-            ) as tags
+                WHERE document_type = 'Item' AND document_name = tabItem.name
+            ) as tags,
+            (
+                SELECT GROUP_CONCAT(CEILING(ifw_supplier_qoh) SEPARATOR ', ')
+                FROM `tabItem Supplier`
+                WHERE parent = tabItem.name and ifw_supplier_qoh IS NOT NULL
+            ) AS sqoh
         FROM `tabItem`
-        WHERE
-            tabItem.disabled = 0
-            AND tabItem.is_sales_item = 1
-            AND tabItem.has_variants = 0
-            AND {filter}
-        LIMIT {limit} OFFSET {offset}
-    """, as_dict=True)
+        WHERE tabItem.name IN %(item_codes)s
+    """, {"item_codes": item_codes}, as_dict=True)
+
+    # SQL doesn't preserve IN-clause order, so restore the ranked/paginated order
+    items_by_code = {item.item_code: item for item in items}
+    items = [items_by_code[code] for code in item_codes if code in items_by_code]
 
     if not items:
         frappe.response.update({
             "Status": 404,
             "Message": "Item not found",
-            "Items": []
+            "Items": [],
+            "Total": 0
         })
         return
 
@@ -1701,6 +1756,16 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     all_price_lists = list(price_list_map.keys())
     can_see_item_cost = frappe.db.get_value("POS User Settings", user, "can_see_item_cost")
 
+    # Last reconciliation date per (item, warehouse) for this page's items - one
+    # batched query instead of a lookup per item x warehouse combo.
+    recon_rows = frappe.db.sql("""
+        SELECT item_code, warehouse, MAX(creation) AS last_reconciliation
+        FROM `tabStock Reconciliation Item`
+        WHERE item_code IN %(item_codes)s AND warehouse IN %(warehouses)s
+        GROUP BY item_code, warehouse
+    """, {"item_codes": item_codes, "warehouses": all_warehouses}, as_dict=True)
+    last_reconciliation_map = {(row.item_code, row.warehouse): row.last_reconciliation for row in recon_rows}
+
     # Attach inventory and pricing data
     for item in items:
         item.branches = {}
@@ -1713,18 +1778,18 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
 
         for bin in bins:
             for operator in warehouse_map.get(bin.warehouse, []):
-                item.branches.setdefault(operator, {
-                    "Price": 0.0,
-                    "PriceList": "",
-                    "Qty": 0,
-                    "Branch": operator,
-                    "Warehouse": bin.warehouse,
-                    "DisplayName": warehouses_display_name_mapping().get(bin.warehouse, bin.warehouse),
-                    "LastReconciliation": frappe.db.get_value("Stock Reconciliation Item", {
-                        "item_code": item.item_code,
-                        "warehouse": bin.warehouse
-                    }, "creation", order_by="creation desc")
-                })
+                if operator not in item.branches:
+                    last_reconciliation = last_reconciliation_map.get((item.item_code, bin.warehouse))
+
+                    item.branches[operator] = {
+                        "Price": 0.0,
+                        "PriceList": "",
+                        "Qty": 0,
+                        "Branch": operator,
+                        "Warehouse": bin.warehouse,
+                        "DisplayName": warehouses_display_name_mapping().get(bin.warehouse, bin.warehouse),
+                        "LastReconciliation": last_reconciliation
+                    }
                 item.branches[operator]["Qty"] = int(bin.actual_qty - bin.reserved_qty)
 
         # Prices per price list
@@ -1735,15 +1800,15 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
 
         for price in prices:
             for operator in price_list_map.get(price.price_list, []):
-                warehouse = profile_map.get(operator, {}).get("warehouse", "")
+                price_warehouse = profile_map.get(operator, {}).get("warehouse", "")
                 if operator not in item.branches:
                     item.branches.setdefault(operator, {
                         "Qty": 0,
                         "Price": 0.0,
                         "Branch": operator,
-                        "Warehouse": profile_map.get(operator, {}).get("warehouse", ""),
+                        "Warehouse": price_warehouse,
                         "PriceList": price.price_list,
-                        "DisplayName": warehouses_display_name_mapping().get(warehouse, warehouse)
+                        "DisplayName": warehouses_display_name_mapping().get(price_warehouse, price_warehouse)
                     })
                 item.branches[operator]["Price"] = price.price_list_rate or 0.0
                 item.branches[operator]["PriceList"] = price.price_list or ""
@@ -1756,7 +1821,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
 
     # Structure final response
     item_details = []
-    warehouse = frappe.db.get_value("POS Profile", branch + ' Operators', 'warehouse')
+    branch_warehouse = frappe.db.get_value("POS Profile", branch + ' Operators', 'warehouse')
 
     for item in items:
         barcodes = [{"Barcode": code} for code in item.barcodes.split(", ")] if item.barcodes else []
@@ -1771,7 +1836,9 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
         sort_orders_index = {name: index for index, name in enumerate(sorted_order)}
         branches = item.branches.values()
         item.branches = sorted(branches, key=lambda x:  sort_orders_index.get(x.get("DisplayName"), len(sorted_order)))
-        on_order  = get_on_order_quantity(item.item_code, warehouse)
+
+        on_order = get_on_order_quantity(item.item_code, branch_warehouse)
+        cost = get_item_cost(item.item_code) if can_see_item_cost else "-"
 
         item_details.append({
             "Sku": item.item_code,
@@ -1790,7 +1857,8 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
             "Barcodes": barcodes,
             "Quantity": item.qty,
             "Price": item.price,
-            "Cost": get_item_cost(item.item_code) if can_see_item_cost else "-",
+            "Cost": cost,
+            "SupplierQoh": item.sqoh or "",
             "DiscountPrice": round(discount.get("discount_price", item.price), 2),
             "OnSale": discount.get("on_sale", False),
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
@@ -1802,7 +1870,8 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1):
     frappe.response.update({
         "Status": 200,
         "Message": "",
-        "Items": item_details
+        "Items": item_details,
+        "Total": total_records
     })
 
 def get_on_order_quantity(item_code, warehouse):
@@ -1811,7 +1880,7 @@ def get_on_order_quantity(item_code, warehouse):
             po.name AS po_name,
             poi.qty,
             poi.received_qty,
-            po.transaction_date,
+            poi.schedule_date,
             (poi.qty - poi.received_qty) AS pending_qty
         FROM `tabPurchase Order Item` poi
         JOIN `tabPurchase Order` po ON poi.parent = po.name
@@ -1829,13 +1898,14 @@ def get_on_order_quantity(item_code, warehouse):
         if pending_qty <= 0:
             continue
         
-        lead_time_in_days = frappe.db.get_value("Item", item_code, "lead_time_days") or 0    
+        # lead_time_in_days = frappe.db.get_value("Item", item_code, "lead_time_days") or 0    
         
-        # add expected delivery date to the pending PO names list
-        expected_delivery_date = po["transaction_date"] + timedelta(days=lead_time_in_days)
+        # # add expected delivery date to the pending PO names list
+        # expected_delivery_date = po["transaction_date"] + timedelta(days=lead_time_in_days)
         
-        # convert date to 01-Jan-26
-        eta = expected_delivery_date.strftime('%d-%b-%y')
+        # # convert date to 01-Jan-26
+        # eta = expected_delivery_date.strftime('%d-%b-%y')
+        eta = po["schedule_date"].strftime('%d-%b-%y') if po["schedule_date"] else "N/A"
         pending_quantities.append(f"{pending_qty} (ETA: {eta})")
 
     return ", ".join(pending_quantities) if pending_quantities else ""
@@ -1843,6 +1913,7 @@ def get_on_order_quantity(item_code, warehouse):
 
 @frappe.whitelist()
 def get_item_by_retail_sku_single(retail_sku, branch):
+    frappe.set_user('Administrator')    
     item = frappe.db.sql(f"""
         SELECT 
             tabItem.name, item_name, ifw_retailskusuffix,
@@ -2061,7 +2132,7 @@ def get_item_cost(item_code):
     default_supplier = frappe.db.get_value("Item Default", {"parent": item_code}, "default_supplier")
     if not default_supplier:
         default_supplier = frappe.db.get_value("Item Supplier", {"parent": item_code}, "supplier")
-        
+
     if default_supplier:
         price_list = frappe.db.get_value("Supplier", default_supplier, "default_price_list")
         if price_list:
