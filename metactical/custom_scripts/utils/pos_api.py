@@ -1913,7 +1913,6 @@ def get_on_order_quantity(item_code, warehouse):
 
 @frappe.whitelist()
 def get_item_by_retail_sku_single(retail_sku, branch):
-    frappe.set_user('Administrator')    
     item = frappe.db.sql(f"""
         SELECT 
             tabItem.name, item_name, ifw_retailskusuffix,
