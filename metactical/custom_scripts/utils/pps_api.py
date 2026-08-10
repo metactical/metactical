@@ -256,14 +256,40 @@ def create_label(*args, **kwargs):
             service_name[parcel_name] = choice.get("service_name")
             shipment_amount += float(choice.get("shipment_amount") or 0)
 
-        # --- Submit the shipment first, if required ---
         shipment_doc = frappe.get_doc("Shipment", shipment)
+
+        # --- If every selected parcel already has a label, reuse it instead of
+        # creating a new one (which would call the carrier API again and, for
+        # Purolator, generate and bill a brand new label). ---
+        existing_labels_by_row = {}
+        for row in shipment_doc.shipments:
+            if row.row_id and row.label:
+                existing_labels_by_row.setdefault(row.row_id, []).append(row.label)
+
+        selected_parcels = list(selections.keys())
+        if selected_parcels and all(existing_labels_by_row.get(parcel_name) for parcel_name in selected_parcels):
+            existing_label_files = [
+                label for parcel_name in selected_parcels for label in existing_labels_by_row[parcel_name]
+            ]
+            printing_disabled = frappe.db.get_single_value("Shipment Settings", "disable_automatic_print")
+            response = {
+                "status": "success",
+                "shipment": shipment,
+                "provider": provider,
+                "label_files": _encode_files_as_base64(existing_label_files),
+                "printing_disabled": printing_disabled,
+                "message": f"Labels already exist for shipment {shipment} using {provider}.",
+            }
+            frappe.db.commit()
+            return response
+
+        # --- Submit the shipment first, if required ---
         if submit_shipment and shipment_doc.docstatus == 0:
             shipment_doc.submit()
             frappe.db.commit()
 
         from metactical.utils.shipping.shipping import create_shipping
-        
+
         result = create_shipping(
             name=shipment,
             provider=provider,
