@@ -15,6 +15,7 @@
   "expected_arrival",
   "carrier",
   "tracking_no",
+  "draft_purchase_receipt",
   "section_ai",
   "source_type",
   "ai_parsed",
@@ -91,6 +92,14 @@
    "fieldname": "tracking_no",
    "fieldtype": "Data",
    "label": "Tracking No"
+  },
+  {
+   "fieldname": "draft_purchase_receipt",
+   "fieldtype": "Link",
+   "label": "Purchase Receipt",
+   "options": "Purchase Receipt",
+   "read_only": 1,
+   "description": "Draft PR auto-created when this shipment was submitted (whole-shipment path)."
   },
   {
    "fieldname": "section_ai",

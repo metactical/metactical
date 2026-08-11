@@ -66,6 +66,14 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 	def on_submit(self):
 		super(CustomPurchaseReceipt, self).on_submit()
 		post_rc_message(self)
+		self.mark_procurement_source_lines_received()
+
+	def mark_procurement_source_lines_received(self):
+		# Flags the Supplier Order Confirmation / Inbound Shipment lines (and
+		# boxes) this PR was built from, so they can't be pulled into a second PR.
+		from metactical.custom_scripts.purchase_order.purchase_receipt_from_source import _mark_source_lines_received
+		if any(item.get("neb_source_doctype") for item in self.items):
+			_mark_source_lines_received(self)
 		
 def post_rc_message(doc):
 	if not doc.is_return and doc.company == "International Camouflage Ltd":
