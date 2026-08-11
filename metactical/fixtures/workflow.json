@@ -1,0 +1,87 @@
+[
+ {
+  "doctype": "Workflow",
+  "name": "Purchase Order Approval",
+  "document_type": "Purchase Order",
+  "is_active": 1,
+  "override_status": 0,
+  "send_email_alert": 0,
+  "workflow_state_field": "workflow_state",
+  "states": [
+   {
+    "state": "Draft",
+    "doc_status": "0",
+    "allow_edit": "Purchase User",
+    "is_optional_state": 0
+   },
+   {
+    "state": "Pending L1 Approval",
+    "doc_status": "0",
+    "allow_edit": "Purchase User",
+    "is_optional_state": 0
+   },
+   {
+    "state": "Pending L2 Approval",
+    "doc_status": "0",
+    "allow_edit": "Purchase Manager",
+    "is_optional_state": 0
+   },
+   {
+    "state": "Approved",
+    "doc_status": "1",
+    "allow_edit": "Purchase Manager",
+    "is_optional_state": 0
+   },
+   {
+    "state": "Rejected",
+    "doc_status": "0",
+    "allow_edit": "Purchase User",
+    "is_optional_state": 0
+   }
+  ],
+  "transitions": [
+   {
+    "state": "Draft",
+    "action": "Submit for Approval",
+    "next_state": "Pending L1 Approval",
+    "allowed": "Purchase User",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Pending L1 Approval",
+    "action": "Approve",
+    "next_state": "Pending L2 Approval",
+    "allowed": "Purchase User",
+    "allow_self_approval": 0
+   },
+   {
+    "state": "Pending L1 Approval",
+    "action": "Reject",
+    "next_state": "Rejected",
+    "allowed": "Purchase User",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Pending L2 Approval",
+    "action": "Approve",
+    "next_state": "Approved",
+    "allowed": "Purchase Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Pending L2 Approval",
+    "action": "Reject",
+    "next_state": "Rejected",
+    "allowed": "Purchase Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Rejected",
+    "action": "Reset to Draft",
+    "next_state": "Draft",
+    "allowed": "Purchase User",
+    "allow_self_approval": 1
+   }
+  ]
+ }
+]

@@ -15,6 +15,16 @@ frappe.ui.form.on('Purchase Order', {
 				});
 				frm.refresh_field("taxes");
 			});
+
+			// Metactical Customization: Allow creating an Inbound Shipment from the PO
+			if (flt(frm.doc.per_received) < 100) {
+				frm.add_custom_button(__('Inbound Shipment'), function() {
+					frappe.model.open_mapped_doc({
+						method: "metactical.custom_scripts.purchase_order.purchase_order.make_inbound_shipment",
+						frm: frm,
+					});
+				}, __("Create"));
+			}
 		}
 	}
 });

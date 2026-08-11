@@ -74,6 +74,13 @@ class CustomPurchaseOrder(PurchaseOrder):
 					"minimum order quantity ({2})."
 				).format(item.idx, frappe.bold(item.item_code), min_order_qty))
 
+	def on_workflow_action(self, workflow_action):
+		if workflow_action == "Mark as Sent":
+			frappe.db.set_value("Purchase Order", self.name, {
+				"custom_sent_on": frappe.utils.now_datetime(),
+				"custom_sent_by": frappe.session.user,
+			})
+
 	def before_submit(self):
 		self.barcode_check()
 
@@ -341,3 +348,37 @@ def get_billing_shipping_address(supplier_name):
 	shipping_address, billing_address = get_default_supplier_address(supplier_name)
 
 	return {"shipping_address": shipping_address, "billing_address": billing_address}
+
+@frappe.whitelist()
+def make_inbound_shipment(source_name, target_doc=None):
+	def set_missing_values(source, target):
+		target.source_type = "Manual"
+
+	def update_item(obj, target, source_parent):
+		target.shipped_qty = flt(obj.qty) - flt(obj.received_qty)
+
+	doc = get_mapped_doc(
+		"Purchase Order",
+		source_name,
+		{
+			"Purchase Order": {
+				"doctype": "Inbound Shipment",
+				"field_map": {"name": "purchase_order"},
+				"validation": {
+					"docstatus": ["=", 1],
+				},
+			},
+			"Purchase Order Item": {
+				"doctype": "Inbound Shipment Item",
+				"field_map": {
+					"name": "po_detail",
+				},
+				"postprocess": update_item,
+				"condition": lambda doc: abs(doc.received_qty) < abs(doc.qty),
+			},
+		},
+		target_doc,
+		set_missing_values,
+	)
+
+	return doc
