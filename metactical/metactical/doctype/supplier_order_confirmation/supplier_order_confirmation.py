@@ -5,10 +5,23 @@ from frappe.model.document import Document
 
 class SupplierOrderConfirmation(Document):
 	def validate(self):
+		self._validate_has_items()
+		self._validate_supplier_matches_po()
 		self._validate_against_po()
 
 	def on_submit(self):
 		self._check_for_discrepancies()
+
+	def _validate_has_items(self):
+		if not self.items:
+			frappe.throw(_("Add at least one confirmation line before saving."))
+
+	def _validate_supplier_matches_po(self):
+		po_supplier = frappe.db.get_value("Purchase Order", self.purchase_order, "supplier")
+		if po_supplier and self.supplier != po_supplier:
+			frappe.throw(_("Supplier {0} does not match the Supplier {1} on Purchase Order {2}.").format(
+				frappe.bold(self.supplier), frappe.bold(po_supplier), self.purchase_order
+			))
 
 	def _validate_against_po(self):
 		po_items = {

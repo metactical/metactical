@@ -28,7 +28,9 @@
    "fieldname": "po_detail",
    "fieldtype": "Data",
    "label": "PO Detail (row name)",
-   "read_only": 1
+   "read_only": 1,
+   "reqd": 1,
+   "description": "Must be the name of a Purchase Order Item row on the linked PO — keeps the accounting link intact."
   },
   {
    "fieldname": "soc_detail",
