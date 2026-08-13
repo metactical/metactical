@@ -42,9 +42,6 @@ frappe.ui.form.on("Item", {
                     limit_page_length: 50 
                 },
                 callback(r) {
-                    // Read the table by warehouse, not by size. The query still takes the
-                    // top 50 Bin rows by quantity, so this orders that slice — it does not
-                    // widen it. numeric:true so W01-…-01-05 sorts before W01-…-01-10.
                     const rows = (r.message || []).sort((a, b) =>
                         (a.warehouse || '').localeCompare(b.warehouse || '', undefined, {
                             numeric: true,
