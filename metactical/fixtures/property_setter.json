@@ -1351,13 +1351,13 @@
   "doctype_or_field": "DocField",
   "field_name": "disable_rounded_total",
   "is_system_generated": 1,
-  "modified": "2026-07-23 22:12:04.222571",
+  "modified": "2026-08-14 22:12:04.222571",
   "module": null,
   "name": "Sales Order-disable_rounded_total-default",
   "property": "default",
   "property_type": "Text",
   "row_name": null,
-  "value": "0"
+  "value": "1"
  },
  {
   "default_value": null,
@@ -1431,13 +1431,13 @@
   "doctype_or_field": "DocField",
   "field_name": "disable_rounded_total",
   "is_system_generated": 1,
-  "modified": "2026-07-23 22:12:04.290773",
+  "modified": "2026-08-14 22:12:04.222571",
   "module": null,
   "name": "Sales Invoice-disable_rounded_total-default",
   "property": "default",
   "property_type": "Text",
   "row_name": null,
-  "value": "0"
+  "value": "1"
  },
  {
   "default_value": null,
@@ -1511,13 +1511,13 @@
   "doctype_or_field": "DocField",
   "field_name": "disable_rounded_total",
   "is_system_generated": 1,
-  "modified": "2026-07-23 22:12:04.364845",
+  "modified": "2026-08-14 22:12:04.222571",
   "module": null,
   "name": "Delivery Note-disable_rounded_total-default",
   "property": "default",
   "property_type": "Text",
   "row_name": null,
-  "value": "0"
+  "value": "1"
  },
  {
   "default_value": null,

@@ -42,7 +42,11 @@ frappe.ui.form.on("Item", {
                     limit_page_length: 50 
                 },
                 callback(r) {
-                    const rows = r.message || [];
+                    const rows = (r.message || []).sort((a, b) =>
+                        (a.warehouse || '').localeCompare(b.warehouse || '', undefined, {
+                            numeric: true,
+                            sensitivity: 'base'
+                        }));
                     let html;
                     if (!rows.length) {
                         html = '<div class="text-muted" style="padding:6px 2px;">No Stock Available Currently</div>'; 
