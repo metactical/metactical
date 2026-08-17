@@ -155,6 +155,11 @@ def make_purchase_order_based_on_supplier(source_name, target_doc=None, args=Non
 			{
 				"Material Request": {
 					"doctype": "Purchase Order",
+					# Metactical Customization: Material Request's own buying_price_list
+					# is incidental to the requester, not the supplier being purchased
+					# from — don't let get_mapped_doc auto-copy it onto the PO and clobber
+					# the supplier-driven price list set in set_missing_values() below.
+					"field_no_map": ["buying_price_list"],
 				},
 				"Material Request Item": {
 					"doctype": "Purchase Order Item",
@@ -245,6 +250,17 @@ def get_material_requests_based_on_supplier(doctype, txt, searchfield, start, pa
 def set_missing_values(source, target_doc, for_validate=False):
 	if target_doc.doctype == "Purchase Order" and getdate(target_doc.schedule_date) <  getdate(nowdate()):
 		target_doc.schedule_date = None
+
+	# Metactical Customization: price the PO off the Supplier's own default
+	# price list *before* item rates / price list currency are computed below
+	# (super().set_missing_values() fetches item rates against buying_price_list),
+	# falling back to Buying Settings' default when the supplier has none set.
+	if target_doc.doctype == "Purchase Order" and getattr(target_doc, "supplier", None):
+		target_doc.buying_price_list = (
+			frappe.db.get_value("Supplier", target_doc.supplier, "default_price_list")
+			or frappe.db.get_single_value("Buying Settings", "buying_price_list")
+		)
+
 	super(BuyingController, target_doc).set_missing_values(for_validate)
 
 	target_doc.set_supplier_from_item_default()

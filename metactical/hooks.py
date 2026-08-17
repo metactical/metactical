@@ -946,7 +946,8 @@ fixtures = [{
 			"Item-custom_section_break_hzwnj",
 			"Item-custom_column_break_iqyli",
 			"Item-custom_column_break_22avz",
-			"Item-custom_identity"
+			"Item-custom_identity",
+			"Sales Order Item-barcode"
 		]]]
 	},
 	{
