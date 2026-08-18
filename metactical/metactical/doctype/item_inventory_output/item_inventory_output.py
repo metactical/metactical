@@ -19,11 +19,118 @@ class ItemInventoryOutput(Document):
 		# logic (and its error handling) lives in restock_notification.py.
 		restock_notification.on_item_inventory_output_update(self)
 
+TRANSFER_RULES_CACHE_KEY = "warehouse_transfer_calculation_rules"
+
 def on_sle_update(doc, method):
+	# Metactical Customization: skip the (expensive) inventory output
+	# recalculation for Stock Entry transfer rows whose source/target
+	# warehouse roles aren't whitelisted in Warehouse Transfer Calculation
+	# Rule — e.g. Bin -> Bin moves within the same location.
+	if is_stock_entry_transfer_skippable(doc):
+		return
+
 	# Fetch bins and calculate net available quantities per warehouse
 	net_available_bins, last_sle = get_inventory_quantity(doc)
- 
+
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
+
+def is_stock_entry_transfer_skippable(doc):
+	if doc.voucher_type != "Stock Entry" or not doc.voucher_no:
+		return False
+
+	decision_cache = get_transfer_decision_cache()
+	cache_key = (doc.voucher_no, doc.item_code, doc.warehouse)
+	if cache_key in decision_cache:
+		return decision_cache[cache_key]
+
+	stock_entry = frappe.get_cached_doc("Stock Entry", doc.voucher_no)
+
+	warehouse_names = {
+		warehouse
+		for row in stock_entry.items
+		for warehouse in (row.s_warehouse, row.t_warehouse)
+		if warehouse
+	}
+	warehouse_map = get_warehouse_map(warehouse_names)
+
+	# Evaluate every transfer row for this item once, caching both the
+	# source and target warehouse decisions so the paired SLE call (each
+	# Stock Entry transfer row fires one SLE per warehouse) reads from
+	# cache instead of re-scanning stock_entry.items.
+	for row in stock_entry.items:
+		if row.item_code != doc.item_code or not row.s_warehouse or not row.t_warehouse:
+			continue
+
+		calculate = should_calculate_transfer(
+			warehouse_map.get(row.s_warehouse), warehouse_map.get(row.t_warehouse)
+		)
+		decision_cache[(doc.voucher_no, row.item_code, row.s_warehouse)] = not calculate
+		decision_cache[(doc.voucher_no, row.item_code, row.t_warehouse)] = not calculate
+
+	# Not part of any transfer row (e.g. plain issue/receipt) -> don't skip.
+	return decision_cache.get(cache_key, False)
+
+def get_transfer_decision_cache():
+	cache = getattr(frappe.local, "_warehouse_transfer_decision_cache", None)
+	if cache is None:
+		cache = {}
+		frappe.local._warehouse_transfer_decision_cache = cache
+	return cache
+
+def get_warehouse_map(warehouse_names):
+	if not warehouse_names:
+		return {}
+
+	rows = frappe.get_all(
+		"Warehouse",
+		filters={"name": ["in", list(warehouse_names)]},
+		fields=["name", "root_warehouse", "warehouse_role"],
+	)
+	return {row.name: row for row in rows}
+
+def should_calculate_transfer(source, target):
+	if not source or not target or source.name == target.name:
+		return False
+
+	if not source.warehouse_role or not target.warehouse_role:
+		return False
+
+	rules = get_transfer_rules()
+
+	same_root = bool(source.root_warehouse) and source.root_warehouse == target.root_warehouse
+	root_condition = "Same" if same_root else "Different"
+
+	action = rules.get((source.warehouse_role, target.warehouse_role, root_condition))
+	if action is None:
+		action = rules.get((source.warehouse_role, target.warehouse_role, "Any"))
+
+	# Default (no matching rule) = Skip.
+	return action == "calculate"
+
+def get_transfer_rules():
+	local_cache = getattr(frappe.local, "_warehouse_transfer_rules", None)
+	if local_cache is not None:
+		return local_cache
+
+	rules = frappe.cache().get_value(TRANSFER_RULES_CACHE_KEY, generator=build_transfer_rules)
+	frappe.local._warehouse_transfer_rules = rules
+	return rules
+
+def build_transfer_rules():
+	rows = frappe.get_all(
+		"Warehouse Transfer Calculation Rule",
+		filters={"enabled": 1},
+		fields=["source_role", "target_role", "same_root", "action"],
+		order_by="priority asc",
+	)
+
+	compiled = {}
+	for row in rows:
+		key = (row.source_role, row.target_role, row.same_root)
+		# First (highest-priority) rule for a given key wins.
+		compiled.setdefault(key, row.action.lower())
+
+	return compiled
 
 def get_posting_time(doc):
 	posting_time_str = None
@@ -243,7 +350,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			inventory_ouput_data.append(item_inventory_output_data)
 
 		# Save changes to Item Inventory Output
-		total_available_qty = sum(net_available_bins.values()) if not bundle else min(net_available_bundles)
+  
+		total_available_qty = sum(net_available_bins.values()) if not bundle else (min(net_available_bundles) if net_available_bundles else 0)
 		inventories_by_country = get_inventory_by_country(item_code, last_sle, net_available_bins, doc)
 
 		if not item_inventory_output_doc:
