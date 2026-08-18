@@ -27,7 +27,3 @@ execute:frappe.db.sql("UPDATE `tabPick List` SET status = 'Picked' WHERE status=
 metactical.patches.create_non_formatted_phone
 metactical.patches.repair_item_tag_links_and_user_tags
 metactical.patches.migrate_to_warehouse_user_permissions
-metactical.patches.create_purchase_order_workflow
-metactical.patches.add_purchase_order_sent_fields
-metactical.patches.add_purchase_receipt_item_source_fields
-metactical.patches.create_inbound_workflows
