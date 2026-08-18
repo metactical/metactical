@@ -9,7 +9,8 @@
   "enabled",
   "api_url",
   "price_list",
-  "api_key"
+  "api_key",
+  "custom_header"
  ],
  "fields": [
   {
@@ -41,6 +42,11 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
+  },
+  {
+   "fieldname": "custom_header",
+   "fieldtype": "Password",
+   "label": "Custom Header"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -52,6 +58,7 @@
  "name": "Item Import Validation",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
