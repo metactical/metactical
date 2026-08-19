@@ -45,6 +45,9 @@ def is_stock_entry_transfer_skippable(doc):
 
 	stock_entry = frappe.get_cached_doc("Stock Entry", doc.voucher_no)
 
+	if stock_entry.purpose != "Material Transfer":
+		return False
+
 	warehouse_names = {
 		warehouse
 		for row in stock_entry.items
