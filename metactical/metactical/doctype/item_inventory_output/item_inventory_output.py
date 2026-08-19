@@ -232,8 +232,27 @@ def get_inventory_quantity(doc):
 		qty = max(doc.actual_qty if doc.actual_qty else 0, doc.qty_after_transaction if doc.qty_after_transaction else 0)
 	else:
 		qty = flt(doc.qty_after_transaction)
-			
-	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0 
+
+	if doc.voucher_type == 'Stock Reconciliation':
+		# Metactical Customization: ERPNext can re-save older, already-posted
+		# Stock Ledger Entries as part of a repost cascade (e.g. after a
+		# back-dated correction), which re-fires this hook for that OLDER
+		# entry -- and if that re-save's job happens to run after the job
+		# for the true latest reconciliation, `qty` above (captured from
+		# that older doc) would clobber qoh with a stale value. Re-check the
+		# true latest non-cancelled SLE for this item + warehouse at
+		# execution time and prefer it, so whichever job runs last always
+		# converges on the same correct answer.
+		latest_qty_after_transaction = frappe.db.get_value(
+			"Stock Ledger Entry",
+			{"item_code": doc.item_code, "warehouse": doc.warehouse, "is_cancelled": 0},
+			"qty_after_transaction",
+			order_by="posting_date desc, posting_time desc, creation desc", 
+		)
+		if latest_qty_after_transaction is not None:
+			qty = flt(latest_qty_after_transaction)
+
+	reserved_qty = frappe.db.get_value("Bin", {"item_code": doc.item_code, "warehouse": doc.warehouse}, "reserved_qty") or 0
 	net_available_bins[doc.warehouse] = qty-reserved_qty
  
 	return net_available_bins, last_sle
@@ -312,7 +331,7 @@ def normalize_warehouse_ranges(warehouse_names, warehouse_meta_map=None):
 def is_in_any_range(item, ranges):
 	return any(r.lft <= item.lft <= r.rgt for r in ranges)
 
-def get_subtree_available_qty(item_code, warehouse_names):
+def get_subtree_available_qty(item_code, warehouse_names, net_available_bins=None):
 	# Sum Bin (actual_qty - reserved_qty) across the union of subtrees
 	# rooted at warehouse_names (leaf or group warehouses), letting the
 	# database filter the subtree via lft/rgt instead of expanding every
@@ -329,15 +348,38 @@ def get_subtree_available_qty(item_code, warehouse_names):
 		params[f"rgt_{i}"] = r.rgt
 
 	result = frappe.db.sql(f"""
-		SELECT COALESCE(SUM(bin.actual_qty - bin.reserved_qty), 0) AS available_qty
+		SELECT bin.warehouse AS warehouse, SUM(bin.actual_qty - bin.reserved_qty) AS available_qty
 		FROM `tabBin` bin
 		JOIN `tabWarehouse` wh ON wh.name = bin.warehouse
 		WHERE bin.item_code = %(item_code)s
 			AND wh.is_group = 0
 			AND ({" OR ".join(conditions)})
+		GROUP BY bin.warehouse
 	""", params, as_dict=True)
 
-	return flt(result[0].available_qty) if result else 0
+	# Bin.actual_qty can momentarily lag behind the SLE that just triggered
+	# this recalculation (e.g. a Stock Reconciliation that re-saves its SLE
+	# more than once). net_available_bins already carries the corrected,
+	# idempotent latest value for the transaction's own warehouse -- prefer
+	# it here too, the same way get_inventory_by_country already does.
+	seen = set()
+	total = 0.0
+	for row in result:
+		qty = net_available_bins.get(row.warehouse, row.available_qty) if net_available_bins else row.available_qty
+		total += flt(qty)
+		seen.add(row.warehouse)
+
+	if net_available_bins:
+		missing = set(net_available_bins.keys()) - seen
+		meta_map = get_warehouse_meta_map(missing)
+		for warehouse, qty in net_available_bins.items():
+			if warehouse in seen:
+				continue
+			meta = meta_map.get(warehouse)
+			if meta and is_in_any_range(meta, ranges):
+				total += flt(qty)
+
+	return total
 
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None, doc=None):
 	try:	
@@ -395,7 +437,7 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			# allowed_warehouses may include group/location warehouses, in which case
 			# every leaf warehouse in that subtree counts toward the total.
 			if not bundle:
-				total_available_qty = get_subtree_available_qty(item_code, allowed_warehouses)
+				total_available_qty = get_subtree_available_qty(item_code, allowed_warehouses, net_available_bins)
 			else:
 				# Initialize variables for bundle calculation
 				available_qty = 0
