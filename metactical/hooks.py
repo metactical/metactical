@@ -952,7 +952,9 @@ fixtures = [{
 			"Item-custom_column_break_jbo41",
 			"Item-custom_tax",
 			"Item-custom_column_break_zxgjb",
-			"Sales Order Item-barcode"
+			"Sales Order Item-barcode",
+			"Warehouse-warehouse_role",
+			"Warehouse-root_warehouse"
 		]]]
 	},
 	{
