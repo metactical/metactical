@@ -11,6 +11,3 @@ TRANSFER_RULES_CACHE_KEY = "warehouse_transfer_calculation_rules"
 class WarehouseTransferCalculationRule(Document):
 	def on_update(self):
 		frappe.cache().delete_value(TRANSFER_RULES_CACHE_KEY)
-
-	def on_trash(self):
-		frappe.cache().delete_value(TRANSFER_RULES_CACHE_KEY)

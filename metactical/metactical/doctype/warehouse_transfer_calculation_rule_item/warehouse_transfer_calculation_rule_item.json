@@ -1,0 +1,84 @@
+{
+ "actions": [],
+ "creation": "2026-08-17 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "priority",
+  "source_role",
+  "target_role",
+  "same_root",
+  "action",
+  "description"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "default": "1",
+   "description": "Lower number is evaluated first when multiple rules match the same role pair.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Priority"
+  },
+  {
+   "fieldname": "source_role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Source Role",
+   "options": "Location\nBin\nGroup Bin\nReceiving\nActive Stock\nDefective\nIn Transit\nPacking\nReturn\nWork In Process",
+   "reqd": 1
+  },
+  {
+   "fieldname": "target_role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Target Role",
+   "options": "Location\nBin\nGroup Bin\nReceiving\nActive Stock\nDefective\nIn Transit\nPacking\nReturn\nWork In Process",
+   "reqd": 1
+  },
+  {
+   "default": "Any",
+   "fieldname": "same_root",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Same Root",
+   "options": "Any\nSame\nDifferent",
+   "reqd": 1
+  },
+  {
+   "default": "Calculate",
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Action",
+   "options": "Calculate\nSkip",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Warehouse Transfer Calculation Rule Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
