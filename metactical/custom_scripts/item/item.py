@@ -612,7 +612,15 @@ def get_item_details(item_code):
                     setting_found = True
                     url =item_detail_api.api_url + "?slug=" + item_detail.slug
                     
-                    response = requests.get(url, headers={"Authorization": "Bearer " + item_detail_api.api_key})
+                    headers = {
+						"Authorization": "Bearer " + item_detail_api.api_key,
+					}
+                    
+                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
+                    if custom_header:
+                        headers["X-Origin-Verify"] = custom_header
+                                            
+                    response = requests.get(url, headers=headers)                    
                     if response.status_code == 200:
                         data = response.json()
                         
@@ -620,7 +628,10 @@ def get_item_details(item_code):
                             failed_slugs.append({
                                 "message": f"<span class='text-danger'>Slug {item_detail.slug} not found in {site_name}</span>"
                             })
-                                                
+                        elif "error" in data:
+                            failed_slugs.append({
+								"message": f"<span class='text-danger'>Error fetching details for slug {item_detail.slug} from {site_name}: {data.get('error')}</span>"
+							})            
                         else:
                             item_detail_doc = frappe.get_doc("Item Detail", item_detail.name)
                             item_detail_doc.item_name = data.get("Name", "")
@@ -776,14 +787,22 @@ def post_variant_validation(config, payload, site_name):
     every save and a confirmation each time would just be noise. The site's name is added by the
     caller, which groups the problems per website.
     """
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + config.api_key
+    }
+
+    # Stored as a Password field, so it has to be read back with get_password — a plain read
+    # returns asterisks. Same header the other two callers of these settings send.
+    custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header") if config.get("custom_header") else None
+    if custom_header:
+        headers["X-Origin-Verify"] = custom_header
+
     try:
         response = requests.post(
             config.api_url,
             json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + config.api_key
-            },
+            headers=headers,
             # This runs inside a save, so a slow site must not hold the user's form open.
             timeout=10
         )
