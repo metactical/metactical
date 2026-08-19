@@ -10,8 +10,7 @@
   "source_role",
   "target_role",
   "same_root",
-  "action",
-  "description"
+  "action"
  ],
  "fields": [
   {
@@ -26,6 +25,7 @@
    "description": "Lower number is evaluated first when multiple rules match the same role pair.",
    "fieldname": "priority",
    "fieldtype": "Int",
+   "hidden": 1,
    "in_list_view": 1,
    "label": "Priority"
   },
@@ -58,26 +58,23 @@
    "default": "Calculate",
    "fieldname": "action",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "label": "Action",
    "options": "Calculate\nSkip",
    "reqd": 1
-  },
-  {
-   "fieldname": "description",
-   "fieldtype": "Small Text",
-   "label": "Description"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-17 00:00:00",
+ "modified": "2026-08-19 11:31:15.993992",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Warehouse Transfer Calculation Rule Item",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
