@@ -1,108 +1,23 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "field:rule_name",
  "creation": "2026-08-17 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "rule_name",
-  "enabled",
-  "column_break_enabled",
-  "priority",
-  "section_transfer",
-  "source_role",
-  "target_role",
-  "column_break_transfer",
-  "same_root",
-  "action",
-  "section_description",
-  "description"
+  "rules"
  ],
  "fields": [
   {
-   "fieldname": "rule_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Rule Name",
-   "reqd": 1,
-   "unique": 1
-  },
-  {
-   "default": "1",
-   "fieldname": "enabled",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Enabled"
-  },
-  {
-   "fieldname": "column_break_enabled",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "1",
-   "description": "Lower number is evaluated first when multiple rules match the same role pair.",
-   "fieldname": "priority",
-   "fieldtype": "Int",
-   "label": "Priority"
-  },
-  {
-   "fieldname": "section_transfer",
-   "fieldtype": "Section Break",
-   "label": "Transfer Match"
-  },
-  {
-   "fieldname": "source_role",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Source Role",
-   "options": "Location\nBin\nGroup Bin\nReceiving\nActive Stock\nDefective\nIn Transit\nPacking\nReturn\nWork In Process",
-   "reqd": 1
-  },
-  {
-   "fieldname": "target_role",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Target Role",
-   "options": "Location\nBin\nGroup Bin\nReceiving\nActive Stock\nDefective\nIn Transit\nPacking\nReturn\nWork In Process",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_transfer",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "Any",
-   "fieldname": "same_root",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Same Root",
-   "options": "Any\nSame\nDifferent",
-   "reqd": 1
-  },
-  {
-   "default": "Calculate",
-   "fieldname": "action",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Action",
-   "options": "Calculate\nSkip",
-   "reqd": 1
-  },
-  {
-   "fieldname": "section_description",
-   "fieldtype": "Section Break",
-   "label": "Description"
-  },
-  {
-   "fieldname": "description",
-   "fieldtype": "Small Text",
-   "label": "Description"
+   "fieldname": "rules",
+   "fieldtype": "Table",
+   "label": "Rules",
+   "options": "Warehouse Transfer Calculation Rule Item"
   }
  ],
  "index_web_pages_for_search": 1,
+ "issingle": 1,
  "links": [],
- "modified": "2026-08-17 00:00:00",
+ "modified": "2026-08-19 07:12:18.353350",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Warehouse Transfer Calculation Rule",
@@ -111,19 +26,26 @@
   {
    "create": 1,
    "delete": 1,
+   "email": 1,
+   "print": 1,
    "read": 1,
    "role": "System Manager",
+   "share": 1,
    "write": 1
   },
   {
    "create": 1,
    "delete": 1,
+   "email": 1,
+   "print": 1,
    "read": 1,
    "role": "Stock Manager",
+   "share": 1,
    "write": 1
   }
  ],
- "sort_field": "priority",
- "sort_order": "ASC",
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
  "states": []
 }
