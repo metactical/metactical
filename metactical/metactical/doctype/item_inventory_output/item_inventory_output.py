@@ -19,11 +19,167 @@ class ItemInventoryOutput(Document):
 		# logic (and its error handling) lives in restock_notification.py.
 		restock_notification.on_item_inventory_output_update(self)
 
+TRANSFER_RULES_CACHE_KEY = "warehouse_transfer_calculation_rules"
+
 def on_sle_update(doc, method):
+	# Metactical Customization: skip the (expensive) inventory output
+	# recalculation for Stock Entry transfer rows whose source/target
+	# warehouse roles aren't whitelisted in Warehouse Transfer Calculation
+	# Rule — e.g. Bin -> Bin moves within the same location.
+	if is_stock_entry_transfer_skippable(doc):
+		return
+
 	# Fetch bins and calculate net available quantities per warehouse
 	net_available_bins, last_sle = get_inventory_quantity(doc)
- 
+
 	frappe.enqueue(update_item_inventory_output, item_code=doc.item_code, net_available_bins=net_available_bins, voucher_type=doc.voucher_type, last_sle=last_sle, doc=doc)
+
+def is_stock_entry_transfer_skippable(doc):
+	if doc.voucher_type != "Stock Entry" or not doc.voucher_no:
+		return False
+
+	decision_cache = get_transfer_decision_cache()
+	cache_key = (doc.voucher_no, doc.item_code, doc.warehouse)
+	if cache_key in decision_cache:
+		return decision_cache[cache_key]
+
+	stock_entry = frappe.get_cached_doc("Stock Entry", doc.voucher_no)
+
+	warehouse_names = {
+		warehouse
+		for row in stock_entry.items
+		for warehouse in (row.s_warehouse, row.t_warehouse)
+		if warehouse
+	}
+	warehouse_map = get_warehouse_map(warehouse_names)
+
+	# Evaluate every transfer row for this item once, caching both the
+	# source and target warehouse decisions so the paired SLE call (each
+	# Stock Entry transfer row fires one SLE per warehouse) reads from
+	# cache instead of re-scanning stock_entry.items.
+	for row in stock_entry.items:
+		if row.item_code != doc.item_code or not row.s_warehouse or not row.t_warehouse:
+			continue
+
+		calculate = should_calculate_transfer(
+			warehouse_map.get(row.s_warehouse), warehouse_map.get(row.t_warehouse)
+		)
+		decision_cache[(doc.voucher_no, row.item_code, row.s_warehouse)] = not calculate
+		decision_cache[(doc.voucher_no, row.item_code, row.t_warehouse)] = not calculate
+
+	# Not part of any transfer row (e.g. plain issue/receipt) -> don't skip.
+	return decision_cache.get(cache_key, False)
+
+def get_transfer_decision_cache():
+	cache = getattr(frappe.local, "_warehouse_transfer_decision_cache", None)
+	if cache is None:
+		cache = {}
+		frappe.local._warehouse_transfer_decision_cache = cache
+	return cache
+
+def get_warehouse_map(warehouse_names):
+	if not warehouse_names:
+		return {}
+
+	tree = get_warehouse_tree()
+	return {name: tree[name] for name in warehouse_names if name in tree}
+
+def should_calculate_transfer(source, target):
+	if not source or not target or source.name == target.name:
+		return False
+
+	if not source.warehouse_role or not target.warehouse_role:
+		return False
+
+	rules = get_transfer_rules()
+
+	same_root = bool(source.root_warehouse) and source.root_warehouse == target.root_warehouse
+	root_condition = "Same" if same_root else "Different"
+
+	action = rules.get((source.warehouse_role, target.warehouse_role, root_condition))
+	if action is None:
+		action = rules.get((source.warehouse_role, target.warehouse_role, "Any"))
+
+	# Default (no matching rule) = Skip.
+	return action == "calculate"
+
+def get_transfer_rules():
+	local_cache = getattr(frappe.local, "_warehouse_transfer_rules", None)
+	if local_cache is not None:
+		return local_cache
+
+	rules = frappe.cache().get_value(TRANSFER_RULES_CACHE_KEY, generator=build_transfer_rules)
+	frappe.local._warehouse_transfer_rules = rules
+	return rules
+
+def build_transfer_rules():
+	# Warehouse Transfer Calculation Rule is a Settings (single) doctype; its
+	# rules live in the "rules" child table, rows tagged by parenttype.
+	rows = frappe.get_all(
+		"Warehouse Transfer Calculation Rule Item",
+		filters={"parenttype": "Warehouse Transfer Calculation Rule", "enabled": 1},
+		fields=["source_role", "target_role", "same_root", "action"],
+		order_by="priority asc",
+	)
+
+	compiled = {}
+	for row in rows:
+		key = (row.source_role, row.target_role, row.same_root)
+		# First (highest-priority) rule for a given key wins.
+		compiled.setdefault(key, row.action.lower())
+
+	return compiled
+
+def get_warehouse_tree():
+	# One query for the whole Warehouse tree, fetched fresh at the start of
+	# this recalculation (each SLE update runs as its own frappe.enqueue job,
+	# i.e. its own request/process, so frappe.local isn't shared across
+	# calculations -- no cross-request cache, no invalidation to manage).
+	local_cache = getattr(frappe.local, "_warehouse_tree_meta", None)
+	if local_cache is not None:
+		return local_cache
+
+	rows = frappe.get_all(
+		"Warehouse",
+		fields=["name", "lft", "rgt", "is_group", "root_warehouse", "warehouse_role"],
+	)
+	tree = {row.name: row for row in rows}
+	frappe.local._warehouse_tree_meta = tree
+	return tree
+
+def get_lead_source_configs():
+	# Every Lead Source's price list, country, and configured warehouses,
+	# fetched in two queries (Lead Source + its SB Warehouse Inventory Sync
+	# rows) at the start of this recalculation instead of once per Lead
+	# Source per item. Same per-request scoping as get_warehouse_tree.
+	local_cache = getattr(frappe.local, "_lead_source_inventory_config", None)
+	if local_cache is not None:
+		return local_cache
+
+	lead_sources = frappe.get_all(
+		"Lead Source",
+		fields=["name", "custom_neb_price_list", "neb_country"],
+	)
+
+	warehouse_rows = frappe.get_all(
+		"SB Warehouse Inventory Sync",
+		fields=["parent", "warehouse"],
+	)
+	warehouses_by_parent = defaultdict(list)
+	for row in warehouse_rows:
+		warehouses_by_parent[row.parent].append(row.warehouse)
+
+	configs = [
+		frappe._dict({
+			"name": ls.name,
+			"price_list": ls.custom_neb_price_list,
+			"country": ls.neb_country,
+			"warehouses": warehouses_by_parent.get(ls.name, []),
+		})
+		for ls in lead_sources
+	]
+	frappe.local._lead_source_inventory_config = configs
+	return configs
 
 def get_posting_time(doc):
 	posting_time_str = None
@@ -83,39 +239,29 @@ def get_inventory_quantity(doc):
 	return net_available_bins, last_sle
 
 def get_all_bins(item_code):
-	all_bins = frappe.get_all(
-		'Bin', 
-		filters={'item_code': item_code, "warehouse":["like", "%active stock%"]}, 
-		fields=["warehouse", "actual_qty", "reserved_qty"]
-	)
-
-	other_active_warehouse_bins = frappe.get_all(
-		'Bin', 
-		filters={'item_code': item_code, "warehouse":["like", "%-active%"]}, 
-		fields=["warehouse", "actual_qty", "reserved_qty"]
-	)
-
-	all_bins.extend(other_active_warehouse_bins)
-
-	return all_bins
+	# Warehouses whose stock counts toward "active"/sellable quantity: real
+	# storage bins and dedicated Active Stock warehouses, identified by
+	# warehouse_role rather than a name pattern.
+	return frappe.db.sql("""
+		SELECT bin.warehouse, bin.actual_qty, bin.reserved_qty
+		FROM `tabBin` bin
+		JOIN `tabWarehouse` wh ON wh.name = bin.warehouse
+		WHERE bin.item_code = %(item_code)s
+			AND wh.warehouse_role IN ('Active Stock', 'Bin')
+	""", {"item_code": item_code}, as_dict=True)
 
 def get_all_bins_for_product_bundle(parent_item, net_available_bins = {}):
 	bundle = frappe.get_doc('Product Bundle', parent_item)
 	bundle_items = {x.item_code: x.qty for x in bundle.items}  # Store item qty per bundle unit
 
-	all_bins = frappe.get_all(
-		'Bin', 
-		filters={'item_code': ["in", list(bundle_items.keys())], "warehouse": ["like", "%active stock%"]}, 
-		fields=["warehouse", "item_code", "actual_qty", "reserved_qty"]
-	)
+	all_bins = frappe.db.sql("""
+		SELECT bin.warehouse, bin.item_code, bin.actual_qty, bin.reserved_qty
+		FROM `tabBin` bin
+		JOIN `tabWarehouse` wh ON wh.name = bin.warehouse
+		WHERE bin.item_code IN %(item_codes)s
+			AND wh.warehouse_role IN ('Active Stock', 'Bin')
+	""", {"item_codes": tuple(bundle_items.keys())}, as_dict=True)
 
-	other_active_warehouse_bins = frappe.get_all(
-		'Bin', 
-		filters={'item_code': ["in", list(bundle_items.keys())], "warehouse": ["like", "%activestock%"]}, 
-		fields=["warehouse", "item_code", "actual_qty", "reserved_qty"]
-	)
-
-	all_bins.extend(other_active_warehouse_bins)
 	warehouse_item_qty = defaultdict(lambda: defaultdict(int))
 
 	for bin_entry in all_bins:
@@ -131,6 +277,67 @@ def get_all_bins_for_product_bundle(parent_item, net_available_bins = {}):
 				warehouse_item_qty[item][wh] = net_available_bins.get(wh)
 
 	return {"all_bins": warehouse_item_qty, "bundle_items": bundle_items}
+
+def get_warehouse_meta_map(warehouse_names):
+	# lft/rgt/is_group for a set of warehouse names, read from the cached
+	# warehouse tree instead of a live query per call.
+	warehouse_names = [w for w in set(warehouse_names) if w]
+	if not warehouse_names:
+		return {}
+
+	tree = get_warehouse_tree()
+	return {name: tree[name] for name in warehouse_names if name in tree}
+
+def normalize_warehouse_ranges(warehouse_names, warehouse_meta_map=None):
+	# Drop any configured warehouse range that's fully nested inside another
+	# configured warehouse's range, so a Lead Source that lists both a
+	# parent/location warehouse and one of its own children isn't double
+	# counted.
+	warehouse_names = [w for w in set(warehouse_names) if w]
+	if not warehouse_names:
+		return []
+
+	meta_map = warehouse_meta_map or get_warehouse_meta_map(warehouse_names)
+	rows = [meta_map[name] for name in warehouse_names if name in meta_map]
+
+	rows.sort(key=lambda r: (r.lft, -r.rgt))
+	kept = []
+	for row in rows:
+		if any(k.lft <= row.lft and row.rgt <= k.rgt for k in kept):
+			continue
+		kept.append(row)
+
+	return kept
+
+def is_in_any_range(item, ranges):
+	return any(r.lft <= item.lft <= r.rgt for r in ranges)
+
+def get_subtree_available_qty(item_code, warehouse_names):
+	# Sum Bin (actual_qty - reserved_qty) across the union of subtrees
+	# rooted at warehouse_names (leaf or group warehouses), letting the
+	# database filter the subtree via lft/rgt instead of expanding every
+	# descendant warehouse name in Python.
+	ranges = normalize_warehouse_ranges(warehouse_names)
+	if not ranges:
+		return 0
+
+	conditions = []
+	params = {"item_code": item_code}
+	for i, r in enumerate(ranges):
+		conditions.append(f"(wh.lft >= %(lft_{i})s AND wh.rgt <= %(rgt_{i})s)")
+		params[f"lft_{i}"] = r.lft
+		params[f"rgt_{i}"] = r.rgt
+
+	result = frappe.db.sql(f"""
+		SELECT COALESCE(SUM(bin.actual_qty - bin.reserved_qty), 0) AS available_qty
+		FROM `tabBin` bin
+		JOIN `tabWarehouse` wh ON wh.name = bin.warehouse
+		WHERE bin.item_code = %(item_code)s
+			AND wh.is_group = 0
+			AND ({" OR ".join(conditions)})
+	""", params, as_dict=True)
+
+	return flt(result[0].available_qty) if result else 0
 
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None, doc=None):
 	try:	
@@ -169,29 +376,26 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		website_deduct_qty_dict = frappe._dict({x.lead_source: x.qty for x in website_deduct_qty})
 		# lead_sources_in_website_deduct_qty = [x.lead_source for x in website_deduct_qty]
   
-		if price_lists:
-			lead_sources = frappe.get_all('Lead Source', pluck='name', filters={"custom_neb_price_list": ["in", price_lists]})
-		else:
-			lead_sources = []
+		price_list_set = set(price_lists)
+		lead_source_configs = [
+			config for config in get_lead_source_configs() if config.price_list in price_list_set
+		] if price_lists else []
 
 		# Check for existing Item Inventory Output, create new if not found
 		item_inventory_output_doc = frappe.db.get_value('Item Inventory Output', {'name': item_code})
 		retail_sku = frappe.db.get_value('Item', item_code, 'ifw_retailskusuffix')
 		inventory_ouput_data = []
-  
-		print(f"Lead sources for {item_code}: {lead_sources}")
 
 		# Loop through each lead source to calculate quantity to send
-		for lead_source in lead_sources:
-			allowed_warehouses = frappe.get_all(
-				'SB Warehouse Inventory Sync', 
-				filters={'parent': lead_source}, 
-				pluck="warehouse"
-			)
+		for lead_source_config in lead_source_configs:
+			lead_source = lead_source_config.name
+			allowed_warehouses = lead_source_config.warehouses
 
-			# Sum total available quantity across allowed warehouses for the lead source
+			# Sum total available quantity across allowed warehouses for the lead source.
+			# allowed_warehouses may include group/location warehouses, in which case
+			# every leaf warehouse in that subtree counts toward the total.
 			if not bundle:
-				total_available_qty = sum(net_available_bins.get(warehouse, 0) for warehouse in allowed_warehouses)
+				total_available_qty = get_subtree_available_qty(item_code, allowed_warehouses)
 			else:
 				# Initialize variables for bundle calculation
 				available_qty = 0
@@ -243,7 +447,8 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 			inventory_ouput_data.append(item_inventory_output_data)
 
 		# Save changes to Item Inventory Output
-		total_available_qty = sum(net_available_bins.values()) if not bundle else min(net_available_bundles)
+  
+		total_available_qty = sum(net_available_bins.values()) if not bundle else (min(net_available_bundles) if net_available_bundles else 0)
 		inventories_by_country = get_inventory_by_country(item_code, last_sle, net_available_bins, doc)
 
 		if not item_inventory_output_doc:
@@ -289,11 +494,9 @@ def update_item_inventory_output(item_code, net_available_bins = {}, voucher_typ
 		frappe.db.rollback()
   
 def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, doc=None):
-	filters = {"item_code": item_code}
-
 	# Check if this is a bundle (has nested structure)
 	is_bundle = isinstance(net_available_bins, dict) and "all_bins" in net_available_bins and "bundle_items" in net_available_bins
-	
+
 	# Convert bundle structure to warehouse quantities
 	if is_bundle:
 		warehouse_bundle_qty = calculate_bundle_qty_per_warehouse(
@@ -304,117 +507,128 @@ def get_inventory_by_country(item_code, last_sle=None, net_available_bins={}, do
 	elif doc and not net_available_bins:
 		net_available_bins, last_sle = get_inventory_quantity(doc)
 
-	# Fetch Lead Sources that have a country set
-	lead_sources = frappe.get_all(
-		'Lead Source',
-		filters={"neb_country": ["is", "set"]},
-		pluck='name'
-	)
-
+	# Build a mapping: country → configured warehouses (leaf or group/location)
 	warehouses_per_country = {}
 
-	# Build a mapping: country → warehouses
-	for lead_source in lead_sources:
-		ls = frappe.get_cached_doc('Lead Source', lead_source)
-		warehouses = [w.warehouse for w in ls.custom_neb_sb_warehouse_inventory_sync]
+	for config in get_lead_source_configs():
+		if not config.country:
+			continue
 
-		if ls.neb_country not in warehouses_per_country:
-			warehouses_per_country[ls.neb_country] = []
-
-		warehouses_per_country[ls.neb_country].extend(warehouses)
+		warehouses_per_country.setdefault(config.country, []).extend(config.warehouses)
 
 	# Remove duplicates
 	for c in warehouses_per_country:
 		warehouses_per_country[c] = list(set(warehouses_per_country[c]))
 
-	# Build list of all warehouses
-	all_warehouses = tuple(
-		w for ws in warehouses_per_country.values() for w in ws
-	)
-	
-	if not all_warehouses:
+	all_configured_warehouses = {w for ws in warehouses_per_country.values() for w in ws}
+
+	if not all_configured_warehouses:
 		frappe.log_error(
 			title=f"No warehouses found for country mapping - {item_code}",
 			message="No warehouses configured in Lead Sources with country set"
 		)
 		return []
-	
-	filters["all_warehouses"] = all_warehouses
 
-	# For bundles, skip SQL query and use calculated bundle quantities
+	warehouse_meta_map = get_warehouse_meta_map(all_configured_warehouses)
+
+	# Normalize each country's configured warehouses into non-overlapping
+	# subtree ranges (drops a child range already covered by a configured
+	# parent within the same country), plus the union across all countries
+	# used to scope the single Bin query below.
+	country_ranges = {
+		country: normalize_warehouse_ranges(names, warehouse_meta_map)
+		for country, names in warehouses_per_country.items()
+	}
+	all_ranges = normalize_warehouse_ranges(all_configured_warehouses, warehouse_meta_map)
+
+	if not all_ranges:
+		frappe.log_error(
+			title=f"No warehouses found for country mapping - {item_code}",
+			message="No warehouses configured in Lead Sources with country set"
+		)
+		return []
+
 	if is_bundle:
+		# For bundles we already have qty per leaf warehouse from
+		# calculate_bundle_qty_per_warehouse; just need each leaf's lft/rgt
+		# to place it inside the right country's ranges.
+		bundle_warehouse_meta = get_warehouse_meta_map(net_available_bins.keys())
 		result = [
-			frappe._dict({
-				"warehouse": wh,
-				"available_qty": qty
-			})
+			frappe._dict({"warehouse": wh, "lft": meta.lft, "rgt": meta.rgt, "available_qty": qty})
 			for wh, qty in net_available_bins.items()
-			if wh in all_warehouses  # Only include warehouses in country mapping
+			if (meta := bundle_warehouse_meta.get(wh)) and is_in_any_range(meta, all_ranges)
 		]
 	else:
-		# Regular items: query from Bin
-		query = """
-			SELECT 
-				warehouse,
+		# Regular items: query from Bin, scoped to the configured subtrees
+		# via lft/rgt instead of an exact warehouse-name IN list.
+		conditions = []
+		params = {"item_code": item_code}
+		for i, r in enumerate(all_ranges):
+			conditions.append(f"(wh.lft >= %(lft_{i})s AND wh.rgt <= %(rgt_{i})s)")
+			params[f"lft_{i}"] = r.lft
+			params[f"rgt_{i}"] = r.rgt
+
+		query = f"""
+			SELECT
+				bin.warehouse AS warehouse,
+				wh.lft AS lft,
+				wh.rgt AS rgt,
 				SUM(bin.actual_qty - bin.reserved_qty) AS available_qty
 			FROM `tabBin` bin
-			WHERE bin.item_code = %(item_code)s 
-				AND bin.warehouse IN %(all_warehouses)s
-			GROUP BY warehouse
+			JOIN `tabWarehouse` wh ON wh.name = bin.warehouse
+			WHERE bin.item_code = %(item_code)s
+				AND wh.warehouse_role IN ('Active Stock', 'Bin')
+				AND ({" OR ".join(conditions)})
+			GROUP BY bin.warehouse, wh.lft, wh.rgt
 			ORDER BY available_qty DESC
 		"""
-		result = frappe.db.sql(query, filters, as_dict=1)
+		result = frappe.db.sql(query, params, as_dict=1)
 
 		# If SQL returned no rows, fill from net_available_bins
 		if not result:
+			net_bin_meta = get_warehouse_meta_map(net_available_bins.keys())
 			result = [
-				frappe._dict({
-					"warehouse": wh,
-					"available_qty": qty
-				})
+				frappe._dict({"warehouse": wh, "lft": meta.lft, "rgt": meta.rgt, "available_qty": qty})
 				for wh, qty in net_available_bins.items()
+				if (meta := net_bin_meta.get(wh)) and is_in_any_range(meta, all_ranges)
 			]
 
+	# Reconcile with net_available_bins: the real-time SLE-derived qty for
+	# the transaction's own warehouse always takes priority over the Bin
+	# snapshot picked up by the query above.
+	net_bin_meta = get_warehouse_meta_map(net_available_bins.keys())
+	result_by_warehouse = {row.warehouse: row for row in result}
+
+	for wh, qty in net_available_bins.items():
+		meta = net_bin_meta.get(wh)
+		if not meta or not is_in_any_range(meta, all_ranges):
+			continue
+
+		if wh in result_by_warehouse:
+			row = result_by_warehouse[wh]
+			if is_bundle:
+				row.available_qty = qty
+			else:
+				sql_qty = float(row.available_qty) if row.available_qty else 0
+				net_qty = float(qty) if qty else 0
+
+				# Use the higher value
+				if sql_qty < net_qty:
+					row.available_qty = net_qty
+		else:
+			new_row = frappe._dict({"warehouse": wh, "lft": meta.lft, "rgt": meta.rgt, "available_qty": qty})
+			result.append(new_row)
+			result_by_warehouse[wh] = new_row
+
 	inventories_by_country = {}
- 
-	# Check if warehouses in net_available_bins are missing or have different values than result
-	for wh in net_available_bins:
-		found = False
-
-		for row in result:
-			if row.warehouse == wh:
-				found = True
-				
-				# For bundles, always use net_available_bins (calculated bundle qty)
-				# For regular items, use the higher value
-				if is_bundle:
-					row.available_qty = net_available_bins[wh]
-				else:
-					sql_qty = float(row.available_qty) if row.available_qty else 0
-					net_qty = float(net_available_bins[wh]) if net_available_bins[wh] else 0
-					
-					# Use the higher value
-					if sql_qty < net_qty:
-						row.available_qty = net_qty
-
-		# If the warehouse was not in result → add it (if in country mapping)
-		if not found and wh in all_warehouses:
-			result.append(
-				frappe._dict({
-					"warehouse": wh,
-					"available_qty": net_available_bins[wh]
-				})
-			)
 
 	for row in result:
-		warehouse = row.warehouse
-
 		# Corrected qty using net_available_bins always takes priority
-		corrected_qty = float(net_available_bins.get(warehouse, row.available_qty) or 0)
+		corrected_qty = float(net_available_bins.get(row.warehouse, row.available_qty) or 0)
 
-		# Sum warehouse qty into its country
-		for country, wh_list in warehouses_per_country.items():
-			if warehouse in wh_list:
+		# Sum warehouse qty into every country whose configured subtree contains it
+		for country, ranges in country_ranges.items():
+			if is_in_any_range(row, ranges):
 				inventories_by_country[country] = (
 					inventories_by_country.get(country, 0) + corrected_qty
 				)
