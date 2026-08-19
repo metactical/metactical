@@ -787,14 +787,22 @@ def post_variant_validation(config, payload, site_name):
     every save and a confirmation each time would just be noise. The site's name is added by the
     caller, which groups the problems per website.
     """
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + config.api_key
+    }
+
+    # Stored as a Password field, so it has to be read back with get_password — a plain read
+    # returns asterisks. Same header the other two callers of these settings send.
+    custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header") if config.get("custom_header") else None
+    if custom_header:
+        headers["X-Origin-Verify"] = custom_header
+
     try:
         response = requests.post(
             config.api_url,
             json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + config.api_key
-            },
+            headers=headers,
             # This runs inside a save, so a slow site must not hold the user's form open.
             timeout=10
         )
