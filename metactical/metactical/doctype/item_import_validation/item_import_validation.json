@@ -10,7 +10,8 @@
   "api_url",
   "price_list",
   "api_key",
-  "custom_header"
+  "custom_header",
+  "cdn_url"
  ],
  "fields": [
   {
@@ -47,6 +48,12 @@
    "fieldname": "custom_header",
    "fieldtype": "Password",
    "label": "Custom Header"
+  },
+  {
+   "description": "Base URL images are served from, e.g. https://images.camouflage.ca (no trailing slash)",
+   "fieldname": "cdn_url",
+   "fieldtype": "Data",
+   "label": "CDN URL"
   }
  ],
  "grid_page_length": 50,

@@ -326,15 +326,23 @@ class CustomItem(Item):
         validate_item_group(self)
         self.update_item_inventory_output()
         self.update_sb_tags()
-        
+
+        # Image work lives in its own module; item.py just says when.
+        from metactical.custom_scripts.utils import s3_image_api
+        s3_image_api.queue_retail_sku_change(self)
+
         if self.drop_and_create_in_websites:
             if not self.item_detail:
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
-            
+
+            # A drop and create re-pushes this product's images from the S3 record. Letting it run
+            # while the image import is still writing that record would push a half-built image set.
+            s3_image_api.block_if_image_job_running(self.item_code)
+
             self.create_item_deletion_log()
-        
+
         frappe.flags.renaming = False
-            
+
     def update_sb_tags(self):
         item_specs = {
             (row.label, row.description)
@@ -660,6 +668,7 @@ def get_item_details(item_code):
     except Exception as e:
         frappe.log_error(title="Error in get_item_details API", message=frappe.get_traceback())
         frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
+
 
 def validate_variants_in_websites(doc):
     """Ask every website this product is published to whether its variants are acceptable.
