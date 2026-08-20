@@ -200,7 +200,7 @@ frappe.ui.form.on("Item", {
         grid.add_custom_button(__('Load Data From SB'), function() {
             frappe.call({
                 freeze: true,
-                method: "metactical.custom_scripts.item.item.get_item_details",
+                method: "metactical.custom_scripts.item.item.load_data_from_sb",
                 args: {
                     item_code: frm.doc.item_code
                 },
