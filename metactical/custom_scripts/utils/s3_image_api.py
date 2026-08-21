@@ -74,17 +74,28 @@ def _flag_started(flag):
     """When the job started, as 20-Aug-2026 12:47 rather than a raw timestamp."""
     started = (flag or {}).get("started")
     if not started:
-        return "—"
+        return "an unknown time"
     try:
         return frappe.utils.format_datetime(started, "dd-MMM-yyyy HH:mm")
     except Exception:
         return str(started)
 
 
+def _flag_user(flag):
+    """Who started it, by name — an email address means nothing to whoever is blocked."""
+    user = (flag or {}).get("user")
+    if not user:
+        return "someone"
+    try:
+        return frappe.utils.get_fullname(user) or user
+    except Exception:
+        return user
+
+
 def _flag_message(flag, item_code=None):
     """One short line: which item is held, what is running, who started it, and when."""
-    line = "{0} — started by {1}, {2}.".format(
-        _flag_reason(flag), (flag or {}).get("user") or "someone", _flag_started(flag)
+    line = "{0}. Started by {1} at {2}.".format(
+        _flag_reason(flag), _flag_user(flag), _flag_started(flag)
     )
     return "{0}: {1}".format(item_code, line) if item_code else line
 
@@ -441,7 +452,7 @@ def sync_images_from_sb(item_code, user=None):
             )
         if stats["errors"]:
             messages.append(
-                "<span class='text-danger'>{0} could not be copied — please check the Error "
+                "<span class='text-danger'>{0} could not be copied. Please check the Error "
                 "Log.</span>".format(_plural(stats["errors"], "file"))
             )
         if found:
@@ -664,8 +675,8 @@ def apply_retail_sku_change_to_s3(old_sku, new_sku, item_code=None, lock_items=N
             doc.add_comment(
                 "Comment",
                 "Retail SKU changed from <b>{0}</b> to <b>{1}</b>. Images copied to the new "
-                "name in S3; the originals were left in place. The websites were not notified "
-                "— drop and re-sync to update them.".format(old_sku, new_sku),
+                "name in S3; the originals were left in place. The websites were not notified, "
+                "so drop and re-sync to update them.".format(old_sku, new_sku),
             )
             frappe.db.commit()
 
@@ -689,7 +700,7 @@ def apply_retail_sku_change_to_s3(old_sku, new_sku, item_code=None, lock_items=N
             )
         if stats["errors"]:
             messages.append(
-                "<span class='text-danger'>{0} could not be renamed — please check the Error "
+                "<span class='text-danger'>{0} could not be renamed. Please check the Error "
                 "Log.</span>".format(_plural(stats["errors"], "image"))
             )
         if renamed:
