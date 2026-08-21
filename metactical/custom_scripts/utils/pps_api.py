@@ -11,6 +11,19 @@ import time
 
 site = frappe.local.site
 
+# Child-table fieldnames on "Warehouse User Permissions" that hold a list of
+# permitted warehouses. Every key here is always returned by
+# `get_warehouse_permissions`, even when empty, so PPS (which fails closed)
+# can tell "no access" apart from "unrecognised contract".
+WAREHOUSE_PERMISSION_FIELDS = [
+    "source_warehouse",
+    "target_warehouse",
+    "cycle_count_warehouse",
+    "purchase_receipt_accepted_warehouse",
+    "material_request_target_warehouse",
+    "material_request_target_warehouse_purchase",
+]
+
 def _get_random_instock_items(warehouse, count):
     """Return `count` random items that have actual_qty >= 1 in `warehouse`."""
     rows = frappe.db.sql("""
@@ -321,6 +334,77 @@ def create_label(*args, **kwargs):
             frappe.db.set_value("PPS API Log", log, "error", frappe.as_json(_error(str(e))))
         frappe.db.commit()
         return _error(str(e))
+
+@frappe.whitelist(allow_guest=True)
+def authenticate(*args, **kwargs):
+    """
+    Single-call authenticate + warehouse permissions for PPS.
+
+    Required: usr, pwd (a full ERPNext password, not a PIN).
+
+    Credential check goes through Frappe's own `LoginManager.authenticate` —
+    the same code path `POST /api/method/login` uses, so password policy,
+    the disabled-user check and login-attempt lockout tracking all apply
+    natively. It deliberately does not call `post_login`/`make_session`, so
+    no browser-visible session is created; PPS mints its own bearer token
+    from this response.
+
+    Never logs the raw form data (it contains the password), unlike the
+    other PPS API methods here which log via `create_log`.
+    """
+    form_data = frappe.local.form_dict
+    usr = form_data.get("usr")
+    pwd = form_data.get("pwd")
+
+    if not usr or not pwd:
+        return {"authenticated": False, "reason": "invalid_credentials"}
+
+    from frappe.auth import LoginManager
+
+    login_manager = LoginManager.__new__(LoginManager)
+    try:
+        login_manager.authenticate(user=usr, pwd=pwd)
+    except frappe.AuthenticationError:
+        reason = "user_disabled" if frappe.local.response.get("message") == "User disabled or missing" else "invalid_credentials"
+        return {"authenticated": False, "reason": reason}
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "PPS Authenticate Error")
+        return {"authenticated": False, "reason": "invalid_credentials"}
+
+    user = login_manager.user
+
+    return {
+        "authenticated": True,
+        "user_id": user,
+        "full_name": frappe.db.get_value("User", user, "full_name"),
+        "enabled": True,
+        "roles": frappe.get_roles(user),
+        "warehouse_permissions": _get_warehouse_permissions(user),
+    }
+
+
+def _get_warehouse_permissions(user):
+    """
+    Full document read of `Warehouse User Permissions` (child tables only
+    come back on a full read, never on a list query) — every key is always
+    present, deduplicated, so PPS's fail-closed client never sees a missing
+    contract as "no access".
+    """
+    permissions = {field: [] for field in WAREHOUSE_PERMISSION_FIELDS}
+
+    if not frappe.db.exists("Warehouse User Permissions", user):
+        return permissions
+
+    doc = frappe.get_doc("Warehouse User Permissions", user)
+    for field in WAREHOUSE_PERMISSION_FIELDS:
+        warehouses = []
+        for row in doc.get(field) or []:
+            if row.warehouse and row.warehouse not in warehouses:
+                warehouses.append(row.warehouse)
+        permissions[field] = warehouses
+
+    return permissions
+
 
 def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note):
     """
