@@ -1580,6 +1580,8 @@ jinja = {
 		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json",
 		"metactical.custom_scripts.utils.metactical_utils.get_refund_details_for_print",
 		"metactical.metactical.page.s3_uploader.s3_uploader.s3_product_payload",
+		"metactical.custom_scripts.utils.pps_order_config.get_order_warehouse_bin_config",
+		"metactical.custom_scripts.utils.pps_user_access.get_user_access_sync_payload",
 	]
 }
 
