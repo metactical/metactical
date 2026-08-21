@@ -406,6 +406,264 @@ def _get_warehouse_permissions(user):
     return permissions
 
 
+@frappe.whitelist()
+def search_inventory(*args, **kwargs):
+    """
+    Single-call inventory search: resolves a scanned barcode, an exact item
+    code, or a free-text description, and returns per-warehouse bin
+    quantities for each match — one call, no second round trip.
+
+    Request: q, site, warehouse, in_stock_only, include_disabled, limit, cursor.
+
+    Exact match (barcode or item code) always wins over the fuzzy match,
+    and is only returned on the first page (no cursor) — everything after
+    that is keyset-paginated fuzzy results, ordered by item_code, using
+    item_code as the cursor. The fuzzy match itself is a prefix match:
+    item_code / item_name / description / barcode must each START WITH
+    `q`, not merely contain it anywhere.
+    """
+    form_data = frappe.local.form_dict
+    q = (form_data.get("q") or "").strip()
+    site_filter = form_data.get("site")
+    warehouse_filter = form_data.get("warehouse")
+    in_stock_only = _as_bool(form_data.get("in_stock_only"))
+    include_disabled = _as_bool(form_data.get("include_disabled"))
+    limit = min(int(form_data.get("limit") or 25), 100)
+    cursor_item_code = _decode_cursor(form_data.get("cursor"))
+
+    if not q:
+        return {"results": [], "next_cursor": None, "has_more": False, "stock_as_of": _utc_now_iso()}
+
+    exact_item_codes = [] if cursor_item_code else _resolve_exact_matches(q, include_disabled)
+
+    remaining = max(limit - len(exact_item_codes), 0)
+    fuzzy_item_codes = []
+    has_more = False
+    if remaining:
+        # fetch one extra row to know whether another page follows. site/warehouse/
+        # in_stock_only are applied inside the query itself (not after truncating to
+        # `limit`) — otherwise a candidate consumed by the limit but filtered out
+        # downstream could leave a page empty despite matches existing further on.
+        candidates = _resolve_fuzzy_matches(
+            q, include_disabled, exclude=exact_item_codes, after=cursor_item_code, limit=remaining + 1,
+            site_filter=site_filter, warehouse_filter=warehouse_filter, in_stock_only=in_stock_only,
+        )
+        has_more = len(candidates) > remaining
+        fuzzy_item_codes = candidates[:remaining]
+
+    ordered_item_codes = exact_item_codes + fuzzy_item_codes
+    results = _load_items_with_locations(
+        ordered_item_codes, site_filter, warehouse_filter, in_stock_only
+    )
+
+    next_cursor = _encode_cursor(fuzzy_item_codes[-1]) if has_more and fuzzy_item_codes else None
+
+    return {
+        "results": results,
+        "next_cursor": next_cursor,
+        "has_more": bool(next_cursor),
+        "stock_as_of": _utc_now_iso(),
+    }
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes")
+
+
+def _utc_now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _encode_cursor(item_code: str) -> str:
+    payload = json.dumps({"i": item_code}, separators=(",", ":")).encode("utf-8")
+    return base64.b64encode(payload).decode("ascii")
+
+
+def _decode_cursor(cursor):
+    if not cursor:
+        return None
+    try:
+        payload = json.loads(base64.b64decode(cursor))
+        return payload.get("i")
+    except Exception:
+        return None
+
+
+def _resolve_exact_matches(q: str, include_disabled: bool) -> list:
+    """Barcode exact match first (a scan must never be beaten by a
+    substring hit), then an exact item-code match, deduplicated."""
+    disabled_clause = "" if include_disabled else "AND i.disabled = 0"
+
+    barcode_rows = frappe.db.sql(f"""
+        SELECT DISTINCT i.name
+        FROM `tabItem Barcode` bc
+        JOIN `tabItem` i ON i.name = bc.parent
+        WHERE bc.barcode = %(q)s
+        {disabled_clause}
+    """, {"q": q}, as_dict=True)
+
+    item_code_rows = frappe.db.sql(f"""
+        SELECT i.name
+        FROM `tabItem` i
+        WHERE i.name = %(q)s
+        {disabled_clause}
+    """, {"q": q}, as_dict=True)
+
+    item_codes = []
+    for row in barcode_rows + item_code_rows:
+        if row.name not in item_codes:
+            item_codes.append(row.name)
+
+    return item_codes
+
+
+def _resolve_fuzzy_matches(
+    q: str, include_disabled: bool, exclude: list, after, limit: int,
+    site_filter=None, warehouse_filter=None, in_stock_only: bool = False,
+) -> list:
+    """Prefix match — item_code, item_name, description and barcode must
+    each START WITH `q`, not merely contain it anywhere.
+
+    site/warehouse/in_stock_only are applied here, inside the query, rather
+    than after the caller has already truncated the candidate list to
+    `limit` — otherwise a candidate that consumes the limit but gets
+    filtered out downstream can leave a page empty even though matches
+    exist further down the alphabet.
+    """
+    disabled_clause = "" if include_disabled else "AND i.disabled = 0"
+    exclude_clause = ""
+    params = {"term": f"{q}%", "limit": limit}
+
+    if exclude:
+        exclude_clause = "AND i.name NOT IN %(exclude)s"
+        params["exclude"] = tuple(exclude)
+
+    after_clause = ""
+    if after:
+        after_clause = "AND i.name > %(after)s"
+        params["after"] = after
+
+    bin_join = ""
+    bin_conditions = []
+    if site_filter or warehouse_filter or in_stock_only:
+        bin_join = "JOIN `tabBin` b ON b.item_code = i.name"
+        if warehouse_filter:
+            bin_conditions.append("b.warehouse = %(warehouse_filter)s")
+            params["warehouse_filter"] = warehouse_filter
+        elif site_filter:
+            # the dash is part of the pattern so "R01-%" can't accidentally
+            # match a warehouse whose site code merely starts with "R01"
+            # (e.g. a hypothetical "R010-...")
+            bin_conditions.append("b.warehouse LIKE %(site_pattern)s")
+            params["site_pattern"] = f"{site_filter}-%"
+        if in_stock_only:
+            bin_conditions.append("b.actual_qty > 0")
+    bin_where = ("AND " + " AND ".join(bin_conditions)) if bin_conditions else ""
+
+    rows = frappe.db.sql(f"""
+        SELECT DISTINCT i.name
+        FROM `tabItem` i
+        LEFT JOIN `tabItem Barcode` bc ON bc.parent = i.name
+        {bin_join}
+        WHERE (
+            i.name LIKE %(term)s
+            OR i.item_name LIKE %(term)s
+            OR i.description LIKE %(term)s
+            OR bc.barcode LIKE %(term)s
+        )
+        {disabled_clause}
+        {exclude_clause}
+        {after_clause}
+        {bin_where}
+        ORDER BY i.name ASC
+        LIMIT %(limit)s
+    """, params, as_dict=True)
+
+    return [row.name for row in rows]
+
+
+def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, in_stock_only: bool) -> list:
+    if not item_codes:
+        return []
+
+    items_by_code = {
+        row.name: row
+        for row in frappe.db.get_all(
+            "Item",
+            filters={"name": ["in", item_codes]},
+            fields=["name", "item_name", "item_group", "stock_uom", "disabled"],
+        )
+    }
+
+    barcodes_by_item = {}
+    for row in frappe.db.get_all(
+        "Item Barcode",
+        filters={"parent": ["in", item_codes]},
+        fields=["parent", "barcode"],
+    ):
+        barcodes_by_item.setdefault(row.parent, []).append(row.barcode)
+
+    bin_filters = {"item_code": ["in", item_codes]}
+    if warehouse_filter:
+        bin_filters["warehouse"] = warehouse_filter
+
+    locations_by_item = {}
+    for row in frappe.db.get_all(
+        "Bin",
+        filters=bin_filters,
+        fields=["item_code", "warehouse", "actual_qty", "reserved_qty"],
+    ):
+        bin_site = _warehouse_site(row.warehouse)
+        if site_filter and bin_site != site_filter:
+            continue
+
+        actual_qty = row.actual_qty or 0.0
+        reserved_qty = row.reserved_qty or 0.0
+        if in_stock_only and actual_qty <= 0:
+            continue
+
+        locations_by_item.setdefault(row.item_code, []).append({
+            "warehouse": row.warehouse,
+            "site": bin_site,
+            "actual_qty": actual_qty,
+            "reserved_qty": reserved_qty,
+            "available_qty": actual_qty - reserved_qty,
+        })
+
+    results = []
+    for item_code in item_codes:
+        item = items_by_code.get(item_code)
+        if not item:
+            continue
+
+        locations = locations_by_item.get(item_code, [])
+        if in_stock_only and not locations:
+            continue
+
+        results.append({
+            "item_code": item.name,
+            "item_name": item.item_name,
+            "item_group": item.item_group,
+            "stock_uom": item.stock_uom,
+            "barcodes": barcodes_by_item.get(item_code, []),
+            "disabled": bool(item.disabled),
+            "locations": locations,
+        })
+
+    return results
+
+
+def _warehouse_site(warehouse_name: str) -> str:
+    """`site` is the segment before the first '-' in the warehouse's base
+    name, stripped of any trailing ` - {Company}` suffix."""
+    base = warehouse_name.split(" - ")[0]
+    return base.split("-")[0]
+
+
 def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note):
     """
     Clear created documents in case of failure.
