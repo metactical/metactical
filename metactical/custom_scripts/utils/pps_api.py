@@ -122,13 +122,31 @@ def create_sales_order(*args, **kwargs):
 
 
 @frappe.whitelist()
-def pack_order(*args, **kwargs):
+def pack_order_complete(*args, **kwargs):
     """
-    Packs an order using nested packing_slips payload structure.
+    Packs an order using nested packing_slips payload structure: creates
+    the Pick List, Delivery Note, Packing Slips and Shipment as one unit.
+
+    Atomicity: any failure partway — including an exception nobody
+    anticipated — unwinds every document this call created so far via
+    `_clear_created_documents`, rather than leaving an orphaned Delivery
+    Note with no Packing Slip. `pick_list_name`, `dn` and `shipment_name`
+    are tracked from the moment each becomes known so the outer `except`
+    can always reach them.
+
+    Attribution: every document this call creates gets a Comment
+    ("Created through PPS by {user}") via `_attribute_pps_write`, using
+    `frappe.session.user` — this endpoint isn't `allow_guest`, so it only
+    runs in a real signed-in PPS user's session (see `authenticate`).
     """
     form_data = dict(frappe.form_dict)
     log = create_log(form_data, "Pack Order")
     order_id = form_data.get("order_id")
+
+    pick_list_name = ""
+    dn = None
+    shipment_name = None
+    packing_slip_docs = []
 
     try:
         # --- Validate input ---
@@ -151,20 +169,22 @@ def pack_order(*args, **kwargs):
         if not pick_list_result.get("success"):
             return _fail_with_log(log, pick_list_result.get("error"))
 
-        pick_list = frappe.get_doc("Pick List", pick_list_result["pick_list"])
+        pick_list = frappe.get_doc("Pick List", pick_list_name)
         frappe.db.set_value("PPS API Log", log, "pick_list", pick_list.name)
+        _attribute_pps_write("Pick List", pick_list.name)
 
         # --- Create packing slips + delivery note ---
         packing_slip_docs, dn = create_packing_slips(pick_list, packing_slips)
-        if not packing_slip_docs:
-            pick_list = frappe.get_doc("Pick List", pick_list.name)
-            if pick_list.docstatus == 1:
-                pick_list.cancel()
-                pick_list.delete()
-                frappe.db.commit()
-                
+        expected_slip_count = len(packing_slips)
+        if len(packing_slip_docs) != expected_slip_count:
+            _clear_created_documents(packing_slip_docs, pick_list_name, dn, shipment_name)
             return _fail_with_log(log, "Failed to create packing slips.")
-        
+
+        if dn:
+            _attribute_pps_write("Delivery Note", dn)
+        for slip_name in packing_slip_docs:
+            _attribute_pps_write("Packing Slip", slip_name)
+
         frappe.db.set_value("PPS API Log", log, {
             "delivery_note": dn,
             "packing_slips": ", ".join(str(s) for s in packing_slip_docs),
@@ -173,8 +193,10 @@ def pack_order(*args, **kwargs):
         # --- Resolve shipment ---
         shipment_name = _get_shipment_for_delivery_note(dn)
         if not shipment_name:
-            _clear_created_documents(packing_slip_docs, pick_list_name, dn)
+            _clear_created_documents(packing_slip_docs, pick_list_name, dn, shipment_name)
             return _fail_with_log(log, f"No shipment found for Delivery Note {dn}")
+
+        _attribute_pps_write("Shipment", shipment_name)
 
         # Trigger parcel auto-population
         frappe.get_doc("Shipment", shipment_name).save(ignore_permissions=True)
@@ -192,7 +214,7 @@ def pack_order(*args, **kwargs):
             "purolator": rates.get("Purolator"),
             "packing_slips": packing_slip_docs,
         }
-        
+
         frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
         frappe.db.commit()
 
@@ -200,6 +222,7 @@ def pack_order(*args, **kwargs):
 
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title=f"Error packing order {order_id}")
+        _clear_created_documents(packing_slip_docs, pick_list_name, dn, shipment_name)
         if log:
             frappe.db.set_value("PPS API Log", log, "error", frappe.as_json(_error(str(e))))
         frappe.db.commit()
@@ -209,14 +232,14 @@ def pack_order(*args, **kwargs):
 def create_label(*args, **kwargs):
     """
     Submit a shipment and create a shipping label using the selected rate
-    option(s) returned from `pack_order` (the `canada_post` / `purolator`
+    option(s) returned from `pack_order_complete` (the `canada_post` / `purolator`
     rate groups).
 
     Required params:
         shipment    - Shipment docname (e.g. "SHIPMENT-05598")
         provider    - "Canada Post" or "Purolator"
         selections  - dict keyed by parcel name (the "name" field of each
-                      rate group from pack_order) -> the chosen rate item,
+                      rate group from pack_order_complete) -> the chosen rate item,
                       e.g.:
                       {
                         "drugqpvo7h": {
@@ -664,36 +687,82 @@ def _warehouse_site(warehouse_name: str) -> str:
     return base.split("-")[0]
 
 
-def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note):
+def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note, shipment_name=None):
     """
-    Clear created documents in case of failure.
+    Roll back everything `pack_order_complete` may have created, in dependency
+    order. Every step is existence-guarded rather than assumed present:
+    cancelling the Pick List cascades (via `CustomPickList.on_cancel`) to
+    delete any still-draft Delivery Note/Shipment tied to it, so by the
+    time we get to the explicit Shipment/Delivery Note steps below they
+    may already be gone — that's expected, not an error.
     """
     try:
-        # Cancel and delete packing slips
-        for slip_name in packing_slip_docs:
+        # Cancel and delete packing slips first — Frappe won't let you
+        # cancel/delete a Pick List or Delivery Note that a submitted
+        # Packing Slip still links to.
+        for slip_name in packing_slip_docs or []:
+            if not frappe.db.exists("Packing Slip", slip_name):
+                continue
             slip = frappe.get_doc("Packing Slip", slip_name)
             if slip.docstatus == 1:
                 slip.cancel()
-            slip.delete()
+            if frappe.db.exists("Packing Slip", slip_name):
+                frappe.get_doc("Packing Slip", slip_name).delete()
 
-        # Cancel and delete pick list
-        if pick_list_name:
+        # Cancel and delete the shipment before the pick list, in case the
+        # pick list's own cancel cascade doesn't reach it (e.g. it was
+        # already submitted, or the pick list is gone/absent).
+        if shipment_name and frappe.db.exists("Shipment", shipment_name):
+            shipment = frappe.get_doc("Shipment", shipment_name)
+            if shipment.docstatus == 1:
+                shipment.cancel()
+            if frappe.db.exists("Shipment", shipment_name):
+                frappe.get_doc("Shipment", shipment_name).delete()
+
+        # Cancel and delete the pick list — this cascades to delete any
+        # still-draft Shipment/Delivery Note tied to it.
+        if pick_list_name and frappe.db.exists("Pick List", pick_list_name):
             pick_list = frappe.get_doc("Pick List", pick_list_name)
             if pick_list.docstatus == 1:
                 pick_list.cancel()
-            pick_list.delete()
+            if frappe.db.exists("Pick List", pick_list_name):
+                pick_list.delete()
 
-        # Cancel and delete delivery note
-        if delivery_note:
+        # Cancel and delete the delivery note, if the cascade above
+        # didn't already remove it.
+        if delivery_note and frappe.db.exists("Delivery Note", delivery_note):
             dn = frappe.get_doc("Delivery Note", delivery_note)
             if dn.docstatus == 1:
                 dn.cancel()
-            dn.delete()
+            if frappe.db.exists("Delivery Note", delivery_note):
+                dn.delete()
 
         frappe.db.commit()
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="Error clearing created documents")
         frappe.db.rollback()
+
+
+def _attribute_pps_write(doctype: str, docname: str):
+    """
+    W4: stamp a Comment ("Created through PPS by {user}") on every document
+    pack_order_complete creates. Must be a Comment, never the `remarks` field — a
+    caller-supplied remark would silently overwrite it. A failed comment
+    must never roll back the real write, so this only ever logs.
+    """
+    try:
+        frappe.get_doc({
+            "doctype": "Comment",
+            "comment_type": "Comment",
+            "reference_doctype": doctype,
+            "reference_name": docname,
+            "content": f"Created through PPS by {frappe.session.user}",
+        }).insert(ignore_permissions=True)
+    except Exception:
+        frappe.log_error(
+            message=frappe.get_traceback(),
+            title=f"PPS Attribution Error for {doctype} {docname}",
+        )
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -963,9 +1032,15 @@ def create_packing_slips(pick_list, packing_slips, round=1):
 
         return created_slips, delivery_note
     except Exception as e:
-        frappe.db.rollback()
+        # Do NOT frappe.db.rollback() here — the Pick List submit (and the
+        # Delivery Note/Shipment it cascades into) is still uncommitted in
+        # this same request transaction, and a rollback here would erase it
+        # out from under the caller before it gets a chance to clean it up
+        # explicitly via `_clear_created_documents`. Return whichever slips
+        # did get created so the caller can actually roll them back, rather
+        # than silently discarding their names.
         frappe.log_error(message=frappe.get_traceback(), title=f"Error creating packing slips for delivery note {delivery_note}")
-        return [], delivery_note
+        return created_slips, delivery_note
 
 def create_log(form_data, request_type):
     try:
