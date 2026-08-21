@@ -1,7 +1,7 @@
 import base64
 import random
 import frappe
-from frappe.utils import add_days, nowdate
+from frappe.utils import add_days, nowdate, flt
 from metactical.custom_scripts.pick_list.pick_list import create_pick_list
 from erpnext.stock.doctype.delivery_note.delivery_note import make_packing_slip
 import json
@@ -22,6 +22,8 @@ WAREHOUSE_PERMISSION_FIELDS = [
     "purchase_receipt_accepted_warehouse",
     "material_request_target_warehouse",
     "material_request_target_warehouse_purchase",
+    "pps_source_warehouse",
+    "pps_target_warehouse",
 ]
 
 def _get_random_instock_items(warehouse, count):
@@ -160,6 +162,14 @@ def pack_order_complete(*args, **kwargs):
         validation_errors = validate_packing_slips(packing_slips, order_id)
         if validation_errors:
             return _error("; ".join(validation_errors))
+
+        # --- Idempotency: a retried/duplicate call for an order that's
+        # already been packed must not create a second Pick List/Delivery
+        # Note/Shipment chain. Recognize "already packed" rather than
+        # diffing the retried payload, and hand back the existing chain.
+        already_packed = _find_existing_pack(order_id)
+        if already_packed:
+            return already_packed
 
         # --- Create pick list ---
         items = flatten_packing_slip_items(packing_slips)
@@ -357,6 +367,243 @@ def create_label(*args, **kwargs):
             frappe.db.set_value("PPS API Log", log, "error", frappe.as_json(_error(str(e))))
         frappe.db.commit()
         return _error(str(e))
+
+
+@frappe.whitelist()
+def receive_purchase_order(*args, **kwargs):
+    """
+    Create and submit a Purchase Receipt directly from a Purchase Order in
+    one call, using ERPNext's own `make_purchase_receipt` mapper (maps
+    every still-outstanding line at its full outstanding qty).
+
+    Required: purchase_order.
+    Optional: items: [{item_code, qty}] — receive only these item(s), each
+    capped at its own outstanding qty, instead of receiving everything
+    outstanding on the PO.
+
+    No Supplier Order Confirmation / Inbound Shipment involved: PO ->
+    outstanding received_qty is core ERPNext bookkeeping, updated on PR
+    submit regardless of how the PR was built. CustomPurchaseReceipt still
+    enforces accepted-warehouse permissions and requires every item to
+    have a barcode before submit; those errors surface here verbatim.
+    """
+    from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
+
+    form_data = dict(frappe.form_dict)
+    log = create_log(form_data, "Receive Purchase Order")
+    purchase_order = form_data.get("purchase_order")
+    items = form_data.get("items")
+
+    pr_name = None
+
+    try:
+        if not purchase_order:
+            return _error("purchase_order is required.")
+        if not frappe.db.exists("Purchase Order", purchase_order):
+            return _error(f"Purchase Order {purchase_order} does not exist.")
+
+        pr = make_purchase_receipt(purchase_order)
+        if not pr.items:
+            return _error(f"No outstanding items to receive on Purchase Order {purchase_order}.")
+
+        if items:
+            requested = {item.get("item_code"): item.get("qty") for item in items}
+            kept_rows = []
+            for row in pr.items:
+                if row.item_code not in requested:
+                    continue
+                qty = requested[row.item_code]
+                if qty is not None:
+                    row.qty = min(flt(qty), flt(row.qty))
+                    row.stock_qty = row.qty * flt(row.conversion_factor or 1)
+                kept_rows.append(row)
+            if not kept_rows:
+                return _error("None of the requested items have outstanding qty on this Purchase Order.")
+            pr.items = kept_rows
+
+        pr.insert()
+        pr_name = pr.name
+        pr.submit()
+        frappe.db.commit()
+
+        _attribute_pps_write("Purchase Receipt", pr.name)
+
+        response = {
+            "status": "success",
+            "message": f"Purchase Receipt {pr.name} created from Purchase Order {purchase_order}.",
+            "purchase_receipt": pr.name,
+            "items": [
+                {"item_code": item.item_code, "qty": item.qty, "warehouse": item.warehouse}
+                for item in pr.items
+            ],
+        }
+        frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
+        frappe.db.commit()
+
+        return response
+
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error receiving purchase order {purchase_order}")
+        if pr_name and frappe.db.exists("Purchase Receipt", pr_name):
+            pr_doc = frappe.get_doc("Purchase Receipt", pr_name)
+            if pr_doc.docstatus == 1:
+                pr_doc.cancel()
+            if frappe.db.exists("Purchase Receipt", pr_name):
+                pr_doc.delete()
+            frappe.db.commit()
+        return _fail_with_log(log, str(e))
+
+
+@frappe.whitelist()
+def reconcile_count(*args, **kwargs):
+    """
+    Create and submit a Stock Reconciliation from a cycle count in one call.
+
+    Required: warehouse, items: [{item_code, qty, valuation_rate?}],
+    reason_for_adjustment (mandatory custom field on this instance's Stock
+    Reconciliation — ais_reason_for_adjustment).
+    valuation_rate is optional per row — ERPNext's own Stock Reconciliation
+    validate() already looks it up (get_stock_balance, then Item.valuation_rate
+    as a fallback) when a row's valuation_rate is left blank, so no separate
+    valuation-lookup call is needed before submitting.
+    """
+    form_data = dict(frappe.form_dict)
+    log = create_log(form_data, "Reconcile Count")
+    warehouse = form_data.get("warehouse")
+    items = form_data.get("items") or []
+    company = form_data.get("company") or frappe.db.get_single_value("Global Defaults", "default_company")
+    reason_for_adjustment = form_data.get("reason_for_adjustment")
+
+    sr_name = None
+
+    try:
+        if not warehouse:
+            return _error("warehouse is required.")
+        if not items:
+            return _error("items is required.")
+        if not reason_for_adjustment:
+            return _error("reason_for_adjustment is required.")
+        for item in items:
+            if not item.get("item_code") or item.get("qty") is None:
+                return _error("Each item requires item_code and qty.")
+
+        sr = frappe.new_doc("Stock Reconciliation")
+        sr.company = company
+        sr.purpose = "Stock Reconciliation"
+        sr.set_posting_time = 1
+        sr.ais_reason_for_adjustment = reason_for_adjustment
+        for item in items:
+            row = {
+                "item_code": item.get("item_code"),
+                "warehouse": warehouse,
+                "qty": item.get("qty"),
+            }
+            if item.get("valuation_rate") is not None:
+                row["valuation_rate"] = item.get("valuation_rate")
+            sr.append("items", row)
+
+        sr.insert()
+        sr_name = sr.name
+        sr.submit()
+        frappe.db.commit()
+
+        _attribute_pps_write("Stock Reconciliation", sr.name)
+
+        response = {
+            "status": "success",
+            "message": f"Stock Reconciliation {sr.name} submitted for {warehouse}.",
+            "stock_reconciliation": sr.name,
+            "items": [
+                {"item_code": row.item_code, "qty": row.qty, "valuation_rate": row.valuation_rate}
+                for row in sr.items
+            ],
+        }
+        frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
+        frappe.db.commit()
+
+        return response
+
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error reconciling count for {warehouse}")
+        if sr_name and frappe.db.exists("Stock Reconciliation", sr_name):
+            sr_doc = frappe.get_doc("Stock Reconciliation", sr_name)
+            if sr_doc.docstatus == 1:
+                sr_doc.cancel()
+            if frappe.db.exists("Stock Reconciliation", sr_name):
+                sr_doc.delete()
+            frappe.db.commit()
+        return _fail_with_log(log, str(e))
+
+
+@frappe.whitelist()
+def reopen_pick_list(*args, **kwargs):
+    """
+    Reopen a Pick List for re-picking in one call: clears `ais_picked_by`
+    (the field the picking board actually gates on — see the existing
+    `close_pick_list`/`clear_totes_picklist` in picklist_page.py, which this
+    generalizes) and, for every Picklist Tote holding items from this pick
+    list, removes just this pick list's rows from `tote_items` (leaving
+    any other pick list's rows on a shared tote intact), clearing `used_by`
+    if the tote is left empty and `current_delivery_note` if that note was
+    against this same pick list.
+    """
+    form_data = dict(frappe.form_dict)
+    log = create_log(form_data, "Reopen Pick List")
+    pick_list_name = form_data.get("pick_list")
+
+    try:
+        if not pick_list_name:
+            return _error("pick_list is required.")
+        if not frappe.db.exists("Pick List", pick_list_name):
+            return _error(f"Pick List {pick_list_name} does not exist.")
+
+        frappe.db.set_value("Pick List", pick_list_name, "ais_picked_by", "")
+
+        dn_names = {
+            row.parent for row in frappe.db.get_all(
+                "Delivery Note Item",
+                filters={"against_pick_list": pick_list_name},
+                fields=["parent"],
+            )
+        }
+
+        tote_names = {
+            row.parent for row in frappe.db.get_all(
+                "Picklist Tote Item",
+                filters={"pick_list": pick_list_name},
+                fields=["parent"],
+            )
+        }
+
+        cleared_totes = []
+        for tote_name in tote_names:
+            tote = frappe.get_doc("Picklist Tote", tote_name)
+            tote.tote_items = [row for row in tote.tote_items if row.pick_list != pick_list_name]
+            if not tote.tote_items:
+                tote.used_by = ""
+            if tote.current_delivery_note and tote.current_delivery_note in dn_names:
+                tote.current_delivery_note = ""
+            tote.save(ignore_permissions=True)
+            cleared_totes.append(tote.name)
+
+        frappe.db.commit()
+        _attribute_pps_write("Pick List", pick_list_name, action="Reopened")
+
+        response = {
+            "status": "success",
+            "message": f"Pick List {pick_list_name} reopened for re-picking.",
+            "pick_list": pick_list_name,
+            "totes_cleared": cleared_totes,
+        }
+        frappe.db.set_value("PPS API Log", log, "response", frappe.as_json(response))
+        frappe.db.commit()
+
+        return response
+
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error reopening pick list {pick_list_name}")
+        return _fail_with_log(log, str(e))
+
 
 @frappe.whitelist(allow_guest=True)
 def authenticate(*args, **kwargs):
@@ -743,12 +990,13 @@ def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note, s
         frappe.db.rollback()
 
 
-def _attribute_pps_write(doctype: str, docname: str):
+def _attribute_pps_write(doctype: str, docname: str, action: str = "Created"):
     """
-    W4: stamp a Comment ("Created through PPS by {user}") on every document
-    pack_order_complete creates. Must be a Comment, never the `remarks` field — a
-    caller-supplied remark would silently overwrite it. A failed comment
-    must never roll back the real write, so this only ever logs.
+    W4: stamp a Comment ("{action} through PPS by {user}") on every document
+    a PPS write method creates or mutates. Must be a Comment, never the
+    `remarks` field — a caller-supplied remark would silently overwrite it.
+    A failed comment must never roll back the real write, so this only
+    ever logs.
     """
     try:
         frappe.get_doc({
@@ -756,7 +1004,7 @@ def _attribute_pps_write(doctype: str, docname: str):
             "comment_type": "Comment",
             "reference_doctype": doctype,
             "reference_name": docname,
-            "content": f"Created through PPS by {frappe.session.user}",
+            "content": f"{action} through PPS by {frappe.session.user}",
         }).insert(ignore_permissions=True)
     except Exception:
         frappe.log_error(
@@ -812,6 +1060,48 @@ def _encode_files_as_base64(file_urls: list, dpi: int = 150) -> list:
             frappe.log_error(frappe.get_traceback(), f"Error encoding label file {file_url}")
 
     return encoded_files
+
+def _find_existing_pack(order_id: str) -> dict | None:
+    """
+    Idempotency guard for `pack_order_complete`: if this Sales Order
+    already has a submitted Pick List with a resulting Delivery Note and
+    Shipment, return that existing chain's response shape instead of
+    letting a retried/duplicate call create a second one.
+    """
+    row = frappe.db.sql("""
+        SELECT DISTINCT pli.parent AS pick_list, dni.parent AS delivery_note
+        FROM `tabPick List Item` pli
+        JOIN `tabPick List` pl ON pl.name = pli.parent
+        JOIN `tabDelivery Note Item` dni ON dni.against_pick_list = pl.name
+        WHERE pli.sales_order = %(order_id)s AND pl.docstatus = 1
+        LIMIT 1
+    """, {"order_id": order_id}, as_dict=True)
+
+    if not row:
+        return None
+
+    pick_list_name = row[0].pick_list
+    dn = row[0].delivery_note
+    shipment_name = _get_shipment_for_delivery_note(dn)
+    if not shipment_name:
+        return None
+
+    packing_slip_docs = [
+        r.name for r in frappe.db.get_all("Packing Slip", filters={"delivery_note": dn, "docstatus": 1}, fields=["name"])
+    ]
+
+    rates = _fetch_rates_concurrently(shipment_name)
+    return {
+        "status": "success",
+        "message": f"Order {order_id} already packed.",
+        "pick_list": pick_list_name,
+        "delivery_note": dn,
+        "shipment": shipment_name,
+        "canada_post": rates.get("Canada Post"),
+        "purolator": rates.get("Purolator"),
+        "packing_slips": packing_slip_docs,
+    }
+
 
 def _get_shipment_for_delivery_note(dn: str) -> str | None:
     rows = frappe.db.sql(

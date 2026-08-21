@@ -9,6 +9,12 @@ def after_migrate():
 def add_index():
     frappe.db.add_index('Item', ['ifw_retailskusuffix'])
     frappe.db.add_index('Stock Reconciliation Item', ['item_code', 'warehouse', 'creation'])
+    # PPS integration (W2 search_inventory / W6 order-affected-warehouse lookups):
+    # Bin -> warehouse resolution, finding orders affected by a config
+    # change, and the barcode scanner hot path.
+    frappe.db.add_index('Warehouse', ['parent_warehouse'])
+    frappe.db.add_index('Sales Order Item', ['warehouse'])
+    frappe.db.add_index('Item Barcode', ['barcode'])
                                  
 def reset_customer_naming_series():
 	exists = frappe.db.exists('Property Setter', {'doctype_or_field': 'DocField', 'doc_type': 'Customer',
