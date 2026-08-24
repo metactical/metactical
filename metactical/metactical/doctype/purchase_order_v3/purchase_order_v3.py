@@ -844,3 +844,38 @@ def v3_sync_closed_short_natives():
 			frappe.db.set_value("Purchase Order", p.erp_purchase_order, "status", "Closed")
 		fixed.append(p.name + " -> " + p.erp_purchase_order)
 	frappe.response["message"] = {"closed": fixed, "left_open": skipped}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Reopen Unbillable Natives"
+# (API: v3_reopen_unbillable_natives).
+#
+# The mirror image of v3_sync_closed_short_natives: reopens any native PO of
+# ours that was closed while goods were received but not yet fully billed,
+# because ERPNext refuses a Purchase Invoice against a Closed order. Native POs
+# with no V3 twin are left alone.
+#
+# Takes no arguments, so the body is entirely verbatim.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_reopen_unbillable_natives():
+	reopened = []
+	still_closed = []
+	for n in frappe.get_all("Purchase Order",
+			filters={"docstatus": 1, "status": "Closed"},
+			fields=["name", "per_received", "per_billed"], limit_page_length=0):
+		if not frappe.db.exists("Purchase Order V3", {"erp_purchase_order": n.name}):
+			continue                      # not ours - leave alone
+		if float(n.per_received or 0) <= 0:
+			still_closed.append(n.name + " (nothing received)")
+			continue
+		if float(n.per_billed or 0) >= 99.999:
+			still_closed.append(n.name + " (fully billed)")
+			continue
+		try:
+			frappe.get_doc("Purchase Order", n.name).update_status("Submitted")
+			reopened.append(n.name + " (" + str(round(float(n.per_received or 0), 1))
+				+ "% received, " + str(round(float(n.per_billed or 0), 1)) + "% billed)")
+		except Exception as e:
+			still_closed.append(n.name + " FAILED " + str(e)[:80])
+	frappe.response["message"] = {"reopened": reopened, "left_closed": still_closed}
