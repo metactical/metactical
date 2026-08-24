@@ -555,3 +555,61 @@ def delete_native_po(doc):
 			npo.reload()
 		frappe.delete_doc("Purchase Order", npo.name, force=1, ignore_permissions=True)
 		frappe.msgprint("Native Purchase Order " + npo.name + " deleted with " + doc.name + ".")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Retry PO Submit" (API: v3_retry_po_submit).
+#
+# Re-attempts the native PO submit for an approved PO3 whose twin is stuck in
+# Draft -- the "Retry Native PO" button on the form.
+#
+# Body is verbatim apart from the first line, where the old
+# frappe.form_dict.get("po3") lookup becomes the function argument. The
+# frappe.response["message"] assignments are left as they were: a whitelisted
+# method returning None does not overwrite them (see frappe/handler.py).
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_retry_po_submit(po3=None):
+	name = po3
+	if not name:
+		frappe.throw("pass po3=<name>")
+	doc = frappe.get_doc("Purchase Order V3", name)
+	if doc.docstatus != 1:
+		frappe.throw(name + " is not submitted.")
+	if not doc.erp_purchase_order:
+		frappe.throw(name + " has no native Purchase Order.")
+
+	npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
+	if npo.docstatus == 1:
+		frappe.db.set_value(doc.doctype, doc.name, "post_error", None)
+		frappe.response["message"] = {"status": "already submitted", "po": npo.name}
+	elif npo.docstatus == 2:
+		frappe.throw("Native PO " + npo.name + " is cancelled. Cancel and amend " + name + " instead.")
+	else:
+		err = ""
+		ok = False
+		try:
+			npo.reload()
+			npo.submit()
+			ok = True
+		except Exception as e:
+			err = str(e)[:300]
+		if not ok:
+			try:
+				npo.reload()
+				npo.docstatus = 1
+				npo.save()
+				ok = True
+			except Exception as e:
+				err = str(e)[:300]
+		if ok:
+			npo.reload()
+			for i in range(len(doc.items)):
+				if i < len(npo.items):
+					frappe.db.set_value("Purchase Order V3 Item", doc.items[i].name,
+						{"erp_po_item": npo.items[i].name})
+			frappe.db.set_value(doc.doctype, doc.name, "post_error", None)
+			frappe.response["message"] = {"status": "submitted", "po": npo.name}
+		else:
+			frappe.db.set_value(doc.doctype, doc.name, "post_error", err)
+			frappe.throw("Still could not submit " + npo.name + ": " + err)
