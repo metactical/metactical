@@ -117,3 +117,31 @@ frappe.ui.form.on('Inbound Shipment V3 Box', {
         frappe.model.set_value(cdt, cdn, 'carrier_service', null);
     }
 });
+
+// ---------------------------------------------------------------------------
+// Migrated from Client Script "Inbound Shipment V3 Stale State Guard" (Form view).
+// Refuses a workflow action when the document has already moved on in the DB.
+// Especially relevant here: posting a Goods Receipt V3 can flip this shipment to
+// Received server-side, so an open form can easily be looking at a stale state.
+// ---------------------------------------------------------------------------
+
+frappe.ui.form.on('Inbound Shipment V3', {
+    before_workflow_action: function(frm) {
+        return new Promise(function(resolve, reject) {
+            if (frm.is_new() || !frm.doc.name) { resolve(); return; }
+            frappe.db.get_value(frm.doctype, frm.doc.name, 'workflow_state')
+                .then(function(r) {
+                    var server = (r && r.message) ? r.message.workflow_state : null;
+                    if (!server || server === frm.doc.workflow_state) { resolve(); return; }
+                    frm.reload_doc().then(function() {
+                        frappe.show_alert({
+                            message: __('This document had already moved to <b>{0}</b>. Refreshed — pick the action you want from the updated list.', [server]),
+                            indicator: 'orange'
+                        }, 10);
+                    });
+                    reject();
+                })
+                .catch(function() { resolve(); });   // never block on a lookup failure
+        });
+    }
+});
