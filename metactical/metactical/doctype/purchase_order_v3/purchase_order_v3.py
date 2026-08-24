@@ -879,3 +879,39 @@ def v3_reopen_unbillable_natives():
 		except Exception as e:
 			still_closed.append(n.name + " FAILED " + str(e)[:80])
 	frappe.response["message"] = {"reopened": reopened, "left_closed": still_closed}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Reset Draft State" (API: v3_reset_draft_state).
+#
+# Development/repair tool: wipes a DRAFT order's progress fields back to their
+# starting values -- send + confirmation + receipt state on the header, and all
+# the quantity/status fields on every line.
+#
+# NOTE (carried over unchanged): this clears erp_purchase_order without touching
+# the native PO, so the twin is left orphaned. Fine for a draft that was never
+# posted; worth knowing before running it on anything else.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_reset_draft_state(po3=None):
+	name = po3
+	if not name or not frappe.db.exists("Purchase Order V3", name):
+		frappe.throw("pass po3=<name>")
+	doc = frappe.get_doc("Purchase Order V3", name)
+	if doc.docstatus != 0:
+		frappe.throw(name + " is not a draft")
+	frappe.db.set_value("Purchase Order V3", name, {
+		"workflow_state": "Draft",
+		"send_status": "Not Sent",
+		"sent_on": None, "sent_by": None,
+		"confirmation_no": None, "confirmation_date": None, "confirmation_no_source": None,
+		"confirmation_status": "Awaiting",
+		"receipt_status": "Not Started",
+		"erp_purchase_order": None, "posted_on": None, "posted_by": None})
+	for r in doc.items:
+		frappe.db.set_value("Purchase Order V3 Item", r.name, {
+			"line_status": "Open", "confirmed_qty": 0, "shipped_qty": 0, "received_qty": 0,
+			"accepted_qty": 0, "rejected_qty": 0, "returned_qty": 0, "short_qty": 0, "over_qty": 0,
+			"backorder_status": None, "backorder_eta": None, "backorder_cancel_reason": None,
+			"erp_po_item": None})
+	frappe.response["message"] = "reset " + name
