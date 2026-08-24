@@ -11,6 +11,9 @@ class InboundShipmentV3(Document):
 	def validate(self):
 		validate(self)
 
+	def after_insert(self):
+		auto_in_transit(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "INS3 Validate"
@@ -202,4 +205,26 @@ def validate(doc):
 		if has_track or (doc.carrier and doc.ship_date):
 			doc.workflow_state = "In Transit"
 			frappe.msgprint("Shipping details added - moved to <b>In Transit</b>. "
+				"It stays fully editable.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "INS3 Auto In Transit"
+# (DocType Event / After Insert on Inbound Shipment V3).
+#
+# A shipment created with tracking (or a carrier plus a ship date) is already
+# on its way, so it opens as In Transit rather than Draft.
+# ---------------------------------------------------------------------------
+def auto_in_transit(doc):
+	if doc.docstatus == 0 and doc.workflow_state in (None, "", "Draft"):
+		has_track = 1 if doc.tracking_no else 0
+		for b in doc.boxes:
+			if b.tracking_no:
+				has_track = 1
+		if has_track or (doc.carrier and doc.ship_date):
+			# set_value writes past the workflow transition check, which refuses
+			# any state but Draft on a document that has just been created
+			frappe.db.set_value("Inbound Shipment V3", doc.name,
+				"workflow_state", "In Transit", update_modified=False)
+			frappe.msgprint("Shipping details present - created as <b>In Transit</b>. "
 				"It stays fully editable.")
