@@ -4,10 +4,7 @@
 import frappe
 from frappe.model.document import Document
 
-
-def F(x):
-	"""Numeric coercion helper, carried over verbatim from the V3 Server Scripts."""
-	return float(x or 0)
+from metactical.procurement_v3.utils import F, mirror_po3_status
 
 
 class PurchaseOrderV3(Document):
@@ -16,6 +13,9 @@ class PurchaseOrderV3(Document):
 
 	def validate(self):
 		validate(self)
+
+	def on_submit(self):
+		auto_send_on_approve(self)
 
 
 # ---------------------------------------------------------------------------
@@ -153,3 +153,105 @@ def validate(doc):
 		doc.confirmation_status = "Awaiting"
 
 	mirror_status_now(doc.erp_purchase_order, doc.workflow_state or "Draft")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "PO3 Auto Send On Approve"
+# (DocType Event / After Submit on Purchase Order V3).
+#
+# On approval: syncs the final lines onto the native PO twin and submits it
+# (gated by Procurement Settings V3.posting_enabled), then emails the order to
+# the supplier and flips the state to Sent to Supplier when that succeeds.
+# ---------------------------------------------------------------------------
+def auto_send_on_approve(doc):
+	posting = frappe.db.get_single_value("Procurement Settings V3", "posting_enabled")
+
+	# The native twin already exists (created with this PO3). Approval syncs the
+	# final lines onto it and submits it.
+	if doc.workflow_state == "Approved" and posting and doc.erp_purchase_order:
+		if frappe.db.get_value("Purchase Order", doc.erp_purchase_order, "docstatus") == 0:
+			npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
+			npo.supplier = doc.supplier
+			npo.transaction_date = doc.order_date
+			npo.schedule_date = doc.required_by
+			npo.currency = doc.currency
+			npo.conversion_rate = F(doc.conversion_rate) or 1
+			npo.buying_price_list = doc.buying_price_list
+			npo.set_warehouse = doc.set_warehouse
+			npo.custom_purchase_order_v3 = doc.name
+			if doc.notes_to_supplier:
+				npo.notes = doc.notes_to_supplier
+			npo.items = []
+			for d in doc.items:
+				if d.line_status == "Cancelled":
+					continue
+				r = npo.append("items", {})
+				r.item_code = d.item_code
+				r.qty = F(d.qty)
+				r.rate = F(d.rate)
+				r.schedule_date = d.required_by or doc.required_by
+				r.warehouse = d.warehouse or doc.set_warehouse
+			npo.flags.ignore_permissions = True
+			npo.save()
+			submitted = False
+			err = ""
+			try:
+				npo.reload()
+				npo.submit()
+				submitted = True
+			except Exception as e:
+				err = str(e)[:180]
+			if not submitted:
+				try:
+					npo.reload()
+					npo.reload()
+					npo.submit()
+					submitted = True
+				except Exception as e:
+					err = str(e)[:180]
+			npo.reload()
+			for i in range(len(doc.items)):
+				if i < len(npo.items):
+					frappe.db.set_value("Purchase Order V3 Item", doc.items[i].name,
+						{"erp_po_item": npo.items[i].name})
+			frappe.db.set_value(doc.doctype, doc.name, {
+				"posted_on": frappe.utils.now_datetime(),
+				"posted_by": frappe.session.user})
+			frappe.db.set_value(doc.doctype, doc.name, "post_error", None if submitted else err)
+			if not submitted:
+				frappe.msgprint("<b>Native PO " + npo.name + " was NOT submitted.</b><br>"
+					+ err + "<br><br>Fix the cause, then use <b>Retry Native PO</b> on this order.")
+
+	if doc.workflow_state == "Approved" and doc.supplier_email:
+		pdf = None
+		try:
+			pdf = frappe.attach_print(doc.doctype, doc.name, print_format=doc.po_print_format or None, doc=doc)
+		except Exception:
+			pdf = None
+		ok = False
+		try:
+			frappe.sendmail(
+				recipients=[doc.supplier_email],
+				cc=[doc.cc_email] if doc.cc_email else None,
+				bcc=[doc.bcc_email] if doc.bcc_email else None,
+				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),
+				message="Please find attached purchase order " + (doc.erp_purchase_order or doc.name)
+					+ ".<br>Ship to: " + (doc.ship_to_display or "")
+					+ (("<br><br>" + doc.notes_to_supplier) if doc.notes_to_supplier else "")
+					+ "<br><br>Please reply with your order confirmation.",
+				attachments=[pdf] if pdf else None,
+				reference_doctype=doc.doctype, reference_name=doc.name)
+			ok = True
+		except Exception:
+			ok = False
+		if ok:
+			frappe.db.set_value(doc.doctype, doc.name, {
+				"workflow_state": "Sent to Supplier",
+				"send_status": "Auto-Sent",
+				"sent_on": frappe.utils.now_datetime(),
+				"sent_by": frappe.session.user,
+				"sent_method": "Email"})
+		else:
+			frappe.db.set_value(doc.doctype, doc.name, {"send_status": "Failed"})
+
+	mirror_po3_status(doc.name)
