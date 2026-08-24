@@ -68,6 +68,10 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 		super(CustomPurchaseReceipt, self).on_submit()
 		post_rc_message(self)
 		v3_sync_to_po3(self)
+
+	def on_cancel(self):
+		super(CustomPurchaseReceipt, self).on_cancel()
+		v3_cancel_sync_to_po3(self)
 		
 def post_rc_message(doc):
 	if not doc.is_return and doc.company == "International Camouflage Ltd":
@@ -169,6 +173,69 @@ def v3_sync_to_po3(doc):
 		p3 = frappe.db.get_value("Purchase Order V3", {"erp_purchase_order": po_name}, "name")
 		if p3:
 			v3_reconcile(p3)
+
+
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "Native PR Cancel Sync To PO3"
+# (DocType Event / After Cancel on Purchase Receipt).
+#
+# Rolls the cancelled receipt's quantities back off the PO3 lines, re-derives
+# each line status from what is left, and steps the order back from
+# Received / Closed to Partially Received or Acknowledged as appropriate.
+# ---------------------------------------------------------------------------
+def v3_cancel_sync_to_po3(doc):
+	po_names = set()
+	for d in doc.items:
+		if d.purchase_order:
+			po_names.add(d.purchase_order)
+
+	for po_name in po_names:
+		po3_name = frappe.db.get_value("Purchase Order V3", {"erp_purchase_order": po_name}, "name")
+		if not po3_name:
+			continue
+		po3 = frappe.get_doc("Purchase Order V3", po3_name)
+		by_erp = {}
+		for r in po3.items:
+			if r.erp_po_item:
+				by_erp[r.erp_po_item] = r
+		touched = False
+		for d in doc.items:
+			if d.purchase_order != po_name:
+				continue
+			if d.get("neb_source_doctype") == "Goods Receipt V3":
+				continue
+			r = by_erp.get(d.purchase_order_item)
+			if not r:
+				continue
+			acc = F(r.accepted_qty) - F(d.qty)
+			rej = F(r.rejected_qty) - F(d.rejected_qty)
+			rec = F(r.received_qty) - F(d.qty) - F(d.rejected_qty)
+			if acc < 0:
+				acc = 0
+			if rej < 0:
+				rej = 0
+			if rec < 0:
+				rec = 0
+			upd = {"received_qty": rec, "accepted_qty": acc, "rejected_qty": rej}
+			if rec >= F(r.qty):
+				upd["line_status"] = "Received"
+			elif r.backorder_status == "Open":
+				upd["line_status"] = "Back-ordered"
+			elif rec > 0 or F(r.confirmed_qty):
+				upd["line_status"] = "Partial"
+				upd["short_qty"] = 0
+			else:
+				upd["line_status"] = "Open"
+				upd["short_qty"] = 0
+			frappe.db.set_value("Purchase Order V3 Item", r.name, upd)
+			touched = True
+		if touched and po3.workflow_state in ("Closed", "Closed Short", "Received"):
+			frappe.db.set_value("Purchase Order V3", po3_name,
+				{"workflow_state": "Partially Received", "receipt_status": "Partially Received"})
+
+	mirror_po3_status(po3_name)
 
 
 def validate(self, method):
