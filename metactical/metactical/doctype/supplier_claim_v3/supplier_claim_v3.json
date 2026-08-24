@@ -1,0 +1,186 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "CLM3-.YYYY.-.#####",
+ "creation": "2026-08-12 13:04:49.201103",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_main",
+  "purchase_order_v3",
+  "goods_receipt_v3",
+  "purchase_receipt",
+  "supplier",
+  "supplier_name",
+  "cb_main",
+  "claim_date",
+  "holding_warehouse",
+  "total_claim_amount",
+  "sec_items",
+  "items",
+  "sec_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "purchase_order_v3",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Purchase Order V3",
+   "options": "Purchase Order V3"
+  },
+  {
+   "fieldname": "goods_receipt_v3",
+   "fieldtype": "Link",
+   "label": "Goods Receipt V3",
+   "options": "Goods Receipt V3"
+  },
+  {
+   "description": "Claims are raised after receiving \u2014 link the receipt the problem came in on.",
+   "fieldname": "purchase_receipt",
+   "fieldtype": "Link",
+   "label": "ERP Purchase Receipt",
+   "options": "Purchase Receipt"
+  },
+  {
+   "columns": 2,
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "default": "Today",
+   "fieldname": "claim_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Claim Date",
+   "reqd": 1
+  },
+  {
+   "description": "Where the goods sit while the claim is open (e.g. by the manager\u2019s desk).",
+   "fieldname": "holding_warehouse",
+   "fieldtype": "Link",
+   "label": "Holding Location",
+   "options": "Warehouse"
+  },
+  {
+   "columns": 1,
+   "fieldname": "total_claim_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Claim Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Claim Lines"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Supplier Claim V3 Item",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:45.063416",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Claim V3",
+ "naming_rule": "Expression (old style)",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}

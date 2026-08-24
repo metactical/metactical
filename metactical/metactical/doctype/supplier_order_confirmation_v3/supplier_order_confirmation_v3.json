@@ -1,0 +1,306 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "SOC3-.YYYY.-.#####",
+ "creation": "2026-08-12 13:04:20.451119",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_main",
+  "purchase_order_v3",
+  "supplier",
+  "supplier_name",
+  "company",
+  "cb_main",
+  "confirmation_date",
+  "promised_ship_date",
+  "source_type",
+  "sec_ref",
+  "confirmation_no",
+  "confirmation_no_source",
+  "cb_ref",
+  "supplier_invoice_no",
+  "supersedes",
+  "revision_no",
+  "sec_ai",
+  "ai_parsed",
+  "ai_confidence",
+  "source_document",
+  "sec_items",
+  "items",
+  "sec_backorders",
+  "backorders",
+  "sec_notes",
+  "notes",
+  "amended_from",
+  "tab_documents",
+  "documents"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "purchase_order_v3",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Purchase Order V3",
+   "options": "Purchase Order V3",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "purchase_order_v3.supplier",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "purchase_order_v3.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "confirmation_date",
+   "fieldtype": "Date",
+   "label": "Confirmation Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "promised_ship_date",
+   "fieldtype": "Date",
+   "label": "Promised Ship Date"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "source_type",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Manual\nEmail\nInvoice PDF\nEDI\nPortal",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_ref",
+   "fieldtype": "Section Break",
+   "label": "Supplier References"
+  },
+  {
+   "description": "Supplier's own acknowledgement number. If they only sent an invoice, put the invoice number here and set the source below.",
+   "fieldname": "confirmation_no",
+   "fieldtype": "Data",
+   "label": "Confirmation No"
+  },
+  {
+   "default": "Confirmation Number",
+   "fieldname": "confirmation_no_source",
+   "fieldtype": "Select",
+   "label": "Number Is A",
+   "options": "Confirmation Number\nInvoice Number"
+  },
+  {
+   "fieldname": "cb_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "supplier_invoice_no",
+   "fieldtype": "Data",
+   "label": "Supplier Invoice No"
+  },
+  {
+   "description": "Earlier confirmation this one replaces.",
+   "fieldname": "supersedes",
+   "fieldtype": "Link",
+   "label": "Supersedes",
+   "options": "Supplier Order Confirmation V3"
+  },
+  {
+   "fieldname": "revision_no",
+   "fieldtype": "Int",
+   "label": "Revision",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_ai",
+   "fieldtype": "Section Break",
+   "label": "Parsing"
+  },
+  {
+   "default": "0",
+   "fieldname": "ai_parsed",
+   "fieldtype": "Check",
+   "label": "AI Parsed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_confidence",
+   "fieldtype": "Percent",
+   "label": "AI Confidence",
+   "read_only": 1
+  },
+  {
+   "description": "Shortcut for the first document; use the Supplier Documents tab for the rest.",
+   "fieldname": "source_document",
+   "fieldtype": "Attach",
+   "label": "Primary Document"
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Lines"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Supplier Order Confirmation V3 Item",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:(doc.backorders||[]).length",
+   "depends_on": "eval:(doc.backorders||[]).length",
+   "fieldname": "sec_backorders",
+   "fieldtype": "Section Break",
+   "label": "Back Orders"
+  },
+  {
+   "description": "Built from the lines above \u2014 every line marked Back-ordered or Partial - Balance Back-ordered appears here with its balance due. Update ETA, status and remarks as the supplier reports in; rows close themselves when the goods are received.",
+   "fieldname": "backorders",
+   "fieldtype": "Table",
+   "label": "Back Orders",
+   "options": "Supplier Order Confirmation V3 Backorder"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "description": "Extra confirmation numbers or anything else from the supplier document.",
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Supplier Order Confirmation V3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tab_documents",
+   "fieldtype": "Tab Break",
+   "label": "Supplier Documents"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Every document the supplier sends for this order \u2014 confirmation, invoice, later backorder notices. Add more at any time, including after confirming.",
+   "fieldname": "documents",
+   "fieldtype": "Table",
+   "label": "Supplier Documents",
+   "options": "Supplier Order Confirmation V3 Document"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:44.216153",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Order Confirmation V3",
+ "naming_rule": "Expression (old style)",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}

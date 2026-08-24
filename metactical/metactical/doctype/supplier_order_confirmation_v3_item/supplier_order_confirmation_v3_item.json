@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-12 13:04:19.148211",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "po3_item",
+  "item_code",
+  "item_name",
+  "ordered_qty",
+  "retail_sku_suffix",
+  "confirmed_qty",
+  "barcode",
+  "line_status",
+  "supplier_part_no",
+  "backorder_eta",
+  "substitute_item_code",
+  "confirmed_rate",
+  "rate_variance_pct",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "description": "Auto-matched from the item when left blank.",
+   "fieldname": "po3_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "PO3 Line"
+  },
+  {
+   "columns": 2,
+   "description": "Type/scan/paste item code, retail SKU or barcode - it resolves and matches back to the PO line on save.",
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "ordered_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Ordered Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "retail_sku_suffix",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Retail SKU",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "Quantity coming in THIS shipment. 0 for Back-ordered, Stock Out, Discontinued or Cancelled. For a split, enter what ships now and use \"Partial - Balance Back-ordered\".",
+   "fieldname": "confirmed_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Confirmed Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "barcode",
+   "fieldtype": "Data",
+   "label": "Barcode",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "line_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Line Status",
+   "options": "Confirmed\nPartial - Balance Cancelled\nPartial - Balance Back-ordered\nBack-ordered\nSupplier Stock Out\nDiscontinued\nSubstituted\nCancelled by Supplier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "supplier_part_no",
+   "fieldtype": "Data",
+   "label": "Supplier SKU",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Optional \u2014 suppliers often will not commit to a date.",
+   "fieldname": "backorder_eta",
+   "fieldtype": "Date",
+   "label": "Backorder ETA"
+  },
+  {
+   "fieldname": "substitute_item_code",
+   "fieldtype": "Link",
+   "label": "Substitute Item",
+   "options": "Item"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "confirmed_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Confirmed Rate"
+  },
+  {
+   "fieldname": "rate_variance_pct",
+   "fieldtype": "Percent",
+   "label": "Rate Variance %",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:44.749518",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Order Confirmation V3 Item",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,231 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "ICV3-.YYYY.-.#####",
+ "creation": "2026-08-12 13:04:48.030199",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_main",
+  "conversion_date",
+  "supplier_claim_v3",
+  "purpose",
+  "cb_main",
+  "parts_cost",
+  "sec_from",
+  "source_item",
+  "source_warehouse",
+  "qty",
+  "cb_from",
+  "target_item",
+  "target_warehouse",
+  "create_target_item",
+  "sec_erp",
+  "erp_stock_entry",
+  "posted_on",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "conversion_date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "supplier_claim_v3",
+   "fieldtype": "Link",
+   "label": "Supplier Claim",
+   "options": "Supplier Claim V3"
+  },
+  {
+   "default": "Refurbished",
+   "fieldname": "purpose",
+   "fieldtype": "Select",
+   "label": "Purpose",
+   "options": "Refurbished\nRepack\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cb_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Added to the valuation of the target item.",
+   "fieldname": "parts_cost",
+   "fieldtype": "Currency",
+   "label": "Added Parts / Repair Cost"
+  },
+  {
+   "fieldname": "sec_from",
+   "fieldtype": "Section Break",
+   "label": "Convert From"
+  },
+  {
+   "columns": 2,
+   "fieldname": "source_item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cb_from",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "description": "Leave blank with \"Create Refurb Item\" ticked to auto-create <source>-REF.",
+   "fieldname": "target_item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target Item (refurb variant)",
+   "options": "Item"
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "label": "Target Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Creates &lt;source_item&gt;-REF as a new item on save when Target Item is blank.",
+   "fieldname": "create_target_item",
+   "fieldtype": "Check",
+   "label": "Create Refurb Item If Missing"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_erp",
+   "fieldtype": "Section Break",
+   "label": "Native ERP Link"
+  },
+  {
+   "fieldname": "erp_stock_entry",
+   "fieldtype": "Link",
+   "label": "ERP Stock Entry (Repack)",
+   "no_copy": 1,
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posted_on",
+   "fieldtype": "Datetime",
+   "label": "Posted On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Item Conversion V3",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:44.011602",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Conversion V3",
+ "naming_rule": "Expression (old style)",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,153 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-13 22:10:27.527184",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "po3_item",
+  "item_display",
+  "item_code",
+  "item_name",
+  "ordered_qty",
+  "shipping_now",
+  "balance_qty",
+  "received_qty",
+  "eta",
+  "status",
+  "shipment",
+  "shipped_on",
+  "cancel_reason",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "po3_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "PO3 Line",
+   "read_only": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "item_display",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item",
+   "read_only": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item Code",
+   "options": "Item"
+  },
+  {
+   "columns": 2,
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "ordered_qty",
+   "fieldtype": "Float",
+   "label": "Ordered",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "What the supplier committed to send straight away. The rest is the Back-ordered Qty. This is a promise, not a receipt \u2014 see Received.",
+   "fieldname": "shipping_now",
+   "fieldtype": "Float",
+   "label": "Confirmed for First Shipment",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "Ordered minus what the supplier confirmed for the first shipment \u2014 the quantity still owed.",
+   "fieldname": "balance_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Back-ordered Qty",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "description": "Total received against this PO line so far, updated by every Goods Receipt.",
+   "fieldname": "received_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Received",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 2,
+   "fieldname": "eta",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "ETA"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 2,
+   "default": "Open",
+   "description": "Open = still owed \u00b7 Shipped = on its way (an Inbound Shipment covers it) \u00b7 Received = arrived \u00b7 Cancelled = written off.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Open\nShipped\nReceived\nCancelled"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "The Inbound Shipment carrying this balance.",
+   "fieldname": "shipment",
+   "fieldtype": "Link",
+   "label": "Shipment",
+   "options": "Inbound Shipment V3",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "shipped_on",
+   "fieldtype": "Date",
+   "label": "Shipped On",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "cancel_reason",
+   "fieldtype": "Select",
+   "label": "Cancel Reason",
+   "options": "\nPast Cancel Date\nCancelled By Us\nCancelled By Supplier\nNo Longer Available\nOrdered Elsewhere\nOther"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:44.906851",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Order Confirmation V3 Backorder",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
