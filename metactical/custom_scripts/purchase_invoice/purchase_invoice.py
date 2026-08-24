@@ -10,6 +10,12 @@ class CustomPurchaseInvoice(PurchaseInvoice):
 		super(CustomPurchaseInvoice, self).on_submit()
 		v3_close_short_closed_po(self)
 
+	def on_cancel(self):
+		# After Cancel: ERPNext unwinds the invoice first, then the V3 reaction
+		# re-derives the native PO's open/closed state from what is left.
+		super(CustomPurchaseInvoice, self).on_cancel()
+		v3_cancel_reopen_po(self)
+
 	def before_cancel(self):
 		# V3 reaction runs BEFORE super(), matching the Server Script's
 		# "Before Cancel" event: the native PO has to be reopened while the
@@ -91,5 +97,37 @@ def v3_precancel_reopen_po(doc):
 			frappe.get_doc("Purchase Order", d.purchase_order).update_status("Submitted")
 			frappe.msgprint("Purchase Order " + d.purchase_order
 				+ " reopened so this invoice can be cancelled.")
+		except Exception:
+			pass
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "Native PI Cancel Reopen PO"
+# (DocType Event / After Cancel on Purchase Invoice).
+#
+# With the invoice gone there is received-but-unbilled value again, so a native
+# PO that had been closed to match a Closed Short PO3 is reopened.
+# ---------------------------------------------------------------------------
+def v3_cancel_reopen_po(doc):
+	seen = {}
+	for d in doc.items:
+		if d.purchase_order:
+			seen[d.purchase_order] = 1
+	for po_name in seen:
+		st = frappe.db.get_value("Purchase Order", po_name,
+			["status", "docstatus", "per_received", "per_billed"], as_dict=True)
+		if not st or st.docstatus != 1 or st.status != "Closed":
+			continue
+		if float(st.per_received or 0) <= 0:
+			continue
+		if float(st.per_billed or 0) + 0.001 >= float(st.per_received or 0):
+			continue
+		if not frappe.db.exists("Purchase Order V3", {"erp_purchase_order": po_name}):
+			continue
+		try:
+			frappe.get_doc("Purchase Order", po_name).update_status("Submitted")
+			frappe.msgprint("Purchase Order " + po_name + " reopened - cancelling this "
+				+ "invoice leaves received goods unbilled, and a Closed order cannot "
+				+ "be invoiced.")
 		except Exception:
 			pass
