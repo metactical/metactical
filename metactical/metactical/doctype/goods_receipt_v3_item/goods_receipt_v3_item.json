@@ -1,0 +1,181 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-12 13:04:19.782651",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "po3_item",
+  "expected_item_code",
+  "expected_qty",
+  "received_item_code",
+  "received_qty",
+  "retail_sku_suffix",
+  "sec_split",
+  "item_name",
+  "accepted_qty",
+  "barcode",
+  "rejected_qty",
+  "supplier_part_no",
+  "reject_reason",
+  "cb_split",
+  "variance_type",
+  "variance_qty",
+  "disposition",
+  "overage_billed",
+  "photo",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "description": "Auto-matched from the received item when left blank; stays blank only for unordered goods.",
+   "fieldname": "po3_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "PO3 Line"
+  },
+  {
+   "columns": 2,
+   "fieldname": "expected_item_code",
+   "fieldtype": "Link",
+   "label": "Expected Item",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "expected_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Expected Qty (outstanding)",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "Type/scan/paste item code, retail SKU or barcode.",
+   "fieldname": "received_item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Received Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "received_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Received Qty",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "retail_sku_suffix",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Retail SKU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_split",
+   "fieldtype": "Section Break",
+   "label": "Accept / Reject"
+  },
+  {
+   "fetch_from": "received_item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "accepted_qty",
+   "fieldtype": "Float",
+   "label": "Accepted Qty"
+  },
+  {
+   "fieldname": "barcode",
+   "fieldtype": "Data",
+   "label": "Barcode",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rejected_qty",
+   "fieldtype": "Float",
+   "label": "Rejected Qty"
+  },
+  {
+   "fieldname": "supplier_part_no",
+   "fieldtype": "Data",
+   "label": "Supplier SKU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reject_reason",
+   "fieldtype": "Select",
+   "label": "Reject Reason",
+   "options": "\nDamaged\nDefective\nExpired\nWrong Labelling\nOther"
+  },
+  {
+   "fieldname": "cb_split",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "variance_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Variance",
+   "no_copy": 1,
+   "options": "\nMatch\nShort\nOver\nWrong Variant\nWrong Item\nDamaged\nUnordered",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variance_qty",
+   "fieldtype": "Float",
+   "label": "Variance Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "disposition",
+   "fieldtype": "Select",
+   "label": "Disposition",
+   "options": "\nAccept\nKeep - Free of Charge\nKeep - Claim Credit\nAccept as Substitution\nQuarantine\nReturn to Supplier\nClose Short\nWrite Off"
+  },
+  {
+   "default": "0",
+   "description": "Supplier invoiced the extra qty. Decides free-of-charge vs claim.",
+   "fieldname": "overage_billed",
+   "fieldtype": "Check",
+   "label": "Overage Was Billed"
+  },
+  {
+   "fieldname": "photo",
+   "fieldtype": "Attach Image",
+   "label": "Photo"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:43.845201",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Goods Receipt V3 Item",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
