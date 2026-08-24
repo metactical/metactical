@@ -25,6 +25,9 @@ class PurchaseOrderV3(Document):
 	def on_update_after_submit(self):
 		submitted_updates(self)
 
+	def before_cancel(self):
+		cancel_guard(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "PO3 Shared Series Naming"
@@ -440,3 +443,55 @@ def submitted_updates(doc):
 				frappe.db.set_value("Purchase Order", doc.erp_purchase_order,
 					"status", "To Receive and Bill")
 			frappe.msgprint("Native PO " + doc.erp_purchase_order + " reopened to match.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "PO3 Cancel Guard"
+# (DocType Event / Before Cancel on Purchase Order V3).
+#
+# Refuses to cancel an order that still has live confirmations, shipments,
+# receipts or claims against it, or that has already taken stock in, and points
+# the user at Close Short instead.
+# ---------------------------------------------------------------------------
+def cancel_guard(doc):
+	blockers = []
+
+	for s in frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": doc.name, "docstatus": ("<", 2)},
+			fields=["name", "workflow_state", "docstatus"], limit_page_length=0):
+		what = "confirmation " + s.name + " (" + str(s.workflow_state) + ")"
+		if s.docstatus == 0:
+			blockers.append(what + " - delete it, or cancel it first")
+		else:
+			blockers.append(what + " - cancel the confirmation first")
+
+	for s in frappe.get_all("Inbound Shipment V3",
+			filters={"purchase_order_v3": doc.name, "docstatus": ("<", 2)},
+			fields=["name", "workflow_state"], limit_page_length=0):
+		blockers.append("shipment " + s.name + " (" + str(s.workflow_state)
+			+ ") - goods are on the way; cancel or delete the shipment first")
+
+	for s in frappe.get_all("Goods Receipt V3",
+			filters={"purchase_order_v3": doc.name, "docstatus": ("<", 2)},
+			fields=["name", "workflow_state"], limit_page_length=0):
+		blockers.append("receipt " + s.name + " (" + str(s.workflow_state)
+			+ ") - cancel or delete the receipt first")
+
+	for s in frappe.get_all("Supplier Claim V3",
+			filters={"purchase_order_v3": doc.name, "docstatus": ("<", 2)},
+			fields=["name"], limit_page_length=0):
+		blockers.append("claim " + s.name + " - resolve or cancel the claim first")
+
+	got = 0.0
+	for d in doc.items:
+		got = got + float(d.received_qty or 0)
+	if got > 0:
+		blockers.append("goods already received (" + str(got)
+			+ " units) - a cancelled order cannot hold stock. Reverse the receipts, "
+			+ "or use Close Short to stop the balance instead")
+
+	if blockers:
+		frappe.throw("<b>" + doc.name + " cannot be cancelled yet.</b><br><br>"
+			+ "<br>".join(blockers)
+			+ "<br><br>If the order is simply not going to be filled, "
+			+ "<b>Close Short</b> ends it while keeping the history.")
