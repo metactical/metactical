@@ -1,0 +1,128 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:22.979300",
+  "name": "Mark Acknowledged",
+  "workflow_action_name": "Mark Acknowledged"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.023616",
+  "name": "Close",
+  "workflow_action_name": "Close"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.207816",
+  "name": "Supplier Cancelled",
+  "workflow_action_name": "Supplier Cancelled"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.289204",
+  "name": "Resolve",
+  "workflow_action_name": "Resolve"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.333507",
+  "name": "Post",
+  "workflow_action_name": "Post"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.424661",
+  "name": "Open Claim",
+  "workflow_action_name": "Open Claim"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.475355",
+  "name": "Await Supplier",
+  "workflow_action_name": "Await Supplier"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-15 12:08:07.504690",
+  "name": "Finish Counting",
+  "workflow_action_name": "Finish Counting"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-15 12:08:07.564427",
+  "name": "Accept Variances",
+  "workflow_action_name": "Accept Variances"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-15 12:08:07.615866",
+  "name": "Post to Stock",
+  "workflow_action_name": "Post to Stock"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:22.930904",
+  "name": "Mark Sent",
+  "workflow_action_name": "Mark Sent"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.121362",
+  "name": "Cancel",
+  "workflow_action_name": "Cancel"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.161232",
+  "name": "Return for Rework",
+  "workflow_action_name": "Return for Rework"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.253821",
+  "name": "Start Count",
+  "workflow_action_name": "Start Count"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.376653",
+  "name": "Reject Delivery",
+  "workflow_action_name": "Reject Delivery"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.518980",
+  "name": "Mark Resolved",
+  "workflow_action_name": "Mark Resolved"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:22.885001",
+  "name": "Reopen",
+  "workflow_action_name": "Reopen"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-08-12 13:02:23.071109",
+  "name": "Close Short",
+  "workflow_action_name": "Close Short"
+ }
+]
