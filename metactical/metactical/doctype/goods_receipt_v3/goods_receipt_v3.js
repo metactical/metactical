@@ -78,7 +78,7 @@ function gr3_load_scan_map(frm) {
     if (!frm.doc.purchase_order_v3) { frm._scan = null; return; }
     if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3) return;
     frappe.call({
-        method: 'v3_gr3_scan_map',
+        method: 'metactical.metactical.doctype.goods_receipt_v3.goods_receipt_v3.v3_gr3_scan_map',
         args: { po3: frm.doc.purchase_order_v3 },
         callback: function (r) {
             var m = r.message || {};
