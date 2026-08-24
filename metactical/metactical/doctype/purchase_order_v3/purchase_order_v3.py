@@ -801,3 +801,46 @@ def v3_reconcile_receiving(po3=None):
 		for x in v3_reconcile(nm):
 			closed.append(x)
 	frappe.response["message"] = {"checked": len(names), "shipments_closed": closed}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Sync Closed Short Natives"
+# (API: v3_sync_closed_short_natives).
+#
+# Maintenance sweep: closes the native PO behind every Closed Short PO3 that
+# has nothing left to invoice, and reports the ones deliberately left open
+# (still to bill, or a draft receipt outstanding).
+#
+# Takes no arguments, so the body is entirely verbatim.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_sync_closed_short_natives():
+	fixed = []
+	skipped = []
+	for p in frappe.get_all("Purchase Order V3",
+			filters={"docstatus": 1, "workflow_state": "Closed Short"},
+			fields=["name", "erp_purchase_order"], limit_page_length=0):
+		if not p.erp_purchase_order:
+			continue
+		st = frappe.db.get_value("Purchase Order", p.erp_purchase_order,
+			["status", "docstatus", "per_received", "per_billed"], as_dict=True)
+		if not st or st.docstatus != 1 or st.status in ("Closed", "Cancelled"):
+			continue
+		rec = float(st.per_received or 0)
+		bil = float(st.per_billed or 0)
+		# only when there is nothing left to bill - a Closed PO refuses invoices
+		if rec > 0 and bil + 0.001 < rec:
+			skipped.append(p.erp_purchase_order + " (" + str(round(rec,1)) + "% received, "
+				+ str(round(bil,1)) + "% billed - still to invoice)")
+			continue
+		if frappe.get_all("Goods Receipt V3",
+				filters={"purchase_order_v3": p.name, "docstatus": 0},
+				fields=["name"], limit_page_length=1):
+			skipped.append(p.erp_purchase_order + " (draft receipt open)")
+			continue
+		try:
+			frappe.get_doc("Purchase Order", p.erp_purchase_order).update_status("Closed")
+		except Exception:
+			frappe.db.set_value("Purchase Order", p.erp_purchase_order, "status", "Closed")
+		fixed.append(p.name + " -> " + p.erp_purchase_order)
+	frappe.response["message"] = {"closed": fixed, "left_open": skipped}
