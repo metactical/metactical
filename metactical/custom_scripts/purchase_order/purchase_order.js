@@ -414,7 +414,7 @@ frappe.ui.form.on('Purchase Order', {
         if (frm.doc.docstatus === 1) {
             frm.add_custom_button(__('Re-sync Receiving'), function () {
                 frappe.call({
-                    method: 'v3_reconcile_receiving',
+                    method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.v3_reconcile_receiving',
                     args: { po3: frm.doc.name },
                     freeze: true,
                     freeze_message: __('Checking shipments and back orders...'),

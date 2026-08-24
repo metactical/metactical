@@ -722,3 +722,82 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 	else:
 		frappe.response["message"] = {"po3": doc.name, "url": url, "lines": count,
 			"skipped": skipped, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Reconcile Receiving"
+# (API: v3_reconcile_receiving).
+#
+# Repair tool: re-derives backorder and shipment state from the receipts that
+# actually exist. Runs for one order, or sweeps every submitted PO3 when called
+# with no argument. Backs "Tools > Re-sync Receiving" on the native PO form.
+#
+# NOTE: v3_reconcile below is NOT the one in procurement_v3.utils. This script
+# carries its own 45-line variant (the shared one is 48 lines and behaves
+# differently), so it stays nested here. Do not collapse the two.
+#
+# No alias in hooks.py: the only caller is custom_scripts/purchase_order/
+# purchase_order.js, repointed to this dotted path.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_reconcile_receiving(po3=None):
+	name = po3
+	names = []
+	if name:
+		names = [name]
+	else:
+		for p in frappe.get_all("Purchase Order V3", filters={"docstatus": 1},
+				fields=["name"], limit_page_length=0):
+			names.append(p.name)
+
+	def v3_reconcile(po3_name):
+		soc = frappe.db.get_value("Supplier Order Confirmation V3",
+			{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
+		if soc:
+			for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
+					filters={"parent": soc}, fields=["name", "po3_item", "status"]):
+				line = frappe.db.get_value("Purchase Order V3 Item", b.po3_item,
+					["received_qty", "qty"], as_dict=True)
+				if not line:
+					continue
+				got = float(line.received_qty or 0)
+				upd = {"received_qty": got}
+				if b.status in ("Open", "Shipped") and got >= float(line.qty or 0):
+					upd["status"] = "Received"
+				frappe.db.set_value("Supplier Order Confirmation V3 Backorder", b.name, upd)
+		out = []
+		for ins in frappe.get_all("Inbound Shipment V3",
+				filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)},
+				fields=["name", "workflow_state", "docstatus"]):
+			d = frappe.get_doc("Inbound Shipment V3", ins.name)
+			all_landed = True if d.items else False
+			for it in d.items:
+				if not it.po3_item:
+					all_landed = False
+					continue
+				line = frappe.db.get_value("Purchase Order V3 Item", it.po3_item,
+					["received_qty", "qty"], as_dict=True)
+				if line and float(line.received_qty or 0) >= float(line.qty or 0):
+					frappe.db.set_value("Inbound Shipment V3 Item", it.name, "received_flag", 1)
+				else:
+					all_landed = False
+			if not all_landed:
+				continue
+			for b in d.boxes:
+				frappe.db.set_value("Inbound Shipment V3 Box", b.name, "received", 1)
+			if ins.docstatus == 0 and ins.workflow_state in ("Draft", "In Transit"):
+				try:
+					d.reload()
+					d.workflow_state = "Received"
+					d.docstatus = 1
+					d.save()
+					out.append(ins.name)
+				except Exception:
+					pass
+		return out
+
+	closed = []
+	for nm in names:
+		for x in v3_reconcile(nm):
+			closed.append(x)
+	frappe.response["message"] = {"checked": len(names), "shipments_closed": closed}
