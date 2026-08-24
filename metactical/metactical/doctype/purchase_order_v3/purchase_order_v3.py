@@ -28,6 +28,9 @@ class PurchaseOrderV3(Document):
 	def before_cancel(self):
 		cancel_guard(self)
 
+	def on_cancel(self):
+		cancel_native_po(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "PO3 Shared Series Naming"
@@ -495,3 +498,35 @@ def cancel_guard(doc):
 			+ "<br>".join(blockers)
 			+ "<br><br>If the order is simply not going to be filled, "
 			+ "<b>Close Short</b> ends it while keeping the history.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "PO3 Cancel Native PO"
+# (DocType Event / After Cancel on Purchase Order V3).
+#
+# Cancels the native twin when nothing was received against it; closes it
+# instead when receipts exist, so no further stock can land on it.
+# ---------------------------------------------------------------------------
+def cancel_native_po(doc):
+	# PO3 cancelled -> deal with the native twin. Cancel it when nothing was
+	# received against it; otherwise close it so nothing further can be received.
+	if doc.erp_purchase_order:
+		npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
+		if npo.docstatus == 1:
+			has_receipts = frappe.db.exists("Purchase Receipt Item",
+				{"purchase_order": npo.name, "docstatus": 1})
+			if not has_receipts:
+				try:
+					npo.cancel()
+					frappe.msgprint("Native PO " + npo.name + " cancelled.")
+				except Exception:
+					frappe.db.set_value("Purchase Order", npo.name, "status", "Closed")
+					frappe.msgprint("Native PO " + npo.name + " could not be cancelled - marked Closed instead.")
+			else:
+				try:
+					npo.update_status("Closed")
+				except Exception:
+					frappe.db.set_value("Purchase Order", npo.name, "status", "Closed")
+				frappe.msgprint("Native PO " + npo.name + " has receipts - marked Closed (no further receiving).")
+
+	mirror_po3_status(doc.name)
