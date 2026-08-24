@@ -1563,15 +1563,69 @@ fixtures = [{
 	},
 	{
 		"dt": "Workflow State",
-		"filters": [["owner", "in", ['akpoclaudeuser@goldenplazadistributors.com']]]
+		"filters": [["name", "in", [
+			"Acknowledged",
+			"Approved",
+			"Awaiting Supplier",
+			"Cancelled",
+			"Closed",
+			"Closed Short",
+			"Confirmed",
+			"Counting",
+			"Discrepancy Hold",
+			"Draft",
+			"In Transit",
+			"Open",
+			"Partially Received",
+			"Pending",
+			"Pending Approval",
+			"Pending L1 Approval",
+			"Pending L2 Approval",
+			"Pending Review",
+			"Posted",
+			"Ready to Post",
+			"Received",
+			"Rejected",
+			"Resolved",
+			"Sent to Supplier",
+			"Variance Review",
+		]]]
 	},
 	{
 		"dt": "Workflow Action Master",
-		"filters": [["owner", "in", ['akpoclaudeuser@goldenplazadistributors.com']]]
+		"filters": [["name", "in", [
+			"Accept Variances",
+			"Approve",
+			"Await Supplier",
+			"Cancel",
+			"Close",
+			"Close Short",
+			"Finish Counting",
+			"Mark Acknowledged",
+			"Mark Resolved",
+			"Mark Sent",
+			"Open Claim",
+			"Post",
+			"Post to Stock",
+			"Reject",
+			"Reject Delivery",
+			"Reopen",
+			"Resolve",
+			"Return for Rework",
+			"Review",
+			"Start Count",
+			"Supplier Cancelled",
+		]]]
 	},
 	{
 		"dt": "Workflow",
-		"filters": [["owner", "in", ['akpoclaudeuser@goldenplazadistributors.com']]]
+		"filters": [["name", "in", [
+			"Goods Receipt V3 Flow",
+			"Inbound Shipment V3 Flow",
+			"Purchase Order V3 Flow",
+			"Supplier Claim V3 Flow",
+			"Supplier Order Confirmation V3 Flow",
+		]]]
 	},
 	{
 		"dt": "Email Template",

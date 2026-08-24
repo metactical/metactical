@@ -2,6 +2,33 @@
  {
   "docstatus": 0,
   "doctype": "Workflow State",
+  "icon": "question-sign",
+  "modified": "2026-07-24 21:31:06.746157",
+  "name": "Pending",
+  "style": "",
+  "workflow_state_name": "Pending"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "ok-sign",
+  "modified": "2026-07-24 21:31:06.760814",
+  "name": "Approved",
+  "style": "Success",
+  "workflow_state_name": "Approved"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "remove",
+  "modified": "2026-07-24 21:31:06.771067",
+  "name": "Rejected",
+  "style": "Danger",
+  "workflow_state_name": "Rejected"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
   "icon": "",
   "modified": "2026-08-12 13:02:22.689681",
   "name": "Open",
@@ -115,5 +142,86 @@
   "name": "Pending Approval",
   "style": "Warning",
   "workflow_state_name": "Pending Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:46.867428",
+  "name": "Received",
+  "style": "",
+  "workflow_state_name": "Received"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.036973",
+  "name": "In Transit",
+  "style": "",
+  "workflow_state_name": "In Transit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.046639",
+  "name": "Discrepancy Hold",
+  "style": "",
+  "workflow_state_name": "Discrepancy Hold"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.068331",
+  "name": "Confirmed",
+  "style": "",
+  "workflow_state_name": "Confirmed"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.094915",
+  "name": "Pending Review",
+  "style": "",
+  "workflow_state_name": "Pending Review"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.120057",
+  "name": "Sent to Supplier",
+  "style": "",
+  "workflow_state_name": "Sent to Supplier"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.144792",
+  "name": "Pending L2 Approval",
+  "style": "",
+  "workflow_state_name": "Pending L2 Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.167601",
+  "name": "Pending L1 Approval",
+  "style": "",
+  "workflow_state_name": "Pending L1 Approval"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-08-24 01:53:47.182462",
+  "name": "Draft",
+  "style": "",
+  "workflow_state_name": "Draft"
  }
 ]
