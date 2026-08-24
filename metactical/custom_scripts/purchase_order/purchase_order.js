@@ -379,3 +379,68 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 }
 // for backward compatibility: combine new and previous states
 extend_cscript(cur_frm.cscript, new erpnext.buying.PurchaseOrderController({frm: cur_frm}));
+
+
+// ---------------------------------------------------------------------------
+// Migrated from Client Script "Purchase Order V3 Backlink" (Form view).
+// Surfaces the originating Purchase Order V3 on the native PO, plus Create
+// Supplier Claim and Tools > Re-sync Receiving.
+//
+// NOTE (carried over unchanged from the Client Script): the two calls below
+// pass frm.doc.name (the NATIVE PO name) where a Purchase Order V3 name is
+// expected. They most likely want frm.doc.custom_purchase_order_v3. Left
+// as-is so this migration does not change behaviour - see the migration notes.
+// ---------------------------------------------------------------------------
+
+function clm3_new_from(field, value) {
+    frappe.model.with_doctype('Supplier Claim V3', function () {
+        var d = frappe.model.get_new_doc('Supplier Claim V3');
+        d[field] = value;
+        d.claim_date = frappe.datetime.get_today();
+        frappe.set_route('Form', 'Supplier Claim V3', d.name);
+    });
+}
+
+frappe.ui.form.on('Purchase Order', {
+    refresh: function(frm) {
+        if (frm.doc.docstatus === 1) {
+            frm.add_custom_button(__('Supplier Claim'), function () {
+                clm3_new_from('purchase_order_v3', frm.doc.name);
+            }, __('Create'));
+        }
+
+        // Receipts normally reconcile themselves. This is for records that
+        // drifted before that was in place, or after a manual data fix.
+        if (frm.doc.docstatus === 1) {
+            frm.add_custom_button(__('Re-sync Receiving'), function () {
+                frappe.call({
+                    method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.v3_reconcile_receiving',
+                    args: { po3: frm.doc.name },
+                    freeze: true,
+                    freeze_message: __('Checking shipments and back orders...'),
+                    callback: function (r) {
+                        var m = (r.message || {});
+                        var c = (m.shipments_closed || []);
+                        frappe.msgprint({
+                            title: __('Re-sync complete'),
+                            indicator: c.length ? 'green' : 'blue',
+                            message: c.length
+                                ? __('Marked received: ') + c.join(', ')
+                                : __('Everything already matches the receipts on this order.')
+                        });
+                        frm.reload_doc();
+                    }
+                });
+            }, __('Tools'));
+        }
+
+        if (!frm.doc.custom_purchase_order_v3) return;
+        frm.dashboard.set_headline(
+            __('Created from {0}',
+               ['<a href="/app/purchase-order-v3/' + frm.doc.custom_purchase_order_v3 + '">'
+                + frm.doc.custom_purchase_order_v3 + '</a>']));
+        frm.add_custom_button(__('Purchase Order V3'), function() {
+            frappe.set_route('Form', 'Purchase Order V3', frm.doc.custom_purchase_order_v3);
+        }, __('View'));
+    }
+});
