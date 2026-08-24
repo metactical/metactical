@@ -14,6 +14,9 @@ class SupplierOrderConfirmationV3(Document):
 	def on_submit(self):
 		mirror_to_po3(self)
 
+	def before_cancel(self):
+		cancel_guard(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "SOC3 Validate"
@@ -289,3 +292,38 @@ def mirror_to_po3(doc):
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
 
 	mirror_po3_status(po.name)
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "SOC3 Cancel Guard"
+# (DocType Event / Before Cancel on Supplier Order Confirmation V3).
+#
+# The confirmation is the record of what the supplier promised, so it cannot be
+# cancelled once shipments were built from it or stock has landed against the
+# order. Points the user at "Supplier Cancelled" instead.
+# ---------------------------------------------------------------------------
+def cancel_guard(doc):
+	blockers = []
+	for s in frappe.get_all("Inbound Shipment V3",
+			filters={"supplier_order_confirmation_v3": doc.name, "docstatus": ("<", 2)},
+			fields=["name", "workflow_state"], limit_page_length=0):
+		blockers.append("shipment " + s.name + " (" + str(s.workflow_state)
+			+ ") was built from this confirmation")
+
+	if doc.purchase_order_v3:
+		got = 0.0
+		for r in frappe.get_all("Purchase Order V3 Item",
+				filters={"parent": doc.purchase_order_v3},
+				fields=["received_qty"], limit_page_length=0):
+			got = got + float(r.received_qty or 0)
+		if got > 0:
+			blockers.append("goods have already been received against "
+				+ doc.purchase_order_v3 + " (" + str(got) + " units)")
+
+	if blockers:
+		frappe.throw("<b>" + doc.name + " cannot be cancelled.</b><br><br>"
+			+ "<br>".join(blockers)
+			+ "<br><br>The confirmation is the record of what the supplier promised; "
+			+ "cancelling it would leave the shipments and receipts with nothing "
+			+ "behind them. Use <b>Supplier Cancelled</b> on the order instead if "
+			+ "the supplier has withdrawn.")
