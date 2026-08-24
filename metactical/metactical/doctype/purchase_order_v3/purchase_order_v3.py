@@ -97,7 +97,7 @@ def validate(doc):
 			["default_price_list", "default_currency"], as_dict=True) or {}
 		global_pl = frappe.db.get_single_value("Buying Settings", "buying_price_list")
 		if not doc.buying_price_list or doc.buying_price_list == global_pl:
-			doc.buying_price_list = sup.default_price_list
+			doc.buying_price_list = supplier_buying_price_list(doc.supplier)
 		if sup.default_currency and (not doc.currency or doc.currency == company_currency):
 			doc.currency = sup.default_currency
 	if not doc.currency:
@@ -915,3 +915,42 @@ def v3_reset_draft_state(po3=None):
 			"backorder_status": None, "backorder_eta": None, "backorder_cancel_reason": None,
 			"erp_po_item": None})
 	frappe.response["message"] = "reset " + name
+
+
+# ---------------------------------------------------------------------------
+# Buying price list for a supplier.
+#
+# Resolved the same way native Purchase Order does it
+# (erpnext.accounts.party.set_price_list -> get_default_price_list):
+#   1. a Price List the user is restricted to by User Permission, if there is
+#      exactly one
+#   2. otherwise the Supplier's own Default Price List
+#
+# It deliberately stops there. Native would fall back to Buying Settings'
+# buying_price_list (Standard Buying); PO3 leaves the field BLANK instead, so a
+# supplier with no price list of its own is an obvious gap on the form rather
+# than an order quietly priced at the generic list.
+#
+# If the field ends up blank and the site has more than one buying price list to
+# choose from, say so -- picking the wrong one prices the whole order wrongly.
+# ---------------------------------------------------------------------------
+def supplier_buying_price_list(supplier):
+	from erpnext.accounts.party import get_default_price_list
+	from frappe.core.doctype.user_permission.user_permission import get_permitted_documents
+
+	permitted = get_permitted_documents("Price List")
+	if permitted and len(permitted) == 1:
+		return permitted[0]
+
+	price_list = get_default_price_list(frappe.get_cached_doc("Supplier", supplier))
+	if price_list:
+		return price_list
+
+	choices = frappe.get_all("Price List", filters={"buying": 1, "enabled": 1},
+		pluck="name", limit_page_length=0)
+	if len(choices) > 1:
+		frappe.msgprint("<b>" + supplier + "</b> has no Default Price List, so Price List "
+			+ "has been left blank.<br><br>There are " + str(len(choices))
+			+ " buying price lists on this site - choose carefully, or set the right one "
+			+ "as the supplier's Default Price List:<br>" + ", ".join(choices))
+	return None
