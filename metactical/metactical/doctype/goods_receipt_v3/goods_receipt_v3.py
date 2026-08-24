@@ -503,3 +503,40 @@ def cancel_guard(doc):
 				+ "stock it moved is still on hand.<br><br>Cancel " + pr.name
 				+ " first - that rolls the quantities back off the order "
 				+ "automatically - then cancel this receipt.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 GR3 Scan Map" (API: v3_gr3_scan_map).
+#
+# Builds the barcode/SKU -> item_code lookup the receipt form scans against:
+# item code, retail SKU suffix, every Item Barcode, and this supplier's part
+# numbers, all upper-cased. Called once per receipt and cached client-side.
+#
+# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed to
+# this dotted path.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_gr3_scan_map(po3=None):
+	supplier = frappe.db.get_value("Purchase Order V3", po3, "supplier")
+	out = {}
+	names = {}
+	for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": po3},
+			fields=["item_code"], limit_page_length=0):
+		ic = r.item_code
+		if not ic or ic in names:
+			continue
+		nm = frappe.db.get_value("Item", ic, ["item_name", "ifw_retailskusuffix"], as_dict=True)
+		names[ic] = (nm.item_name if nm else ic) or ic
+		out[ic.upper()] = ic
+		if nm and nm.ifw_retailskusuffix:
+			out[str(nm.ifw_retailskusuffix).upper()] = ic
+		for b in frappe.get_all("Item Barcode", filters={"parent": ic},
+				fields=["barcode"], limit_page_length=0):
+			if b.barcode:
+				out[str(b.barcode).upper()] = ic
+		for sp in frappe.get_all("Item Supplier",
+				filters={"parent": ic, "supplier": supplier},
+				fields=["supplier_part_no"], limit_page_length=0):
+			if sp.supplier_part_no:
+				out[str(sp.supplier_part_no).upper()] = ic
+	frappe.response["message"] = {"map": out, "names": names}
