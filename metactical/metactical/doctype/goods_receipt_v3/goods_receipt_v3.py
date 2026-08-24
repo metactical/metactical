@@ -20,6 +20,9 @@ class GoodsReceiptV3(Document):
 	def on_submit(self):
 		post_to_po3(self)
 
+	def before_cancel(self):
+		cancel_guard(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Validate And Classify"
@@ -480,3 +483,23 @@ def post_to_po3(doc):
 				frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "Closed")
 		elif gate["why"]:
 			frappe.msgprint(gate["why"])
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "GR3 Cancel Guard"
+# (DocType Event / Before Cancel on Goods Receipt V3).
+#
+# While the native Purchase Receipt is still submitted the stock it moved is
+# on hand, so that has to be cancelled first -- which rolls the quantities back
+# off the order on its own.
+# ---------------------------------------------------------------------------
+def cancel_guard(doc):
+	if doc.erp_purchase_receipt:
+		pr = frappe.db.get_value("Purchase Receipt", doc.erp_purchase_receipt,
+			["docstatus", "name"], as_dict=True)
+		if pr and pr.docstatus == 1:
+			frappe.throw("<b>" + doc.name + " cannot be cancelled yet.</b><br><br>"
+				+ "Purchase Receipt <b>" + pr.name + "</b> is still submitted, so the "
+				+ "stock it moved is still on hand.<br><br>Cancel " + pr.name
+				+ " first - that rolls the quantities back off the order "
+				+ "automatically - then cancel this receipt.")
