@@ -244,6 +244,10 @@ after_migrate = "metactical.migrate.after_migrate"
 # ------------------------------
 #
 override_whitelisted_methods = {
+	# Procurement V3 APIs moved from Server Scripts to code. The aliases keep
+	# the original /api/method/<name> endpoints working for external callers.
+	"v3_create_po_from_buylist": "metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.v3_create_po_from_buylist",
+	"v3_soc_bulk_status": "metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3.v3_soc_bulk_status",
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",

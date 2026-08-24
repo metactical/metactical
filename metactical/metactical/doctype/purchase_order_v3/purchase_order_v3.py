@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.model.document import Document
 
@@ -613,3 +615,110 @@ def v3_retry_po_submit(po3=None):
 		else:
 			frappe.db.set_value(doc.doctype, doc.name, "post_error", err)
 			frappe.throw("Still could not submit " + npo.name + ": " + err)
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Create PO From Buy List"
+# (API: v3_create_po_from_buylist).
+#
+# Accepts a Buy List as POST JSON, or as GET query params for link/n8n use, and
+# creates a draft Purchase Order V3 from it.
+#
+# The old endpoint name is kept alive by an override_whitelisted_methods alias
+# in hooks.py, so external callers hitting /api/method/v3_create_po_from_buylist
+# keep working. json is imported at module level (safe_exec provided it for
+# free); the form_dict lookups become the function arguments.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
+		warehouse=None, redirect=None):
+	# v3_create_po_from_buylist — creates a DRAFT Purchase Order V3 from a Buy List.
+	# POST JSON: {"supplier": "...", "items": [{"item_code": "...", "qty": 5, "rate": 2.6}, ...],
+	#             "required_by": "YYYY-MM-DD" (opt), "warehouse": "..." (opt), "source": "..." (opt)}
+	# GET (for future links/n8n): ?supplier=...&items=CODE:QTY,CODE:QTY&redirect=1
+
+	payload = {}
+	if frappe.request and frappe.request.data:
+		try:
+			payload = json.loads(frappe.request.data) or {}
+		except Exception:
+			payload = {}
+
+	supplier = payload.get("supplier") or supplier
+	if not supplier:
+		frappe.throw("supplier is required")
+	if not frappe.db.exists("Supplier", supplier):
+		near = frappe.get_all("Supplier", filters={"name": ("like", "%" + supplier.split(" ")[0] + "%")},
+			fields=["name"], limit=5)
+		names = []
+		for n in near:
+			names.append(n.name)
+		frappe.throw("Supplier '" + supplier + "' not found. Close matches: " + ", ".join(names))
+
+	raw_items = payload.get("items")
+	if not raw_items and items:
+		if not isinstance(items, str):
+			# A list passed straight to the function. Over HTTP this arrives in
+			# the JSON body and is picked up by `payload` above, so this branch
+			# was unreachable in the Server Script - it only matters now that
+			# `items` is a real argument. Purely additive: it used to raise
+			# AttributeError on .split().
+			raw_items = items
+		else:
+			raw_items = []
+			for part in items.split(","):
+				bits = part.strip().split(":")
+				if len(bits) >= 2:
+					raw_items.append({"item_code": bits[0].strip(), "qty": bits[1].strip()})
+	if not raw_items:
+		frappe.throw("items is required - a list of {item_code, qty} or CODE:QTY,CODE:QTY")
+
+	def resolve_item(val):
+		if frappe.db.exists("Item", val):
+			return val
+		hit = frappe.db.get_value("Item", {"ifw_retailskusuffix": val}, "name")
+		if not hit:
+			hit = frappe.db.get_value("Item Barcode", {"barcode": val}, "parent")
+		return hit
+
+	required_by = payload.get("required_by") or required_by
+	if not required_by:
+		lead = frappe.db.get_value("Supplier", supplier, "lead_time_in_days") or 60
+		required_by = frappe.utils.add_days(frappe.utils.nowdate(), int(lead) if int(lead) > 0 else 60)
+
+	doc = frappe.new_doc("Purchase Order V3")
+	doc.supplier = supplier
+	doc.company = payload.get("company") or "International Camouflage Ltd"
+	doc.order_date = frappe.utils.nowdate()
+	doc.required_by = required_by
+	doc.set_warehouse = payload.get("warehouse") or warehouse or "W01-A-01-AA-01-02 - ICL"
+	doc.remarks = "Created from Buy List" + (" - " + payload.get("source") if payload.get("source") else "")
+
+	count = 0
+	skipped = []
+	for it in raw_items:
+		qty = float(it.get("qty") or 0)
+		if qty <= 0:
+			continue
+		code = resolve_item(str(it.get("item_code")).strip())
+		if not code:
+			skipped.append(str(it.get("item_code")).strip())
+			continue
+		row = doc.append("items", {})
+		row.item_code = code
+		row.qty = qty
+		if it.get("rate") is not None and float(it.get("rate") or 0) > 0:
+			row.rate = float(it.get("rate"))
+		count += 1
+	if not count:
+		frappe.throw("No usable lines - every item was unknown or qty 0. Unknown: " + ", ".join(skipped))
+
+	doc.insert()
+
+	url = frappe.utils.get_url("/app/purchase-order-v3/" + doc.name)
+	if redirect:
+		frappe.response["type"] = "redirect"
+		frappe.response["location"] = url
+	else:
+		frappe.response["message"] = {"po3": doc.name, "url": url, "lines": count,
+			"skipped": skipped, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
