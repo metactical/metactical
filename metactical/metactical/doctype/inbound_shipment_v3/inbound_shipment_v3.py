@@ -17,6 +17,9 @@ class InboundShipmentV3(Document):
 	def on_submit(self):
 		record_shipment(self)
 
+	def before_cancel(self):
+		cancel_guard(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "INS3 Validate"
@@ -292,3 +295,23 @@ def record_shipment(doc):
 				flagged.append(d.item_code or "?")
 		if flagged:
 			frappe.msgprint("Back Orders on " + soc + " marked <b>Shipped</b>: " + ", ".join(flagged))
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "INS3 Cancel Guard"
+# (DocType Event / Before Cancel on Inbound Shipment V3).
+#
+# A shipment that already has a receipt booked against it cannot be cancelled;
+# the receipt has to go first.
+# ---------------------------------------------------------------------------
+def cancel_guard(doc):
+	blockers = []
+	for g in frappe.get_all("Goods Receipt V3",
+			filters={"inbound_shipment_v3": doc.name, "docstatus": ("<", 2)},
+			fields=["name", "workflow_state"], limit_page_length=0):
+		blockers.append("receipt " + g.name + " (" + str(g.workflow_state)
+			+ ") was booked against this shipment")
+	if blockers:
+		frappe.throw("<b>" + doc.name + " cannot be cancelled.</b><br><br>"
+			+ "<br>".join(blockers)
+			+ "<br><br>Cancel or delete the receipt first.")
