@@ -190,7 +190,7 @@ function gr3_fetch_lines(frm) {
     var filled = (frm.doc.items || []).filter(function (d) { return d.received_item_code; });
     if (filled.length) return;
     frappe.call({
-        method: 'v3_gr3_prefill_preview',
+        method: 'metactical.metactical.doctype.goods_receipt_v3.goods_receipt_v3.v3_gr3_prefill_preview',
         args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '' },
         callback: function (r) {
             var m = (r.message || {});

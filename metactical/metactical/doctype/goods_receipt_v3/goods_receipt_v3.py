@@ -540,3 +540,83 @@ def v3_gr3_scan_map(po3=None):
 			if sp.supplier_part_no:
 				out[str(sp.supplier_part_no).upper()] = ic
 	frappe.response["message"] = {"map": out, "names": names}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 GR3 Prefill Preview"
+# (API: v3_gr3_prefill_preview).
+#
+# Works out which lines a new receipt should show and what is outstanding on
+# each, so the form can lay the grid out before anything is saved. Counts are
+# always returned at zero -- the server re-derives them on save.
+#
+# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed here.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_gr3_prefill_preview(po3=None, shipment=None):
+	po = frappe.get_doc("Purchase Order V3", po3)
+
+	# pick the shipment exactly as GR3 Validate And Classify does
+	ship = shipment
+	if not ship:
+		best = None
+		best_key = None
+		for cand in frappe.get_all("Inbound Shipment V3",
+				filters={"purchase_order_v3": po3,
+						"workflow_state": ("in", ["In Transit", "Received"]),
+						"docstatus": ("<", 2)},
+				fields=["name", "ship_date", "creation"], limit_page_length=0):
+			onboard = 0.0
+			for si in frappe.get_all("Inbound Shipment V3 Item",
+					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
+				onboard = onboard + float(si.qty or 0)
+			taken = 0.0
+			for prior in frappe.get_all("Goods Receipt V3",
+					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
+					fields=["name"], limit_page_length=0):
+				for gi in frappe.get_all("Goods Receipt V3 Item",
+						filters={"parent": prior.name}, fields=["received_qty"],
+						limit_page_length=0):
+					taken = taken + float(gi.received_qty or 0)
+			if onboard - taken <= 0:
+				continue
+			key = str(cand.ship_date or cand.creation)
+			if best_key is None or key < best_key:
+				best_key = key
+				best = cand.name
+		ship = best
+
+	shipped_map = {}
+	recv_on_ship = {}
+	if ship:
+		for si in frappe.get_all("Inbound Shipment V3 Item", filters={"parent": ship},
+				fields=["po3_item", "qty"], limit_page_length=0):
+			if si.po3_item:
+				shipped_map[si.po3_item] = shipped_map.get(si.po3_item, 0) + float(si.qty or 0)
+		for p in frappe.get_all("Goods Receipt V3",
+				filters={"inbound_shipment_v3": ship, "docstatus": 1},
+				fields=["name"], limit_page_length=0):
+			for gi in frappe.get_all("Goods Receipt V3 Item", filters={"parent": p.name},
+					fields=["po3_item", "received_qty"], limit_page_length=0):
+				if gi.po3_item:
+					recv_on_ship[gi.po3_item] = recv_on_ship.get(gi.po3_item, 0) + float(gi.received_qty or 0)
+
+	rows = []
+	for r in po.items:
+		if r.line_status in ("Received", "Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued"):
+			continue
+		if ship:
+			out = shipped_map.get(r.name, 0) - recv_on_ship.get(r.name, 0)
+		else:
+			if r.line_status in ("Confirmed", "Partial", "Substituted"):
+				base = float(r.confirmed_qty or 0)
+			else:
+				base = float(r.qty or 0)
+			out = base - float(r.received_qty or 0)
+		if out <= 0:
+			continue
+		rows.append({"po3_item": r.name, "expected_item_code": r.item_code,
+			"received_item_code": r.item_code, "expected_qty": out,
+			"retail_sku_suffix": r.retail_sku_suffix})
+
+	frappe.response["message"] = {"shipment": ship, "warehouse": po.set_warehouse, "rows": rows}
