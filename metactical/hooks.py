@@ -1570,6 +1570,18 @@ fixtures = [{
 		"dt": "City Symbol"
 	},
 	{
+		"dt": "Workflow State",
+		"filters": [["owner", "in", ['akpoclaudeuser@goldenplazadistributors.com']]]
+	},
+	{
+		"dt": "Workflow Action Master",
+		"filters": [["owner", "in", ['akpoclaudeuser@goldenplazadistributors.com']]]
+	},
+	{
+		"dt": "Workflow",
+		"filters": [["owner", "in", ['akpoclaudeuser@goldenplazadistributors.com']]]
+	},
+	{
 		"dt": "Email Template",
 		"filters": [["name", "in", [
 			"POS User Welcome Email"
