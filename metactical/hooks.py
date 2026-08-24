@@ -946,7 +946,19 @@ fixtures = [{
 			"Item-custom_section_break_hzwnj",
 			"Item-custom_column_break_iqyli",
 			"Item-custom_column_break_22avz",
-			"Item-custom_identity"
+			"Item-custom_identity",
+			"Supplier-custom_tracking_url_template",
+			"Purchase Order-custom_po3_status",
+			"Supplier Claim V3-workflow_state",
+			"Inbound Shipment V3-workflow_state",
+			"Goods Receipt V3-workflow_state",
+			"Supplier Order Confirmation V3-workflow_state",
+			"Purchase Order V3-workflow_state",
+			"Purchase Order-custom_purchase_order_v3",
+			"Supplier-po3_print_format",
+			"Supplier-po3_cc_email",
+			"Supplier-po3_order_email",
+			"Supplier-po3_section"
 		]]]
 	},
 	{
