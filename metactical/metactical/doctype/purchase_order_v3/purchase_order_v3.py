@@ -31,6 +31,9 @@ class PurchaseOrderV3(Document):
 	def on_cancel(self):
 		cancel_native_po(self)
 
+	def on_trash(self):
+		delete_native_po(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "PO3 Shared Series Naming"
@@ -530,3 +533,25 @@ def cancel_native_po(doc):
 				frappe.msgprint("Native PO " + npo.name + " has receipts - marked Closed (no further receiving).")
 
 	mirror_po3_status(doc.name)
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "PO3 Delete Native PO"
+# (DocType Event / Before Delete on Purchase Order V3).
+#
+# Deleting a PO3 takes its native twin with it, refusing outright if receipts
+# already exist against that PO.
+# ---------------------------------------------------------------------------
+def delete_native_po(doc):
+	if doc.erp_purchase_order and frappe.db.exists("Purchase Order", doc.erp_purchase_order):
+		npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
+		receipts = frappe.db.exists("Purchase Receipt Item",
+			{"purchase_order": npo.name, "docstatus": ("<", 2)})
+		if receipts:
+			frappe.throw("Cannot delete " + doc.name + ": its native Purchase Order " + npo.name
+				+ " already has receipts. Cancel those first.")
+		if npo.docstatus == 1:
+			npo.cancel()
+			npo.reload()
+		frappe.delete_doc("Purchase Order", npo.name, force=1, ignore_permissions=True)
+		frappe.msgprint("Native Purchase Order " + npo.name + " deleted with " + doc.name + ".")
