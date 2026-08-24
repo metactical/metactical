@@ -14,6 +14,9 @@ class InboundShipmentV3(Document):
 	def after_insert(self):
 		auto_in_transit(self)
 
+	def on_submit(self):
+		record_shipment(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "INS3 Validate"
@@ -228,3 +231,64 @@ def auto_in_transit(doc):
 				"workflow_state", "In Transit", update_modified=False)
 			frappe.msgprint("Shipping details present - created as <b>In Transit</b>. "
 				"It stays fully editable.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "INS3 On Submit"
+# (DocType Event / After Submit on Inbound Shipment V3).
+#
+# Adds this shipment's quantities to each PO3 line's shipped_qty, back-fills
+# customs / origin / weight onto the Item where those were still blank, and
+# marks the confirmation's Back Order rows this shipment covers as Shipped.
+# ---------------------------------------------------------------------------
+def record_shipment(doc):
+	shipped = {}
+	for d in doc.items:
+		if d.po3_item:
+			shipped[d.po3_item] = shipped.get(d.po3_item, 0.0) + F(d.qty)
+	for po3_item, q in shipped.items():
+		prev = F(frappe.db.get_value("Purchase Order V3 Item", po3_item, "shipped_qty"))
+		frappe.db.set_value("Purchase Order V3 Item", po3_item, {"shipped_qty": prev + q})
+
+	for d in doc.items:
+		if not d.item_code:
+			continue
+		item = frappe.db.get_value("Item", d.item_code,
+			["customs_tariff_number", "country_of_origin", "weight_per_unit"], as_dict=True)
+		upd = {}
+		if d.hs_code and not item.customs_tariff_number:
+			upd["customs_tariff_number"] = d.hs_code
+		if d.country_of_origin and not item.country_of_origin:
+			upd["country_of_origin"] = d.country_of_origin
+		if F(d.unit_weight) and not F(item.weight_per_unit):
+			upd["weight_per_unit"] = F(d.unit_weight)
+		if upd:
+			frappe.db.set_value("Item", d.item_code, upd)
+
+
+	# --- mark the Back Orders rows this shipment covers ---
+	soc = doc.supplier_order_confirmation_v3
+	if not soc:
+		soc = frappe.db.get_value("Supplier Order Confirmation V3",
+			{"purchase_order_v3": doc.purchase_order_v3, "docstatus": ("<", 2)}, "name")
+	if soc:
+		flagged = []
+		for d in doc.items:
+			if not d.po3_item:
+				continue
+			shipped_so_far = F(frappe.db.get_value("Purchase Order V3 Item", d.po3_item, "shipped_qty"))
+			for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
+					filters={"parent": soc, "po3_item": d.po3_item, "status": "Open"},
+					fields=["name", "shipping_now"]):
+				# the confirmed-now portion shipping is NOT the back-order shipping
+				if shipped_so_far <= F(b.shipping_now):
+					continue
+				frappe.db.set_value("Supplier Order Confirmation V3 Backorder", b.name, {
+					"status": "Shipped",
+					"shipment": doc.name,
+					"shipped_on": doc.ship_date or frappe.utils.nowdate(),
+					"eta": doc.expected_arrival or frappe.db.get_value(
+						"Supplier Order Confirmation V3 Backorder", b.name, "eta")})
+				flagged.append(d.item_code or "?")
+		if flagged:
+			frappe.msgprint("Back Orders on " + soc + " marked <b>Shipped</b>: " + ", ".join(flagged))
