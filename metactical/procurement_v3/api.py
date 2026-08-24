@@ -46,3 +46,21 @@ def v3_workflow_state_audit():
 				out.append({"doctype": wf.document_type, "name": d.name,
 							"was": d.workflow_state, "docstatus": d.docstatus, "now": fixed})
 	frappe.response["message"] = {"stranded": out, "checked": len(flows)}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Clear Cache" (API: v3_clear_cache).
+#
+# Small operational helper: drops the cached Carrier Service meta so the
+# Inbound Shipment V3 carrier/service pickers see edits without a full
+# bench clear-cache.
+#
+# Takes no arguments, so the body is entirely verbatim.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_clear_cache():
+	try:
+		frappe.clear_cache(doctype="Carrier Service")
+		frappe.response["message"]="OK"
+	except Exception as e:
+		frappe.response["message"]="ERR "+str(e)[:120]
