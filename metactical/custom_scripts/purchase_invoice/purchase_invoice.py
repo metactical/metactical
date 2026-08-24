@@ -10,6 +10,13 @@ class CustomPurchaseInvoice(PurchaseInvoice):
 		super(CustomPurchaseInvoice, self).on_submit()
 		v3_close_short_closed_po(self)
 
+	def before_cancel(self):
+		# V3 reaction runs BEFORE super(), matching the Server Script's
+		# "Before Cancel" event: the native PO has to be reopened while the
+		# invoice is still submitted, or ERPNext refuses the status change.
+		v3_precancel_reopen_po(self)
+		super(CustomPurchaseInvoice, self).before_cancel()
+
 	def save(self):
 		if self.docstatus == DocStatus.submitted() and len(self.items) > 100 and \
 			self.ais_queue_status and self.ais_queue_status != "Queued":
@@ -61,3 +68,28 @@ def v3_close_short_closed_po(doc):
 		frappe.msgprint("Purchase Order " + po_name + " is now fully invoiced for what "
 			+ "arrived, and " + p3.name + " is Closed Short - closing it so the "
 			+ "unfilled balance stops counting as on order.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "Native PI Precancel Reopen PO"
+# (DocType Event / Before Cancel on Purchase Invoice).
+#
+# Reopens a Closed native PO before the invoice is cancelled, because ERPNext
+# will not let a Closed order have its billed amounts unwound.
+# ---------------------------------------------------------------------------
+def v3_precancel_reopen_po(doc):
+	for d in doc.items:
+		if not d.purchase_order:
+			continue
+		st = frappe.db.get_value("Purchase Order", d.purchase_order,
+			["status", "docstatus"], as_dict=True)
+		if not st or st.docstatus != 1 or st.status != "Closed":
+			continue
+		if not frappe.db.exists("Purchase Order V3", {"erp_purchase_order": d.purchase_order}):
+			continue
+		try:
+			frappe.get_doc("Purchase Order", d.purchase_order).update_status("Submitted")
+			frappe.msgprint("Purchase Order " + d.purchase_order
+				+ " reopened so this invoice can be cancelled.")
+		except Exception:
+			pass
