@@ -123,7 +123,8 @@ frappe.ui.form.on('Purchase Order V3', {
                         '</b></span>' + (frm.doc.post_error ? '<br>' + frappe.utils.escape_html(frm.doc.post_error) : ''));
                     frm.add_custom_button(__('Retry Native PO'), function() {
                         frappe.call({
-                            method: 'v3_retry_po_submit', args: { po3: frm.doc.name },
+                            method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.v3_retry_po_submit',
+                            args: { po3: frm.doc.name },
                             freeze: true, freeze_message: __('Submitting native PO…'),
                             callback: function(res) {
                                 var m = res.message || {};
