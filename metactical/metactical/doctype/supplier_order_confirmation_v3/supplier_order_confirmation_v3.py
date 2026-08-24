@@ -232,6 +232,7 @@ def validate(doc):
 # ---------------------------------------------------------------------------
 def mirror_to_po3(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
+	discontinued_items = []
 
 	for d in doc.items:
 		s = d.line_status
@@ -263,12 +264,22 @@ def mirror_to_po3(doc):
 		elif s == "Discontinued":
 			upd["line_status"] = "Discontinued"
 			upd["short_qty"] = F(d.ordered_qty)
+			# The supplier has discontinued the product, not just this order, so
+			# carry it onto the Item itself. set_value rather than a full save: the
+			# Item's own validation must never be able to block a confirmation.
+			if d.item_code and not frappe.db.get_value("Item", d.item_code, "ifw_discontinued"):
+				frappe.db.set_value("Item", d.item_code, "ifw_discontinued", 1)
+				discontinued_items.append(d.item_code)
 		elif s == "Cancelled by Supplier":
 			upd["line_status"] = "Cancelled"
 			upd["short_qty"] = F(d.ordered_qty)
 		elif s == "Substituted":
 			upd["line_status"] = "Substituted"
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
+
+	if discontinued_items:
+		frappe.msgprint("Marked <b>Discontinued</b> on the Item record: "
+			+ ", ".join(discontinued_items))
 
 	hdr = {}
 	if not po.confirmation_no and doc.confirmation_no:
