@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.model.document import Document
 
@@ -327,3 +329,84 @@ def cancel_guard(doc):
 			+ "cancelling it would leave the shipments and receipts with nothing "
 			+ "behind them. Use <b>Supplier Cancelled</b> on the order instead if "
 			+ "the supplier has withdrawn.")
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 SOC Bulk Status" (API: v3_soc_bulk_status).
+#
+#   GET  ?soc=SOC3-...  -> the confirmation's lines, for export
+#   POST {"soc": ..., "rows": [...]} -> bulk-apply status/qty/ETA back onto a
+#        draft confirmation
+#
+# The old endpoint name is aliased in hooks.py so external callers keep working.
+# Body verbatim apart from the two form_dict/payload lookups becoming arguments.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_soc_bulk_status(soc=None, rows=None):
+	# v3_soc_bulk_status
+	#   GET  ?soc=SOC3-...            -> rows for export
+	#   POST {"soc": "...", "rows": [{"item_code": "...", "confirmed_qty": 5,
+	#         "line_status": "...", "backorder_eta": "YYYY-MM-DD", "remarks": "..."}]}
+	def F(x):
+		return float(x or 0)
+
+	payload = {}
+	if frappe.request and frappe.request.data:
+		try:
+			payload = json.loads(frappe.request.data) or {}
+		except Exception:
+			payload = {}
+
+	name = payload.get("soc") or soc
+	if not name:
+		frappe.throw("pass soc=<name>")
+	doc = frappe.get_doc("Supplier Order Confirmation V3", name)
+
+	rows = payload.get("rows") or rows
+	if not rows:
+		out = []
+		for d in doc.items:
+			out.append({
+				"item_code": d.item_code,
+				"retail_sku": d.retail_sku_suffix,
+				"supplier_sku": d.supplier_part_no,
+				"ordered_qty": F(d.ordered_qty),
+				"confirmed_qty": F(d.confirmed_qty),
+				"line_status": d.line_status,
+				"backorder_eta": str(d.backorder_eta or ""),
+				"confirmed_rate": F(d.confirmed_rate),
+				"remarks": d.remarks or ""})
+		frappe.response["message"] = {"soc": doc.name, "docstatus": doc.docstatus,
+			"purchase_order_v3": doc.purchase_order_v3, "rows": out}
+	else:
+		if doc.docstatus != 0:
+			frappe.throw(doc.name + " is not a draft - confirmed lines cannot be bulk-edited. Create a superseding confirmation instead.")
+		by_item = {}
+		for d in doc.items:
+			by_item[d.item_code] = d
+		applied = 0
+		unknown = []
+		for r in rows:
+			code = str(r.get("item_code") or "").strip()
+			d = by_item.get(code)
+			if not d:
+				hit = frappe.db.get_value("Item", {"ifw_retailskusuffix": code}, "name")
+				if hit:
+					d = by_item.get(hit)
+			if not d:
+				unknown.append(code)
+				continue
+			if r.get("line_status"):
+				d.line_status = str(r.get("line_status")).strip()
+			if r.get("confirmed_qty") is not None:
+				d.confirmed_qty = F(r.get("confirmed_qty"))
+			if r.get("backorder_eta"):
+				d.backorder_eta = r.get("backorder_eta")
+			if r.get("remarks") is not None:
+				d.remarks = r.get("remarks")
+			if r.get("confirmed_rate"):
+				d.confirmed_rate = F(r.get("confirmed_rate"))
+			applied += 1
+		doc.save()
+		frappe.response["message"] = {"soc": doc.name, "updated": applied, "unknown": unknown,
+			"url": frappe.utils.get_url("/app/supplier-order-confirmation-v3/" + doc.name)}
