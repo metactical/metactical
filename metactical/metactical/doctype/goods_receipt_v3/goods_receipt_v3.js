@@ -306,7 +306,7 @@ frappe.ui.form.on('Goods Receipt V3', {
                         '</b></span>');
                     frm.add_custom_button(__('Retry ERP Posting'), function() {
                         frappe.call({
-                            method: 'v3_retry_gr3_posting',
+                            method: 'metactical.metactical.doctype.goods_receipt_v3.goods_receipt_v3.v3_retry_gr3_posting',
                             args: { gr3: frm.doc.name },
                             freeze: true,
                             freeze_message: __('Posting to ERP...'),

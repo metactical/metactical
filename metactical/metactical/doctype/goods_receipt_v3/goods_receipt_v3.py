@@ -620,3 +620,99 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 			"retail_sku_suffix": r.retail_sku_suffix})
 
 	frappe.response["message"] = {"shipment": ship, "warehouse": po.set_warehouse, "rows": rows}
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "V3 Retry GR3 Posting"
+# (API: v3_retry_gr3_posting).
+#
+# Recovery for a posted Goods Receipt V3 whose native Purchase Receipt never
+# made it: submits an existing draft PR, or builds and submits a new one.
+# Backs the "Retry ERP Posting" button.
+#
+# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed here.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def v3_retry_gr3_posting(gr3=None):
+	# v3_retry_gr3_posting?gr3=GR3-YYYY-NNNNN
+	# Submits the draft PR a Goods Receipt already created, or creates one if the
+	# earlier attempt never got that far. Safe to call repeatedly.
+	name = gr3
+	if not name:
+		frappe.throw("pass gr3=<name>")
+	doc = frappe.get_doc("Goods Receipt V3", name)
+	if doc.docstatus != 1 or doc.workflow_state != "Posted":
+		frappe.throw(name + " is not Posted - nothing to retry.")
+
+	if doc.erp_purchase_receipt and frappe.db.exists("Purchase Receipt", doc.erp_purchase_receipt):
+		pr = frappe.get_doc("Purchase Receipt", doc.erp_purchase_receipt)
+		if pr.docstatus == 1:
+			frappe.db.set_value(doc.doctype, doc.name, {"post_error": None})
+			frappe.response["message"] = {"status": "already submitted", "pr": pr.name}
+		elif pr.docstatus == 2:
+			frappe.throw("Purchase Receipt " + pr.name + " was cancelled. Amend it in ERP, or cancel this Goods Receipt and re-receive.")
+		else:
+			try:
+				pr.submit()
+				frappe.db.set_value(doc.doctype, doc.name, {"post_error": None})
+				frappe.response["message"] = {"status": "submitted", "pr": pr.name}
+			except Exception as e:
+				msg = str(e)[:300]
+				frappe.db.set_value(doc.doctype, doc.name, {"post_error": msg})
+				frappe.throw("Still could not submit " + pr.name + ": " + msg)
+	else:
+		if not frappe.db.get_single_value("Procurement Settings V3", "posting_enabled"):
+			frappe.throw("Posting to native ERP is disabled in Procurement Settings V3.")
+		po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
+		if not po.erp_purchase_order:
+			frappe.throw(po.name + " has no native Purchase Order yet.")
+		rows = {}
+		for r in po.items:
+			rows[r.name] = r
+		npo = frappe.db.get_value("Purchase Order", po.erp_purchase_order,
+			["currency", "conversion_rate", "buying_price_list"], as_dict=True)
+		po_status = frappe.db.get_value("Purchase Order", po.erp_purchase_order, "status")
+		if po_status == "Closed":
+			try:
+				frappe.get_doc("Purchase Order", po.erp_purchase_order).update_status("Submitted")
+			except Exception:
+				frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "To Receive and Bill")
+			frappe.msgprint("Native PO " + po.erp_purchase_order
+				+ " was Closed - reopened so this receipt could post.")
+		pr = frappe.new_doc("Purchase Receipt")
+		pr.supplier = doc.supplier
+		pr.company = po.company
+		pr.currency = npo.currency
+		pr.conversion_rate = F(npo.conversion_rate) or 1
+		pr.buying_price_list = npo.buying_price_list
+		pr.purchase_order = po.erp_purchase_order
+		for d in doc.items:
+			if F(d.accepted_qty) <= 0 and F(d.rejected_qty) <= 0:
+				continue
+			row = pr.append("items", {})
+			row.item_code = d.received_item_code
+			row.qty = F(d.accepted_qty)
+			row.rejected_qty = F(d.rejected_qty)
+			row.warehouse = doc.warehouse
+			row.rejected_warehouse = doc.rejected_warehouse
+			if d.po3_item and d.received_item_code == d.expected_item_code:
+				r = rows.get(d.po3_item)
+				if r:
+					row.purchase_order = po.erp_purchase_order
+					row.purchase_order_item = r.erp_po_item
+					row.rate = F(r.rate)
+			row.neb_source_doctype = doc.doctype
+			row.neb_source_name = doc.name
+			row.neb_source_detail = d.name
+			row.neb_box_no = doc.box_no
+		pr.insert()
+		frappe.db.set_value(doc.doctype, doc.name, {"erp_purchase_receipt": pr.name})
+		try:
+			pr.reload()
+			pr.submit()
+			frappe.db.set_value(doc.doctype, doc.name, {"post_error": None})
+			frappe.response["message"] = {"status": "created and submitted", "pr": pr.name}
+		except Exception as e:
+			msg = str(e)[:300]
+			frappe.db.set_value(doc.doctype, doc.name, {"post_error": msg})
+			frappe.throw("Created " + pr.name + " but could not submit it: " + msg)
