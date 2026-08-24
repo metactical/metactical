@@ -1,0 +1,128 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-12 13:04:19.350900",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "po3_item",
+  "item_code",
+  "item_name",
+  "qty",
+  "uom",
+  "box_no",
+  "country_of_origin",
+  "hs_code",
+  "unit_weight",
+  "received_flag",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "po3_item",
+   "fieldtype": "Data",
+   "label": "PO3 Line",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "item_code.stock_uom",
+   "fetch_if_empty": 1,
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "box_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Box No"
+  },
+  {
+   "allow_on_submit": 1,
+   "fetch_from": "item_code.country_of_origin",
+   "fetch_if_empty": 1,
+   "fieldname": "country_of_origin",
+   "fieldtype": "Link",
+   "label": "Country of Origin",
+   "options": "Country"
+  },
+  {
+   "allow_on_submit": 1,
+   "fetch_from": "item_code.customs_tariff_number",
+   "fetch_if_empty": 1,
+   "fieldname": "hs_code",
+   "fieldtype": "Data",
+   "label": "HS Code"
+  },
+  {
+   "allow_on_submit": 1,
+   "fetch_from": "item_code.weight_per_unit",
+   "fetch_if_empty": 1,
+   "fieldname": "unit_weight",
+   "fieldtype": "Float",
+   "label": "Unit Weight (kg)"
+  },
+  {
+   "default": "0",
+   "fieldname": "received_flag",
+   "fieldtype": "Check",
+   "label": "Received",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:43.498963",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Inbound Shipment V3 Item",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
