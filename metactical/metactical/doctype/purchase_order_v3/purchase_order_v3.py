@@ -4,7 +4,12 @@
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.utils import F, mirror_po3_status
+from metactical.procurement_v3.utils import (
+	F,
+	mirror_po3_status,
+	v3_may_close_native,
+	v3_open_bo,
+)
 
 
 class PurchaseOrderV3(Document):
@@ -16,6 +21,9 @@ class PurchaseOrderV3(Document):
 
 	def on_submit(self):
 		auto_send_on_approve(self)
+
+	def on_update_after_submit(self):
+		submitted_updates(self)
 
 
 # ---------------------------------------------------------------------------
@@ -255,3 +263,180 @@ def auto_send_on_approve(doc):
 			frappe.db.set_value(doc.doctype, doc.name, {"send_status": "Failed"})
 
 	mirror_po3_status(doc.name)
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "PO3 Submitted Updates"
+# (DocType Event / After Save (Submitted Document) on Purchase Order V3).
+#
+# Runs on every save of an already-submitted order: self-heals a native twin
+# that never submitted, stamps the manual send, applies backorder cancellations,
+# handles a deliberate reopen, auto-closes once every line is terminal, and
+# keeps the native PO's open/closed status in step.
+# ---------------------------------------------------------------------------
+def submitted_updates(doc):
+	posting = frappe.db.get_single_value("Procurement Settings V3", "posting_enabled")
+
+	# Self-heal: an approved PO3 whose twin is still a draft gets synced + submitted.
+	if posting and doc.erp_purchase_order and doc.workflow_state in ("Approved", "Sent to Supplier", "Acknowledged", "Partially Received"):
+		if frappe.db.get_value("Purchase Order", doc.erp_purchase_order, "docstatus") == 0:
+			npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
+			npo.supplier = doc.supplier
+			npo.transaction_date = doc.order_date
+			npo.schedule_date = doc.required_by
+			npo.currency = doc.currency
+			npo.conversion_rate = F(doc.conversion_rate) or 1
+			npo.buying_price_list = doc.buying_price_list
+			npo.set_warehouse = doc.set_warehouse
+			npo.custom_purchase_order_v3 = doc.name
+			if doc.notes_to_supplier:
+				npo.notes = doc.notes_to_supplier
+			npo.items = []
+			for d in doc.items:
+				if d.line_status == "Cancelled":
+					continue
+				r = npo.append("items", {})
+				r.item_code = d.item_code
+				r.qty = F(d.qty)
+				r.rate = F(d.rate)
+				r.schedule_date = d.required_by or doc.required_by
+				r.warehouse = d.warehouse or doc.set_warehouse
+			npo.flags.ignore_permissions = True
+			npo.save()
+			submitted = False
+			err = ""
+			try:
+				npo.reload()
+				npo.submit()
+				submitted = True
+			except Exception as e:
+				err = str(e)[:180]
+			if not submitted:
+				try:
+					npo.reload()
+					npo.reload()
+					npo.submit()
+					submitted = True
+				except Exception as e:
+					err = str(e)[:180]
+			npo.reload()
+			for i in range(len(doc.items)):
+				if i < len(npo.items):
+					frappe.db.set_value("Purchase Order V3 Item", doc.items[i].name,
+						{"erp_po_item": npo.items[i].name})
+			frappe.db.set_value(doc.doctype, doc.name, {
+				"posted_on": frappe.utils.now_datetime(),
+				"posted_by": frappe.session.user})
+			frappe.db.set_value(doc.doctype, doc.name, "post_error", None if submitted else err)
+			if not submitted:
+				frappe.msgprint("<b>Native PO " + npo.name + " was NOT submitted.</b><br>"
+					+ err + "<br><br>Fix the cause, then use <b>Retry Native PO</b> on this order.")
+
+	if doc.workflow_state == "Sent to Supplier" and not doc.sent_on:
+		frappe.db.set_value(doc.doctype, doc.name, {
+			"sent_on": frappe.utils.now_datetime(),
+			"sent_by": frappe.session.user,
+			"send_status": "Manually Sent" if doc.send_status in ("Not Sent", "Failed") else doc.send_status,
+			"sent_method": doc.sent_method or "Other"})
+
+	for d in doc.items:
+		if d.backorder_status == "Cancelled" and d.line_status == "Back-ordered":
+			if not d.backorder_cancel_reason:
+				frappe.throw("Row " + str(d.idx) + ": pick a Backorder Cancel Reason before cancelling the backorder.")
+			new_status = "Closed Short" if F(d.received_qty) > 0 else "Cancelled"
+			frappe.db.set_value("Purchase Order V3 Item", d.name, {
+				"line_status": new_status,
+				"short_qty": F(d.qty) - F(d.received_qty)})
+
+
+	# ---- a deliberate reopen ----------------------------------------
+	# Header says the order is live again while every line is still terminal:
+	# that only happens right after someone reopens it. Put the short-closed
+	# lines back so there is something outstanding, and remember we did.
+	if doc.workflow_state in ("Sent to Supplier", "Acknowledged",
+			"Partially Received", "Received"):
+		term_all = True
+		shorts = []
+		for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": doc.name},
+				fields=["name", "line_status"], limit_page_length=0):
+			if r.line_status not in ("Received", "Closed Short", "Cancelled",
+					"Supplier Stock Out", "Discontinued"):
+				term_all = False
+			if r.line_status == "Closed Short":
+				shorts.append(r.name)
+		if term_all:
+			frappe.db.set_value("Purchase Order V3", doc.name,
+				"manually_reopened", 1, update_modified=False)
+			for nm in shorts:
+				frappe.db.set_value("Purchase Order V3 Item", nm,
+					{"line_status": "Open", "short_qty": 0})
+			if shorts:
+				frappe.msgprint("Reopened - " + str(len(shorts))
+					+ " short-closed line(s) put back to Open, so the balance is "
+					+ "expected again.")
+	elif doc.workflow_state in ("Closed", "Closed Short"):
+		frappe.db.set_value("Purchase Order V3", doc.name,
+			"manually_reopened", 0, update_modified=False)
+
+	open_bo_now = v3_open_bo(doc.name)
+	rows = frappe.get_all("Purchase Order V3 Item", filters={"parent": doc.name},
+		fields=["name", "line_status"])
+	all_terminal = bool(rows)
+	any_short = False
+	for r in rows:
+		if r.line_status not in ("Received", "Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued"):
+			all_terminal = False
+		elif r.name in open_bo_now:
+			# goods are still owed on this line - nothing here is finished
+			all_terminal = False
+		if r.line_status in ("Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued"):
+			any_short = True
+	reopened_flag = frappe.db.get_value("Purchase Order V3", doc.name, "manually_reopened")
+	if (all_terminal and not reopened_flag and doc.workflow_state in
+			("Sent to Supplier", "Acknowledged", "Partially Received", "Received")):
+		frappe.db.set_value(doc.doctype, doc.name, {
+			"workflow_state": "Closed Short" if any_short else "Closed",
+			"receipt_status": "Closed Short" if any_short else "Received"})
+		open_grs = frappe.get_all("Goods Receipt V3",
+			filters={"purchase_order_v3": doc.name, "docstatus": 0},
+			fields=["name"], limit_page_length=1)
+		if any_short and doc.erp_purchase_order and not open_grs:
+			try:
+				frappe.get_doc("Purchase Order", doc.erp_purchase_order).update_status("Closed")
+			except Exception:
+				frappe.db.set_value("Purchase Order", doc.erp_purchase_order, "status", "Closed")
+
+	mirror_po3_status(doc.name)
+
+	# ---- native PO follows the PO3 closing state --------------------
+	# Closing by hand used to change nothing outside V3: the native close only
+	# ran from the receipt path, or when every line happened to be terminal.
+	if doc.erp_purchase_order:
+		native_now = frappe.db.get_value("Purchase Order", doc.erp_purchase_order, "status")
+		drafts = frappe.get_all("Goods Receipt V3",
+			filters={"purchase_order_v3": doc.name, "docstatus": 0},
+			fields=["name"], limit_page_length=1)
+		# "Closed" is fully received - ERPNext shows that as To Bill and needs it
+		# left open to be invoiced. Only giving up on a balance justifies a close.
+		if doc.workflow_state == "Closed Short":
+			gate = v3_may_close_native(doc.erp_purchase_order)
+			if gate["ok"] and not drafts:
+				try:
+					frappe.get_doc("Purchase Order", doc.erp_purchase_order).update_status("Closed")
+				except Exception:
+					frappe.db.set_value("Purchase Order", doc.erp_purchase_order,
+						"status", "Closed")
+				frappe.msgprint("Native PO " + doc.erp_purchase_order + " closed to match.")
+			elif gate["why"]:
+				frappe.msgprint(gate["why"])
+			elif drafts:
+				frappe.msgprint("Native PO " + doc.erp_purchase_order
+					+ " left open - there is still a draft Goods Receipt against this order.")
+		elif doc.workflow_state in ("Sent to Supplier", "Acknowledged",
+				"Partially Received", "Received") and native_now == "Closed":
+			try:
+				frappe.get_doc("Purchase Order", doc.erp_purchase_order).update_status("Submitted")
+			except Exception:
+				frappe.db.set_value("Purchase Order", doc.erp_purchase_order,
+					"status", "To Receive and Bill")
+			frappe.msgprint("Native PO " + doc.erp_purchase_order + " reopened to match.")
