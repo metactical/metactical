@@ -4,12 +4,15 @@
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.utils import F
+from metactical.procurement_v3.utils import F, mirror_po3_status
 
 
 class SupplierOrderConfirmationV3(Document):
 	def validate(self):
 		validate(self)
+
+	def on_submit(self):
+		mirror_to_po3(self)
 
 
 # ---------------------------------------------------------------------------
@@ -212,3 +215,77 @@ def validate(doc):
 		b.status = (old.status if old else "Open")
 		b.cancel_reason = (old.cancel_reason if old else None)
 		b.remarks = (old.remarks if old else None)
+
+
+# ---------------------------------------------------------------------------
+# Migrated from Server Script "SOC3 Mirror To PO3"
+# (DocType Event / After Submit on Supplier Order Confirmation V3).
+#
+# Pushes each confirmed line back onto its PO3 line (confirmed qty, line status,
+# shortfall, backorder ETA), copies the confirmation number onto the header,
+# and moves the order to Acknowledged once the supplier has replied.
+# ---------------------------------------------------------------------------
+def mirror_to_po3(doc):
+	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
+
+	for d in doc.items:
+		s = d.line_status
+		prev = frappe.db.get_value("Purchase Order V3 Item", d.po3_item,
+			["line_status", "confirmed_qty"], as_dict=True)
+		total = F(d.confirmed_qty)
+		if prev and prev.line_status == "Back-ordered":
+			total = total + F(prev.confirmed_qty)
+		upd = {"confirmed_qty": total}
+		if s == "Confirmed":
+			upd["line_status"] = "Confirmed"
+		elif s == "Partial - Balance Cancelled":
+			upd["line_status"] = "Partial"
+			upd["short_qty"] = F(d.ordered_qty) - F(d.confirmed_qty)
+		elif s == "Partial - Balance Back-ordered":
+			upd["line_status"] = "Back-ordered"
+			upd["backorder_status"] = "Open"
+			upd["backorder_eta"] = d.backorder_eta
+		elif s == "Back-ordered":
+			# nothing ships now; the whole ordered qty is still due later, so the
+			# PO3 line must not record a confirmed quantity of 0 as "nothing coming"
+			upd["line_status"] = "Back-ordered"
+			upd["backorder_status"] = "Open"
+			upd["backorder_eta"] = d.backorder_eta
+			upd["confirmed_qty"] = F(d.ordered_qty)
+		elif s == "Supplier Stock Out":
+			upd["line_status"] = "Supplier Stock Out"
+			upd["short_qty"] = F(d.ordered_qty)
+		elif s == "Discontinued":
+			upd["line_status"] = "Discontinued"
+			upd["short_qty"] = F(d.ordered_qty)
+		elif s == "Cancelled by Supplier":
+			upd["line_status"] = "Cancelled"
+			upd["short_qty"] = F(d.ordered_qty)
+		elif s == "Substituted":
+			upd["line_status"] = "Substituted"
+		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
+
+	hdr = {}
+	if not po.confirmation_no and doc.confirmation_no:
+		hdr["confirmation_no"] = doc.confirmation_no
+		hdr["confirmation_date"] = doc.confirmation_date
+		hdr["confirmation_no_source"] = doc.confirmation_no_source or "Confirmation Number"
+
+	covered = {}
+	for soc in frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": po.name, "docstatus": 1}, fields=["name"]):
+		for ln in frappe.get_all("Supplier Order Confirmation V3 Item",
+				filters={"parent": soc.name}, fields=["po3_item"]):
+			covered[ln.po3_item] = 1
+	missing = 0
+	for r in po.items:
+		if r.name not in covered:
+			missing += 1
+	hdr["confirmation_status"] = "Confirmed" if missing == 0 else "Partially Confirmed"
+
+	if po.workflow_state in ("Sent to Supplier", "Approved"):
+		hdr["workflow_state"] = "Acknowledged"
+
+	frappe.db.set_value("Purchase Order V3", po.name, hdr)
+
+	mirror_po3_status(po.name)
