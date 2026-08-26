@@ -970,7 +970,10 @@ fixtures = [{
 			"Supplier-po3_print_format",
 			"Supplier-po3_cc_email",
 			"Supplier-po3_order_email",
-			"Supplier-po3_section"
+			"Supplier-po3_section",
+			"Supplier-section_break_e11nr",
+			"Supplier-custom_sender_address",
+			"Supplier-custom_sender_email",
 		]]]
 	},
 	{
@@ -1565,6 +1568,7 @@ fixtures = [{
 			"Item-stock_uom-depends_on",
 			"Item-country_of_origin-depends_on",
 			"Item-customs_tariff_number-depends_on",
+			"Supplier-main-field_order",
 		]]]
 	},
   	{
