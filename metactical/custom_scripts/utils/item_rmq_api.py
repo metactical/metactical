@@ -1,6 +1,19 @@
+import time
+
 import frappe
 from frappe.utils import get_link_to_form
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
+
+# Item save fires an on_update webhook that (re)creates the item in the target system.
+# That webhook runs in its own background job, so firing the inventory update right after
+# item.save() can race it there and land on an item that doesn't exist yet. Delay the
+# inventory update so the item webhook has time to land first.
+INVENTORY_SYNC_DELAY_SECONDS = 10
+
+
+def _delayed_update_item_inventory_output(**kwargs):
+    time.sleep(INVENTORY_SYNC_DELAY_SECONDS)
+    update_item_inventory_output(**kwargs)
 
 
 def sync_s3_images(item_code, user=None):
@@ -119,9 +132,19 @@ def receive_deletion_message(parsedContent):
                     is_product_bundle = frappe.db.exists('Product Bundle', item.item_code)
                     if is_product_bundle:
                         all_bins = get_all_bins_for_product_bundle(item.item_code)
-                        update_item_inventory_output(item_code=item.item_code, net_available_bins=all_bins, bundle=True, voucher_type=item.doctype)
+                        _delayed_update_item_inventory_output(
+                            item_code=item.item_code,
+                            net_available_bins=all_bins,
+                            bundle=True,
+                            voucher_type=item.doctype,
+                        )
                     else:
-                        frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type=item.doctype, queue='default')
+                        frappe.enqueue(
+                            _delayed_update_item_inventory_output,
+                            queue='default',
+                            item_code=item.item_code,
+                            voucher_type=item.doctype,
+                        )
 
                 sync_s3_images(item_code, user=user)
 
