@@ -4,24 +4,6 @@ BATCH_SIZE = 1000
 
 
 def execute():
-    """Bring every Item Inventory Output's Retail SKU into line with its Item.
-
-    Item Inventory Output.ifw_retailskusuffix is declared with
-    fetch_from="item_code.ifw_retailskusuffix", but a fetch_from only fires when
-    the dependent document is itself saved, and this one also carries
-    fetch_if_empty=1 so it will not overwrite a value that is already there.
-    Editing an Item's Retail SKU therefore left the inventory output showing the
-    old one, with nothing to ever correct it.
-
-    CustomItem.sync_retail_sku_to_inventory_output now keeps the two in step on
-    every save. This patch cleans up the rows that drifted before that existed.
-
-    Runs in batches of BATCH_SIZE, committing as it goes, so a large site does
-    not build one enormous transaction. Corrected rows stop matching the query,
-    so each pass simply picks up the next batch.
-
-    Safe to re-run: it only touches rows that actually disagree.
-    """
     total = 0
 
     while True:

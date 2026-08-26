@@ -23,6 +23,8 @@
   "set_warehouse",
   "ship_to_display",
   "cb_shipto",
+  "sender_address",
+  "sender_email",
   "supplier_email",
   "cc_email",
   "bcc_email",
@@ -421,6 +423,22 @@
    "fieldname": "get_items_from_open_material_requests",
    "fieldtype": "Button",
    "label": "Get Items from Open Material Requests"
+  },
+  {
+   "fieldname": "sender_address",
+   "fieldtype": "Link",
+   "label": "Sender Address",
+   "options": "Address",
+   "description": "The address this order is sent from. Its email is used as the From address."
+  },
+  {
+   "fieldname": "sender_email",
+   "fieldtype": "Data",
+   "label": "Sender Email Address",
+   "options": "Email",
+   "read_only": 1,
+   "fetch_from": "sender_address.email_id",
+   "description": "Taken from the Sender Address."
   }
  ],
  "grid_page_length": 50,

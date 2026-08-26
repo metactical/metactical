@@ -430,16 +430,6 @@ class CustomItem(Item):
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
     def sync_retail_sku_to_inventory_output(self):
-        """Push a changed Retail SKU onto this item's Item Inventory Output.
-
-        Item Inventory Output.ifw_retailskusuffix is declared with
-        fetch_from="item_code.ifw_retailskusuffix", but a fetch_from only fires
-        when the dependent document is itself saved, and this one also carries
-        fetch_if_empty=1 so it will not overwrite a value that is already there.
-        update_item_inventory_output() above does not help either: it only runs
-        when custom_neb_website_deduct_qty changes. The result was that editing
-        an item's Retail SKU left the inventory output showing the old one.
-        """
         previous = self.get_doc_before_save()
         if not previous:
             return
