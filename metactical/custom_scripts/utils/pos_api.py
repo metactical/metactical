@@ -78,7 +78,7 @@ def create_manual_order(*args, **kwargs):
 				create_comments,
 				queue="default", # one of short, default, long
 				form_data=form_data,
-				sales_order=sales_order.name
+				sales_order=sales_order["sales_order"].name
 			)
 			
 			comment = get_so_comment(sales_order["sales_order"], form_data, sales_order["error"])

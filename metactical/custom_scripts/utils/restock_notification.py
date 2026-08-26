@@ -15,6 +15,7 @@ def on_item_inventory_output_update(doc, method=None):
 			process_inventory_output_job,
 			item_inventory_output=doc.name,
 			queue="default",
+			enqueue_after_commit=True,
 		)
 	except Exception:
 		# A queueing failure must never roll back the inventory-output save.

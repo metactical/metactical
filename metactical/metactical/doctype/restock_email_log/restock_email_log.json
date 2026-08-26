@@ -9,6 +9,7 @@
   "section_break_xgkl",
   "customer_email",
   "customer_name",
+  "custom_item_name",
   "item_code",
   "retail_sku",
   "lead_source",
@@ -18,7 +19,8 @@
   "message_id",
   "sg_message_id",
   "delivery_status",
-  "status"
+  "status",
+  "url_slug"
  ],
  "fields": [
   {
@@ -111,12 +113,22 @@
    "fieldtype": "Data",
    "label": "SG Message ID",
    "read_only": 1
+  },
+  {
+   "fieldname": "url_slug",
+   "fieldtype": "Data",
+   "label": "URL Slug"
+  },
+  {
+   "fieldname": "custom_item_name",
+   "fieldtype": "Data",
+   "label": "Item Name (Custom)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-13 12:10:43.999499",
+ "modified": "2026-08-26 06:16:46.710017",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Restock Email Log",
