@@ -447,13 +447,10 @@ class CustomItem(Item):
         if previous.get("ifw_retailskusuffix") == new_sku:
             return
 
-        for name in frappe.get_all(
-            "Item Inventory Output", filters={"item_code": self.name}, pluck="name"
-        ):
-            frappe.db.set_value(
-                "Item Inventory Output", name, "ifw_retailskusuffix", new_sku,
-                update_modified=False,
-            )
+        frappe.db.set_value(
+            "Item Inventory Output", {"item_code": self.name},
+            "ifw_retailskusuffix", new_sku, update_modified=False,
+        )
 
     def create_item_deletion_log(self):
         existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
