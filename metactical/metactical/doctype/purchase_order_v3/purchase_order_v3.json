@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "PO3-.YYYY.-.#####",
- "creation": "2026-08-12 13:04:20.157920",
+ "creation": "2026-08-26 07:16:08.743696",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -105,8 +105,7 @@
    "description": "The PO cancel date. Lines not fulfilled by then are candidates for backorder cancellation.",
    "fieldname": "required_by",
    "fieldtype": "Date",
-   "label": "Required By (Cancel Date)",
-   "reqd": 1
+   "label": "Required By (Cancel Date)"
   },
   {
    "fieldname": "cb_main",
