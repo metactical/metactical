@@ -962,7 +962,9 @@ fixtures = [{
 			"Supplier-po3_print_format",
 			"Supplier-po3_cc_email",
 			"Supplier-po3_order_email",
-			"Supplier-po3_section"
+			"Supplier-po3_section",
+			"Supplier-custom_sender_address",
+			"Supplier-custom_sender_email",
 		]]]
 	},
 	{
@@ -1556,7 +1558,8 @@ fixtures = [{
 			"Item-details-label",
 			"Item-ifw_retailskusuffix-in_list_view",
 			"Item-item_group-in_list_view",
-			"Item-weight_uom-default"
+			"Item-weight_uom-default",
+			"Supplier-main-field_order",
 		]]]
 	},
   	{
