@@ -252,7 +252,19 @@ def auto_send_on_approve(doc):
 	if doc.workflow_state == "Approved" and doc.supplier_email:
 		pdf = None
 		try:
-			pdf = frappe.attach_print(doc.doctype, doc.name, print_format=doc.po_print_format or None, doc=doc)
+			# PO print formats are written against native Purchase Order fields
+			# (transaction_date, schedule_date, ...) which PO3 simply does not have,
+			# so rendering one against a PO3 blows up on the first missing field.
+			# Print the native twin instead: same order, in the field names the
+			# templates expect, and it is the document the supplier is being sent.
+			if doc.erp_purchase_order:
+				pdf = frappe.attach_print("Purchase Order", doc.erp_purchase_order,
+					print_format=doc.po_print_format or None)
+			else:
+				# no twin to print - fall back to PO3's own default format. The chosen
+				# po_print_format is deliberately NOT passed here: it belongs to
+				# Purchase Order and would fail against this doctype.
+				pdf = frappe.attach_print(doc.doctype, doc.name, doc=doc)
 		except Exception:
 			pdf = None
 		ok = False

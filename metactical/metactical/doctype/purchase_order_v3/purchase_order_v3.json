@@ -193,7 +193,8 @@
    "fieldname": "po_print_format",
    "fieldtype": "Link",
    "label": "PO Print Format",
-   "options": "Print Format"
+   "options": "Print Format",
+   "link_filters": "[[\"Print Format\",\"doc_type\",\"=\",\"Purchase Order\"]]"
   },
   {
    "fieldname": "sec_items",
