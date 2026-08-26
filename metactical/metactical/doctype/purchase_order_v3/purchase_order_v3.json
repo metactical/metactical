@@ -10,6 +10,7 @@
   "sec_main",
   "supplier",
   "supplier_name",
+  "get_items_from_open_material_requests",
   "company",
   "order_date",
   "required_by",
@@ -413,6 +414,13 @@
    "fieldname": "internal_notes",
    "fieldtype": "Small Text",
    "label": "Internal Notes"
+  },
+  {
+   "depends_on": "eval:doc.supplier && doc.docstatus===0 && (!(doc.items && doc.items.length) || (doc.items.length==1 && !doc.items[0].item_code))",
+   "description": "Fetch items based on Default Supplier.",
+   "fieldname": "get_items_from_open_material_requests",
+   "fieldtype": "Button",
+   "label": "Get Items from Open Material Requests"
   }
  ],
  "grid_page_length": 50,

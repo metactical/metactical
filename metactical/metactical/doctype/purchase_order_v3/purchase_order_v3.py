@@ -63,6 +63,10 @@ def shared_series_naming(doc):
 			r.rate = F(d.rate)
 			r.schedule_date = d.required_by or doc.required_by
 			r.warehouse = d.warehouse or doc.set_warehouse
+			# carry the request through: ERPNext marks a Material Request
+			# as ordered off the NATIVE PO, not off the PO3
+			r.material_request = d.material_request
+			r.material_request_item = d.material_request_item
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -210,6 +214,10 @@ def auto_send_on_approve(doc):
 				r.rate = F(d.rate)
 				r.schedule_date = d.required_by or doc.required_by
 				r.warehouse = d.warehouse or doc.set_warehouse
+				# carry the request through: ERPNext marks a Material Request
+				# as ordered off the NATIVE PO, not off the PO3
+				r.material_request = d.material_request
+				r.material_request_item = d.material_request_item
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -312,6 +320,10 @@ def submitted_updates(doc):
 				r.rate = F(d.rate)
 				r.schedule_date = d.required_by or doc.required_by
 				r.warehouse = d.warehouse or doc.set_warehouse
+				# carry the request through: ERPNext marks a Material Request
+				# as ordered off the NATIVE PO, not off the PO3
+				r.material_request = d.material_request
+				r.material_request_item = d.material_request_item
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -954,3 +966,81 @@ def supplier_buying_price_list(supplier):
 			+ " buying price lists on this site - choose carefully, or set the right one "
 			+ "as the supplier's Default Price List:<br>" + ", ".join(choices))
 	return None
+
+
+# ---------------------------------------------------------------------------
+# "Get Items from Open Material Requests" -- the PO3 equivalent of the button
+# native Purchase Order carries.
+#
+# This mirrors metactical's own override of that button rather than stock
+# ERPNext's. The difference that matters: metactical passes get_all_items, which
+# skips the document picker entirely and pulls every open request for the
+# supplier in one go. Same behaviour here -- no popup.
+#
+# The supplier's item list and the open-request lookup are reused from
+# custom_scripts.purchase_order so PO3 and the native form can never drift.
+#
+# material_request / material_request_item are carried onto the PO3 line and
+# from there onto the native PO twin, which is what makes ERPNext mark the
+# request as ordered -- per_ordered is driven off the native PO, not off PO3.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
+	from frappe.model.mapper import get_mapped_doc
+	from metactical.custom_scripts.purchase_order.purchase_order import (
+		get_items_based_on_default_supplier,
+		get_material_requests_based_on_items,
+	)
+
+	if isinstance(args, str):
+		args = json.loads(args)
+	args = args or {}
+	supplier = args.get("supplier")
+	supplier_items = get_items_based_on_default_supplier(supplier)
+
+	material_requests = [source_name]
+	if args.get("get_all_items"):
+		material_requests = get_material_requests_based_on_items(supplier_items)
+
+	def postprocess(source, target):
+		target.supplier = supplier
+		target.set("items", [
+			d for d in target.get("items")
+			if d.get("item_code") in supplier_items and F(d.get("qty")) > 0
+		])
+		today = frappe.utils.getdate(frappe.utils.nowdate())
+		for d in target.get("items"):
+			if d.required_by and frappe.utils.getdate(d.required_by) < today:
+				d.required_by = None
+
+	for mr in material_requests:
+		target_doc = get_mapped_doc(
+			"Material Request",
+			mr,
+			{
+				"Material Request": {
+					"doctype": "Purchase Order V3",
+					# the request's own price list belongs to the requester, not to
+					# the supplier being bought from - PO3 resolves its own
+					"field_no_map": ["buying_price_list"],
+				},
+				"Material Request Item": {
+					"doctype": "Purchase Order V3 Item",
+					"field_map": {
+						"name": "material_request_item",
+						"parent": "material_request",
+						"schedule_date": "required_by",
+						"uom": "uom",
+					},
+					# only the part of each line that has not been ordered yet
+					"postprocess": lambda source, target, source_parent: target.update(
+						{"qty": F(source.qty) - F(source.ordered_qty)}
+					),
+					"condition": lambda doc: F(doc.ordered_qty) < F(doc.qty),
+				},
+			},
+			target_doc,
+			postprocess,
+		)
+
+	return target_doc

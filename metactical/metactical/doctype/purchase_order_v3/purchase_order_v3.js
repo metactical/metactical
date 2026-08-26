@@ -44,6 +44,46 @@ function po3_fx(frm) {
 }
 
 frappe.ui.form.on('Purchase Order V3', {
+    // Mirrors metactical's own override of this button on native Purchase
+    // Order, not stock ERPNext's. get_all_items makes the server pull every
+    // open Material Request for the supplier at once, so there is no document
+    // picker - the items just land in the grid.
+    get_items_from_open_material_requests: function(frm) {
+        if (!frm.doc.supplier) {
+            frappe.msgprint(__('Pick a Supplier first.'));
+            return;
+        }
+        // drop the blank starter row so the fetched lines are not appended after it
+        if ((frm.doc.items || []).length === 1 && !frm.doc.items[0].item_code) {
+            frm.clear_table('items');
+        }
+        frappe.call({
+            type: 'POST',
+            method: 'frappe.model.mapper.map_docs',
+            args: {
+                method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.make_po3_based_on_supplier',
+                source_names: [frm.doc.supplier],
+                target_doc: frm.doc,
+                args: { supplier: frm.doc.supplier, get_all_items: true }
+            },
+            freeze: true,
+            freeze_message: __('Fetching items from open Material Requests...'),
+            callback: function(r) {
+                if (r.exc) return;
+                frappe.model.sync(r.message);
+                frm.dirty();
+                frm.refresh();
+                var n = (frm.doc.items || []).filter(function(d) { return d.item_code; }).length;
+                frappe.show_alert({
+                    message: n
+                        ? __('{0} item(s) fetched from open Material Requests.', [n])
+                        : __('No open Material Requests found for this supplier.'),
+                    indicator: n ? 'green' : 'orange'
+                });
+            }
+        });
+    },
+
     currency: po3_fx,
     supplier: function(frm) {
         if (!frm.doc.supplier) return;
