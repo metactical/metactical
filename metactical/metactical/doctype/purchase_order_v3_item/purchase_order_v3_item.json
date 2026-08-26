@@ -36,6 +36,8 @@
   "backorder_eta",
   "backorder_status",
   "backorder_cancel_reason",
+  "material_request",
+  "material_request_item",
   "erp_po_item"
  ],
  "fields": [
@@ -251,6 +253,26 @@
    "label": "ERP PO Item Row",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "material_request",
+   "fieldtype": "Link",
+   "label": "Material Request",
+   "options": "Material Request",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "material_request_item",
+   "fieldtype": "Data",
+   "label": "Material Request Item",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "hidden": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
