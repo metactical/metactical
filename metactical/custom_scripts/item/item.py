@@ -325,6 +325,9 @@ class CustomItem(Item):
         self.update_item_inventory_output()
         self.update_sb_tags()
         
+
+        self.sync_retail_sku_to_inventory_output()
+
         if self.drop_and_create_in_websites:
             if not self.item_detail:
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
@@ -426,6 +429,33 @@ class CustomItem(Item):
             else:
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
+    def sync_retail_sku_to_inventory_output(self):
+        """Push a changed Retail SKU onto this item's Item Inventory Output.
+
+        Item Inventory Output.ifw_retailskusuffix is declared with
+        fetch_from="item_code.ifw_retailskusuffix", but a fetch_from only fires
+        when the dependent document is itself saved, and this one also carries
+        fetch_if_empty=1 so it will not overwrite a value that is already there.
+        update_item_inventory_output() above does not help either: it only runs
+        when custom_neb_website_deduct_qty changes. The result was that editing
+        an item's Retail SKU left the inventory output showing the old one.
+        """
+        previous = self.get_doc_before_save()
+        if not previous:
+            return
+
+        new_sku = self.get("ifw_retailskusuffix")
+        if previous.get("ifw_retailskusuffix") == new_sku:
+            return
+
+        for name in frappe.get_all(
+            "Item Inventory Output", filters={"item_code": self.name}, pluck="name"
+        ):
+            frappe.db.set_value(
+                "Item Inventory Output", name, "ifw_retailskusuffix", new_sku,
+                update_modified=False,
+            )
+
     def create_item_deletion_log(self):
         existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
         for log in existing_active_logs:
