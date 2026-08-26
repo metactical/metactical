@@ -1,7 +1,7 @@
 import base64
 import random
 import frappe
-from frappe.utils import add_days, nowdate, flt
+from frappe.utils import add_days, nowdate, flt, now_datetime
 from metactical.custom_scripts.pick_list.pick_list import create_pick_list
 from erpnext.stock.doctype.delivery_note.delivery_note import make_packing_slip
 import json
@@ -126,6 +126,144 @@ def create_sales_order(*args, **kwargs):
 @frappe.whitelist()
 def pack_order_complete(*args, **kwargs):
     """
+    Entry point for packing. Runs the work inline, or queues it when the
+    caller sends `defer`.
+
+    PPS sets `defer` per pack station. A packer who labels at the bench needs
+    the delivery note within seconds and calls with defer off. Bulk/wave
+    packing, or packing while ERPNext is slow, sets it on: the bench is not
+    blocked and the documents are reported back over RabbitMQ instead.
+    """
+    form_data = dict(frappe.form_dict)
+
+    if not _truthy(form_data.get("defer")):
+        return _pack_order_complete_run(form_data)
+
+    order_id = form_data.get("order_id")
+    if not order_id:
+        return _error("Order ID is required.")
+
+    request_id = form_data.get("request_id") or frappe.generate_hash(length=20)
+
+    # Enqueue rather than run. `_pack_order_complete_job` re-establishes
+    # form_dict inside the worker, because the background job has no request.
+    frappe.enqueue(
+        "metactical.custom_scripts.utils.pps_api._pack_order_complete_job",
+        queue="long",
+        timeout=1500,
+        form_data=form_data,
+        request_id=request_id,
+        enqueue_after_commit=True,
+    )
+
+    return {
+        "status": "queued",
+        "request_id": request_id,
+        "order_id": order_id,
+        "queued_at": str(now_datetime()),
+    }
+
+
+def _pack_order_complete_job(form_data: dict, request_id: str):
+    """
+    Background half of a deferred pack. Publishes the outcome to PPS on
+    RabbitMQ - success *and* failure. Without the failure message a deferred
+    pack that fails is invisible to PPS: the order sits packed with no
+    delivery note and nobody is told.
+    """
+    try:
+        # The job has no HTTP request, so helpers that read form_dict
+        # (attribution, validation) need it put back.
+        frappe.form_dict.update(form_data)
+        result = _pack_order_complete_run(form_data)
+    except Exception as e:
+        frappe.log_error(
+            message=frappe.get_traceback(),
+            title=f"Deferred pack failed for {form_data.get('order_id')}",
+        )
+        result = _error(str(e))
+
+    _publish_pack_completed(form_data, request_id, result)
+
+
+def _publish_pack_completed(form_data: dict, request_id: str, result: dict):
+    """Report a deferred pack back to PPS over the existing pps.publish fanout."""
+    ok = (result or {}).get("status") == "success"
+
+    message = {
+        "message_type": "PackCompletedMessage",
+        "request_id": request_id,
+        "order_id": form_data.get("order_id"),
+        "status": "success" if ok else "error",
+        "completed_at": str(now_datetime()),
+    }
+
+    if ok:
+        message.update({
+            "pick_list": result.get("pick_list"),
+            "delivery_note": result.get("delivery_note"),
+            "shipment": result.get("shipment"),
+            "packing_slips": result.get("packing_slips") or [],
+        })
+    else:
+        message["error"] = (result or {}).get("message") or "Pack failed"
+        # PPS moves the order to PackFailed either way; this only tells it
+        # whether re-running the same payload is worth offering.
+        message["retryable"] = True
+
+    try:
+        # Local import: rabbitmq_handler imports pika at module scope, and a
+        # missing driver must not take down the rest of pps_api.
+        from metactical.custom_scripts.utils.rabbitmq_handler import publish_to_rabbitmq
+
+        settings = _pps_rabbitmq_settings()
+        publish_to_rabbitmq(
+            server_ip=settings["server_ip"],
+            exchange=settings["exchange"],
+            exchange_type=settings["exchange_type"],
+            routing_key="pps.packdone",
+            message=message,
+            username=settings["username"],
+            password=settings["password"],
+            queue_name=settings["queue_name"],
+        )
+    except Exception:
+        # A publish failure must not lose the pack itself - the documents
+        # exist. PPS's timeout sweeper catches the silence.
+        frappe.log_error(
+            message=frappe.get_traceback(),
+            title=f"Failed to publish PackCompletedMessage for {request_id}",
+        )
+
+
+def _pps_rabbitmq_settings() -> dict:
+    """
+    Broker settings for PPS callbacks. Read from site config so they are not
+    duplicated in code - the Sales Order webhooks carry the same values in
+    their payload templates.
+    """
+    conf = frappe.conf or {}
+    return {
+        "server_ip": conf.get("pps_rmq_host") or "staging2.metactical.com",
+        "exchange": conf.get("pps_rmq_exchange") or "pps.publish",
+        "exchange_type": conf.get("pps_rmq_exchange_type") or "fanout",
+        "queue_name": conf.get("pps_rmq_queue") or "pps_dev_queue",
+        "username": conf.get("pps_rmq_user") or "deverp",
+        "password": conf.get("pps_rmq_password") or "",
+    }
+
+
+def _truthy(value) -> bool:
+    """form_dict values arrive as strings, so `"false"` must not read as True."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in ("1", "true", "yes", "y")
+
+
+def _pack_order_complete_run(form_data: dict):
+    """
     Packs an order using nested packing_slips payload structure: creates
     the Pick List, Delivery Note, Packing Slips and Shipment as one unit.
 
@@ -141,7 +279,6 @@ def pack_order_complete(*args, **kwargs):
     `frappe.session.user` — this endpoint isn't `allow_guest`, so it only
     runs in a real signed-in PPS user's session (see `authenticate`).
     """
-    form_data = dict(frappe.form_dict)
     log = create_log(form_data, "Pack Order")
     order_id = form_data.get("order_id")
 
@@ -638,8 +775,16 @@ def authenticate(*args, **kwargs):
         reason = "user_disabled" if frappe.local.response.get("message") == "User disabled or missing" else "invalid_credentials"
         return {"authenticated": False, "reason": reason}
     except Exception:
+        # NOT "invalid_credentials". The password is verified inside
+        # LoginManager.authenticate before anything else runs, so an exception that
+        # is not AuthenticationError means the credential was fine and something
+        # else broke - most often the login-attempt tracker, which keys its Redis
+        # hash on `frappe.local.request_ip` and throws when that is None.
+        #
+        # Reporting a system fault as a bad password sends every worker to reset a
+        # password that was never wrong, and hides the real outage.
         frappe.log_error(frappe.get_traceback(), "PPS Authenticate Error")
-        return {"authenticated": False, "reason": "invalid_credentials"}
+        return {"authenticated": False, "reason": "system_error"}
 
     user = login_manager.user
 
@@ -865,7 +1010,14 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
         for row in frappe.db.get_all(
             "Item",
             filters={"name": ["in", item_codes]},
-            fields=["name", "item_name", "item_group", "stock_uom", "disabled"],
+            fields=[
+                "name", "item_name", "item_group", "stock_uom", "disabled",
+                # PPS renders these on the item detail panel and the measurements
+                # screen; without them it has to read the Item doctype directly.
+                "image", "description",
+                "valuation_rate", "last_purchase_rate", "standard_rate",
+                "weight_per_unit", "weight_uom",
+            ],
         )
     }
 
@@ -885,7 +1037,13 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
     for row in frappe.db.get_all(
         "Bin",
         filters=bin_filters,
-        fields=["item_code", "warehouse", "actual_qty", "reserved_qty"],
+        # projected_qty and ordered_qty are already displayed by PPS - without
+        # them the UI renders zeroes rather than falling back to a live read.
+        fields=[
+            "item_code", "warehouse", "actual_qty", "reserved_qty",
+            "projected_qty", "ordered_qty", "indented_qty", "planned_qty",
+            "valuation_rate",
+        ],
     ):
         bin_site = _warehouse_site(row.warehouse)
         if site_filter and bin_site != site_filter:
@@ -902,6 +1060,13 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
             "actual_qty": actual_qty,
             "reserved_qty": reserved_qty,
             "available_qty": actual_qty - reserved_qty,
+            "projected_qty": row.projected_qty or 0.0,
+            "ordered_qty": row.ordered_qty or 0.0,
+            "indented_qty": row.indented_qty or 0.0,
+            "planned_qty": row.planned_qty or 0.0,
+            # Bin valuation takes precedence over the item-level rate when set,
+            # which is what stock reconciliation prices against.
+            "valuation_rate": row.valuation_rate or 0.0,
         })
 
     results = []
@@ -921,6 +1086,13 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
             "stock_uom": item.stock_uom,
             "barcodes": barcodes_by_item.get(item_code, []),
             "disabled": bool(item.disabled),
+            "image": item.image,
+            "description": item.description,
+            "valuation_rate": item.valuation_rate or 0.0,
+            "last_purchase_rate": item.last_purchase_rate or 0.0,
+            "standard_rate": item.standard_rate or 0.0,
+            "weight_per_unit": item.weight_per_unit or 0.0,
+            "weight_uom": item.weight_uom,
             "locations": locations,
         })
 
@@ -990,21 +1162,40 @@ def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note, s
         frappe.db.rollback()
 
 
-def _attribute_pps_write(doctype: str, docname: str, action: str = "Created"):
+def _pps_actor() -> str:
+    """
+    Who to attribute a PPS write to.
+
+    `frappe.session.user` is the owner of the API key PPS authenticated with -
+    one shared integration account, the same value for every worker. The
+    person who actually did the work is only known to PPS, so it sends
+    `pps_user` on the request and that wins when present.
+    """
+    actor = (frappe.form_dict or {}).get("pps_user")
+    if actor and isinstance(actor, str) and actor.strip():
+        return actor.strip()
+    return frappe.session.user
+
+
+def _attribute_pps_write(doctype: str, docname: str, action: str = "Created", actor: str = None):
     """
     W4: stamp a Comment ("{action} through PPS by {user}") on every document
     a PPS write method creates or mutates. Must be a Comment, never the
     `remarks` field — a caller-supplied remark would silently overwrite it.
     A failed comment must never roll back the real write, so this only
     ever logs.
+
+    `actor` is the worker PPS names on the request; without it the comment
+    records the shared API-key account and every pack looks identical.
     """
     try:
+        user = actor or _pps_actor()
         frappe.get_doc({
             "doctype": "Comment",
             "comment_type": "Comment",
             "reference_doctype": doctype,
             "reference_name": docname,
-            "content": f"{action} through PPS by {frappe.session.user}",
+            "content": f"{action} through PPS by {user}",
         }).insert(ignore_permissions=True)
     except Exception:
         frappe.log_error(
