@@ -259,6 +259,11 @@ def auto_send_on_approve(doc):
 		try:
 			frappe.sendmail(
 				recipients=[doc.supplier_email],
+				# Sender Address -> Sender Email Address, so each order can go out
+				# from the address it belongs to. Frappe matches this against an
+				# outgoing Email Account (EmailAccount.find_outgoing); with no
+				# match it still sends, but over the default account's server.
+				sender=doc.sender_email or None,
 				cc=[doc.cc_email] if doc.cc_email else None,
 				bcc=[doc.bcc_email] if doc.bcc_email else None,
 				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),
