@@ -28,3 +28,4 @@ metactical.patches.create_non_formatted_phone
 metactical.patches.repair_item_tag_links_and_user_tags
 metactical.patches.migrate_to_warehouse_user_permissions
 metactical.patches.backfill_warehouse_root_and_role
+metactical.patches.backfill_item_inventory_output_retail_sku
