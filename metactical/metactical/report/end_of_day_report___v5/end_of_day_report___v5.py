@@ -348,7 +348,7 @@ def get_website_orders_sql(source, date, end_date=None, field="total_without_tax
 
 	# sum them
 	total = so_total + si_total + si_p_total
- 
+  
 	# return in required format
 	return [frappe._dict({field: total})]
  
