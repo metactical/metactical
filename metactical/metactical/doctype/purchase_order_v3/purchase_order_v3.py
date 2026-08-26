@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import json
+import re
 
 import frappe
 from frappe.model.document import Document
@@ -63,6 +64,10 @@ def shared_series_naming(doc):
 			r.rate = F(d.rate)
 			r.schedule_date = d.required_by or doc.required_by
 			r.warehouse = d.warehouse or doc.set_warehouse
+			# carry the request through: ERPNext marks a Material Request
+			# as ordered off the NATIVE PO, not off the PO3
+			r.material_request = d.material_request
+			r.material_request_item = d.material_request_item
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -156,6 +161,14 @@ def validate(doc):
 			doc.cc_email = frappe.db.get_value("Supplier", doc.supplier, "po3_cc_email")
 		if not doc.po_print_format:
 			doc.po_print_format = frappe.db.get_value("Supplier", doc.supplier, "po3_print_format")
+		if not doc.sender_address:
+			doc.sender_address = frappe.db.get_value("Supplier", doc.supplier, "nat_sender_address")
+
+	# sender_email is read-only and derived, so keep it tied to the address. The
+	# field's fetch_from resolves before validate runs, which misses an address
+	# defaulted from the supplier just above.
+	doc.sender_email = frappe.db.get_value("Address", doc.sender_address, "email_id") \
+		if doc.sender_address else None
 
 	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
 
@@ -210,6 +223,10 @@ def auto_send_on_approve(doc):
 				r.rate = F(d.rate)
 				r.schedule_date = d.required_by or doc.required_by
 				r.warehouse = d.warehouse or doc.set_warehouse
+				# carry the request through: ERPNext marks a Material Request
+				# as ordered off the NATIVE PO, not off the PO3
+				r.material_request = d.material_request
+				r.material_request_item = d.material_request_item
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -244,13 +261,30 @@ def auto_send_on_approve(doc):
 	if doc.workflow_state == "Approved" and doc.supplier_email:
 		pdf = None
 		try:
-			pdf = frappe.attach_print(doc.doctype, doc.name, print_format=doc.po_print_format or None, doc=doc)
+			# PO print formats are written against native Purchase Order fields
+			# (transaction_date, schedule_date, ...) which PO3 simply does not have,
+			# so rendering one against a PO3 blows up on the first missing field.
+			# Print the native twin instead: same order, in the field names the
+			# templates expect, and it is the document the supplier is being sent.
+			if doc.erp_purchase_order:
+				pdf = frappe.attach_print("Purchase Order", doc.erp_purchase_order,
+					print_format=doc.po_print_format or None)
+			else:
+				# no twin to print - fall back to PO3's own default format. The chosen
+				# po_print_format is deliberately NOT passed here: it belongs to
+				# Purchase Order and would fail against this doctype.
+				pdf = frappe.attach_print(doc.doctype, doc.name, doc=doc)
 		except Exception:
 			pdf = None
 		ok = False
 		try:
 			frappe.sendmail(
 				recipients=[doc.supplier_email],
+				# Sender Address -> Sender Email Address, so each order can go out
+				# from the address it belongs to. Frappe matches this against an
+				# outgoing Email Account (EmailAccount.find_outgoing); with no
+				# match it still sends, but over the default account's server.
+				sender=doc.sender_email or None,
 				cc=[doc.cc_email] if doc.cc_email else None,
 				bcc=[doc.bcc_email] if doc.bcc_email else None,
 				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),
@@ -312,6 +346,10 @@ def submitted_updates(doc):
 				r.rate = F(d.rate)
 				r.schedule_date = d.required_by or doc.required_by
 				r.warehouse = d.warehouse or doc.set_warehouse
+				# carry the request through: ERPNext marks a Material Request
+				# as ordered off the NATIVE PO, not off the PO3
+				r.material_request = d.material_request
+				r.material_request_item = d.material_request_item
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -954,3 +992,177 @@ def supplier_buying_price_list(supplier):
 			+ " buying price lists on this site - choose carefully, or set the right one "
 			+ "as the supplier's Default Price List:<br>" + ", ".join(choices))
 	return None
+
+
+# ---------------------------------------------------------------------------
+# "Get Items from Open Material Requests" -- the PO3 equivalent of the button
+# native Purchase Order carries.
+#
+# This mirrors metactical's own override of that button rather than stock
+# ERPNext's. The difference that matters: metactical passes get_all_items, which
+# skips the document picker entirely and pulls every open request for the
+# supplier in one go. Same behaviour here -- no popup.
+#
+# The supplier's item list and the open-request lookup are reused from
+# custom_scripts.purchase_order so PO3 and the native form can never drift.
+#
+# material_request / material_request_item are carried onto the PO3 line and
+# from there onto the native PO twin, which is what makes ERPNext mark the
+# request as ordered -- per_ordered is driven off the native PO, not off PO3.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
+	from frappe.model.mapper import get_mapped_doc
+	from metactical.custom_scripts.purchase_order.purchase_order import (
+		get_items_based_on_default_supplier,
+		get_material_requests_based_on_items,
+	)
+
+	if isinstance(args, str):
+		args = json.loads(args)
+	args = args or {}
+	supplier = args.get("supplier")
+	supplier_items = get_items_based_on_default_supplier(supplier)
+
+	material_requests = [source_name]
+	if args.get("get_all_items"):
+		material_requests = get_material_requests_based_on_items(supplier_items)
+
+	def postprocess(source, target):
+		target.supplier = supplier
+		target.set("items", [
+			d for d in target.get("items")
+			if d.get("item_code") in supplier_items and F(d.get("qty")) > 0
+		])
+		today = frappe.utils.getdate(frappe.utils.nowdate())
+		for d in target.get("items"):
+			if d.required_by and frappe.utils.getdate(d.required_by) < today:
+				d.required_by = None
+
+	for mr in material_requests:
+		target_doc = get_mapped_doc(
+			"Material Request",
+			mr,
+			{
+				"Material Request": {
+					"doctype": "Purchase Order V3",
+					# the request's own price list belongs to the requester, not to
+					# the supplier being bought from - PO3 resolves its own
+					"field_no_map": ["buying_price_list"],
+				},
+				"Material Request Item": {
+					"doctype": "Purchase Order V3 Item",
+					"field_map": {
+						"name": "material_request_item",
+						"parent": "material_request",
+						"schedule_date": "required_by",
+						"uom": "uom",
+					},
+					# only the part of each line that has not been ordered yet
+					"postprocess": lambda source, target, source_parent: target.update(
+						{"qty": F(source.qty) - F(source.ordered_qty)}
+					),
+					"condition": lambda doc: F(doc.ordered_qty) < F(doc.qty),
+				},
+			},
+			target_doc,
+			postprocess,
+		)
+
+	return target_doc
+
+
+# ---------------------------------------------------------------------------
+# "Paste Items" -- the PO3 equivalent of the paste button on Supplier Order
+# Confirmation V3.
+#
+# The confirmation's version updates lines that are already there; this one
+# builds them, because a PO3 starts empty. Item resolution stays on the server:
+# the browser cannot search barcodes or supplier part numbers, and the same
+# identifier chain is used elsewhere in the flow (Goods Receipt V3 scanning).
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def resolve_pasted_items(rows, supplier=None, price_list=None):
+	"""Turn pasted (code, qty, rate) triples into rows PO3 can append.
+
+	Each code is matched against, in order: item code, retail SKU suffix, barcode,
+	then this supplier's part number. Rows with no usable quantity are dropped --
+	a buying report typically lists the whole catalogue with most quantities at
+	zero, and only the ones actually being ordered belong on the order.
+	"""
+	if isinstance(rows, str):
+		rows = json.loads(rows)
+
+	def num(val):
+		"""Excel puts the DISPLAYED value on the clipboard, so a formatted cell
+		arrives as "$4.25" or "1,200" rather than a bare number. Strip the
+		formatting; anything still unreadable counts as nothing rather than
+		blowing up the whole paste over one bad cell."""
+		if val is None:
+			return 0.0
+		if isinstance(val, (int, float)):
+			return float(val)
+		text = str(val).strip()
+		if not text:
+			return 0.0
+		negative = text.startswith("(") and text.endswith(")")   # accounting style
+		text = re.sub(r"[^0-9.\-]", "", text)
+		if text in ("", "-", ".", "-."):
+			return 0.0
+		try:
+			out = float(text)
+		except ValueError:
+			return 0.0
+		return -out if negative else out
+
+	def resolve(val):
+		val = (val or "").strip()
+		if not val:
+			return None
+		if frappe.db.exists("Item", val):
+			return val
+		hit = frappe.db.get_value("Item", {"ifw_retailskusuffix": val}, "name")
+		if not hit:
+			hit = frappe.db.get_value("Item Barcode", {"barcode": val}, "parent")
+		if not hit and supplier:
+			hit = frappe.db.get_value("Item Supplier",
+				{"supplier": supplier, "supplier_part_no": val}, "parent")
+		if not hit:
+			hit = frappe.db.get_value("Item Supplier", {"supplier_part_no": val}, "parent")
+		return hit
+
+	out, unknown, skipped = [], [], 0
+	for r in rows:
+		code = (r.get("code") or "").strip()
+		if not code:
+			continue
+		qty = num(r.get("qty"))
+		if qty <= 0:
+			skipped += 1
+			continue
+		item = resolve(code)
+		if not item:
+			unknown.append(code)
+			continue
+
+		rate = num(r.get("rate"))
+		if rate <= 0 and price_list:
+			rate = F(frappe.db.get_value("Item Price",
+				{"item_code": item, "price_list": price_list, "buying": 1},
+				"price_list_rate", order_by="valid_from desc"))
+
+		detail = frappe.db.get_value("Item", item,
+			["item_name", "stock_uom", "ifw_retailskusuffix"], as_dict=True) or {}
+		out.append({
+			"item_code": item,
+			"item_name": detail.get("item_name"),
+			"uom": detail.get("stock_uom"),
+			"retail_sku_suffix": detail.get("ifw_retailskusuffix"),
+			"supplier_part_no": frappe.db.get_value("Item Supplier",
+				{"parent": item, "supplier": supplier}, "supplier_part_no") if supplier else None,
+			"qty": qty,
+			"rate": rate,
+			"pasted_as": code,
+		})
+
+	return {"items": out, "unknown": unknown, "skipped_zero_qty": skipped}

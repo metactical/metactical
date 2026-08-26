@@ -331,6 +331,8 @@ class CustomItem(Item):
         from metactical.custom_scripts.utils import s3_image_api
         s3_image_api.queue_retail_sku_change(self)
 
+        self.sync_retail_sku_to_inventory_output()
+
         if self.drop_and_create_in_websites:
             if not self.item_detail:
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
@@ -436,6 +438,20 @@ class CustomItem(Item):
             else:
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
+    def sync_retail_sku_to_inventory_output(self):
+        previous = self.get_doc_before_save()
+        if not previous:
+            return
+
+        new_sku = self.get("ifw_retailskusuffix")
+        if previous.get("ifw_retailskusuffix") == new_sku:
+            return
+
+        frappe.db.set_value(
+            "Item Inventory Output", {"item_code": self.name},
+            "ifw_retailskusuffix", new_sku, update_modified=False,
+        )
+
     def create_item_deletion_log(self):
         existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
         for log in existing_active_logs:
