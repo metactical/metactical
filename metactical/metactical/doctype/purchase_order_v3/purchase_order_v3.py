@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import json
+import re
 
 import frappe
 from frappe.model.document import Document
@@ -1061,3 +1062,99 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 		)
 
 	return target_doc
+
+
+# ---------------------------------------------------------------------------
+# "Paste Items" -- the PO3 equivalent of the paste button on Supplier Order
+# Confirmation V3.
+#
+# The confirmation's version updates lines that are already there; this one
+# builds them, because a PO3 starts empty. Item resolution stays on the server:
+# the browser cannot search barcodes or supplier part numbers, and the same
+# identifier chain is used elsewhere in the flow (Goods Receipt V3 scanning).
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def resolve_pasted_items(rows, supplier=None, price_list=None):
+	"""Turn pasted (code, qty, rate) triples into rows PO3 can append.
+
+	Each code is matched against, in order: item code, retail SKU suffix, barcode,
+	then this supplier's part number. Rows with no usable quantity are dropped --
+	a buying report typically lists the whole catalogue with most quantities at
+	zero, and only the ones actually being ordered belong on the order.
+	"""
+	if isinstance(rows, str):
+		rows = json.loads(rows)
+
+	def num(val):
+		"""Excel puts the DISPLAYED value on the clipboard, so a formatted cell
+		arrives as "$4.25" or "1,200" rather than a bare number. Strip the
+		formatting; anything still unreadable counts as nothing rather than
+		blowing up the whole paste over one bad cell."""
+		if val is None:
+			return 0.0
+		if isinstance(val, (int, float)):
+			return float(val)
+		text = str(val).strip()
+		if not text:
+			return 0.0
+		negative = text.startswith("(") and text.endswith(")")   # accounting style
+		text = re.sub(r"[^0-9.\-]", "", text)
+		if text in ("", "-", ".", "-."):
+			return 0.0
+		try:
+			out = float(text)
+		except ValueError:
+			return 0.0
+		return -out if negative else out
+
+	def resolve(val):
+		val = (val or "").strip()
+		if not val:
+			return None
+		if frappe.db.exists("Item", val):
+			return val
+		hit = frappe.db.get_value("Item", {"ifw_retailskusuffix": val}, "name")
+		if not hit:
+			hit = frappe.db.get_value("Item Barcode", {"barcode": val}, "parent")
+		if not hit and supplier:
+			hit = frappe.db.get_value("Item Supplier",
+				{"supplier": supplier, "supplier_part_no": val}, "parent")
+		if not hit:
+			hit = frappe.db.get_value("Item Supplier", {"supplier_part_no": val}, "parent")
+		return hit
+
+	out, unknown, skipped = [], [], 0
+	for r in rows:
+		code = (r.get("code") or "").strip()
+		if not code:
+			continue
+		qty = num(r.get("qty"))
+		if qty <= 0:
+			skipped += 1
+			continue
+		item = resolve(code)
+		if not item:
+			unknown.append(code)
+			continue
+
+		rate = num(r.get("rate"))
+		if rate <= 0 and price_list:
+			rate = F(frappe.db.get_value("Item Price",
+				{"item_code": item, "price_list": price_list, "buying": 1},
+				"price_list_rate", order_by="valid_from desc"))
+
+		detail = frappe.db.get_value("Item", item,
+			["item_name", "stock_uom", "ifw_retailskusuffix"], as_dict=True) or {}
+		out.append({
+			"item_code": item,
+			"item_name": detail.get("item_name"),
+			"uom": detail.get("stock_uom"),
+			"retail_sku_suffix": detail.get("ifw_retailskusuffix"),
+			"supplier_part_no": frappe.db.get_value("Item Supplier",
+				{"parent": item, "supplier": supplier}, "supplier_part_no") if supplier else None,
+			"qty": qty,
+			"rate": rate,
+			"pasted_as": code,
+		})
+
+	return {"items": out, "unknown": unknown, "skipped_zero_qty": skipped}
