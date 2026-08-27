@@ -126,140 +126,15 @@ def create_sales_order(*args, **kwargs):
 @frappe.whitelist()
 def pack_order_complete(*args, **kwargs):
     """
-    Entry point for packing. Runs the work inline, or queues it when the
-    caller sends `defer`.
+    Packs an order: creates the Pick List, Delivery Note, Packing Slips and Shipment
+    as one unit, synchronously.
 
-    PPS sets `defer` per pack station. A packer who labels at the bench needs
-    the delivery note within seconds and calls with defer off. Bulk/wave
-    packing, or packing while ERPNext is slow, sets it on: the bench is not
-    blocked and the documents are reported back over RabbitMQ instead.
+    Runs inline on purpose. This method never publishes to RabbitMQ, so it carries no
+    broker configuration - PPS owns those settings in its own appsettings, and having
+    a second copy here would be a place for them to drift. ERPNext publishes to PPS
+    only through the Webhook doctype, where the routing is configured per environment.
     """
-    form_data = dict(frappe.form_dict)
-
-    if not _truthy(form_data.get("defer")):
-        return _pack_order_complete_run(form_data)
-
-    order_id = form_data.get("order_id")
-    if not order_id:
-        return _error("Order ID is required.")
-
-    request_id = form_data.get("request_id") or frappe.generate_hash(length=20)
-
-    # Enqueue rather than run. `_pack_order_complete_job` re-establishes
-    # form_dict inside the worker, because the background job has no request.
-    frappe.enqueue(
-        "metactical.custom_scripts.utils.pps_api._pack_order_complete_job",
-        queue="long",
-        timeout=1500,
-        form_data=form_data,
-        request_id=request_id,
-        enqueue_after_commit=True,
-    )
-
-    return {
-        "status": "queued",
-        "request_id": request_id,
-        "order_id": order_id,
-        "queued_at": str(now_datetime()),
-    }
-
-
-def _pack_order_complete_job(form_data: dict, request_id: str):
-    """
-    Background half of a deferred pack. Publishes the outcome to PPS on
-    RabbitMQ - success *and* failure. Without the failure message a deferred
-    pack that fails is invisible to PPS: the order sits packed with no
-    delivery note and nobody is told.
-    """
-    try:
-        # The job has no HTTP request, so helpers that read form_dict
-        # (attribution, validation) need it put back.
-        frappe.form_dict.update(form_data)
-        result = _pack_order_complete_run(form_data)
-    except Exception as e:
-        frappe.log_error(
-            message=frappe.get_traceback(),
-            title=f"Deferred pack failed for {form_data.get('order_id')}",
-        )
-        result = _error(str(e))
-
-    _publish_pack_completed(form_data, request_id, result)
-
-
-def _publish_pack_completed(form_data: dict, request_id: str, result: dict):
-    """Report a deferred pack back to PPS over the existing pps.publish fanout."""
-    ok = (result or {}).get("status") == "success"
-
-    message = {
-        "message_type": "PackCompletedMessage",
-        "request_id": request_id,
-        "order_id": form_data.get("order_id"),
-        "status": "success" if ok else "error",
-        "completed_at": str(now_datetime()),
-    }
-
-    if ok:
-        message.update({
-            "pick_list": result.get("pick_list"),
-            "delivery_note": result.get("delivery_note"),
-            "shipment": result.get("shipment"),
-            "packing_slips": result.get("packing_slips") or [],
-        })
-    else:
-        message["error"] = (result or {}).get("message") or "Pack failed"
-        # PPS moves the order to PackFailed either way; this only tells it
-        # whether re-running the same payload is worth offering.
-        message["retryable"] = True
-
-    try:
-        # Local import: rabbitmq_handler imports pika at module scope, and a
-        # missing driver must not take down the rest of pps_api.
-        from metactical.custom_scripts.utils.rabbitmq_handler import publish_to_rabbitmq
-
-        settings = _pps_rabbitmq_settings()
-        publish_to_rabbitmq(
-            server_ip=settings["server_ip"],
-            exchange=settings["exchange"],
-            exchange_type=settings["exchange_type"],
-            routing_key="pps.packdone",
-            message=message,
-            username=settings["username"],
-            password=settings["password"],
-            queue_name=settings["queue_name"],
-        )
-    except Exception:
-        # A publish failure must not lose the pack itself - the documents
-        # exist. PPS's timeout sweeper catches the silence.
-        frappe.log_error(
-            message=frappe.get_traceback(),
-            title=f"Failed to publish PackCompletedMessage for {request_id}",
-        )
-
-
-def _pps_rabbitmq_settings() -> dict:
-    """
-    Broker settings for PPS callbacks. Read from site config so they are not
-    duplicated in code - the Sales Order webhooks carry the same values in
-    their payload templates.
-    """
-    conf = frappe.conf or {}
-    return {
-        "server_ip": conf.get("pps_rmq_host") or "staging2.metactical.com",
-        "exchange": conf.get("pps_rmq_exchange") or "pps.publish",
-        "exchange_type": conf.get("pps_rmq_exchange_type") or "fanout",
-        "queue_name": conf.get("pps_rmq_queue") or "pps_dev_queue",
-        "username": conf.get("pps_rmq_user") or "deverp",
-        "password": conf.get("pps_rmq_password") or "",
-    }
-
-
-def _truthy(value) -> bool:
-    """form_dict values arrive as strings, so `"false"` must not read as True."""
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    return str(value).strip().lower() in ("1", "true", "yes", "y")
+    return _pack_order_complete_run(dict(frappe.form_dict))
 
 
 def _pack_order_complete_run(form_data: dict):
