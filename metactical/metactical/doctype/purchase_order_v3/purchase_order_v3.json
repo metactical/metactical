@@ -23,7 +23,7 @@
   "set_warehouse",
   "ship_to_display",
   "cb_shipto",
-  "sender_address",
+  "sender_email_account",
   "sender_email",
   "supplier_email",
   "cc_email",
@@ -192,8 +192,8 @@
    "fieldname": "po_print_format",
    "fieldtype": "Link",
    "label": "PO Print Format",
-   "options": "Print Format",
-   "link_filters": "[[\"Print Format\",\"doc_type\",\"=\",\"Purchase Order\"]]"
+   "link_filters": "[[\"Print Format\",\"doc_type\",\"=\",\"Purchase Order\"]]",
+   "options": "Print Format"
   },
   {
    "fieldname": "sec_items",
@@ -425,20 +425,21 @@
    "label": "Get Items from Open Material Requests"
   },
   {
-   "fieldname": "sender_address",
-   "fieldtype": "Link",
-   "label": "Sender Address",
-   "options": "Address",
-   "description": "The address this order is sent from. Its email is used as the From address."
-  },
-  {
+   "description": "Taken from the Sender Email Account.",
+   "fetch_from": "sender_email_account.email_id",
    "fieldname": "sender_email",
    "fieldtype": "Data",
    "label": "Sender Email Address",
    "options": "Email",
-   "read_only": 1,
-   "fetch_from": "sender_address.email_id",
-   "description": "Taken from the Sender Address."
+   "read_only": 1
+  },
+  {
+   "description": "From Supplier master; the account the PO email is sent from.",
+   "fieldname": "sender_email_account",
+   "fieldtype": "Link",
+   "label": "Sender Email Account",
+   "link_filters": "[[\"Email Account\", \"enable_outgoing\", \"=\", 1]]",
+   "options": "Email Account"
   }
  ],
  "grid_page_length": 50,
@@ -467,11 +468,11 @@
    "link_fieldname": "purchase_order_v3"
   }
  ],
- "modified": "2026-08-23 22:41:33.857456",
+ "modified": "2026-08-27 07:20:12.244439",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3",
- "naming_rule": "Expression (old style)",
+ "naming_rule": "Expression",
  "owner": "akpoclaudeuser@goldenplazadistributors.com",
  "permissions": [
   {
