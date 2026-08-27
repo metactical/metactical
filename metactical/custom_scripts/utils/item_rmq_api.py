@@ -10,45 +10,6 @@ from metactical.metactical.doctype.item_inventory_output.item_inventory_output i
 # inventory update so the item webhook has time to land first.
 INVENTORY_SYNC_DELAY_SECONDS = 10
 
-
-def sync_s3_images(item_code, user=None):
-    """Re-push the product's images by re-saving its S3 Uploader record.
-
-    Nothing on the record changes — the save exists only to fire its on_update webhook, which
-    runs on every save regardless of what was modified.
-    """
-    s3_record = frappe.db.get_value(
-        "S3 Product Image Meta Data", {"nat_product_template": item_code}, "name"
-    )
-
-    if not s3_record:
-        message = f"We don't have an S3 Uploader record for {item_code}, so its images were not synced."
-        frappe.log_error(title="SB-Item Image Sync Skipped", message=message)
-        if user:
-            frappe.publish_realtime("msgprint", message=message, user=user)
-        return
-
-    try:
-        s3_doc = frappe.get_doc("S3 Product Image Meta Data", s3_record)
-        s3_doc.save(ignore_permissions=True)
-
-        # Say why the record was touched — the save changes nothing on it, so the timeline
-        # would otherwise show an unexplained version bump.
-        s3_doc.add_comment(
-            "Comment",
-            "Triggered from Drop and Create in Websites on {0}.".format(
-                get_link_to_form("Item", item_code)
-            )
-        )
-
-        frappe.db.commit()
-    except Exception as e:
-        frappe.log_error(
-            title="SB-Item Image Sync Error",
-            message=f"Failed to re-sync S3 images for {item_code}: {str(e)} \n{frappe.get_traceback()}",
-        )
-
-
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
     try:
@@ -156,8 +117,6 @@ def receive_deletion_message(parsedContent):
                             queue='default',
                             **sync_kwargs,
                         )
-
-                sync_s3_images(item_code, user=user)
 
                 all_logs = frappe.get_all(
                     "Item Drop and Create Log",
