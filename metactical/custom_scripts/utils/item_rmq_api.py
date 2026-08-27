@@ -11,11 +11,6 @@ from metactical.metactical.doctype.item_inventory_output.item_inventory_output i
 INVENTORY_SYNC_DELAY_SECONDS = 10
 
 
-def _delayed_update_item_inventory_output(**kwargs):
-    time.sleep(INVENTORY_SYNC_DELAY_SECONDS)
-    update_item_inventory_output(**kwargs)
-
-
 def sync_s3_images(item_code, user=None):
     """Re-push the product's images by re-saving its S3 Uploader record.
 
@@ -28,7 +23,6 @@ def sync_s3_images(item_code, user=None):
 
     if not s3_record:
         message = f"We don't have an S3 Uploader record for {item_code}, so its images were not synced."
-        frappe.log_error(title="SB-Item Image Sync Skipped", message=message)
         if user:
             frappe.publish_realtime("msgprint", message=message, user=user)
         return
@@ -58,11 +52,7 @@ def sync_s3_images(item_code, user=None):
 def receive_deletion_message(parsedContent):
     try:
         lead_source = parsedContent.get("publisher_site")
-        # frappe.log_error(
-        #     title="SB-Item Deletion Message Received",
-        #     message=f"Received deletion message for lead source: {lead_source} \nContent: {parsedContent}"
-        # )
-        
+
         price_list = frappe.db.get_value(
             "Lead Source",
             {"name": lead_source},
@@ -124,26 +114,46 @@ def receive_deletion_message(parsedContent):
                     filters={"variant_of": item_code},
                     pluck="name"
                 )
-                
+
+                # Save every variant first (fast, no per-item wait), then wait once for the
+                # item webhook to land, then sync inventory for all of them.
+                pending_inventory_syncs = []
                 for variant in variants:
                     item = frappe.get_doc("Item", variant)
                     item.save()
-                    
+
+                    # Webhooks queue on frappe.db.after_commit and aren't actually enqueued
+                    # until the next commit. Without this, the item's on_update webhook can
+                    # still be sitting unenqueued when the delayed inventory sync below runs,
+                    # so it gets no real head start.
+                    frappe.db.commit()
+
                     is_product_bundle = frappe.db.exists('Product Bundle', item.item_code)
                     if is_product_bundle:
-                        all_bins = get_all_bins_for_product_bundle(item.item_code)
-                        _delayed_update_item_inventory_output(
-                            item_code=item.item_code,
-                            net_available_bins=all_bins,
-                            bundle=True,
-                            voucher_type=item.doctype,
-                        )
+                        pending_inventory_syncs.append({
+                            "item_code": item.item_code,
+                            "net_available_bins": get_all_bins_for_product_bundle(item.item_code),
+                            "bundle": True,
+                            "voucher_type": item.doctype,
+                        })
+                    else:
+                        pending_inventory_syncs.append({
+                            "item_code": item.item_code,
+                            "voucher_type": item.doctype,
+                        })
+
+                if pending_inventory_syncs:
+                    time.sleep(INVENTORY_SYNC_DELAY_SECONDS)
+
+                for sync_kwargs in pending_inventory_syncs:
+                    if sync_kwargs.get("bundle"):
+                        # Must run standalone (not frappe.enqueue) for bundles.
+                        update_item_inventory_output(**sync_kwargs)
                     else:
                         frappe.enqueue(
-                            _delayed_update_item_inventory_output,
+                            update_item_inventory_output,
                             queue='default',
-                            item_code=item.item_code,
-                            voucher_type=item.doctype,
+                            **sync_kwargs,
                         )
 
                 sync_s3_images(item_code, user=user)
