@@ -1,7 +1,6 @@
 import time
 
 import frappe
-from frappe.utils import get_link_to_form
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 
 # Item save fires an on_update webhook that (re)creates the item in the target system.
