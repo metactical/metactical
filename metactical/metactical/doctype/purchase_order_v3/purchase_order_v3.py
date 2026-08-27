@@ -161,14 +161,15 @@ def validate(doc):
 			doc.cc_email = frappe.db.get_value("Supplier", doc.supplier, "po3_cc_email")
 		if not doc.po_print_format:
 			doc.po_print_format = frappe.db.get_value("Supplier", doc.supplier, "po3_print_format")
-		if not doc.sender_address:
-			doc.sender_address = frappe.db.get_value("Supplier", doc.supplier, "nat_sender_address")
+		if not doc.sender_email_account:
+			doc.sender_email_account = frappe.db.get_value(
+				"Supplier", doc.supplier, "nat_sender_email_account")
 
-	# sender_email is read-only and derived, so keep it tied to the address. The
-	# field's fetch_from resolves before validate runs, which misses an address
+	# sender_email is read-only and derived, so keep it tied to the account. The
+	# field's fetch_from resolves before validate runs, which misses an account
 	# defaulted from the supplier just above.
-	doc.sender_email = frappe.db.get_value("Address", doc.sender_address, "email_id") \
-		if doc.sender_address else None
+	doc.sender_email = frappe.db.get_value("Email Account", doc.sender_email_account, "email_id") \
+		if doc.sender_email_account else None
 
 	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
 
