@@ -382,6 +382,73 @@ def create_label(*args, **kwargs):
 
 
 @frappe.whitelist()
+def update_shipment_parcels(*args, **kwargs):
+    """
+    Update weight and dimensions on a Shipment's parcel rows (shipment_parcel child table).
+    Called when a carrier rejects a rate because a value is out of range — the operator
+    corrects the measurement and PPS re-fetches rates without re-packing the order.
+
+    Required:
+        shipment  - Shipment docname
+        parcels   - list of {idx, length?, width?, height?, weight?}
+                    idx is the 1-based child-table row index (equals the "box" number
+                    PPS displays). Only the fields present in each entry are updated.
+    """
+    form_data = dict(frappe.form_dict)
+    shipment = form_data.get("shipment")
+    parcels = form_data.get("parcels")
+
+    if not shipment:
+        return _error("shipment is required.")
+    if not frappe.db.exists("Shipment", shipment):
+        return _error(f"Shipment {shipment} does not exist.")
+    if not parcels:
+        return _error("parcels is required.")
+    if isinstance(parcels, str):
+        try:
+            parcels = json.loads(parcels)
+        except ValueError:
+            return _error("parcels must be valid JSON.")
+
+    try:
+        doc = frappe.get_doc("Shipment", shipment)
+
+        updates_by_idx = {int(p["idx"]): p for p in parcels if p.get("idx") is not None}
+        updated_idxs = []
+
+        for row in doc.shipment_parcel:
+            upd = updates_by_idx.get(row.idx)
+            if upd is None:
+                continue
+            if upd.get("length") is not None:
+                row.length = flt(upd["length"])
+            if upd.get("width") is not None:
+                row.width = flt(upd["width"])
+            if upd.get("height") is not None:
+                row.height = flt(upd["height"])
+            if upd.get("weight") is not None:
+                row.weight = flt(upd["weight"])
+            updated_idxs.append(row.idx)
+
+        if not updated_idxs:
+            return _error("No matching parcels found — check that the idx values match the shipment.")
+
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()
+        _attribute_pps_write("Shipment", shipment, action="Parcels updated")
+
+        return {
+            "status": "success",
+            "shipment": shipment,
+            "updated_parcels": updated_idxs,
+        }
+
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title=f"Error updating shipment parcels for {shipment}")
+        return _error(str(e))
+
+
+@frappe.whitelist()
 def receive_purchase_order(*args, **kwargs):
     """
     Create and submit a Purchase Receipt directly from a Purchase Order in
