@@ -254,7 +254,7 @@ def get_website_level_data(source_name, date):
 	selected_date = datetime.strptime(date, "%Y-%m-%d")
 
 	sd = get_website_orders_sql(source_name, date, field="total_without_tax")
-	total_without_tax = sd[0].total_without_tax if sd else 0
+	daily_total = sd[0].total_without_tax if sd else 0
 
 	mtd_start = selected_date.strftime("%Y-%m-01")
 	sd_mtd = get_website_orders_sql(source_name, mtd_start, end_date=date, field="total_mtd")
@@ -267,6 +267,7 @@ def get_website_level_data(source_name, date):
 	total_pmtd = sd_pmtd[0].total_pmtd if sd_pmtd else 0
 
 	return {
+		"expected": daily_total,
 		"total_mtd":  total_mtd,
 		"total_pmtd": total_pmtd,
 	}
