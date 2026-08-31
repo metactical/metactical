@@ -2,39 +2,87 @@
     <!-- Current Item -->
     <div>
         <div class="d-flex justify-content-between section-title align-items-center">
-            <h4 class="cur-item-barcode mb-0" v-if="item">
+            <h4 class="cur-item-barcode mb-0" v-if="item && !item.is_bundle">
                 {{ item.item_barcode ? item.item_barcode.join(", ") : "" }}
+            </h4>
+            <h4 class="cur-item-barcode mb-0" v-else-if="item && item.is_bundle">
+                <span class="badge badge-warning">Bundle</span>
             </h4>
             <span class="fa fa-gear fa-lg cur-item-close cursor-pointer" @click="showSettings"></span>
         </div>
         <div class="current-items-wrap">
-            <div class="current-packing-item">
-                <div class="item-detail">
-                    <h5 class="item-title cur-item-name">{{ item.item_name }}</h5>
-                    <p class="item-description cur-item-code">{{ item.item_code }}</p>
+            <!-- Bundle item display -->
+            <template v-if="item && item.is_bundle">
+                <div class="current-packing-item">
+                    <div class="item-detail">
+                        <h5 class="item-title cur-item-name">{{ item.item_name }}</h5>
+                        <p class="item-description cur-item-code">{{ item.item_code }}</p>
+                    </div>
+                    <p class="text-muted mt-1">Scan the items below to complete this bundle:</p>
+                    <table class="table table-bordered mt-2">
+                        <thead>
+                            <tr>
+                                <th style="width:70px"></th>
+                                <th>Item</th>
+                                <th>Barcodes</th>
+                                <th class="text-center">Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="bi in item.bundle_items" :key="bi.item_code"
+                                :class="bi.scanned_qty >= bi.qty ? 'table-success' : ''">
+                                <td>
+                                    <img v-if="bi.image" :src="bi.image" :alt="bi.item_name"
+                                        style="width:60px;height:60px;object-fit:contain;" />
+                                    <div v-else style="width:60px;height:60px;background:#f4f5f6;display:flex;align-items:center;justify-content:center;">
+                                        <span class="text-muted" style="font-size:10px">No img</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>{{ bi.item_name }}</strong>
+                                    <br/><small class="text-muted">{{ bi.item_code }}</small>
+                                </td>
+                                <td><small>{{ bi.item_barcode.join(", ") || "—" }}</small></td>
+                                <td class="text-center">
+                                    <span :class="bi.scanned_qty >= bi.qty ? 'text-success font-weight-bold' : ''">
+                                        {{ bi.scanned_qty }} / {{ bi.qty }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="item-quantity" v-if="item && item.qty">
-                    <span class="cur-item-quantity-remaining">{{ item.qty }} more to scan</span>
+            </template>
+            <!-- Regular item display -->
+            <template v-else>
+                <div class="current-packing-item">
+                    <div class="item-detail">
+                        <h5 class="item-title cur-item-name">{{ item.item_name }}</h5>
+                        <p class="item-description cur-item-code">{{ item.item_code }}</p>
+                    </div>
+                    <div class="item-quantity" v-if="item && item.qty">
+                        <span class="cur-item-quantity-remaining">{{ item.qty }} more to scan</span>
+                    </div>
+
+                    <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
+                        <button class="btn btn-default btn-sm" @click="add_one_item">Click to Add</button>
+                        <button class="btn btn-default btn-sm" @click="add_multiple">Add Multiple</button>
+                    </h3>
+                    <h3
+                        class="current-section-title cur-item-scan-feedback"
+                        v-else-if="item && item.qty > max_qty_to_pack && has_add_permission_when_qty_exceeds"
+                    >
+                        <button class="btn btn-default btn-sm" @click="add_multiple">Add Multiple</button>
+                    </h3>
+
+                    <template v-if="item && item.image">
+                        <img :src="item.image" alt="" class="cur-item-image my-4" />
+                    </template>
+                    <template v-else>
+                        <h5 class="my-5 py-5 text-muted text-center">No Image Available</h5>
+                    </template>
                 </div>
-
-                <h3 class="current-section-title cur-item-scan-feedback" v-if="has_add_permission">
-                    <button class="btn btn-default btn-sm" @click="add_one_item">Click to Add</button>
-                    <button class="btn btn-default btn-sm" @click="add_multiple">Add Multiple</button>
-                </h3>
-                <h3
-                    class="current-section-title cur-item-scan-feedback"
-                    v-else-if="item && item.qty > max_qty_to_pack && has_add_permission_when_qty_exceeds"
-                >
-                    <button class="btn btn-default btn-sm" @click="add_multiple">Add Multiple</button>
-                </h3>
-
-                <template v-if="item && item.image">
-                    <img :src="item.image" alt="" class="cur-item-image my-4" />
-                </template>
-                <template v-else>
-                    <h5 class="my-5 py-5 text-muted text-center">No Image Available</h5>
-                </template>
-            </div>
+            </template>
         </div>
     </div>
     <!--/ Current Item -->
