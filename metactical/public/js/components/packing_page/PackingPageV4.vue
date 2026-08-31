@@ -123,6 +123,23 @@ export default {
       },
 
       revertItem(item) {
+        if (item.is_bundle) {
+          // Remove the bundle from packed items
+          this.packed_items = this.packed_items.filter((i) => i.dn_detail !== item.dn_detail);
+          if (this.packed_items.length === 0) {
+            $(".pack-items-btn").addClass("d-none");
+          }
+          // Reset all sub-item scanned quantities
+          item.bundle_items.forEach((bi) => { bi.scanned_qty = 0; });
+          // Put the bundle back in pending
+          const alreadyPending = this.pending_items.find((i) => i.dn_detail === item.dn_detail);
+          if (!alreadyPending) {
+            this.pending_items.push(item);
+          }
+          this.reGenerateCurrentItem(item, true);
+          return;
+        }
+
         const exists = this.pending_items.find((i) => i.dn_detail === item.dn_detail);
         if (!exists) {
           const new_item = { ...item, qty: 0, item_barcode: [item.item_barcode] };
@@ -228,7 +245,25 @@ export default {
         let barcode_found = false;
         try {
           this.pending_items.forEach((cur_item) => {
-            if (cur_item.item_barcode.indexOf(barcode) !== -1) {
+            if (cur_item.is_bundle) {
+              const sub_item = cur_item.bundle_items.find(
+                (bi) => bi.item_barcode.indexOf(barcode) !== -1 && bi.qty - bi.scanned_qty > 0
+              );
+              if (sub_item) {
+                if (amount > sub_item.qty - sub_item.scanned_qty) {
+                  frappe.throw(`You can only add a maximum of ${sub_item.qty - sub_item.scanned_qty} of ${sub_item.item_name}`);
+                }
+                frappe.utils.play_sound("alert");
+                sub_item.scanned_qty += amount;
+                barcode_found = true;
+
+                const all_done = cur_item.bundle_items.every((bi) => bi.scanned_qty >= bi.qty);
+                if (all_done) {
+                  me.packBundle(cur_item);
+                }
+                throw "Break";
+              }
+            } else if (cur_item.item_barcode.indexOf(barcode) !== -1) {
               if (amount > cur_item.qty) {
                 frappe.throw(`You can only add a maximum of ${cur_item.qty} items`);
               }
@@ -252,6 +287,27 @@ export default {
           frappe.utils.play_sound("error");
           frappe.msgprint("Wrong Barcode");
         }
+      },
+
+      packBundle(bundle_item) {
+        // Remove bundle from pending
+        const index = this.pending_items.findIndex((i) => i.dn_detail === bundle_item.dn_detail);
+        if (index > -1) this.pending_items.splice(index, 1);
+
+        // Add the bundle itself to packed_items (sub-items are expanded only on submit)
+        const already = this.packed_items.find((p) => p.dn_detail === bundle_item.dn_detail);
+        if (!already) {
+          this.packed_items.push({ ...bundle_item });
+        }
+
+        // Move current_item to next pending
+        if (this.pending_items.length > 0) {
+          this.current_item = this.pending_items[0];
+        } else {
+          this.current_item = {};
+        }
+
+        $(".pack-items-btn").removeClass("d-none");
       },
 
       getMeasurementFields(cur_item) {
@@ -425,9 +481,31 @@ export default {
           });
       },
 
+      getPackingSlipItems() {
+        const items = [];
+        this.packed_items.forEach((item) => {
+          if (item.is_bundle) {
+            item.bundle_items.forEach((bi) => {
+              items.push({
+                item_code: bi.item_code,
+                item_name: bi.item_name,
+                qty: bi.scanned_qty,
+                pi_detail: bi.name,
+                net_weight: bi.net_weight || 0,
+                weight_uom: bi.weight_uom || "",
+                stock_uom: bi.stock_uom || "",
+              });
+            });
+          } else {
+            items.push(item);
+          }
+        });
+        return items;
+      },
+
       saveForm(dialog, values) {
         this.cur_packing_slip = { ...this.cur_packing_slip, ...values };
-        this.cur_packing_slip.items = this.packed_items;
+        this.cur_packing_slip.items = this.getPackingSlipItems();
         this.cur_packing_slip.custom_neb_box_height = values.height;
         this.cur_packing_slip.custom_neb_box_width = values.width;
         this.cur_packing_slip.custom_neb_box_length = values.length;
@@ -461,14 +539,20 @@ export default {
 
       calculateNetWeight() {
         let net_weight_pkg = 0;
-        const weight_uom = this.packed_items.length ? this.packed_items[0].weight_uom : "";
+        const weight_uom = this.packed_items.length ? (this.packed_items[0].weight_uom || "") : "";
         this.packed_items.forEach((item) => {
-          if (item.weight_uom !== weight_uom) {
-            frappe.msgprint(
-              "The packed items have different weight UOM which leads to incorrect (Total) Net Weight value. Therefore the weight will not be calculated for this Packing Slip."
-            );
+          if (item.is_bundle) {
+            item.bundle_items.forEach((bi) => {
+              net_weight_pkg += (bi.net_weight || 0) * bi.scanned_qty;
+            });
+          } else {
+            if (item.weight_uom !== weight_uom) {
+              frappe.msgprint(
+                "The packed items have different weight UOM which leads to incorrect (Total) Net Weight value. Therefore the weight will not be calculated for this Packing Slip."
+              );
+            }
+            net_weight_pkg += (item.net_weight || 0) * item.qty;
           }
-          net_weight_pkg += item.net_weight * item.qty;
         });
         return roundNumber(net_weight_pkg, 2);
       },

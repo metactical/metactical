@@ -1,0 +1,109 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:bin_number",
+ "creation": "2026-08-08 15:56:30.532725",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "bin_number",
+  "bin_size",
+  "status",
+  "current_warehouse",
+  "current_rack",
+  "last_moved",
+  "last_moved_by",
+  "contents",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "bin_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Bin Number",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "bin_size",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Bin Size",
+   "options": "Storage Bin Size"
+  },
+  {
+   "default": "Empty",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Empty\nFilling\nFull\nShelved\nReserved\nIn Transit"
+  },
+  {
+   "fieldname": "current_warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Current Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "current_rack",
+   "fieldtype": "Data",
+   "label": "Current Rack"
+  },
+  {
+   "fieldname": "last_moved",
+   "fieldtype": "Datetime",
+   "label": "Last Moved"
+  },
+  {
+   "fieldname": "last_moved_by",
+   "fieldtype": "Data",
+   "label": "Last Moved By"
+  },
+  {
+   "description": "What was counted into this bin at receiving, while its stock is still pooled in W01-Receiving. This is the only record of which physical bin holds which units at that stage, and it is what the putaway swap reads to decide what stock to move. Cleared on putaway \u2014 once the bin is in a shelf slot, that location's live ERP stock is its contents, and a stored copy would be wrong the moment a picker took something. Maintained by PPS; not editable here.",
+   "fieldname": "contents",
+   "fieldtype": "Table",
+   "label": "Contents \u2014 receiving manifest",
+   "options": "Storage Bin Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-31 08:57:11.944199",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Storage Bin",
+ "owner": "akmergeuser@goldenplaz.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

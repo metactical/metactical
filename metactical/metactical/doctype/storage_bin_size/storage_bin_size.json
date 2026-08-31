@@ -1,0 +1,167 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:size_name",
+ "creation": "2026-07-18 20:58:37.206454",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "size_name",
+  "description",
+  "disabled",
+  "sb_dims",
+  "length_cm",
+  "width_cm",
+  "height_cm",
+  "cb_dims",
+  "volume_cm3",
+  "usable_factor",
+  "sb_limits",
+  "max_weight_kg",
+  "cb_limits",
+  "notes"
+ ],
+ "fields": [
+  {
+   "description": "Stable class code, e.g. SHELF-M. Avoid putting dimensions here \u2014 they change.",
+   "fieldname": "size_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Size Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Human summary, e.g. \"Standard shelf 45 x 60 x 35 cm\".",
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "sb_dims",
+   "fieldtype": "Section Break",
+   "label": "Dimensions"
+  },
+  {
+   "fieldname": "length_cm",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Length (cm)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "width_cm",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Width (cm)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "height_cm",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Height (cm)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cb_dims",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Length x Width x Height. Maintained automatically.",
+   "fieldname": "volume_cm3",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Volume (cm\u00b3)",
+   "read_only": 1
+  },
+  {
+   "default": "0.85",
+   "description": "Fraction of raw volume that is realistically fillable (0-1). Packing is never perfect.",
+   "fieldname": "usable_factor",
+   "fieldtype": "Float",
+   "label": "Usable Factor"
+  },
+  {
+   "fieldname": "sb_limits",
+   "fieldtype": "Section Break",
+   "label": "Limits"
+  },
+  {
+   "description": "Optional. Used to warn, never to block.",
+   "fieldname": "max_weight_kg",
+   "fieldtype": "Float",
+   "label": "Max Weight (kg)"
+  },
+  {
+   "fieldname": "cb_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-31 08:57:11.761951",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Storage Bin Size",
+ "naming_rule": "By fieldname",
+ "owner": "abdul@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
