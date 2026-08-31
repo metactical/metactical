@@ -70,7 +70,6 @@ def get_item_master(items):
 							'item_name': pi['item_name'],
 							'qty': remaining,
 							'scanned_qty': 0,
-							'scan_all': False,
 							'item_barcode': pi_barcodes,
 							'image': pi_item_doc.get('image'),
 							'ifw_retailskusufix': pi_item_doc.get('ifw_retailskusuffix'),
