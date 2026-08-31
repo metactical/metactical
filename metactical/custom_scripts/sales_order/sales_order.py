@@ -38,6 +38,7 @@ class SalesOrderCustom(SalesOrder):
 	def validate(self):
 		super(SalesOrderCustom, self).validate()
 		self.pull_reserved_qty()
+		self.update_barcode()
 		
 	def pull_reserved_qty(self):
 		for row in self.items:
@@ -121,7 +122,13 @@ class SalesOrderCustom(SalesOrder):
 				update_item_inventory_output(item_code=item.item_code, net_available_bins=all_bins, bundle=True, voucher_type=self.doctype)
 			else:
 				frappe.enqueue(update_item_inventory_output, item_code=item.item_code, voucher_type=self.doctype, queue='default')
-			
+	
+	def update_barcode(self):
+		for item in self.items:
+			if not item.barcode:
+				barcode = frappe.db.get_value("Item Barcode", {"parent": item.item_code}, "barcode")
+				if barcode:
+					item.barcode = barcode
    
 def get_draft_dns(sales_order):
 	draft_dn = frappe.db.sql("""

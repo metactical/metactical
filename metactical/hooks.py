@@ -966,6 +966,7 @@ fixtures = [{
 			"Supplier-custom_column_break_duesj",
 			"Supplier-custom_sender_address",
 			"Supplier-custom_sender_email",
+			"Sales Order Item-barcode"
 		]]]
 	},
 	{
