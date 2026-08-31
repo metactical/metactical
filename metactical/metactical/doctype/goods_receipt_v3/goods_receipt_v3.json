@@ -1,0 +1,301 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "GR3-.YYYY.-.#####",
+ "creation": "2026-08-12 13:04:20.975552",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_main",
+  "purchase_order_v3",
+  "supplier",
+  "supplier_name",
+  "inbound_shipment_v3",
+  "box_no",
+  "cb_main",
+  "receipt_date",
+  "warehouse",
+  "rejected_warehouse",
+  "counted_by",
+  "sec_items",
+  "scan_barcode",
+  "cb_scan",
+  "scan_qty",
+  "scan_log",
+  "sec_scan_end",
+  "items",
+  "sec_var",
+  "has_variance",
+  "variance_count",
+  "sec_erp",
+  "erp_purchase_receipt",
+  "posted_on",
+  "posted_by",
+  "remarks",
+  "post_error",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "purchase_order_v3",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Purchase Order V3",
+   "options": "Purchase Order V3",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "purchase_order_v3.supplier",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "inbound_shipment_v3",
+   "fieldtype": "Link",
+   "label": "Inbound Shipment",
+   "options": "Inbound Shipment V3"
+  },
+  {
+   "description": "When receiving one carton at a time.",
+   "fieldname": "box_no",
+   "fieldtype": "Data",
+   "label": "Box No"
+  },
+  {
+   "fieldname": "cb_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "default": "Today",
+   "fieldname": "receipt_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Receipt Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Accepted Goods Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rejected_warehouse",
+   "fieldtype": "Link",
+   "label": "Rejected Goods Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "counted_by",
+   "fieldtype": "Link",
+   "label": "Counted By",
+   "options": "User"
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Lines"
+  },
+  {
+   "description": "Scan a barcode, retail SKU, supplier SKU or item code. Each scan adds Qty per Scan to that line.",
+   "fieldname": "scan_barcode",
+   "fieldtype": "Data",
+   "label": "Scan to Count"
+  },
+  {
+   "fieldname": "cb_scan",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Set to the case pack to count whole cartons with one scan.",
+   "fieldname": "scan_qty",
+   "fieldtype": "Float",
+   "label": "Qty per Scan"
+  },
+  {
+   "fieldname": "scan_log",
+   "fieldtype": "Small Text",
+   "label": "Last Scans",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_scan_end",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Goods Receipt V3 Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_var",
+   "fieldtype": "Section Break",
+   "label": "Variance"
+  },
+  {
+   "default": "0",
+   "fieldname": "has_variance",
+   "fieldtype": "Check",
+   "label": "Has Variance",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "variance_count",
+   "fieldtype": "Int",
+   "label": "Variance Lines",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_erp",
+   "fieldtype": "Section Break",
+   "label": "Native ERP Link"
+  },
+  {
+   "fieldname": "erp_purchase_receipt",
+   "fieldtype": "Link",
+   "label": "ERP Purchase Receipt",
+   "no_copy": 1,
+   "options": "Purchase Receipt",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posted_on",
+   "fieldtype": "Datetime",
+   "label": "Posted On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "posted_by",
+   "fieldtype": "Link",
+   "label": "Posted By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.post_error",
+   "fieldname": "post_error",
+   "fieldtype": "Small Text",
+   "label": "Last Posting Error",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Goods Receipt V3",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:43.651506",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Goods Receipt V3",
+ "naming_rule": "Expression (old style)",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}
