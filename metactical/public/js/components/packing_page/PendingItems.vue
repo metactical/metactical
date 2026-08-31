@@ -2,7 +2,10 @@
     <div class="packing-item" @click="selectItem">
       <img :src="item.image" :alt="item.item_name" />
       <div class="item-detail">
-        <p class="item-title">{{ item.item_name }}</p>
+        <p class="item-title">
+          {{ item.item_name }}
+          <span v-if="item.is_bundle" class="badge badge-warning ml-1" style="font-size:10px">Bundle</span>
+        </p>
         <p class="item-description mt-2 text-bold">{{ item.ifw_retailskusufix }}</p>
       </div>
       <div class="item-quantity">
