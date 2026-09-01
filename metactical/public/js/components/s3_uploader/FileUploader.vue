@@ -1433,6 +1433,17 @@ const normalizeFilename = (filename) => {
   return [...parts, extension].join('.')
 }
 
+// Swap a filename's extension for the one carried by `sourceName`, keeping the base.
+const swapExtension = (filename, sourceName) => {
+  if (!sourceName || !sourceName.includes('.')) return filename
+  const extension = sourceName.split('.').pop().toLowerCase()
+  if (!extension) return filename
+  const parts = filename.split('.')
+  if (parts.length < 2) return `${filename}.${extension}`
+  parts.pop()
+  return [...parts, extension].join('.')
+}
+
 const cascade = (field, changedFile) => {
   const base = getBaseName(changedFile.name)
   for (const f of files.value) {
@@ -1655,6 +1666,7 @@ const updateServerFile = async (file, event) => {
     file.width = img.width
     file.height = img.height
     file.type = newFile.type
+    file.name = swapExtension(file.name, newFile.name)
     
     // Update preview
     if (file.preview) {
@@ -1773,11 +1785,11 @@ const startUpload = async () => {
           wasModified: file.isOnServer // Mark as modified if it was already on server
         })
 
-        // Update file status - always mark as on server after upload
-        if (!file.isOnServer) {
-          file.isOnServer = true
-          file.serverPath = result.key
-        }
+        // Update file status - always mark as on server after upload, and refresh
+
+        file.isOnServer = true
+        file.serverPath = result.key
+        
 
         // Reset flags since we've uploaded
         file.hasImageUpdate = false
