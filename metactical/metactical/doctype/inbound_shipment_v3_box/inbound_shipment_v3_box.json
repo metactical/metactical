@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-12 13:04:19.560303",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "box_no",
+  "sscc",
+  "pallet_no",
+  "carrier",
+  "carrier_service",
+  "tracking_no",
+  "tracking_url",
+  "length_cm",
+  "width_cm",
+  "height_cm",
+  "weight_kg",
+  "item_count",
+  "received"
+ ],
+ "fields": [
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "box_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Box No",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "sscc",
+   "fieldtype": "Data",
+   "label": "SSCC"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "pallet_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Pallet No"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "carrier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Carrier",
+   "options": "Supplier"
+  },
+  {
+   "description": "Filtered to the carrier chosen above.",
+   "fieldname": "carrier_service",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Service",
+   "options": "Carrier Service"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 2,
+   "fieldname": "tracking_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tracking No"
+  },
+  {
+   "description": "Built from the carrier\u2019s tracking URL template.",
+   "fieldname": "tracking_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Track",
+   "options": "URL",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "length_cm",
+   "fieldtype": "Float",
+   "label": "Length (cm)"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "width_cm",
+   "fieldtype": "Float",
+   "label": "Width (cm)"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "height_cm",
+   "fieldtype": "Float",
+   "label": "Height (cm)"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "weight_kg",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Weight (kg)"
+  },
+  {
+   "columns": 1,
+   "fieldname": "item_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Item Count",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "received",
+   "fieldtype": "Check",
+   "label": "Received",
+   "no_copy": 1,
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:45.426209",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Inbound Shipment V3 Box",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,294 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-08-12 13:04:18.912230",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "retail_sku_suffix",
+  "supplier_part_no",
+  "barcode",
+  "variant_of",
+  "variant_attributes",
+  "sec_qty",
+  "qty",
+  "uom",
+  "rate",
+  "amount",
+  "last_purchase_rate",
+  "cb_qty",
+  "warehouse",
+  "required_by",
+  "sec_progress",
+  "line_status",
+  "confirmed_qty",
+  "shipped_qty",
+  "received_qty",
+  "accepted_qty",
+  "rejected_qty",
+  "returned_qty",
+  "cb_progress",
+  "short_qty",
+  "over_qty",
+  "backorder_eta",
+  "backorder_status",
+  "backorder_cancel_reason",
+  "material_request",
+  "material_request_item",
+  "erp_po_item"
+ ],
+ "fields": [
+  {
+   "columns": 4,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.ifw_retailskusuffix",
+   "fieldname": "retail_sku_suffix",
+   "fieldtype": "Data",
+   "label": "Retail SKU Suffix",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_part_no",
+   "fieldtype": "Data",
+   "label": "Supplier Part No"
+  },
+  {
+   "fieldname": "barcode",
+   "fieldtype": "Data",
+   "label": "Barcode"
+  },
+  {
+   "fetch_from": "item_code.variant_of",
+   "fieldname": "variant_of",
+   "fieldtype": "Link",
+   "label": "Variant Of",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variant_attributes",
+   "fieldtype": "Data",
+   "label": "Variant Attributes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_qty",
+   "fieldtype": "Section Break",
+   "label": "Quantity & Rate"
+  },
+  {
+   "columns": 1,
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "item_code.stock_uom",
+   "fetch_if_empty": 1,
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "columns": 1,
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate"
+  },
+  {
+   "columns": 1,
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.last_purchase_rate",
+   "fieldname": "last_purchase_rate",
+   "fieldtype": "Currency",
+   "label": "Last Purchase Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "required_by",
+   "fieldtype": "Date",
+   "label": "Required By"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_progress",
+   "fieldtype": "Section Break",
+   "label": "Progress (updated by confirmations & receipts)"
+  },
+  {
+   "columns": 2,
+   "default": "Open",
+   "fieldname": "line_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Line Status",
+   "no_copy": 1,
+   "options": "Open\nConfirmed\nPartial\nBack-ordered\nSupplier Stock Out\nDiscontinued\nSubstituted\nReceived\nClosed Short\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmed_qty",
+   "fieldtype": "Float",
+   "label": "Confirmed Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "shipped_qty",
+   "fieldtype": "Float",
+   "label": "Shipped Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "received_qty",
+   "fieldtype": "Float",
+   "label": "Received Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "accepted_qty",
+   "fieldtype": "Float",
+   "label": "Accepted Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "rejected_qty",
+   "fieldtype": "Float",
+   "label": "Rejected Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "returned_qty",
+   "fieldtype": "Float",
+   "label": "Returned Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "short_qty",
+   "fieldtype": "Float",
+   "label": "Short Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "over_qty",
+   "fieldtype": "Float",
+   "label": "Over Qty",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "backorder_eta",
+   "fieldtype": "Date",
+   "label": "Backorder ETA",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "backorder_status",
+   "fieldtype": "Select",
+   "label": "Backorder Status",
+   "no_copy": 1,
+   "options": "\nOpen\nFulfilled\nCancelled"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "backorder_cancel_reason",
+   "fieldtype": "Select",
+   "label": "Backorder Cancel Reason",
+   "no_copy": 1,
+   "options": "\nPast Cancel Date\nCancelled By Us\nCancelled By Supplier\nNo Longer Available\nPrice Changed\nOrdered Elsewhere\nOther"
+  },
+  {
+   "fieldname": "erp_po_item",
+   "fieldtype": "Data",
+   "label": "ERP PO Item Row",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "material_request",
+   "fieldtype": "Link",
+   "label": "Material Request",
+   "options": "Material Request",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "material_request_item",
+   "fieldtype": "Data",
+   "label": "Material Request Item",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "hidden": 1,
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:44:44.573905",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Purchase Order V3 Item",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -244,6 +244,10 @@ after_migrate = "metactical.migrate.after_migrate"
 # ------------------------------
 #
 override_whitelisted_methods = {
+	# Procurement V3 APIs moved from Server Scripts to code. The aliases keep
+	# the original /api/method/<name> endpoints working for external callers.
+	"v3_create_po_from_buylist": "metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.v3_create_po_from_buylist",
+	"v3_soc_bulk_status": "metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3.v3_soc_bulk_status",
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
@@ -946,7 +950,23 @@ fixtures = [{
 			"Item-custom_section_break_hzwnj",
 			"Item-custom_column_break_iqyli",
 			"Item-custom_column_break_22avz",
-			"Item-custom_identity"
+			"Item-custom_identity",
+			"Supplier-custom_tracking_url_template",
+			"Purchase Order-custom_po3_status",
+			"Supplier Claim V3-workflow_state",
+			"Inbound Shipment V3-workflow_state",
+			"Goods Receipt V3-workflow_state",
+			"Supplier Order Confirmation V3-workflow_state",
+			"Purchase Order V3-workflow_state",
+			"Purchase Order-custom_purchase_order_v3",
+			"Supplier-po3_print_format",
+			"Supplier-po3_cc_email",
+			"Supplier-po3_order_email",
+			"Supplier-po3_section",
+			"Supplier-custom_column_break_duesj",
+			"Supplier-custom_sender_address",
+			"Supplier-custom_sender_email",
+			"Sales Order Item-barcode"
 		]]]
 	},
 	{
@@ -1540,7 +1560,8 @@ fixtures = [{
 			"Item-details-label",
 			"Item-ifw_retailskusuffix-in_list_view",
 			"Item-item_group-in_list_view",
-			"Item-weight_uom-default"
+			"Item-weight_uom-default",
+			"Supplier-main-field_order",
 		]]]
 	},
   	{
@@ -1548,6 +1569,72 @@ fixtures = [{
 	},
 	{
 		"dt": "City Symbol"
+	},
+	{
+		"dt": "Workflow State",
+		"filters": [["name", "in", [
+			"Acknowledged",
+			"Approved",
+			"Awaiting Supplier",
+			"Cancelled",
+			"Closed",
+			"Closed Short",
+			"Confirmed",
+			"Counting",
+			"Discrepancy Hold",
+			"Draft",
+			"In Transit",
+			"Open",
+			"Partially Received",
+			"Pending",
+			"Pending Approval",
+			"Pending L1 Approval",
+			"Pending L2 Approval",
+			"Pending Review",
+			"Posted",
+			"Ready to Post",
+			"Received",
+			"Rejected",
+			"Resolved",
+			"Sent to Supplier",
+			"Variance Review",
+		]]]
+	},
+	{
+		"dt": "Workflow Action Master",
+		"filters": [["name", "in", [
+			"Accept Variances",
+			"Approve",
+			"Await Supplier",
+			"Cancel",
+			"Close",
+			"Close Short",
+			"Finish Counting",
+			"Mark Acknowledged",
+			"Mark Resolved",
+			"Mark Sent",
+			"Open Claim",
+			"Post",
+			"Post to Stock",
+			"Reject",
+			"Reject Delivery",
+			"Reopen",
+			"Resolve",
+			"Return for Rework",
+			"Review",
+			"Start Count",
+			"Supplier Cancelled",
+		]]]
+	},
+	{
+		"dt": "Workflow",
+		"filters": [["name", "in", [
+			"Goods Receipt V3 Flow",
+			"Inbound Shipment V3 Flow",
+			"Purchase Order V3 Flow",
+			"Supplier Claim V3 Flow",
+			"Supplier Order Confirmation V3 Flow",
+		]]]
 	},
 	{
 		"dt": "Email Template",

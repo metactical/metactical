@@ -1,0 +1,556 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "PO3-.YYYY.-.#####",
+ "creation": "2026-08-26 07:16:08.743696",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_main",
+  "supplier",
+  "supplier_name",
+  "get_items_from_open_material_requests",
+  "company",
+  "order_date",
+  "required_by",
+  "cb_main",
+  "currency",
+  "conversion_rate",
+  "buying_price_list",
+  "approval_tier",
+  "sec_shipto",
+  "set_warehouse",
+  "ship_to_display",
+  "cb_shipto",
+  "sender_email_account",
+  "sender_email",
+  "supplier_email",
+  "cc_email",
+  "bcc_email",
+  "po_print_format",
+  "sec_items",
+  "items",
+  "sec_totals",
+  "total_qty",
+  "total",
+  "cb_totals",
+  "base_grand_total",
+  "sec_send",
+  "send_status",
+  "sent_on",
+  "sent_by",
+  "sent_method",
+  "ack_expected",
+  "ack_due_date",
+  "cb_send",
+  "confirmation_status",
+  "confirmation_no",
+  "confirmation_date",
+  "confirmation_no_source",
+  "receipt_status",
+  "manually_reopened",
+  "sec_erp",
+  "erp_purchase_order",
+  "posted_on",
+  "posted_by",
+  "post_error",
+  "sec_notes",
+  "remarks",
+  "notes_to_supplier",
+  "amended_from",
+  "cb_notes",
+  "internal_notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "default": "International Camouflage Ltd",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "default": "Today",
+   "fieldname": "order_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Order Date",
+   "reqd": 1
+  },
+  {
+   "description": "The PO cancel date. Lines not fulfilled by then are candidates for backorder cancellation.",
+   "fieldname": "required_by",
+   "fieldtype": "Date",
+   "label": "Required By (Cancel Date)"
+  },
+  {
+   "fieldname": "cb_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "supplier.default_currency",
+   "fetch_if_empty": 1,
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "default": "1",
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "precision": "9"
+  },
+  {
+   "description": "Auto-picked from the Supplier\u2019s Default Price List. Blank = the supplier has no default; pick manually.",
+   "fetch_from": "supplier.default_price_list",
+   "fetch_if_empty": 1,
+   "fieldname": "buying_price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "approval_tier",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Approval Tier",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_shipto",
+   "fieldtype": "Section Break",
+   "label": "Ship To"
+  },
+  {
+   "fieldname": "set_warehouse",
+   "fieldtype": "Link",
+   "label": "Ship To Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ship_to_display",
+   "fieldtype": "Small Text",
+   "label": "Ship To Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_shipto",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Auto-filled from the Supplier. Clear this before approving to skip auto-send and send manually.",
+   "fieldname": "supplier_email",
+   "fieldtype": "Data",
+   "label": "Send PO To (email)",
+   "options": "Email"
+  },
+  {
+   "fieldname": "cc_email",
+   "fieldtype": "Data",
+   "label": "CC",
+   "options": "Email"
+  },
+  {
+   "fieldname": "bcc_email",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "BCC",
+   "read_only": 1
+  },
+  {
+   "description": "From Supplier master; the format attached to the outgoing email.",
+   "fieldname": "po_print_format",
+   "fieldtype": "Link",
+   "label": "PO Print Format",
+   "link_filters": "[[\"Print Format\",\"doc_type\",\"=\",\"Purchase Order\"]]",
+   "options": "Print Format"
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Purchase Order V3 Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "label": "Total Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Currency",
+   "label": "Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "base_grand_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Grand Total (Company Currency)",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_send",
+   "fieldtype": "Section Break",
+   "label": "Send / Confirmation Status"
+  },
+  {
+   "default": "Not Sent",
+   "fieldname": "send_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Send Status",
+   "no_copy": 1,
+   "options": "Not Sent\nAuto-Sent\nManually Sent\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_on",
+   "fieldtype": "Datetime",
+   "label": "Sent On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_by",
+   "fieldtype": "Link",
+   "label": "Sent By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "sent_method",
+   "fieldtype": "Select",
+   "label": "Sent Method",
+   "options": "\nEmail\nPhone\nPortal\nEDI\nOther"
+  },
+  {
+   "default": "1",
+   "fieldname": "ack_expected",
+   "fieldtype": "Check",
+   "label": "Confirmation Expected"
+  },
+  {
+   "fieldname": "ack_due_date",
+   "fieldtype": "Date",
+   "label": "Confirmation Due"
+  },
+  {
+   "fieldname": "cb_send",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Awaiting",
+   "fieldname": "confirmation_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Confirmation Status",
+   "no_copy": 1,
+   "options": "Not Requested\nAwaiting\nPartially Confirmed\nConfirmed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmation_no",
+   "fieldtype": "Data",
+   "label": "Confirmation No",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmation_date",
+   "fieldtype": "Date",
+   "label": "Confirmation Date",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "confirmation_no_source",
+   "fieldtype": "Select",
+   "label": "Confirmation No Source",
+   "no_copy": 1,
+   "options": "\nConfirmation Number\nInvoice Number",
+   "read_only": 1
+  },
+  {
+   "default": "Not Started",
+   "fieldname": "receipt_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Receipt Status",
+   "no_copy": 1,
+   "options": "Not Started\nPartially Received\nReceived\nClosed Short",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Set when someone reopens a closed order; stops the automatic close from shutting it again on the same save.",
+   "fieldname": "manually_reopened",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Manually Reopened",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_erp",
+   "fieldtype": "Section Break",
+   "label": "Native ERP Link"
+  },
+  {
+   "fieldname": "erp_purchase_order",
+   "fieldtype": "Link",
+   "label": "ERP Purchase Order",
+   "no_copy": 1,
+   "options": "Purchase Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posted_on",
+   "fieldtype": "Datetime",
+   "label": "Posted On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "posted_by",
+   "fieldtype": "Link",
+   "label": "Posted By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.post_error",
+   "fieldname": "post_error",
+   "fieldtype": "Small Text",
+   "label": "Native PO Posting Error",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "description": "Stamped automatically (e.g. Buy List origin).",
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "System / Source Notes",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Sent to the supplier \u2014 included in the PO email and copied to the native PO.",
+   "fieldname": "notes_to_supplier",
+   "fieldtype": "Small Text",
+   "label": "Notes to Supplier"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Purchase Order V3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_notes",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Never leaves ERP. Not emailed, not copied to the native PO.",
+   "fieldname": "internal_notes",
+   "fieldtype": "Small Text",
+   "label": "Internal Notes"
+  },
+  {
+   "depends_on": "eval:doc.supplier && doc.docstatus===0 && (!(doc.items && doc.items.length) || (doc.items.length==1 && !doc.items[0].item_code))",
+   "description": "Fetch items based on Default Supplier.",
+   "fieldname": "get_items_from_open_material_requests",
+   "fieldtype": "Button",
+   "label": "Get Items from Open Material Requests"
+  },
+  {
+   "description": "Taken from the Sender Email Account.",
+   "fetch_from": "sender_email_account.email_id",
+   "fieldname": "sender_email",
+   "fieldtype": "Data",
+   "label": "Sender Email Address",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "description": "From Supplier master; the account the PO email is sent from.",
+   "fieldname": "sender_email_account",
+   "fieldtype": "Link",
+   "label": "Sender Email Account",
+   "link_filters": "[[\"Email Account\", \"enable_outgoing\", \"=\", 1]]",
+   "options": "Email Account"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "group": "Fulfilment",
+   "hidden": 1,
+   "link_doctype": "Supplier Order Confirmation V3",
+   "link_fieldname": "purchase_order_v3"
+  },
+  {
+   "group": "Fulfilment",
+   "link_doctype": "Inbound Shipment V3",
+   "link_fieldname": "purchase_order_v3"
+  },
+  {
+   "group": "Fulfilment",
+   "link_doctype": "Goods Receipt V3",
+   "link_fieldname": "purchase_order_v3"
+  },
+  {
+   "group": "Issues",
+   "link_doctype": "Supplier Claim V3",
+   "link_fieldname": "purchase_order_v3"
+  }
+ ],
+ "modified": "2026-08-27 07:20:12.244439",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Purchase Order V3",
+ "naming_rule": "Expression",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Approver L3",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "search_fields": "supplier,supplier_name,order_date",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}
