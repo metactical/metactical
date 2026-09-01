@@ -250,11 +250,12 @@ export default {
                 (bi) => bi.item_barcode.indexOf(barcode) !== -1 && bi.qty - bi.scanned_qty > 0
               );
               if (sub_item) {
-                if (amount > sub_item.qty - sub_item.scanned_qty) {
+                const effective_amount = sub_item.scan_all ? (sub_item.qty - sub_item.scanned_qty) : amount;
+                if (effective_amount > sub_item.qty - sub_item.scanned_qty) {
                   frappe.throw(`You can only add a maximum of ${sub_item.qty - sub_item.scanned_qty} of ${sub_item.item_name}`);
                 }
                 frappe.utils.play_sound("alert");
-                sub_item.scanned_qty += amount;
+                sub_item.scanned_qty += effective_amount;
                 barcode_found = true;
 
                 const all_done = cur_item.bundle_items.every((bi) => bi.scanned_qty >= bi.qty);

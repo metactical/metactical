@@ -26,6 +26,7 @@
                                 <th>Item</th>
                                 <th>Barcodes</th>
                                 <th class="text-center">Progress</th>
+                                <th class="text-center" title="When enabled, scanning this item once fills all remaining quantity">Bulk Scan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -47,6 +48,9 @@
                                     <span :class="bi.scanned_qty >= bi.qty ? 'text-success font-weight-bold' : ''">
                                         {{ bi.scanned_qty }} / {{ bi.qty }}
                                     </span>
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" v-model="bi.scan_all" :disabled="bi.scanned_qty >= bi.qty" />
                                 </td>
                             </tr>
                         </tbody>
