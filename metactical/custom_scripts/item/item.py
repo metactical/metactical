@@ -5,7 +5,7 @@ from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
 import datetime
 import requests
-from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
+from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost, RepostItemValuation
 
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
@@ -111,22 +111,46 @@ class CustomItem(Item):
 
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
-        finally:    
-            repost_item_valuations = frappe.get_list("Repost Item Valuation", 
-                                                    filters={"item_code": new_item_code, "status": "Queued"}, 
+        finally:
+            repost_item_valuations = frappe.get_list("Repost Item Valuation",
+                                                    filters={"item_code": new_item_code, "status": "Queued"},
                                                     fields=["name", "warehouse"],
                                                     order_by="creation desc"
                                                 )
             if not repost_item_valuations:
                 return
 
+            from frappe.utils import add_days, getdate
+
+            warehouses = [r.warehouse for r in repost_item_valuations if r.warehouse]
+            warehouse_map = {
+                r.name: r
+                for r in frappe.get_all("Warehouse", filters={"name": ["in", warehouses]}, fields=["name", "company", "disabled"])
+            }
+            closing_date_cache = {}
+
             for repost_item_valuation in repost_item_valuations:
-                if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
+                wh = warehouse_map.get(repost_item_valuation.warehouse)
+                if not wh or wh.disabled:
                     continue
-                
+
+                company = wh.company
+                if company:
+                    if company not in closing_date_cache:
+                        closing_date_cache[company] = RepostItemValuation.get_max_period_closing_date(company)
+                        
+                    max_closing_date = closing_date_cache[company]
+                    if max_closing_date and getdate("1900-01-01") <= getdate(max_closing_date):
+                        frappe.db.set_value(
+                            "Repost Item Valuation",
+                            repost_item_valuation.name,
+                            "posting_date",
+                            add_days(max_closing_date, 1),
+                        )
+
                 doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
                 try:
-                    
+
                     doc.deduplicate_similar_repost()
                     frappe.enqueue(repost, doc=doc, queue='long')
                 except Exception as e:
