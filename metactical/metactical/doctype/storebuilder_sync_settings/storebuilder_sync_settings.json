@@ -7,7 +7,9 @@
  "field_order": [
   "validation_apis",
   "section_break_itpt",
-  "item_detail_apis"
+  "item_detail_apis",
+  "section_break_imgap",
+  "image_apis"
  ],
  "fields": [
   {
@@ -25,6 +27,17 @@
    "fieldname": "item_detail_apis",
    "fieldtype": "Table",
    "label": "Item Detail APIs (Slugs and Descriptions)",
+   "options": "Item Import Validation"
+  },
+  {
+   "fieldname": "section_break_imgap",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "papi_product_images endpoint and CDN base URL per website. Called from Load Data From SB to import product images into S3.",
+   "fieldname": "image_apis",
+   "fieldtype": "Table",
+   "label": "Product Image APIs",
    "options": "Item Import Validation"
   }
  ],
