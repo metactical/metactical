@@ -109,13 +109,32 @@ erpnext.utils.update_child_items = function(opts) {
 		);
 	}
 
-	if (frm.doc.doctype == 'Sales Order' || frm.doc.doctype == 'Purchase Order' ) {
+	if (frm.doc.doctype == 'Sales Order') {
 		fields.splice(2, 0, {
 			fieldtype: 'Date',
-			fieldname: frm.doc.doctype == 'Sales Order' ? "delivery_date" : "schedule_date",
+			fieldname: "delivery_date",
 			in_list_view: 1,
-			label: frm.doc.doctype == 'Sales Order' ? __("Delivery Date") : __("Reqd by date"),
+			label: __("Delivery Date"),
 			reqd: 1
+		})
+		fields.splice(3, 0, {
+			fieldtype: 'Float',
+			fieldname: "conversion_factor",
+			default: 1,
+			in_list_view: 0,
+			label: __("Conversion Factor"),
+			precision: get_precision('conversion_factor')
+		})
+	}
+
+	// Metactical Customization: Show Supplier Part No instead of Reqd by Date for Purchase Orders
+	if (frm.doc.doctype == 'Purchase Order') {
+		fields.splice(2, 0, {
+			fieldtype: 'Data',
+			fieldname: "supplier_part_no",
+			in_list_view: 1,
+			label: __("Supplier Part No"),
+			reqd: 0
 		})
 		fields.splice(3, 0, {
 			fieldtype: 'Float',
@@ -235,7 +254,8 @@ erpnext.utils.update_child_items = function(opts) {
 				"conversion_factor": d.conversion_factor,
 				"qty": d.qty,
 				"rate": d.rate,
-				"uom": d.uom
+				"uom": d.uom,
+				"supplier_part_no": d.supplier_part_no
 			});
 			this.data = dialog.fields_dict.trans_items.df.data;
 			dialog.fields_dict.trans_items.grid.refresh();
