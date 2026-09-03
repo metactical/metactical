@@ -7,6 +7,27 @@ import datetime
 import requests
 from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost, RepostItemValuation
 
+
+def _background_repost_and_update_inventory(doc_names, item_code, doctype):
+    """Run repost item valuations sequentially then update inventory output.
+
+    Runs as a single background job so update_item_inventory_output is
+    guaranteed to execute after the last repost completes.
+    """
+    for name in doc_names:
+        doc = frappe.get_doc("Repost Item Valuation", name)
+        try:
+            doc.deduplicate_similar_repost()
+            repost(doc)
+        except Exception:
+            frappe.log_error(
+                title="Error during reposting item valuation after item merge",
+                message=frappe.get_traceback(),
+            )
+
+    update_item_inventory_output(item_code=item_code, voucher_type=doctype)
+
+
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
         super().before_rename(old_item_code, new_item_code, merge)
@@ -89,20 +110,18 @@ class CustomItem(Item):
             else:
                 old_item = new_item
                 old_item.item_code = old_item_code
-            
+
             item_merge_history = frappe.new_doc("Item Merge History")
             item_merge_history.old_item_code = old_item_code
             item_merge_history.new_item_code = new_item_code
-            
             item_merge_history.old_item = self.sanitize(old_item.as_dict())
             item_merge_history.new_item = self.sanitize(new_item.as_dict())
-            
             item_merge_history.insert(ignore_permissions=True)
 
             if merge:
                 if old_item.variant_of:
                     remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
-                    if remaining_variants == 0 or remaining_variants is None:  
+                    if remaining_variants == 0 or remaining_variants is None:
                         try:
                             frappe.db.delete("Item", old_item.variant_of)
                         except Exception as e:
@@ -112,51 +131,68 @@ class CustomItem(Item):
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
         finally:
-            repost_item_valuations = frappe.get_list("Repost Item Valuation",
-                                                    filters={"item_code": new_item_code, "status": "Queued"},
-                                                    fields=["name", "warehouse"],
-                                                    order_by="creation desc"
-                                                )
-            if not repost_item_valuations:
+            if not merge:
                 return
 
-            from frappe.utils import add_days, getdate
+            self._repost_after_merge(new_item_code)
+            
+    def _repost_after_merge(self, item_code):
+        from frappe.utils import getdate
+        from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import RepostItemValuation
 
-            warehouses = [r.warehouse for r in repost_item_valuations if r.warehouse]
-            warehouse_map = {
-                r.name: r
-                for r in frappe.get_all("Warehouse", filters={"name": ["in", warehouses]}, fields=["name", "company", "disabled"])
-            }
-            closing_date_cache = {}
+        repost_item_valuations = frappe.get_list(
+            "Repost Item Valuation",
+            filters={"item_code": item_code, "status": "Queued"},
+            fields=["name", "warehouse", "posting_date"],
+            order_by="creation desc",
+        )
+        if not repost_item_valuations:
+            return
 
-            for repost_item_valuation in repost_item_valuations:
-                wh = warehouse_map.get(repost_item_valuation.warehouse)
-                if not wh or wh.disabled:
+        warehouses = [r.warehouse for r in repost_item_valuations if r.warehouse]
+        warehouse_map = {
+            r.name: r
+            for r in frappe.get_all(
+                "Warehouse",
+                filters={"name": ["in", warehouses]},
+                fields=["name", "company", "disabled"],
+            )
+        }
+        closing_date_cache = {}
+        docs_to_repost = []
+
+        for riv in repost_item_valuations:
+            wh = warehouse_map.get(riv.warehouse)
+            if not wh or wh.disabled:
+                continue
+
+            company = wh.company
+            if company:
+                if company not in closing_date_cache:
+                    closing_date_cache[company] = RepostItemValuation.get_max_period_closing_date(company)
+
+                max_closing_date = closing_date_cache[company]
+                if max_closing_date and getdate(riv.posting_date) <= getdate(max_closing_date):
+                    frappe.db.set_value("Repost Item Valuation", riv.name, "status", "Skipped")
                     continue
 
-                company = wh.company
-                if company:
-                    if company not in closing_date_cache:
-                        closing_date_cache[company] = RepostItemValuation.get_max_period_closing_date(company)
-                        
-                    max_closing_date = closing_date_cache[company]
-                    if max_closing_date and getdate("1900-01-01") <= getdate(max_closing_date):
-                        frappe.db.set_value(
-                            "Repost Item Valuation",
-                            repost_item_valuation.name,
-                            "posting_date",
-                            add_days(max_closing_date, 1),
-                        )
+            docs_to_repost.append(riv.name)
 
-                doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
-                try:
+        if not docs_to_repost:
+            return
 
-                    doc.deduplicate_similar_repost()
-                    frappe.enqueue(repost, doc=doc, queue='long')
-                except Exception as e:
-                    frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
-                    
-            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
+        # Commit the rename before handing off to the background job so the
+        # worker sees the updated item_code in the stock ledger entries.
+        frappe.db.commit()
+
+        frappe.enqueue(
+            _background_repost_and_update_inventory,
+            doc_names=docs_to_repost,
+            item_code=item_code,
+            doctype=self.doctype,
+            queue="long",
+            timeout=1800,  # set a timeout of 3000 seconds for the background job
+        )
 
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
