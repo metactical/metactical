@@ -171,13 +171,19 @@ def _fetch_sb_product(config, external_id, slug):
     if slug:
         body["slug"] = slug.strip()
 
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + (config.api_key or ""),
+    }
+
+    custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header", raise_exception=False) if config.get("custom_header") else None
+    if custom_header:
+        headers.update({"X-Origin-Verify": custom_header})
+
     response = requests.post(
         config.api_url,
         json=body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + (config.api_key or ""),
-        },
+        headers=headers,
         timeout=(5, 30),
     )
     if response.status_code != 200:
