@@ -105,6 +105,19 @@ class CustomStockEntry(StockEntry):
 					title=_("Insufficient Stock"),
 				)
 
+	def _validate_links(self):
+		# _validate_links runs before before_validate and validate in Frappe's lifecycle,
+		# so this is the only place we can guarantee warehouses exist before link checks fire.
+		if self.stock_entry_type == "Material Transfer":
+			for item in self.items:
+				if item.t_warehouse:
+					try:
+						_ensure_warehouse_exists(item.t_warehouse)
+					except Exception:
+						frappe.log_error(frappe.get_traceback(), f"_ensure_warehouse_exists failed: {item.t_warehouse}")
+						raise
+		super(CustomStockEntry, self)._validate_links()
+
 	def validate(self):
 		super(CustomStockEntry, self).validate()
 		# Metactical Customization: Validate that user has permission to make stock entry against warehouse
@@ -309,5 +322,110 @@ def move_stock(source_name, target_doc=None):
 		target_doc,
 		set_missing_values,
 	)
-
 	return doclist
+
+
+def _ensure_warehouse_exists(warehouse_name: str) -> None:
+	"""Create the warehouse and its full parent hierarchy if they don't exist yet.
+
+	Naming convention: "W01-D-01-BA-02-05 - ICL"
+	Actual ERPNext hierarchy:
+	  W01-Bins - ICL  (site group, must exist, parent is outside W01-* subtree)
+	    W01-D - ICL   (zone)
+	      W01-D-01 - ICL
+	        ...
+	          W01-D-01-BA-02-05 - ICL  (leaf, is_group=0)
+
+	chain[0] ("W01 - ICL") does NOT exist in this structure — it is skipped.
+	The zone level (chain[1]) is parented to the site group found by querying.
+	"""
+	frappe.log_error(f"Ensuring warehouse: {warehouse_name}", "StorageBin Debug")
+	sep = " - "
+	idx = warehouse_name.rfind(sep)
+	if idx < 0:
+		frappe.log_error(f"No ' - ' separator, skipping: {warehouse_name}", "StorageBin Debug")
+		return
+
+	code = warehouse_name[:idx]
+	company_abbr = warehouse_name[idx + len(sep):]
+	parts = code.split("-")
+
+	# chain[0] = "W01 - ICL", chain[1] = "W01-D - ICL", ..., chain[-1] = full target
+	chain = ["-".join(parts[:i]) + sep + company_abbr for i in range(1, len(parts) + 1)]
+	frappe.log_error(f"Chain: {chain}", "StorageBin Debug")
+
+	company = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
+	if not company:
+		frappe.log_error(f"No company with abbr '{company_abbr}'", "StorageBin Debug")
+		frappe.throw(f"No company found with abbreviation '{company_abbr}'")
+
+	# Scan ALL chain entries to find the deepest existing one.
+	# Do NOT break early — chain[0] may not exist even if chain[1] does.
+	anchor_idx = -1
+	for i, name in enumerate(chain):
+		if frappe.db.exists("Warehouse", name):
+			anchor_idx = i
+
+	frappe.log_error(f"anchor_idx={anchor_idx}, chain_len={len(chain)}", "StorageBin Debug")
+
+	if anchor_idx == len(chain) - 1:
+		frappe.log_error(f"Leaf already exists: {warehouse_name}", "StorageBin Debug")
+		return
+
+	if anchor_idx >= 0:
+		# Normal case: the deepest existing chain entry is the parent.
+		first_parent = chain[anchor_idx]
+		start_idx = anchor_idx + 1
+	else:
+		# Nothing in the chain exists. chain[0] ("W01 - ICL") never exists in this
+		# structure. Find the real site group (e.g. "W01-Bins - ICL"): a group warehouse
+		# whose parent lies outside the W01-* subtree.
+		site_like = f"{parts[0]}-% - {company_abbr}"
+		rows = frappe.db.sql("""
+			SELECT name FROM `tabWarehouse`
+			WHERE company = %s AND name LIKE %s AND is_group = 1
+			  AND (parent_warehouse NOT LIKE %s
+			       OR parent_warehouse IS NULL
+			       OR parent_warehouse = '')
+			LIMIT 1
+		""", (company, site_like, site_like), as_dict=True)
+
+		if not rows:
+			frappe.log_error(
+				f"No site group warehouse found matching '{site_like}'", "StorageBin Debug"
+			)
+			frappe.throw(
+				f"No group warehouse found for site '{parts[0]}' "
+				f"(expected something like '{parts[0]}-Bins - {company_abbr}'). "
+				f"Create it in ERPNext first.",
+				frappe.DoesNotExistError,
+			)
+
+		first_parent = rows[0]["name"]
+		start_idx = 1  # skip chain[0]; chain[1] goes under first_parent
+		frappe.log_error(f"Site group found: '{first_parent}'", "StorageBin Debug")
+
+	for i in range(start_idx, len(chain)):
+		level_name = chain[i]
+		level_code = level_name[:level_name.rfind(sep)]
+		is_leaf = i == len(chain) - 1
+		parent = first_parent if i == start_idx else chain[i - 1]
+
+		frappe.db.savepoint("before_warehouse_insert")
+		try:
+			wh = frappe.new_doc("Warehouse")
+			wh.warehouse_name = level_code
+			wh.parent_warehouse = parent
+			wh.company = company
+			wh.is_group = 0 if is_leaf else 1
+			wh.insert(ignore_permissions=True)
+			frappe.log_error(
+				f"Created '{level_name}' (is_group={wh.is_group}, parent='{parent}')",
+				"StorageBin Debug"
+			)
+		except frappe.DuplicateEntryError:
+			frappe.db.rollback(save_point="before_warehouse_insert")
+			frappe.log_error(f"'{level_name}' already exists (concurrent), skipping", "StorageBin Debug")
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), f"Failed to create warehouse '{level_name}'")
+			raise
