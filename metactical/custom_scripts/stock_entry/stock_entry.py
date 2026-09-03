@@ -325,6 +325,32 @@ def move_stock(source_name, target_doc=None):
 	return doclist
 
 
+def _ensure_site_bins_warehouse(site: str, company: str, company_abbr: str, site_bins_name: str) -> None:
+	"""Create {site}-Bins directly under W01-MainWarehouse if it doesn't exist yet.
+
+	All WXX-Bins nodes live under the single top-level physical warehouse
+	(W01-MainWarehouse - abbr). W01-MainWarehouse must already exist in ERPNext.
+	"""
+	if frappe.db.exists("Warehouse", site_bins_name):
+		return
+
+	# All WXX-Bins nodes live directly under W01-MainWarehouse - {abbr}.
+	main_wh_name = f"W01-MainWarehouse - {company_abbr}"
+	if not frappe.db.exists("Warehouse", main_wh_name):
+		frappe.throw(
+			f"'{main_wh_name}' not found. Create it in ERPNext first.",
+			frappe.DoesNotExistError,
+		)
+
+	wh = frappe.new_doc("Warehouse")
+	wh.warehouse_name = f"{site}-Bins"
+	wh.parent_warehouse = main_wh_name
+	wh.company = company
+	wh.is_group = 1
+	wh.insert(ignore_permissions=True)
+	frappe.log_error(f"Created '{site_bins_name}' under '{main_wh_name}'", "StorageBin Debug")
+
+
 def _ensure_warehouse_exists(warehouse_name: str) -> None:
 	"""Create the warehouse and its full parent hierarchy if they don't exist yet.
 
@@ -377,33 +403,13 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 		first_parent = chain[anchor_idx]
 		start_idx = anchor_idx + 1
 	else:
-		# Nothing in the chain exists. chain[0] ("W01 - ICL") never exists in this
-		# structure. Find the real site group (e.g. "W01-Bins - ICL"): a group warehouse
-		# whose parent lies outside the W01-* subtree.
-		site_like = f"{parts[0]}-% - {company_abbr}"
-		rows = frappe.db.sql("""
-			SELECT name FROM `tabWarehouse`
-			WHERE company = %s AND name LIKE %s AND is_group = 1
-			  AND (parent_warehouse NOT LIKE %s
-			       OR parent_warehouse IS NULL
-			       OR parent_warehouse = '')
-			LIMIT 1
-		""", (company, site_like, site_like), as_dict=True)
-
-		if not rows:
-			frappe.log_error(
-				f"No site group warehouse found matching '{site_like}'", "StorageBin Debug"
-			)
-			frappe.throw(
-				f"No group warehouse found for site '{parts[0]}' "
-				f"(expected something like '{parts[0]}-Bins - {company_abbr}'). "
-				f"Create it in ERPNext first.",
-				frappe.DoesNotExistError,
-			)
-
-		first_parent = rows[0]["name"]
+		# Nothing in the chain exists. Ensure the canonical bins container
+		# "{site}-Bins - {abbr}" exists, creating it (and its MainWarehouse
+		# parent) on demand.
+		site_bins_name = f"{parts[0]}-Bins - {company_abbr}"
+		_ensure_site_bins_warehouse(parts[0], company, company_abbr, site_bins_name)
+		first_parent = site_bins_name
 		start_idx = 1  # skip chain[0]; chain[1] goes under first_parent
-		frappe.log_error(f"Site group found: '{first_parent}'", "StorageBin Debug")
 
 	for i in range(start_idx, len(chain)):
 		level_name = chain[i]
