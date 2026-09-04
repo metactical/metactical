@@ -384,18 +384,25 @@ class CustomItem(Item):
         validate_item_group(self)
         self.update_item_inventory_output()
         self.update_sb_tags()
-        
 
         self.sync_retail_sku_to_inventory_output()
+
+        # Image work lives in its own module; item.py just says when.
+        from metactical.custom_scripts.utils import s3_image_api
+        s3_image_api.queue_retail_sku_change(self)
 
         if self.drop_and_create_in_websites:
             if not self.item_detail:
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
-            
+
+            # A drop and create re-pushes this product's images from the S3 record. Letting it run
+            # while the image import is still writing that record would push a half-built image set.
+            s3_image_api.block_if_image_job_running(self.item_code)
+
             self.create_item_deletion_log()
-        
+
         frappe.flags.renaming = False
-            
+
     def update_sb_tags(self):
         item_specs = {
             (row.label, row.description)
@@ -724,3 +731,181 @@ def get_item_details(item_code):
     except Exception as e:
         frappe.log_error(title="Error in get_item_details API", message=frappe.get_traceback())
         frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
+
+
+def validate_variants_in_websites(doc):
+    """Ask every website this product is published to whether its variants are acceptable.
+
+    Called on each Item save. Warn only, never block: a website being unreachable — or rejecting a
+    variant — must not stop anyone saving an item in ERP.
+    """
+    # Bulk paths would fire a request per row, and nobody is there to read the warnings.
+    if (frappe.flags.get("item_from_excel") or frappe.flags.in_import
+            or frappe.flags.in_migrate or frappe.flags.in_install):
+        return
+
+    template = doc.variant_of or doc.item_code
+
+    # Saving a template cascades into a save of every variant (erpnext's Item.update_variants) and
+    # they all resolve to the same family, so validate it once per request.
+    validated = frappe.flags.setdefault("variant_validation_done", set())
+    if template in validated:
+        return
+
+    try:
+        variants = frappe.get_all("Item", filters={"variant_of": template}, order_by="name", pluck="name")
+        if not variants:
+            # A plain item, or a template with no variants yet — nothing to validate.
+            return
+
+        validated.add(template)
+
+        # Use the in-flight document when it is the template, so the retail SKU and price lists
+        # being validated are the ones the user is saving, not the stored copy.
+        template_doc = doc if doc.item_code == template else frappe.get_doc("Item", template)
+
+        # The product is identified by its retail SKU, but most templates carry none — fall
+        # back to the item code, which is always set, rather than skipping the validation.
+        product_external_id = template_doc.ifw_retailskusuffix or template_doc.item_code
+
+        configs = frappe.get_all(
+            "Item Import Validation",
+            filters={"parentfield": "variant_validation_apis", "enabled": 1},
+            fields=["*"]
+        )
+        if not configs:
+            return
+
+        payload = build_variant_payload(product_external_id, variants, doc)
+
+        problems_by_site = {}
+        for item_detail in template_doc.item_detail:
+            site_name = item_detail.price_list.split("-")[-1].strip()
+
+            for config in configs:
+                if item_detail.price_list == config.price_list:
+                    problems = post_variant_validation(config, payload, site_name)
+                    if problems:
+                        problems_by_site.setdefault(site_name, []).extend(problems)
+
+        if problems_by_site:
+            frappe.msgprint(
+                format_variant_problems(problems_by_site),
+                title="Variants need attention",
+                indicator="orange"
+            )
+
+    except Exception as e:
+        frappe.log_error(title="Error in variant validation API", message=frappe.get_traceback())
+        frappe.msgprint("Could not validate the variants against the websites. Please check the error log for more information.")
+
+def build_variant_payload(product_external_id, variants, in_flight_doc=None):
+    """Build the papi_validate_variants body for one product.
+
+    `in_flight_doc` is the document being saved; its own values are used in place of the stored
+    copy, so the user is warned about the edits they are making rather than the ones on disk.
+    """
+    variant_payload = []
+
+    for variant_code in variants:
+        if in_flight_doc is not None and in_flight_doc.item_code == variant_code:
+            variant = in_flight_doc
+        else:
+            variant = frappe.get_doc("Item", variant_code)
+
+        # Specifications the websites use to tell variants apart: label -> chosen description.
+        # Rows with no description carry no selector value, so they are left out.
+        specifications = {}
+        for spec in variant.get("neb_website_specifications") or []:
+            if spec.label and spec.description:
+                specifications[spec.label] = spec.description
+
+        variant_payload.append({
+            "identifier": variant.item_code,
+            "retailSkuSuffix": variant.ifw_retailskusuffix,
+            "specifications": specifications
+        })
+
+    return {
+        "productExternalId": product_external_id,
+        "variants": variant_payload
+    }
+
+def format_variant_problems(problems_by_site):
+    """Render the per-website problems as something readable in a popup.
+
+    One block per website, its problems as a plain list — no error codes, since they say nothing
+    the sentence next to them doesn't already say.
+    """
+    blocks = ["<div style='margin-bottom:6px'>The item was saved, but these websites will not accept its variants:</div>"]
+
+    for site_name, problems in problems_by_site.items():
+        # A site can report the same problem several times — once per offending variant — and the
+        # messages carry no variant name, so the repeats read as identical lines. Show each once.
+        unique_problems = list(dict.fromkeys(problems))
+
+        items = "".join("<li style='margin-bottom:2px'>{0}</li>".format(problem) for problem in unique_problems)
+        blocks.append(
+            "<div style='margin-bottom:8px'><b>{0}</b>"
+            "<ul style='margin:4px 0 0 0; padding-left:18px'>{1}</ul></div>".format(site_name, items)
+        )
+
+    return "".join(blocks)
+
+def post_variant_validation(config, payload, site_name):
+    """Send one product's variants to one website; return what it objected to, in plain words.
+
+    An empty list means the site is happy — nothing is reported on success, since this runs on
+    every save and a confirmation each time would just be noise. The site's name is added by the
+    caller, which groups the problems per website.
+    """
+    try:
+        response = requests.post(
+            config.api_url,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + config.api_key
+            },
+            # This runs inside a save, so a slow site must not hold the user's form open.
+            timeout=10
+        )
+    except Exception as e:
+        frappe.log_error(
+            title="Variant validation request failed for {0}".format(site_name),
+            message=frappe.get_traceback()
+        )
+        return ["This website could not be reached, so its variants were not checked."]
+
+    if response.status_code != 200:
+        frappe.log_error(
+            title="Variant validation failed for {0}".format(site_name),
+            message="Status: {0}\nResponse: {1}".format(response.status_code, response.text)
+        )
+        return ["This website returned an error ({0}), so its variants were not checked.".format(response.status_code)]
+
+    try:
+        data = response.json() or {}
+    except ValueError:
+        frappe.log_error(
+            title="Variant validation returned invalid JSON for {0}".format(site_name),
+            message=response.text
+        )
+        return ["This website sent back a response we could not read, so its variants were not checked."]
+
+    if data.get("valid"):
+        return []
+
+    errors = data.get("errors") or []
+    if not errors:
+        return ["The variants were rejected, but no reason was given."]
+
+    messages = []
+    for error in errors:
+        # The Message is a full sentence already; the Code repeats it in shouting case.
+        message = error.get("Message") or error.get("message")
+        if not message:
+            message = "Rejected: {0}".format(error.get("Code") or error.get("code") or "no reason given")
+        messages.append(frappe.utils.escape_html(message))
+
+    return messages
