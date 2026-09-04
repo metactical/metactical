@@ -121,7 +121,7 @@ class CustomItem(Item):
             if merge:
                 if old_item.variant_of:
                     remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
-                    if remaining_variants == 0 or remaining_variants is None:
+                    if remaining_variants == 0 or remaining_variants is None:  
                         try:
                             frappe.db.delete("Item", old_item.variant_of)
                         except Exception as e:
@@ -130,11 +130,28 @@ class CustomItem(Item):
 
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
-        finally:
-            if not merge:
+        finally:    
+            repost_item_valuations = frappe.get_list("Repost Item Valuation", 
+                                                    filters={"item_code": new_item_code, "status": "Queued"}, 
+                                                    fields=["name", "warehouse"],
+                                                    order_by="creation desc"
+                                                )
+            if not repost_item_valuations:
                 return
 
-            self._repost_after_merge(new_item_code)
+            for repost_item_valuation in repost_item_valuations:
+                if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
+                    continue
+                
+                doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
+                try:
+                    doc.deduplicate_similar_repost()
+                    frappe.enqueue(repost, doc=doc, queue='long')
+                except Exception as e:
+                    frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
+                    
+            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
+            frappe.db.commit()
             
     def recalculate_bin_qty(self, new_name):
         """Override to use only_bin=True so repost_actual_qty (which hardcodes
