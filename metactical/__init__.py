@@ -11,6 +11,15 @@ try:
 except ImportError:
 	pass
 
+try:
+	import erpnext.stock.doctype.repost_item_valuation.repost_item_valuation as _riv
+	from metactical.custom_scripts.repost_item_valuation.repost_item_valuation import repost_entries
+	_riv._original_repost_entries = _riv.repost_entries
+	_riv.repost_entries = repost_entries
+except ImportError:
+	pass
+
+
 def check_app_permission():
 	import frappe
 	from frappe.utils.user import is_website_user
