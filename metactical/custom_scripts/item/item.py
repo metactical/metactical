@@ -136,6 +136,31 @@ class CustomItem(Item):
 
             self._repost_after_merge(new_item_code)
             
+    def recalculate_bin_qty(self, new_name):
+        """Override to use only_bin=True so repost_actual_qty (which hardcodes
+        posting_date=1900-01-01) is skipped. That avoids the period-closing
+        ValidationError. Actual item-valuation reposting is handled separately
+        by _repost_after_merge which respects the period-closing date."""
+        from erpnext.stock.stock_balance import repost_stock
+
+        existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
+        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
+
+        repost_stock_for_warehouses = frappe.get_all(
+            "Stock Ledger Entry",
+            "warehouse",
+            filters={"item_code": new_name},
+            pluck="warehouse",
+            distinct=True,
+        )
+
+        frappe.db.delete("Bin", {"item_code": new_name})
+
+        for warehouse in repost_stock_for_warehouses:
+            repost_stock(new_name, warehouse, only_bin=True)
+
+        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
+
     def _repost_after_merge(self, item_code):
         from frappe.utils import getdate
         from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import RepostItemValuation
