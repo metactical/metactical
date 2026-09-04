@@ -121,7 +121,7 @@ class CustomItem(Item):
             if merge:
                 if old_item.variant_of:
                     remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
-                    if remaining_variants == 0 or remaining_variants is None:
+                    if remaining_variants == 0 or remaining_variants is None:  
                         try:
                             frappe.db.delete("Item", old_item.variant_of)
                         except Exception as e:
@@ -130,12 +130,54 @@ class CustomItem(Item):
 
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
-        finally:
-            if not merge:
+        finally:    
+            repost_item_valuations = frappe.get_list("Repost Item Valuation", 
+                                                    filters={"item_code": new_item_code, "status": "Queued"}, 
+                                                    fields=["name", "warehouse"],
+                                                    order_by="creation desc"
+                                                )
+            if not repost_item_valuations:
                 return
 
-            self._repost_after_merge(new_item_code)
+            for repost_item_valuation in repost_item_valuations:
+                if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
+                    continue
+                
+                doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
+                try:
+                    doc.deduplicate_similar_repost()
+                    frappe.enqueue(repost, doc=doc, queue='long')
+                except Exception as e:
+                    frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
+                    
+            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
+            frappe.db.commit()
             
+    def recalculate_bin_qty(self, new_name):
+        """Override to use only_bin=True so repost_actual_qty (which hardcodes
+        posting_date=1900-01-01) is skipped. That avoids the period-closing
+        ValidationError. Actual item-valuation reposting is handled separately
+        by _repost_after_merge which respects the period-closing date."""
+        from erpnext.stock.stock_balance import repost_stock
+
+        existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
+        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
+
+        repost_stock_for_warehouses = frappe.get_all(
+            "Stock Ledger Entry",
+            "warehouse",
+            filters={"item_code": new_name},
+            pluck="warehouse",
+            distinct=True,
+        )
+
+        frappe.db.delete("Bin", {"item_code": new_name})
+
+        for warehouse in repost_stock_for_warehouses:
+            repost_stock(new_name, warehouse, only_bin=True)
+
+        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
+
     def _repost_after_merge(self, item_code):
         from frappe.utils import getdate
         from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import RepostItemValuation
