@@ -367,14 +367,22 @@ def sync_images_from_sb(item_code, user=None):
                 continue
 
             # nat_site is a Link to Lead Source, so a price list with no website behind it
-            # has nowhere to be recorded.
+            # has nowhere to be recorded. Lead Source Domain must be set: it is the same
+            # condition the uploader page picks its sites by (get_sites), so matching one
+            # without it would record a site the uploader can never show or reselect.
             lead_source = frappe.db.get_value(
-                "Lead Source", {"custom_neb_price_list": item_detail.price_list}, "name"
+                "Lead Source",
+                {
+                    "custom_neb_price_list": item_detail.price_list,
+                    "lead_source_domain": ["is", "set"],
+                },
+                "name",
             )
             if not lead_source:
                 messages.append(
-                    "<span class='text-warning'>No Lead Source is mapped to price list "
-                    "{0}</span>".format(frappe.utils.escape_html(str(item_detail.price_list)))
+                    "<span class='text-warning'>No Lead Source with a Lead Source Domain is "
+                    "mapped to price list {0}</span>".format(
+                        frappe.utils.escape_html(str(item_detail.price_list)))
                 )
                 continue
 
