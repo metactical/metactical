@@ -643,6 +643,14 @@ const templateItem = ref(null)            // resolved template Item name
 const templateVariants = ref([])          // [{ item_code, sku }] — the allowed variants
 const templateRef = ref(null)             // DOM node for the native Link control
 let templateControl = null
+
+// The item code applyTemplateFromItem is currently working on, claimed synchronously
+// before its first await. One pick fires the picker twice (see buildTemplateControl), and
+// `templateItem` is only set after that first await, so the handler's own guard cannot see
+// a load that has already started — both runs would load the same record into the same
+// grid and every card would be there twice. It doubles as the staleness marker: a run whose
+// code is no longer the claimed one has been superseded and stops.
+let templateRequest = null
 const ROLES = ['icon', 'small', 'medium', 'large']
 
 // One empty placeholder card for a (role, order) holding ALL the template's variants —
@@ -842,6 +850,13 @@ const loadRecordImages = async (recordName) => {
 // Resolve the picked Item to its template + variant set, then either load the
 // template's existing record (if one exists) or scaffold fresh upload slots.
 const applyTemplateFromItem = async (itemCode) => {
+  const code = itemCode || ''
+  if (code === templateRequest) return // second event of the same pick
+  templateRequest = code
+  // True once a later pick has claimed the picker: this run is for an item the user has
+  // already moved on from, so it must not touch the grid the newer run is building.
+  const isStale = () => templateRequest !== code
+
   if (!itemCode) {
     templateItem.value = null
     templateVariants.value = []
@@ -860,16 +875,19 @@ const applyTemplateFromItem = async (itemCode) => {
     templateVariants.value = []
     resetFiles()
     if (templateControl) templateControl.set_value('')
+    templateRequest = null // nothing was applied, so let the same item be picked again
     return
   }
 
   try {
     const res = await callBackend('get_item_family', { item_code: itemCode })
+    if (isStale()) return
     templateItem.value = (res && (res.template || itemCode)) || null
     templateVariants.value = (res && res.items) || []
   } catch (e) {
     console.error('Failed to resolve template:', e)
     frappe.show_alert({ message: `Failed to resolve ${itemCode}`, indicator: 'red' })
+    templateRequest = null // failed, so a retry on the same item is allowed
     return
   }
 
@@ -883,6 +901,7 @@ const applyTemplateFromItem = async (itemCode) => {
   } catch (e) {
     console.error('Failed to look up template record:', e)
   }
+  if (isStale()) return
 
   if (existing && existing.name) {
     isLoadingFromS3.value = true
@@ -905,6 +924,7 @@ const applyTemplateFromItem = async (itemCode) => {
     } catch (e) {
       console.error('Failed to check the old system:', e)
     }
+    if (isStale()) return
     const matches = (legacy && legacy.matches) || []
     if (matches.length === 0) {
       scaffoldAndNotify()
@@ -1619,9 +1639,11 @@ const clearAllFiles = () => {
   orderCount.value = 1
   appliedOrderCount.value = 1
 
-  // Clear the locked template + its picker.
+  // Clear the locked template + its picker. Releasing the claim too, so the same template
+  // can be picked again after a clear.
   templateItem.value = null
   templateVariants.value = []
+  templateRequest = null
   if (templateControl) templateControl.set_value('')
 }
 
@@ -2059,6 +2081,10 @@ const buildTemplateControl = () => {
     },
   })
   templateControl.refresh()
+  // Both events are needed — `awesomplete-selectcomplete` for a pick from the dropdown,
+  // `change` for a value typed and then blurred. One pick usually fires BOTH (the `change`
+  // when focus leaves the input), so applyTemplateFromItem has to be safe to call twice for
+  // the same item; the check below only catches the case where it has already finished.
   templateControl.$input.on('change awesomplete-selectcomplete', () => {
     setTimeout(() => {
       const val = templateControl.get_value() || ''
