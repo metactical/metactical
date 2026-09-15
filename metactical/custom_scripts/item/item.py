@@ -782,7 +782,7 @@ def preview_item_details(item_code, slug_price_list=None):
         frappe.response["message"] = f"Item {item_code} not found"
         frappe.response["status"] = "error"
         frappe.response["results"] = []
-        return
+        return 
 
     try:
         if isinstance(slug_price_list, str):
