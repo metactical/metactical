@@ -157,7 +157,7 @@ def receive_deletion_message(parsedContent):
                             **sync_kwargs,
                         )
 
-                # sync_s3_images(item_code, user=user)
+                sync_s3_images(item_code, user=user)
 
                 all_logs = frappe.get_all(
                     "Item Drop and Create Log",
