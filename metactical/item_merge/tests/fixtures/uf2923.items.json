@@ -1,0 +1,162 @@
+[
+ {
+  "name": "UF2923",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge",
+  "variant_of": null,
+  "has_variants": 1,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": null
+   },
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": null
+   }
+  ]
+ },
+ {
+  "name": "UF2923--0003",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge--0003",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "Small"
+   }
+  ]
+ },
+ {
+  "name": "UF2923--0004",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge--0004",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "Medium"
+   }
+  ]
+ },
+ {
+  "name": "UF2923--0005",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge--0005",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "Large"
+   }
+  ]
+ },
+ {
+  "name": "UF2923--0006",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge--0006",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "XLarge"
+   }
+  ]
+ },
+ {
+  "name": "UF2923--0007",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge--0007",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "2XLarge"
+   }
+  ]
+ },
+ {
+  "name": "UF2923--0008",
+  "item_name": "Ultra Force Murica US Flag T-Shirt - XXLarge--0008",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "3XLarge"
+   }
+  ]
+ },
+ {
+  "name": "UF2923-0001",
+  "item_name": "Murica US Flag T-Shirt - Small",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "1"
+   }
+  ]
+ },
+ {
+  "name": "UF2923-0002",
+  "item_name": "Murica US Flag T-Shirt - Medium",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "2"
+   }
+  ]
+ },
+ {
+  "name": "UF2923-0003",
+  "item_name": "Murica US Flag T-Shirt - Large",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "3"
+   }
+  ]
+ },
+ {
+  "name": "UF2923-0004",
+  "item_name": "Murica US Flag T-Shirt - XLarge",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "4"
+   }
+  ]
+ },
+ {
+  "name": "UF2923-0005",
+  "item_name": "Murica US Flag T-Shirt - XXLarge",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "5"
+   }
+  ]
+ },
+ {
+  "name": "UF2923-0006",
+  "item_name": "Murica US Flag T-Shirt - 3XLarge",
+  "variant_of": "UF2923",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "6"
+   }
+  ]
+ }
+]
