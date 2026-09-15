@@ -1,0 +1,114 @@
+[
+ {
+  "name": "GS1233-01",
+  "item_name": "Russian Camo Pants",
+  "variant_of": null,
+  "has_variants": 1,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "0"
+   },
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": null
+   }
+  ]
+ },
+ {
+  "name": "GS1233-0001",
+  "item_name": "Russian Camo Pants - Small",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "1"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-0002",
+  "item_name": "Russian Camo Pants - Medium",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "1"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-0003",
+  "item_name": "Russian Camo Pants - Large",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "1"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-0004",
+  "item_name": "Russian Camo Pants - XL",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Variant Number",
+    "attribute_value": "1"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-01--0003",
+  "item_name": "Russian Camo Pants--0003",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "Small"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-01--0004",
+  "item_name": "Russian Camo Pants--0004",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "Medium"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-01--0005",
+  "item_name": "Russian Camo Pants--0005",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "Large"
+   }
+  ]
+ },
+ {
+  "name": "GS1233-01--0006",
+  "item_name": "Russian Camo Pants--0006",
+  "variant_of": "GS1233-01",
+  "has_variants": 0,
+  "attributes": [
+   {
+    "attribute": "Size - Clothing - XS to 8XL",
+    "attribute_value": "XLarge"
+   }
+  ]
+ }
+]
