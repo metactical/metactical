@@ -788,6 +788,14 @@ def preview_item_details(item_code, slug_price_list=None):
         if isinstance(slug_price_list, str):
             slug_price_list = json.loads(slug_price_list) if slug_price_list else None
 
+        if slug_price_list:
+            for entry in slug_price_list:
+                if not entry.get("slug") or not entry.get("price_list"):
+                    frappe.response["message"] = "Each slug_price_list entry must have both slug and price_list"
+                    frappe.response["status"] = "error"
+                    frappe.response["results"] = []
+                    return
+
         item_detail_apis = frappe.get_all("Item Import Validation", filters={"parentfield": "item_detail_apis"}, fields=["*"])
 
         if slug_price_list:
