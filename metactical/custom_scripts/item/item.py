@@ -771,6 +771,110 @@ def get_item_details(item_code):
         frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
 
 
+@frappe.whitelist()
+def preview_item_details(item_code, slug_price_list=None):
+    """Fetch item details from the external APIs and return them without saving.
+
+    Uses the given slug_price_list overrides (a list of {"slug", "price_list"}) instead of the
+    item's saved Item Detail rows when provided.
+    """
+    if not frappe.db.exists("Item", item_code):
+        frappe.response["message"] = f"Item {item_code} not found"
+        frappe.response["status"] = "error"
+        frappe.response["results"] = []
+        return
+
+    try:
+        if isinstance(slug_price_list, str):
+            slug_price_list = json.loads(slug_price_list) if slug_price_list else None
+
+        if slug_price_list:
+            for entry in slug_price_list:
+                if not entry.get("slug") or not entry.get("price_list"):
+                    frappe.response["message"] = "Each slug_price_list entry must have both slug and price_list"
+                    frappe.response["status"] = "error"
+                    frappe.response["results"] = []
+                    return
+
+        item_detail_apis = frappe.get_all("Item Import Validation", filters={"parentfield": "item_detail_apis"}, fields=["*"])
+
+        if slug_price_list:
+            entries = slug_price_list
+        else:
+            item = frappe.get_doc("Item", item_code)
+            entries = [{"slug": d.slug, "price_list": d.price_list} for d in item.item_detail]
+
+        results = []
+
+        for entry in entries:
+            slug = entry.get("slug")
+            price_list = entry.get("price_list")
+            site_name = price_list.split("-")[-1].strip() if price_list else ""
+
+            setting_found = False
+            for item_detail_api in item_detail_apis:
+                if price_list == item_detail_api.price_list:
+                    setting_found = True
+                    url = item_detail_api.api_url + "?slug=" + slug
+
+                    headers = {
+                        "Authorization": "Bearer " + item_detail_api.api_key,
+                    }
+
+                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
+                    if custom_header:
+                        headers["X-Origin-Verify"] = custom_header
+
+                    response = requests.get(url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+
+                        if data.get("Found") == False:
+                            results.append({
+                                "slug": slug,
+                                "price_list": price_list,
+                                "message": f"<span class='text-danger'>Slug {slug} not found in {site_name}</span>"
+                            })
+                        elif "error" in data:
+                            results.append({
+                                "slug": slug,
+                                "price_list": price_list,
+                                "message": f"<span class='text-danger'>Error fetching details for slug {slug} from {site_name}: {data.get('error')}</span>"
+                            })
+                        else:
+                            results.append({
+                                "slug": slug,
+                                "price_list": price_list,
+                                "item_name": data.get("Name", ""),
+                                "description": data.get("Description", ""),
+                                "productmetasedescription": data.get("ProductMetaSEDescription", ""),
+                                "productmetasekeywords": data.get("ProductMetaSEKeywords", ""),
+                                "productmetasetitle": data.get("ProductMetaSETitle", ""),
+                                "h2": data.get("h2", ""),
+                                "h3": data.get("h3", ""),
+                                "message": f"<span class='text-success'>Successfully fetched details for slug {slug} from {site_name}</span>"
+                            })
+                    else:
+                        results.append({
+                            "slug": slug,
+                            "price_list": price_list,
+                            "message": "Failed to fetch details for slug {0} from API {1}. Status code: {2}".format(slug, item_detail_api.api_url, response.status_code)
+                        })
+
+            if not setting_found:
+                results.append({
+                    "slug": slug,
+                    "price_list": price_list,
+                    "message": "<span class='text-warning'>No API setting found for price list {0}</span>".format(price_list)
+                })
+
+        frappe.response["results"] = results
+        frappe.response["status"] = "success"
+    except Exception as e:
+        frappe.log_error(title="Error in preview_item_details API", message=frappe.get_traceback())
+        frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
+
+
 def validate_variants_in_websites(doc):
     """Ask every website this product is published to whether its variants are acceptable.
 
