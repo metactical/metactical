@@ -15,16 +15,55 @@ from metactical.item_merge import family, jobs, websites
 from metactical.item_merge.rules import UserError
 
 ROLES = ("System Manager", "Item Manager")
+# Kept in step with the roles on item_merge.json, which decide who can open the page. Those only
+# guard the desk route; every whitelisted method below is reachable by any logged-in user, so this
+# is the real check - and most reads use frappe.get_all, which applies no permissions of its own.
+ROLE_NEEDED = "Item Manager"
+
+# No outbound Webhook may fire while a family is half restructured: on the server, Item alone
+# carries three unconditional ones plus one on `doc.variant_of` - every variant save - and
+# Item Price, Pricing Rule, Item Merge History and Item Group carry more. in_import is the first
+# thing frappe's run_webhooks checks, so it returns before queueing anything. item_from_excel has
+# to be set with it: CustomItem.validate clears in_import unless that flag is on, which would let
+# every Item save through. The sites are updated once, deliberately, by the website steps at the
+# end of the job. frappe.flags proxies frappe.local.flags, which is thread-local, so a concurrent
+# request in this worker keeps its webhooks.
+WEBHOOK_FLAGS = ("in_import", "item_from_excel")
+
 
 
 @contextmanager
 def _api():
-	frappe.only_for(ROLES)
+	"""Role check, a readable message for anything the user can fix, and no outbound Webhooks.
+
+	The page restructures a catalogue in steps; pushing each half-finished step to the websites is
+	never wanted. They are brought back in step by the website slugs step at the end of the job."""
+	_require_roles()
+	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
+	for name in WEBHOOK_FLAGS:
+		frappe.local.flags[name] = True
 	try:
 		yield
 	except (UserError, websites.NotConfigured) as e:
 		frappe.db.rollback()
 		frappe.throw(str(e), title=_("Item Merge"))
+	finally:
+		for name, value in before.items():
+			frappe.local.flags[name] = value
+
+
+def _require_roles():
+	"""frappe.only_for raises a bare PermissionError, which reaches the browser as an empty dialog.
+	Say what is missing and who can grant it instead."""
+	try:
+		frappe.only_for(ROLES)
+	except frappe.PermissionError:
+		frappe.throw(
+			_("You need the {0} role to use Item Merge. Ask a System Manager to add it to your user.")
+			.format(frappe.bold(_(ROLE_NEEDED))),
+			frappe.PermissionError,
+			title=_("Item Merge"),
+		)
 
 
 def _list(value):
@@ -41,6 +80,20 @@ def _logger(lines):
 def search_templates(sku=None, name=None):
 	with _api():
 		return {"templates": family.search_templates(sku, name)}
+
+
+@frappe.whitelist()
+def template_code_options(txt=None, **kwargs):
+	"""Dropdown for the Template SKU box. Frappe's Autocomplete control posts `txt` and `query`."""
+	with _api():
+		return family.template_code_options(txt)
+
+
+@frappe.whitelist()
+def template_name_options(txt=None, **kwargs):
+	"""Dropdown for the Template name box."""
+	with _api():
+		return family.template_name_options(txt)
 
 
 @frappe.whitelist()

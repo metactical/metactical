@@ -160,8 +160,29 @@
         </table>
       </div>
 
+      <!-- the one problem typing can't solve: the generated code belongs to an old variant here -->
+      <div v-if="oldCodeClashes.length" class="im-note warn mt-3">
+        <b>{{ oldCodeClashes.length }} code(s) are still in use by this template's own old variants</b>
+        (<span class="font-mono">{{ oldCodeClashes.map((r) => r.item_code).join(', ') }}</span>).
+        The legacy <span class="font-mono">-0001</span> numbering overlaps the
+        {{ attributes[attributes.length - 1] }} abbreviations, so those codes only free up once the old
+        variants have been merged away. Either:
+        <ul class="mb-0 mt-1">
+          <li>create the rows that don't clash now, merge them, then come back for the rest; or</li>
+          <li>type a different code on those rows; or</li>
+          <li v-if="attributes.length === 1">go back and pick a second attribute - a
+            <span class="font-mono">TEMPLATE-colour-size</span> code can't clash with
+            <span class="font-mono">-0001</span>.</li>
+        </ul>
+      </div>
+
       <div class="flex items-center flex-wrap gap-2 mt-3">
-        <span v-if="problems.length" class="text-sm text-danger">{{ problems.length }} ticked row(s) need fixing before creating</span>
+        <template v-if="problems.length">
+          <span class="text-sm text-danger">{{ problems.length }} ticked row(s) need fixing before creating</span>
+          <button class="btn btn-default btn-xs" @click="untickProblemRows">
+            Untick {{ problems.length }} and create the rest
+          </button>
+        </template>
         <button class="btn btn-primary btn-sm ml-auto" :disabled="!toCreate.length || problems.length > 0 || creating" @click="create">
           {{ creating ? 'Creating…' : 'Create ' + toCreate.length + ' variant(s)' }}
         </button>
@@ -399,7 +420,8 @@ const toCreate = computed(() => rows.value.filter((r) => r.tick && !r.existing))
 const rowProblems = computed(() => {
   const counts = {}
   toCreate.value.forEach((r) => { const c = (r.item_code || '').trim(); counts[c] = (counts[c] || 0) + 1 })
-  const have = new Set(variants.value.map((v) => v.item_code))
+  // code -> is that variant already attribute-based, or still an old Variant Number one?
+  const have = new Map(variants.value.map((v) => [v.item_code, v.is_new]))
   const out = new Map()
   rows.value.forEach((r) => {
     let p = ''
@@ -408,8 +430,13 @@ const rowProblems = computed(() => {
       if (!code) p = 'Item code is empty'
       else if (BAD_CODE.test(code)) p = "Item code can't contain spaces or / \\ % # ?"
       else if (counts[code] > 1) p = 'Same item code as another row'
-      else if (have.has(code)) p = `${code} already exists under this template`
-      else if (!(r.item_name || '').trim()) p = 'Item name is empty'
+      // The legacy -0001… numbering overlaps the size abbreviations (0002…), so a one-attribute
+      // family can generate the code of an old variant that has not been merged away yet.
+      else if (have.has(code)) {
+        p = have.get(code)
+          ? `${code} already exists under this template`
+          : `${code} is still an old variant here`
+      } else if (!(r.item_name || '').trim()) p = 'Item name is empty'
     }
     out.set(r, p)
   })
@@ -421,6 +448,11 @@ const codeInvalid = (r) => {
   return p.startsWith('Item code') || p.startsWith('Same') || p.includes('already exists')
 }
 const problems = computed(() => toCreate.value.map(problemOf).filter(Boolean))
+const problemRows = computed(() => toCreate.value.filter((r) => problemOf(r)))
+// rows whose generated code is taken by an old variant of this very template - the one problem the
+// person can't solve by typing, because that code only frees up once the old variant is merged away
+const oldCodeClashes = computed(() => problemRows.value.filter((r) => problemOf(r).endsWith('is still an old variant here')))
+const untickProblemRows = () => problemRows.value.forEach((r) => { r.tick = false })
 
 // ---- bulk add modal ----
 const bulkOpen = ref(false)

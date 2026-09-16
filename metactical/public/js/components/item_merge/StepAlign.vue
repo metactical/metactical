@@ -203,6 +203,7 @@ const hints = ref({}) // old item_code -> why the server couldn't pair it
 
 function place(data) {
   tmpl.value = data.template
+  nameAliases.value = data.name_aliases || {}
   const l = []
   const r = []
   for (const row of data.rows) { l.push(row.old); r.push(row.new) }
@@ -240,6 +241,7 @@ async function refreshItems() {
   })
   data.unpaired_new.forEach((n) => { byCode[n.item_code] = n })
   tmpl.value = data.template
+  nameAliases.value = data.name_aliases || {}
   left.value = left.value.map((v) => v && (byCode[v.item_code] || v))
   right.value = right.value.map((v) => v && (byCode[v.item_code] || v))
 }
@@ -249,14 +251,13 @@ function settingsDiff(o, n) {
     .map(([k, label]) => ({ key: k, label, old: o[k], new: n[k] }))
 }
 
-const NAME_ALIAS = {
-  'Camo - Woodland': ['Woodland', 'Woodland Camo'], 'Camo - Black': ['Black Camo'],
-  'Camo - City/Urban': ['City Camo'], XLarge: ['XL'], '2XLarge': ['XXLarge', 'XXL', '2XL'],
-  '3XLarge': ['XXXLarge', 'XXXL', '3XL'], XSmall: ['XS'], Olive: ['OD', 'Olive Drab', 'Olive Drap'], 'Midnight Navy': ['Midnight Navy Blue'],
-}
+// {value: [other wordings]}, sent with the alignment. Keeping a copy here meant it drifted from the
+// tables the server pairs with - it had lost S, M, L and XXS, so every single-letter size raised a
+// "names differ" warning on a pair the server had matched perfectly well.
+const nameAliases = ref({})
 function nameHas(name, value) {
   const parts = String(name || '').split(' - ').map((s) => s.trim().toLowerCase())
-  return [value, ...(NAME_ALIAS[value] || [])].some((v) => parts.includes(String(v).toLowerCase()))
+  return [value, ...(nameAliases.value[value] || [])].some((v) => parts.includes(String(v).toLowerCase()))
 }
 
 const rows = computed(() => left.value.map((o, i) => {

@@ -25,6 +25,10 @@
           <button class="btn btn-default btn-sm" :disabled="!variants.length" @click="codesToSku">
             Set every item code to its retail SKU
           </button>
+          <button class="btn btn-default btn-sm" :disabled="!dashedCount" @click="collapseDashes"
+                  title="create_variant emits doubled dashes while Variant Number is still on the template; once the old variants are gone the codes can be cleaned up">
+            Collapse doubled dashes{{ dashedCount ? ' (' + dashedCount + ')' : '' }}
+          </button>
           <button class="btn btn-default btn-sm" :disabled="!changes.length" @click="resetAll">↺ Undo all edits</button>
           <span class="ml-auto text-sm text-muted tabular-nums">{{ changes.length }} changed · {{ renameCount }} rename(s)</span>
           <button class="btn btn-danger btn-sm" :disabled="!changes.length || problems.length > 0 || saving" @click="save">
@@ -200,6 +204,27 @@ function codesToSku() {
   variants.value.forEach((v) => {
     const sku = val(v, 'retail_sku').trim()
     if (sku) next[v.item_code] = { ...(next[v.item_code] || {}), new_code: sku }
+  })
+  edits.value = next
+}
+
+// RVX4183---001-0002 -> RVX4183-001-0002; same rule as pairing.clean_code on the server
+const cleanCode = (code) => String(code || '').replace(/-{2,}/g, '-')
+const dashedRows = computed(() => variants.value.filter((v) => {
+  const code = val(v, 'new_code').trim()
+  return code && cleanCode(code) !== code
+}))
+const dashedCount = computed(() => dashedRows.value.length)
+
+function collapseDashes() {
+  const next = { ...edits.value }
+  const taken = new Set(variants.value.map((v) => val(v, 'new_code').trim()))
+  dashedRows.value.forEach((v) => {
+    const clean = cleanCode(val(v, 'new_code').trim())
+    // a clean code already in use elsewhere in the family stays as it is, rather than colliding
+    if (taken.has(clean)) return
+    taken.add(clean)
+    next[v.item_code] = { ...(next[v.item_code] || {}), new_code: clean }
   })
   edits.value = next
 }

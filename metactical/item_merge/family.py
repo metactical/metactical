@@ -10,8 +10,8 @@ from collections import Counter
 
 import frappe
 
-from metactical.item_merge import rules
-from metactical.item_merge.pairing import VARIANT_NUMBER, plan_pairs
+from metactical.item_merge import catalogue, rules
+from metactical.item_merge.pairing import plan_pairs, variant_attribute
 from metactical.item_merge.rules import UserError
 
 ITEM_FIELDS = ["name", "item_name", "ifw_retailskusuffix", "variant_of", "is_stock_item", "stock_uom",
@@ -68,23 +68,28 @@ def load_template(template):
 
 
 def load_family(template):
+	"""(template doc, variant docs, stock, legacy attribute) - the legacy attribute read from the
+	template itself, so nothing downstream has to assume it is called "Variant Number"."""
 	tdoc = load_template(template)
 	codes = variant_codes(template)
 	docs = load_items(codes)
-	return tdoc, [docs[c] for c in codes if c in docs], load_stock(codes)
+	return tdoc, [docs[c] for c in codes if c in docs], load_stock(codes), variant_attribute(tdoc)
 
 
-def is_new(doc):
-	return any(a["attribute"] != VARIANT_NUMBER and a.get("attribute_value") for a in doc.get("attributes") or [])
+def is_new(doc, legacy=None):
+	"""Does this variant carry real attributes yet? `legacy` is the family's numeric attribute, read
+	off its template by load_family; without one, fall back to whatever this site calls it."""
+	legacy = legacy or catalogue.site_variant_attribute()
+	return any(a["attribute"] != legacy and a.get("attribute_value") for a in doc.get("attributes") or [])
 
 
-def variant_view(doc, stock):
+def variant_view(doc, stock, legacy=None):
 	s = stock.get(doc["name"], {})
 	return {
 		"item_code": doc["name"],
 		"item_name": doc.get("item_name"),
 		"retail_sku": doc.get("ifw_retailskusuffix"),
-		"is_new": is_new(doc),
+		"is_new": is_new(doc, legacy),
 		"attributes": {a["attribute"]: a.get("attribute_value") for a in doc.get("attributes") or []},
 		"qty": s.get("qty", 0),
 		"ledger_count": s.get("ledger", 0),
@@ -134,6 +139,24 @@ def template_group_fix(tdoc):
 					+ " - set the template's Item Group, then try again.")
 
 
+def save_template(doc):
+	"""Save a template WITHOUT pushing its field values down onto its variants.
+
+	ERPNext's Item.on_update runs update_variants(), which copies every field listed in Item Variant
+	Settings from the template onto each variant. On this site that list includes ifw_retailskusuffix,
+	supplier_items, neb_website_specifications, custom_neb_website_deduct_qty and item_detail - exactly
+	the per-variant data a merge exists to preserve. So a template save here (adding the attributes,
+	fixing the item group, dropping Variant Number, writing website slugs) would silently overwrite
+	every variant's retail SKU and child tables with the template's own.
+
+	dont_update_variants is ERPNext's own opt-out. This page always sets variant values explicitly, so
+	it never wants the template pushed down. It also stops the "Item Variants updated" msgprint.
+	"""
+	doc.flags.dont_update_variants = True
+	doc.save()
+	return doc
+
+
 def update_template(template, updates, log=None):
 	"""Save a template, fixing a group item_group on the way (logged)."""
 	log = log or (lambda m: None)
@@ -143,7 +166,7 @@ def update_template(template, updates, log=None):
 		log(f"template {template}: item_group is a group - set to {fix['item_group']}, the group its variants use")
 	for field, value in {**fix, **updates}.items():
 		doc.set(field, value)
-	doc.save()
+	save_template(doc)
 	return fix
 
 
@@ -170,6 +193,33 @@ def search_templates(sku=None, name=None, limit=SEARCH_LIMIT):
 	counts = variant_counts([r.name for r in rows])
 	return [{"item_code": r.name, "item_name": r.item_name, "item_group": r.item_group, "brand": r.brand,
 			 "disabled": bool(r.disabled), "variant_count": counts.get(r.name, 0)} for r in rows]
+
+
+AUTOCOMPLETE_LIMIT = 20
+
+
+def template_code_options(txt=None):
+	"""Template codes matching what has been typed, for the search box's dropdown.
+
+	The search boxes are Autocomplete, not Link, controls: a half-typed code like RVX418 has to
+	survive as a search term, which a Link would reject. These only offer what exists in Item."""
+	txt = (txt or "").strip()
+	filters = [["has_variants", "=", 1]]
+	if txt:
+		filters.append(["name", "like", f"%{txt}%"])
+	rows = frappe.get_list("Item", filters=filters, fields=["name", "item_name"], order_by="name asc",
+						   limit_page_length=AUTOCOMPLETE_LIMIT)
+	return [{"value": r.name, "label": r.name, "description": r.item_name or ""} for r in rows]
+
+
+def template_name_options(txt=None):
+	"""Template item names matching every word typed, deduplicated - one line per product name."""
+	txt = (txt or "").strip()
+	filters = [["has_variants", "=", 1], ["item_name", "is", "set"]]
+	filters += [["item_name", "like", f"%{w}%"] for w in txt.split()]
+	rows = frappe.get_list("Item", filters=filters, fields=["item_name"], group_by="item_name",
+						   order_by="item_name asc", limit_page_length=AUTOCOMPLETE_LIMIT)
+	return [{"value": r.item_name, "label": r.item_name} for r in rows if r.item_name]
 
 
 def variant_counts(templates):
@@ -285,12 +335,12 @@ def consolidate_templates(target, sources, rename_to=None, confirm_different_pro
 # ---------- step 2: attributes, combinations, new variants ----------
 
 def list_variants(template):
-	tdoc, docs, stock = load_family(template)
+	tdoc, docs, stock, legacy = load_family(template)
 	return {
 		"template": {"item_code": tdoc["name"], "item_name": tdoc.get("item_name"),
 					 "attributes": [a["attribute"] for a in tdoc.get("attributes") or []],
 					 "is_stock_item": bool(tdoc.get("is_stock_item")), "stock_uom": tdoc.get("stock_uom")},
-		"variants": [variant_view(d, stock) for d in docs],
+		"variants": [variant_view(d, stock, legacy) for d in docs],
 	}
 
 
@@ -313,13 +363,13 @@ def _attribute_tables(attrs):
 
 def suggest_combinations(template, attributes):
 	"""Combinations read from the old variants' names, ready for the variants grid."""
-	attrs = rules.check_attributes(attributes)
-	tdoc, docs, stock = load_family(template)
+	tdoc, docs, stock, legacy = load_family(template)
+	attrs = rules.check_attributes(attributes, legacy)
 	vals, allowed, abbr = _attribute_tables(attrs)
-	olds = [d for d in docs if not is_new(d)]
+	olds = [d for d in docs if not is_new(d, legacy)]
 	style = rules.style_name(tdoc, olds, allowed)
-	existing = {tuple((a, variant_view(d, stock)["attributes"].get(a)) for a in attrs): d["name"]
-				for d in docs if is_new(d)}
+	existing = {tuple((a, variant_view(d, stock, legacy)["attributes"].get(a)) for a in attrs): d["name"]
+				for d in docs if is_new(d, legacy)}
 
 	combos, unread = {}, []
 	for d in olds:
@@ -352,10 +402,10 @@ def suggest_combinations(template, attributes):
 			"unreadable": unread, "values": vals}
 
 
-def plan_variants(template, attrs, combinations, style_name, tdoc, docs, allowed, abbr):
+def plan_variants(template, attrs, combinations, style_name, tdoc, docs, allowed, abbr, legacy=None):
 	if not combinations:
 		raise UserError("Tick at least one combination to create")
-	olds = [d for d in docs if not is_new(d)]
+	olds = [d for d in docs if not is_new(d, legacy)]
 	style = (style_name or "").strip() or rules.style_name(tdoc, olds, allowed)
 	planned, seen = [], set()
 	for c in combinations:
@@ -387,13 +437,22 @@ def create_variants(template, attributes, combinations, style_name=None, dry_run
 	from erpnext.controllers.item_variant import create_variant
 
 	log = log or (lambda m: None)
-	attrs = rules.check_attributes(attributes)
-	tdoc, docs, stock = load_family(template)
+	tdoc, docs, stock, legacy = load_family(template)
+	attrs = rules.check_attributes(attributes, legacy)
 	_, allowed, abbr = _attribute_tables(attrs)
-	planned = plan_variants(template, attrs, combinations, style_name, tdoc, docs, allowed, abbr)
-	olds = [d for d in docs if not is_new(d)]
+	planned = plan_variants(template, attrs, combinations, style_name, tdoc, docs, allowed, abbr, legacy)
+	olds = [d for d in docs if not is_new(d, legacy)]
 	stock_item = 1 if any(d.get("is_stock_item") for d in olds) else int(tdoc.get("is_stock_item") or 0)
+	# The legacy -0001… numbering overlaps the size abbreviations, so a one-attribute family can
+	# generate the code of an old variant of this very template. Reporting that as "exists" would
+	# read as "already done" when nothing was created and the old variant is untouched.
+	old_codes = {d["name"] for d in olds}
 	for p in planned:
+		if p["item_code"] in old_codes:
+			p["status"] = "failed"
+			p["error"] = (f"{p['item_code']} is still an old variant of {template}. Its code only frees up once "
+						  f"that variant has been merged away - use another code, or create this one after the merge.")
+			continue
 		p["status"] = "exists" if exists(p["item_code"]) else "planned"
 	group_fix = template_group_fix(tdoc)  # raises with a clear message when it can't be fixed
 	if dry_run:
@@ -411,7 +470,7 @@ def create_variants(template, attributes, combinations, style_name=None, dry_run
 		frappe.db.commit()
 
 	for p in planned:
-		if p["status"] == "exists":
+		if p["status"] != "planned":  # already there, or ruled out above
 			continue
 		frappe.db.savepoint("item_merge_variant")
 		try:
@@ -420,7 +479,7 @@ def create_variants(template, attributes, combinations, style_name=None, dry_run
 			doc.item_name = p["item_name"]
 			doc.ifw_retailskusuffix = p["item_code"]
 			doc.is_stock_item = stock_item
-			doc.set("attributes", [a for a in doc.get("attributes") or [] if a.attribute != VARIANT_NUMBER])
+			doc.set("attributes", [a for a in doc.get("attributes") or [] if a.attribute != legacy])
 			doc.insert()
 			p["status"] = "created"
 			log(f"created {p['item_code']} {p['item_name']}")
@@ -442,7 +501,7 @@ def message_of(e):
 # ---------- step 3: line up old and new ----------
 
 def alignment(template):
-	tdoc, docs, stock = load_family(template)
+	tdoc, docs, stock, legacy = load_family(template)
 	empty = {c: s["ledger"] == 0 and s["qty"] == 0 for c, s in stock.items()}
 	plan = plan_pairs(tdoc, docs, empty)
 	by = {d["name"]: d for d in docs}
@@ -450,28 +509,30 @@ def alignment(template):
 	for p in plan["pairs"]:
 		old, new = by[p["old"]], by[p["new"]]
 		issues, fixes = rules.settings_diff(old, new, stock[p["new"]]["ledger"])
-		rows.append({"old": variant_view(old, stock), "new": variant_view(new, stock),
+		rows.append({"old": variant_view(old, stock, legacy), "new": variant_view(new, stock, legacy),
 					 "status": "blocked" if issues else ("fix" if fixes else "ready"), "issues": issues, "fixes": fixes})
 	for u in plan["unmatched"]:
-		rows.append({"old": variant_view(by[u["old"]], stock), "new": None,
+		rows.append({"old": variant_view(by[u["old"]], stock, legacy), "new": None,
 					 "status": "leftover" if u["empty"] else "unmatched", "issues": [u["reason"]], "fixes": {}})
 	for c in plan["conflicts"]:
 		for o in c["olds"]:
-			rows.append({"old": variant_view(by[o], stock), "new": None, "status": "unmatched",
+			rows.append({"old": variant_view(by[o], stock, legacy), "new": None, "status": "unmatched",
 						 "issues": [f"{len(c['olds'])} old variants resolve to {c['new']}; align by hand"], "fixes": {}})
 	for a in plan["ambiguous"]:
-		rows.append({"old": variant_view(by[a["old"]], stock), "new": None, "status": "unmatched",
+		rows.append({"old": variant_view(by[a["old"]], stock, legacy), "new": None, "status": "unmatched",
 					 "issues": [f"could match {', '.join(a['candidates'])}; align by hand"], "fixes": {}})
 	return {"template": {"item_code": tdoc["name"], "item_name": tdoc.get("item_name"),
 						 "attributes": [a["attribute"] for a in tdoc.get("attributes") or []]},
-			"rows": rows, "unpaired_new": [variant_view(by[n], stock) for n in plan["unused_new"]],
-			"attribute_roles": {"colour": plan["colour_attribute"], "size": plan["size_attribute"]}}
+			"rows": rows, "unpaired_new": [variant_view(by[n], stock, legacy) for n in plan["unused_new"]],
+			"attribute_roles": {"colour": plan["colour_attribute"], "size": plan["size_attribute"]},
+			# so the screen's "names differ" check reads the same wordings the pairing did
+			"name_aliases": rules.alias_map()}
 
 
 def check_plan(template, pairs, leftovers=None):
 	"""Validate the pairs as lined up by hand. Nothing is written."""
 	leftovers = list(dict.fromkeys(leftovers or []))
-	tdoc, docs, stock = load_family(template)
+	tdoc, docs, stock, legacy = load_family(template)
 	by = {d["name"]: d for d in docs}
 	problems, rows = [], []
 	olds = [p.get("old") for p in pairs]
@@ -488,9 +549,9 @@ def check_plan(template, pairs, leftovers=None):
 		if n not in by:
 			problems.append(f"{n} is not a variant of {template}")
 			continue
-		if is_new(by[o]):
+		if is_new(by[o], legacy):
 			problems.append(f"{o} already uses real attributes - it is not an old variant")
-		if not is_new(by[n]):
+		if not is_new(by[n], legacy):
 			problems.append(f"{n} is a Variant Number item - merge into an attribute variant")
 		issues, fixes = rules.settings_diff(by[o], by[n], stock[n]["ledger"])
 		rows.append({"old": o, "new": n, "issues": issues, "fixes": fixes})

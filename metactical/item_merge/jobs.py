@@ -13,12 +13,22 @@ from frappe.utils import now_datetime, time_diff_in_seconds
 
 from metactical.item_merge import family, merge, rules, websites
 from metactical.item_merge.family import exists, message_of
-from metactical.item_merge.pairing import VARIANT_NUMBER
+from metactical.item_merge.pairing import variant_attribute
 from metactical.item_merge.rules import UserError
 
 DOCTYPE = "Item Merge Job"
 PROGRESS_EVENT = "item_merge_progress"
 ACTIVE = ("Queued", "Running")
+
+# No outbound Webhook may fire while a family is half restructured: on the server, Item alone
+# carries three unconditional ones plus one on `doc.variant_of` - every variant save - and
+# Item Price, Pricing Rule, Item Merge History and Item Group carry more. in_import is the first
+# thing frappe's run_webhooks checks, so it returns before queueing anything. item_from_excel has
+# to be set with it: CustomItem.validate clears in_import unless that flag is on, which would let
+# every Item save through. The sites are updated once, deliberately, by the website steps at the
+# end of the job. frappe.flags proxies frappe.local.flags, which is thread-local, so a concurrent
+# request in this worker keeps its webhooks.
+WEBHOOK_FLAGS = ("in_import", "item_from_excel")
 LOG_LINES = 400
 
 
@@ -121,13 +131,20 @@ def run_job(merge_job):
 		return
 	_set(job, status="Running", started_on=job.started_on or now_datetime(), error=None)
 	log = JobLog(job)
+	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
+	for name in WEBHOOK_FLAGS:
+		frappe.local.flags[name] = True
 	try:
+		log("website webhooks held back for this job - the sites are updated once, at the end")
 		(run_changes if job.job_type == "Item Changes" else run_merge)(job, log)
 	except Exception as e:  # surfaced on the job rather than lost in the worker log
 		frappe.db.rollback()
 		frappe.log_error(title=f"Item Merge Job {job_name}", message=frappe.get_traceback())
 		log(f"ERROR {message_of(e)}")
 		_set(job, status="Failed", finished_on=now_datetime(), error=message_of(e)[:1000])
+	finally:
+		for name, value in before.items():
+			frappe.local.flags[name] = value
 
 
 def run_merge(job, log):
@@ -181,19 +198,22 @@ def run_merge(job, log):
 
 
 def _drop_variant_number(job, template, log):
+	"""Drop the legacy numeric attribute this family hangs off, once nothing still uses it. Which
+	attribute that is comes from the template itself, not from a constant."""
 	tdoc = frappe.get_doc("Item", template).as_dict()
-	if not any(a.get("attribute") == VARIANT_NUMBER for a in tdoc.get("attributes") or []):
+	legacy = variant_attribute(tdoc)
+	step = f"Remove {legacy} from template"
+	if not any(a.get("attribute") == legacy for a in tdoc.get("attributes") or []):
 		return
 	docs = family.load_items(family.variant_codes(template))
-	vn_only = sorted(c for c, d in docs.items() if not family.is_new(d))
+	vn_only = sorted(c for c, d in docs.items() if not family.is_new(d, legacy))
 	if vn_only:
-		_step(job, "Remove Variant Number from template", "skipped",
-			  f"{len(vn_only)} Variant Number variant(s) still under the template: {vn_only[:4]}")
+		_step(job, step, "skipped", f"{len(vn_only)} {legacy} variant(s) still under the template: {vn_only[:4]}")
 		return
-	family.update_template(template, {"attributes": family.template_attribute_rows(tdoc, drop=VARIANT_NUMBER)}, log)
+	family.update_template(template, {"attributes": family.template_attribute_rows(tdoc, drop=legacy)}, log)
 	frappe.db.commit()
-	log(f"template {template}: removed {VARIANT_NUMBER}")
-	_step(job, "Remove Variant Number from template", "done")
+	log(f"template {template}: removed {legacy}")
+	_step(job, step, "done")
 
 
 def _delete_leftovers(job, log):

@@ -232,7 +232,7 @@
           </div>
           <div v-if="web && web.load_data_from_sb" class="text-xs text-muted mt-2">Load Data From SB: {{ loadDataText }}</div>
           <div v-if="web && web.filled_gaps && web.filled_gaps.length" class="text-xs text-muted mt-1">
-            Name and description filled from the Storebuilder product API for: {{ web.filled_gaps.join(', ') }}
+            Name and description filled for: {{ web.filled_gaps.join(', ') }}
           </div>
         </div>
         <div class="mt-4">
