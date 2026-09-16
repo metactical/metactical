@@ -23,11 +23,24 @@ CHILD_TABLES = {
 CHILD_PARENT = {child: (parent, field) for parent, tables in CHILD_TABLES.items() for field, child in tables.items()}
 
 
+def FAKE_RUN_WEBHOOKS(doc, method):
+	"""Dispatch through whatever frappe.model.document.run_webhooks currently is, so a wrapper
+	installed over it - no_webhooks.suppressed() - really does stop the push."""
+	module = sys.modules.get("frappe.model.document")
+	if module:
+		module.run_webhooks(doc, method)
+
+
 class _dict(dict):
 	def __getattr__(self, key):
 		try:
 			return self[key]
 		except KeyError:
+			# A missing dunder must raise, exactly as frappe's own _dict does. Returning None for
+			# __getstate__ makes copy.deepcopy call None on Python < 3.11 (object.__getstate__ only
+			# exists from 3.11), which is what the bench runs.
+			if key.startswith("__"):
+				raise AttributeError(key) from None
 			return None
 
 	def __setattr__(self, key, value):
@@ -46,8 +59,32 @@ class LinkExistsError(ValidationError):
 	pass
 
 
+class PermissionError(Exception):
+	"""frappe.only_for raises this bare, with no message - which is the point of _require_roles."""
+
+
+class TimestampMismatchError(ValidationError):
+	"""Raised by a real save when the row changed underneath it - here, when the rename hook is
+	still writing to the item merge.py is trying to finish off."""
+
+
+class QueryDeadlockError(Exception):
+	"""MariaDB's 1213, which the same race shows up as under load."""
+
+
 class Doc(_dict):
 	"""A document: fields plus child tables (lists of Doc)."""
+
+	@property
+	def flags(self):
+		"""The flags bag every real document carries. Kept off the dict itself so it never leaks
+		into as_dict() or a snapshot."""
+		try:
+			return object.__getattribute__(self, "_flags")
+		except AttributeError:
+			bag = _dict()
+			object.__setattr__(self, "_flags", bag)
+			return bag
 
 	def as_dict(self):
 		return _dict({k: ([_dict(c) for c in v] if isinstance(v, list) else v) for k, v in self.items()})
@@ -96,6 +133,7 @@ class Doc(_dict):
 		self._assign()
 		FRAPPE.hooks_validate(self)
 		FRAPPE.db_rows(dt)[self["name"]] = copy.deepcopy(self)
+		FAKE_RUN_WEBHOOKS(self, "after_insert")
 		return self
 
 	def save(self, ignore_permissions=False):
@@ -103,6 +141,8 @@ class Doc(_dict):
 		FRAPPE.hooks_validate(self)
 		FRAPPE.saves.append((self["doctype"], self["name"]))
 		FRAPPE.db_rows(self["doctype"])[self["name"]] = copy.deepcopy(self)
+		FRAPPE.push_template_fields_to_variants(self)
+		FAKE_RUN_WEBHOOKS(self, "on_update")
 		return self
 
 	def reload(self):
@@ -121,6 +161,9 @@ class FakeFrappe(types.ModuleType):
 	_fake = True
 	ValidationError = ValidationError
 	LinkExistsError = LinkExistsError
+	PermissionError = PermissionError
+	TimestampMismatchError = TimestampMismatchError
+	QueryDeadlockError = QueryDeadlockError
 	_dict = _dict
 
 	def __init__(self):
@@ -132,7 +175,13 @@ class FakeFrappe(types.ModuleType):
 		self.DB = {}
 		self._counters = {}
 		self.session = _dict(user="merge@example.com")
+		self.roles = ["System Manager", "Item Manager"]  # what the page needs; tests narrow it
+		# real frappe hangs per-request state here, and frappe.flags IS frappe.local.flags - the same
+		# bag, which is what catalogue.py memoises on and no_webhooks flips
+		self.flags = _dict()
+		self.local = _dict(flags=self.flags)
 		self.comments, self.enqueued, self.published, self.saves, self.errors = [], [], [], [], []
+		self.webhooks_fired = []  # (doctype, name, method) the real frappe would have pushed
 		self.defaults = {"Item Merge Job": {"log": "", "steps": "[]"}}
 		self.fail_save = {}  # (doctype, name) -> message, raised by save/insert
 		self.clock = datetime.datetime(2026, 9, 15, 9, 0, 0)
@@ -155,6 +204,19 @@ class FakeFrappe(types.ModuleType):
 		msg = self.fail_save.get((doc["doctype"], doc["name"]))
 		if msg:
 			raise ValidationError(msg)
+
+	# Item Variant Settings on this site lists ifw_retailskusuffix (among ~120 fields), so ERPNext's
+	# Item.on_update -> update_variants() copies the template's value onto every variant on each save.
+	# Modelled here because it silently destroys exactly the per-variant data a merge preserves.
+	VARIANT_PUSH_FIELDS = ("ifw_retailskusuffix",)
+
+	def push_template_fields_to_variants(self, doc):
+		if doc.get("doctype") != "Item" or not doc.get("has_variants") or doc.flags.dont_update_variants:
+			return
+		for row in self.db_rows("Item").values():
+			if row.get("variant_of") == doc["name"]:
+				for field in self.VARIANT_PUSH_FIELDS:
+					row[field] = doc.get(field)
 
 	# ---------- documents ----------
 	def get_doc(self, doctype, name=None):
@@ -307,7 +369,21 @@ class FakeFrappe(types.ModuleType):
 	def throw(self, msg, exc=ValidationError, title=None):
 		raise exc(msg)
 
-	def only_for(self, roles):
+	def get_roles(self, user=None):
+		return self.roles
+
+	def bold(self, text):
+		return text
+
+	def only_for(self, roles, message=False):
+		"""Matches frappe: Administrator is exempt, otherwise a bare PermissionError."""
+		if self.session.user == "Administrator":
+			return
+		if set(roles if isinstance(roles, (list, tuple)) else [roles]).isdisjoint(self.roles):
+			raise PermissionError
+		return self._only_for_original(roles)
+
+	def _only_for_original(self, roles):
 		return None
 
 	def parse_json(self, value):
@@ -372,6 +448,19 @@ def install():
 	global FRAPPE
 	FRAPPE = FakeFrappe()
 	FRAPPE.db = FakeDB(FRAPPE)
+
+	model = types.ModuleType("frappe.model")
+	document = types.ModuleType("frappe.model.document")
+
+	def run_webhooks(doc, method):
+		"""What frappe calls after every doc event; the real one queues the outbound Webhooks."""
+		FRAPPE.webhooks_fired.append((doc.get("doctype"), doc.get("name"), method))
+
+	document.run_webhooks = run_webhooks
+	model.document = document
+	FRAPPE.model = model
+	sys.modules["frappe.model"] = model
+	sys.modules["frappe.model.document"] = document
 
 	utils = types.ModuleType("frappe.utils")
 	utils.now_datetime = FRAPPE.now

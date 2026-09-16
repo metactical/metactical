@@ -20,17 +20,26 @@ export const alertWarn = (message) => frappe.show_alert({ message, indicator: 'o
 // danger: the primary button is red (frappe.warn), for merges, renames and deletes.
 export const confirmAction = ({ title, message, label = __('Continue'), danger = false }) =>
   new Promise((resolve) => {
+    // Decide BEFORE hiding, and only once. onhide is what catches a dismissal (Esc, the X, the
+    // backdrop), but hide() triggers it too - and whether that lands before or after the line under
+    // it depends on the modal's fade transition. Settling first makes the answer not depend on that.
+    let settled = false
+    const settle = (value) => {
+      if (settled) return
+      settled = true
+      resolve(value)
+    }
     const html = `<div style="white-space:pre-line">${frappe.utils.escape_html(message)}</div>`
     const d = new frappe.ui.Dialog({
       title,
       fields: [{ fieldtype: 'HTML', fieldname: 'message', options: html }],
       primary_action_label: label,
-      primary_action: () => { d.hide(); resolve(true) },
+      primary_action: () => { settle(true); d.hide() },
       secondary_action_label: __('Cancel'),
-      secondary_action: () => { d.hide(); resolve(false) },
+      secondary_action: () => { settle(false); d.hide() },
     })
     if (danger) d.get_primary_btn().removeClass('btn-primary').addClass('btn-danger')
-    d.onhide = () => resolve(false)
+    d.onhide = () => settle(false)
     d.show()
   })
 
@@ -80,5 +89,38 @@ export function makeLink(parent, { options, placeholder, filters, onPick, value 
   return {
     control,
     set(v) { last = v || ''; control.set_value(v || '') },
+  }
+}
+
+// A native Frappe Autocomplete mounted into a DOM node, fed by a whitelisted method that takes `txt`.
+//
+// Used where the value must be offered from ERP but does not have to BE one of the offers: the
+// template search boxes take half a code ("RVX418") or a couple of words, which a Link control
+// would refuse and blank out on blur. onInput(value) fires on every keystroke and on a pick.
+export function makeAutocomplete(parent, { query, placeholder, value, onInput, onPick }) {
+  parent.innerHTML = ''
+  const control = frappe.ui.form.make_control({
+    parent,
+    render_input: true,
+    df: {
+      fieldtype: 'Autocomplete',
+      placeholder,
+      ignore_validation: true, // a partial search term is a valid thing to type here
+      get_query: () => ({ query }),
+    },
+  })
+  control.refresh()
+  if (value) control.set_value(value)
+  // Awesomplete highlights the first suggestion by default, so Enter would replace a deliberate
+  // partial term with a full code. Leave nothing highlighted until the user arrows onto it.
+  if (control.awesomplete) control.awesomplete.autoFirst = false
+  const report = () => onInput?.(control.$input.val() || '')
+  control.$input.on('input change awesomplete-selectcomplete', () => setTimeout(report, 0))
+  // a pick from the dropdown is a decision, not just typing: it can act straight away
+  control.$input.on('awesomplete-selectcomplete', () => setTimeout(() => onPick?.(control.$input.val() || ''), 0))
+  return {
+    control,
+    set(v) { control.set_value(v || '') },
+    value: () => control.$input.val() || '',
   }
 }

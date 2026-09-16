@@ -10,14 +10,22 @@ rows, website specs and item defaults from the old item, Item Price clean-up, It
 fields, the merge history row and the stock reposts.
 """
 import json
+import time
 
 import frappe
 
-from metactical.item_merge import rules
+from metactical.item_merge import catalogue, rules
 from metactical.item_merge.family import exists, message_of
 
-DEDUCT_LEAD = "Website - Camo"
 MERGE_SPACING_S = 1.5  # measured: zero repost deadlocks across ~800 reposts at this spacing
+# The rename hook keeps working on the new item after rename_doc returns: it commits as it goes and
+# enqueues the reposts. Saving the follow-ups straight away races it, which MariaDB reports as a
+# deadlock and Frappe as "Document has been modified after you have opened it". The stand-alone app
+# waited for the hook's Item Merge History row before touching the item; in-process the equivalent
+# is to re-read the item and try again.
+FOLLOW_UP_ATTEMPTS = 6
+FOLLOW_UP_BACKOFF_S = 0.75
+CONTENDED = (frappe.TimestampMismatchError, frappe.QueryDeadlockError)
 
 
 def bins(code):
@@ -30,6 +38,68 @@ def qty(rows):
 
 def ledger_count(code):
 	return frappe.db.count("Stock Ledger Entry", {"item_code": code, "is_cancelled": 0})
+
+
+def _plan_follow_ups(after, od, pair, fix_names, sku, specs_before):
+	"""Everything the merge leaves for us to set on the new item, applied to a freshly read doc.
+	Returns the labels of what changed and how many duplicate supplier rows were dropped."""
+	changed = []
+	# a pair can carry the exact name / retail SKU chosen on the align screen
+	want_name = (pair.get("item_name") or "").strip() or (od.item_name if fix_names else None)
+	if want_name and after.item_name != want_name:
+		after.item_name = want_name
+		changed.append("name")
+	want_sku = (pair.get("retail_sku") or "").strip() or (after.name if sku == "code" else None)
+	if want_sku and after.get("ifw_retailskusuffix") != want_sku:
+		after.ifw_retailskusuffix = want_sku
+		changed.append("retail sku")
+	suppliers = after.get("supplier_items") or []
+	kept = rules.dedupe_suppliers([r.as_dict() for r in suppliers])
+	removed = len(suppliers) - len(kept)
+	if removed:
+		keep_names = {r["name"] for r in kept}
+		after.set("supplier_items", [r for r in suppliers if r.name in keep_names])
+		changed.append("suppliers")
+	if not after.get("neb_website_specifications") and specs_before:
+		# the hook replaces the new item's specs with the old item's, even when the old had none
+		for r in specs_before:
+			after.append("neb_website_specifications", r)
+		changed.append("website specs")
+	# Which sites need a deduct row is read from ERPNext, not assumed: the Lead Source of each price
+	# list the family actually sells on. It used to be the literal "Website - Camo" on every item,
+	# which is a Link - so on a site without that record every single pair failed.
+	have = {r.lead_source for r in after.get("custom_neb_website_deduct_qty") or []}
+	for lead_source in catalogue.deduct_lead_sources(after.name, after.variant_of):
+		if lead_source in have:
+			continue
+		# qty 0 is the house default; a non-zero buffer is a deliberate per-product decision made later
+		after.append("custom_neb_website_deduct_qty", {"lead_source": lead_source, "qty": 0})
+		changed.append(f"deduct row ({lead_source})")
+	return changed, removed
+
+
+def _apply_follow_ups(new, od, pair, fix_names, sku, specs_before, log):
+	"""Save the follow-ups, standing out of the rename hook's way.
+
+	The hook is still writing to this item when rename_doc returns, so a save can lose a race with
+	it. Each attempt re-reads the item, so a retry applies to whatever the hook has left behind
+	rather than overwriting it from a stale copy."""
+	for attempt in range(1, FOLLOW_UP_ATTEMPTS + 1):
+		after = frappe.get_doc("Item", new)
+		changed, removed = _plan_follow_ups(after, od, pair, fix_names, sku, specs_before)
+		if not changed:
+			return after, changed, removed
+		try:
+			after.save()
+			frappe.db.commit()
+			return after, changed, removed
+		except CONTENDED as e:
+			frappe.db.rollback()
+			if attempt == FOLLOW_UP_ATTEMPTS:
+				raise
+			log(f"    {new}: the rename hook still holds the item ({type(e).__name__}) - "
+				f"retry {attempt}/{FOLLOW_UP_ATTEMPTS - 1}")
+			time.sleep(FOLLOW_UP_BACKOFF_S * attempt)
 
 
 def merge_pair(pair, log, fix_names=True, sku="keep"):
@@ -66,35 +136,7 @@ def merge_pair(pair, log, fix_names=True, sku="keep"):
 		log(f"FAIL {old}: ledger rows still on the old code")
 		return "failed", {**details, "message": "stock ledger rows are still on the old code"}
 
-	after = frappe.get_doc("Item", new)
-	changed = []
-	# a pair can carry the exact name / retail SKU chosen on the align screen
-	want_name = (pair.get("item_name") or "").strip() or (od.item_name if fix_names else None)
-	if want_name and after.item_name != want_name:
-		after.item_name = want_name
-		changed.append("name")
-	want_sku = (pair.get("retail_sku") or "").strip() or (new if sku == "code" else None)
-	if want_sku and after.get("ifw_retailskusuffix") != want_sku:
-		after.ifw_retailskusuffix = want_sku
-		changed.append("retail sku")
-	suppliers = after.get("supplier_items") or []
-	kept = rules.dedupe_suppliers([r.as_dict() for r in suppliers])
-	removed = len(suppliers) - len(kept)
-	if removed:
-		keep_names = {r["name"] for r in kept}
-		after.set("supplier_items", [r for r in suppliers if r.name in keep_names])
-		changed.append("suppliers")
-	if not after.get("neb_website_specifications") and specs_before:
-		# the hook replaces the new item's specs with the old item's, even when the old had none
-		for r in specs_before:
-			after.append("neb_website_specifications", r)
-		changed.append("website specs")
-	if not any(r.lead_source == DEDUCT_LEAD for r in after.get("custom_neb_website_deduct_qty") or []):
-		# qty 0 is the house default; a non-zero buffer is a deliberate per-product decision made later
-		after.append("custom_neb_website_deduct_qty", {"lead_source": DEDUCT_LEAD, "qty": 0})
-		changed.append("deduct row")
-	if changed:
-		after.save()
+	after, changed, removed = _apply_follow_ups(new, od, pair, fix_names, sku, specs_before, log)
 
 	if not frappe.db.exists("Item Merge History", {"old_item_code": old}):
 		frappe.get_doc({"doctype": "Item Merge History", "old_item_code": old, "new_item_code": new,
