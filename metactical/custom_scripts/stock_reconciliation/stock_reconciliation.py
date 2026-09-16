@@ -20,7 +20,25 @@ class CustomStockReconciliation(StockReconciliation):
 	# 		queue_action(self, "submit", timeout=2000)
 	# 	else:
 			# super().save()
-   
+
+	def validate(self):
+		super(CustomStockReconciliation, self).validate()
+		# Metactical Customization: Validate that user has permission to reconcile stock against warehouse.
+		# Uses Nested Set lft/rgt so group warehouses cover all descendants without expanding them.
+		from metactical.metactical.doctype.warehouse_user_permissions.warehouse_user_permissions import (
+			get_setting_name, has_permitted_warehouses, is_warehouse_permitted,
+		)
+		user = frappe.session.user
+		setting_name = get_setting_name(user)
+		if not setting_name or not has_permitted_warehouses(setting_name, "cycle_count_warehouse"):
+			return
+
+		for item in self.items:
+			if item.warehouse and not is_warehouse_permitted(item.warehouse, setting_name, "cycle_count_warehouse"):
+				frappe.throw(
+					"Warehouse {} not in list of warehouses allowed for user {}".format(item.warehouse, user)
+				)
+
 	def on_submit(self):
 		super(CustomStockReconciliation, self).on_submit()
 		
