@@ -62,18 +62,32 @@ def build_code(template, attrs, values, abbr):
 	return "-".join([template] + parts)
 
 
-def check_attributes(attrs):
+def check_attributes(attrs, legacy=VARIANT_NUMBER):
+	"""`legacy` is the family's own numeric attribute, read from its template - never a guess."""
 	attrs = [a for a in (attrs or []) if a]
 	if not 1 <= len(attrs) <= 2:
 		raise UserError("Choose one or two item attributes")
 	if len(set(attrs)) != len(attrs):
 		raise UserError("Choose two different attributes")
-	if VARIANT_NUMBER in attrs:
-		raise UserError("Variant Number is the attribute being replaced")
+	if legacy in attrs:
+		raise UserError(f"{legacy} is the attribute being replaced")
 	return attrs
 
 
 # ---------- reading attribute values out of old item names ----------
+
+def alias_map():
+	"""{attribute value: [other wordings that mean it]} - the alias tables inverted.
+
+	The align screen needs this to tell whether an old item's name really mentions the new variant's
+	values ("... - L" does mean Large). It is sent with the alignment rather than kept as a second
+	copy in the Vue component: the copy there had drifted and no longer knew S, M, L or XXS, so every
+	single-letter size raised a spurious "names differ" warning."""
+	out = {}
+	for alias, value in {**SIZE_ALIASES, **COLOUR_ALIASES}.items():
+		out.setdefault(value, []).append(alias)
+	return {value: sorted(aliases) for value, aliases in out.items()}
+
 
 def role_aliases(attribute):
 	if re.search(r"colou?r", attribute, re.I):

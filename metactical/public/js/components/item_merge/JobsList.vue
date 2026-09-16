@@ -3,8 +3,9 @@
     <h3 class="im-card-title">Merge jobs</h3>
     <p class="im-lede">Every merge and item-change job run from this page. Search by template to check on a family.</p>
     <form class="flex items-center gap-2" @submit.prevent="load">
-      <input v-model="q" class="form-control font-mono" style="max-width: 420px" placeholder="Template SKU" aria-label="Template SKU" />
+      <div ref="pickerEl" class="im-link-control" style="flex: 1; max-width: 420px"></div>
       <button type="submit" class="btn btn-default btn-sm" :disabled="loading">{{ loading ? 'Loading…' : 'Search' }}</button>
+      <button v-if="q" type="button" class="btn btn-default btn-sm" @click="clearFilter">Clear</button>
       <a class="btn btn-default btn-sm ml-auto" href="/app/item-merge-job">Open the job list</a>
     </form>
     <div v-if="!loading && !jobs.length" class="im-empty">{{ q ? 'No jobs for ' + q : 'No merge jobs yet.' }}</div>
@@ -32,21 +33,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { itemMergeApi, PROGRESS_EVENT } from './api.js'
-import { fmtDateTime, pillClass } from './utils.js'
+import { fmtDateTime, makeLink, pillClass } from './utils.js'
 
 const emit = defineEmits(['open'])
 
 const q = ref('')
 const jobs = ref([])
 const loading = ref(false)
+const pickerEl = ref(null)
+let picker = null
 let timer = null
 
 async function load() {
   loading.value = true
   try {
-    jobs.value = (await itemMergeApi.listJobs(q.value.trim())).jobs
+    jobs.value = (await itemMergeApi.listJobs((q.value || '').trim())).jobs
   } catch (e) {
     // Frappe has shown the reason
   } finally {
@@ -64,7 +67,22 @@ const onProgress = (data) => {
   pending = setTimeout(load, 500)
 }
 
+function clearFilter() {
+  q.value = ''
+  picker?.set('')
+  load()
+}
+
 onMounted(() => {
+  nextTick(() => {
+    // the template filter is a real Link on Item, so it only ever offers templates that exist
+    picker = makeLink(pickerEl.value, {
+      options: 'Item',
+      filters: { has_variants: 1 },
+      placeholder: 'Any template',
+      onPick: (v) => { q.value = v || ''; load() },
+    })
+  })
   load()
   frappe.realtime.on(PROGRESS_EVENT, onProgress)
 })

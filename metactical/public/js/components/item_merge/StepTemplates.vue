@@ -4,23 +4,23 @@
     <section class="im-card">
       <h3 class="im-card-title">Find templates</h3>
       <p class="im-lede">
-        Search by template SKU, template name, or both. Part of a code works (<span class="font-mono">RVX418</span> finds every
-        RavenX 418x template); every word of the name must appear, in any order (<i>fleece vest</i>).
+        Search by template SKU, template name, or both. Both boxes suggest from the templates that exist - pick one
+        and it searches straight away - and part of a value still works: <span class="font-mono">RVX418</span> finds
+        every RavenX 418x template, and every word of the name must appear, in any order (<i>fleece vest</i>).
       </p>
       <form class="flex flex-wrap items-end gap-2" @submit.prevent="search">
         <div style="flex: 1; min-width: 200px">
           <label class="control-label-sm block">Template SKU</label>
-          <input v-model="sku" class="form-control font-mono" placeholder="e.g. RVX4184" autofocus aria-label="Template SKU" />
+          <div ref="skuEl" class="im-link-control font-mono"></div>
         </div>
         <div style="flex: 1.4; min-width: 240px">
           <label class="control-label-sm block">Template name</label>
-          <input v-model="name" class="form-control" placeholder="e.g. fleece vest" aria-label="Template name" />
+          <div ref="nameEl" class="im-link-control"></div>
         </div>
         <button type="submit" class="btn btn-primary btn-sm" :disabled="loading || (!sku.trim() && !name.trim())">
           {{ loading ? 'Searching…' : 'Search' }}
         </button>
       </form>
-
       <div v-if="searched" class="mt-4">
         <div v-if="!results.length" class="im-empty">No templates match <b>{{ searchedFor }}</b>.</div>
         <template v-else>
@@ -120,9 +120,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { itemMergeApi } from './api.js'
-import { alertOk, confirmAction } from './utils.js'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { itemMergeApi, TEMPLATE_CODE_QUERY, TEMPLATE_NAME_QUERY } from './api.js'
+import { alertOk, confirmAction, makeAutocomplete } from './utils.js'
 
 const emit = defineEmits(['chosen'])
 
@@ -136,6 +136,31 @@ const selected = ref([])
 const survivor = ref(null)
 const renameTo = ref('')
 const busy = ref(false)
+
+// ---- the two search boxes, both native Frappe Autocompletes fed from Item ----
+// Autocomplete rather than Link: they suggest what exists, but a partial term ("RVX418") is a valid
+// search here and a Link would reject it and blank the box on blur. Picking a suggestion searches
+// immediately, which is how you get to one known template in a single action.
+const skuEl = ref(null)
+const nameEl = ref(null)
+let skuBox = null
+let nameBox = null
+
+onMounted(() => nextTick(() => {
+  skuBox = makeAutocomplete(skuEl.value, {
+    query: TEMPLATE_CODE_QUERY,
+    placeholder: 'e.g. RVX4184',
+    onInput: (v) => { sku.value = v },
+    onPick: (v) => { sku.value = v; search() },
+  })
+  nameBox = makeAutocomplete(nameEl.value, {
+    query: TEMPLATE_NAME_QUERY,
+    placeholder: 'e.g. fleece vest',
+    onInput: (v) => { name.value = v },
+    onPick: (v) => { name.value = v; search() },
+  })
+  skuBox.control.$input.trigger('focus')
+}))
 
 // ---- results table ----
 const sortKey = ref('item_code')
@@ -156,6 +181,10 @@ const baseCode = computed(() => {
 })
 
 async function search() {
+  // read straight off the controls: a pick made with the mouse lands here before Vue's watcher runs
+  sku.value = skuBox?.value() ?? sku.value
+  name.value = nameBox?.value() ?? name.value
+  if (!sku.value.trim() && !name.value.trim()) return
   loading.value = true
   try {
     results.value = (await itemMergeApi.searchTemplates(sku.value.trim(), name.value.trim())).templates
@@ -245,8 +274,10 @@ async function consolidate() {
 }
 
 function refresh() {
+
   if (searched.value) search()
 }
+
 
 defineExpose({ refresh })
 </script>

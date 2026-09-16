@@ -9,6 +9,9 @@ abbreviations `0002..0007`, so suffix matching silently moves stock to the wrong
 """
 import re
 
+# The conventional name of the legacy numeric attribute. Only a fallback: the attribute a given
+# family actually uses is read off its own template (variant_attribute below), and the site-wide
+# answer comes from ERPNext via catalogue.variant_attribute().
 VARIANT_NUMBER = "Variant Number"
 
 # item_name wording -> Item Attribute value. Extend as new families surface new wording.
@@ -30,23 +33,35 @@ SUFFIX_COLOUR = {
 }
 
 
-def real_attributes(doc):
-	"""{attribute: value} for every non-Variant-Number attribute that has a value."""
+def variant_attribute(template_doc):
+	"""The legacy attribute this family hangs off: the numeric one on its own template.
+
+	Read from the document rather than assumed, so a family that uses a differently named numeric
+	attribute still works. Falls back to the conventional name when the template says nothing."""
+	for a in template_doc.get("attributes") or []:
+		if a.get("numeric_values") and a.get("attribute"):
+			return a["attribute"]
+	return VARIANT_NUMBER
+
+
+def real_attributes(doc, legacy=VARIANT_NUMBER):
+	"""{attribute: value} for every attribute that has a value and is not the legacy one."""
 	return {a["attribute"]: a["attribute_value"]
 			for a in doc.get("attributes") or []
-			if a.get("attribute") != VARIANT_NUMBER and a.get("attribute_value")}
+			if a.get("attribute") != legacy and a.get("attribute_value")}
 
 
-def is_new(doc):
-	return bool(real_attributes(doc))
+def is_new(doc, legacy=VARIANT_NUMBER):
+	return bool(real_attributes(doc, legacy))
 
 
 def attribute_roles(template_doc):
 	"""Which template attribute is the colour and which is the size (either may be None)."""
+	legacy = variant_attribute(template_doc)
 	colour = size = None
 	for a in template_doc.get("attributes") or []:
 		name = a.get("attribute") or ""
-		if name == VARIANT_NUMBER:
+		if name == legacy:
 			continue
 		if colour is None and re.search(r"colou?r", name, re.I):
 			colour = name
@@ -88,12 +103,13 @@ def plan_pairs(template_doc, variants, emptiness=None):
 	Returns a dict describing pairs and everything that could not be paired safely.
 	"""
 	emptiness = emptiness or {}
+	legacy = variant_attribute(template_doc)
 	colour_attr, size_attr = attribute_roles(template_doc)
-	news = [v for v in variants if is_new(v)]
-	olds = [v for v in variants if not is_new(v)]
+	news = [v for v in variants if is_new(v, legacy)]
+	olds = [v for v in variants if not is_new(v, legacy)]
 
-	allowed_size = {real_attributes(n).get(size_attr) for n in news} - {None}
-	allowed_colour = {real_attributes(n).get(colour_attr) for n in news} - {None}
+	allowed_size = {real_attributes(n, legacy).get(size_attr) for n in news} - {None}
+	allowed_colour = {real_attributes(n, legacy).get(colour_attr) for n in news} - {None}
 
 	pairs, unmatched, ambiguous = [], [], []
 	for o in olds:
@@ -122,8 +138,8 @@ def plan_pairs(template_doc, variants, emptiness=None):
 			continue
 
 		cands = [n for n in news
-				 if (not size_attr or real_attributes(n).get(size_attr) == size)
-				 and (not colour_attr or real_attributes(n).get(colour_attr) == colour)]
+				 if (not size_attr or real_attributes(n, legacy).get(size_attr) == size)
+				 and (not colour_attr or real_attributes(n, legacy).get(colour_attr) == colour)]
 		if len(cands) == 1:
 			pairs.append({"old": o["name"], "new": cands[0]["name"], "old_name": o.get("item_name"),
 						  "size": size, "colour": colour, "empty": bool(emptiness.get(o["name"]))})
