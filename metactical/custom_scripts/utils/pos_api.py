@@ -1165,7 +1165,7 @@ def get_item_from_barcode(barcode, branch):
     item = frappe.db.sql(f"""
         SELECT 
             tabItem.name, item_name, ifw_retailskusuffix,
-            brand, image, is_stock_item
+            brand, image, is_stock_item, item_group
         FROM `tabItem Barcode` ib Join `tabItem` on ib.parent=tabItem.name
         WHERE 
             `tabItem`.disabled = 0
@@ -1185,7 +1185,7 @@ def get_item_from_barcode(barcode, branch):
         frappe.response["Sku"] = item.name
         frappe.response["ItemName"] = item.item_name
         frappe.response["RetailSku"] = item.ifw_retailskusuffix
-        frappe.response["Categories"] = []
+        frappe.response["Categories"] = [item.item_group] if item.item_group else []  # POS pricing rules match "Item Group" rules on this
         frappe.response["Comment"] = ""
         frappe.response["ImageUrl"] = item.image if item.image else ""
         frappe.response["Brand"] = item.brand if item.brand else ""
@@ -1705,7 +1705,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
         SELECT
             tabItem.name AS item_code, item_name, ifw_retailskusuffix, ifw_discontinued,
             variant_of, asi_item_class, ifw_location,
-            brand, image, is_stock_item, tabItem.has_variants,
+            brand, image, is_stock_item, tabItem.has_variants, item_group,
             (
                 SELECT GROUP_CONCAT(barcode SEPARATOR ', ')
                 FROM `tabItem Barcode`
@@ -1845,7 +1845,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
             "ItemName": item.item_name,
             "RetailSku": item.ifw_retailskusuffix,
             "Discontinued": True if item.ifw_discontinued else False,
-            "Categories": [],
+            "Categories": [item.item_group] if item.item_group else [],
             "Comment": "",
             "ItemClass": item.asi_item_class or "",
             "Location": item.ifw_location or "",
@@ -1916,7 +1916,7 @@ def get_item_by_retail_sku_single(retail_sku, branch):
     item = frappe.db.sql(f"""
         SELECT 
             tabItem.name, item_name, ifw_retailskusuffix,
-            brand, image, is_stock_item
+            brand, image, is_stock_item, item_group
         FROM `tabItem`
         WHERE 
             `tabItem`.disabled = 0
@@ -1937,7 +1937,7 @@ def get_item_by_retail_sku_single(retail_sku, branch):
         frappe.response["Sku"] = item.name
         frappe.response["ItemName"] = item.item_name
         frappe.response["RetailSku"] = item.ifw_retailskusuffix
-        frappe.response["Categories"] = []
+        frappe.response["Categories"] = [item.item_group] if item.item_group else []
         frappe.response["Comment"] = ""
         frappe.response["ImageUrl"] = item.image if item.image else ""
         frappe.response["Brand"] = item.brand if item.brand else ""
