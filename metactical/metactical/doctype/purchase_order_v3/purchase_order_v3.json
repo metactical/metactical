@@ -21,6 +21,7 @@
   "approval_tier",
   "sec_shipto",
   "set_warehouse",
+  "shipping_address",
   "ship_to_display",
   "cb_shipto",
   "sender_email_account",
@@ -102,7 +103,7 @@
    "reqd": 1
   },
   {
-   "description": "The PO cancel date. Lines not fulfilled by then are candidates for backorder cancellation.",
+   "description": "The PO cancel date, printed on the order the supplier receives. Lines not fulfilled by then are candidates for backorder cancellation. Optional while the order is a draft; required before it can be sent for approval.",
    "fieldname": "required_by",
    "fieldtype": "Date",
    "label": "Required By (Cancel Date)"
@@ -158,9 +159,16 @@
    "reqd": 1
   },
   {
+   "description": "The address printed on the order and sent to the supplier. Left blank it is filled from the supplier's default ship-to, or failing that from an address attached to the Ship To Warehouse. Set it here if this one order goes somewhere else.",
+   "fieldname": "shipping_address",
+   "fieldtype": "Link",
+   "label": "Ship To Address",
+   "options": "Address"
+  },
+  {
    "fieldname": "ship_to_display",
    "fieldtype": "Small Text",
-   "label": "Ship To Address",
+   "label": "Ship To",
    "read_only": 1
   },
   {
@@ -272,6 +280,7 @@
    "fieldname": "sent_method",
    "fieldtype": "Select",
    "label": "Sent Method",
+   "no_copy": 1,
    "options": "\nEmail\nPhone\nPortal\nEDI\nOther"
   },
   {
@@ -338,6 +347,7 @@
    "fieldtype": "Check",
    "hidden": 1,
    "label": "Manually Reopened",
+   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -506,6 +516,7 @@
    "write": 1
   },
   {
+   "amend": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -519,6 +530,7 @@
    "write": 1
   },
   {
+   "amend": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -532,6 +544,7 @@
    "write": 1
   },
   {
+   "amend": 1,
    "create": 1,
    "delete": 1,
    "email": 1,

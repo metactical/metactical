@@ -9,13 +9,21 @@ from frappe.model.document import Document
 
 from metactical.procurement_v3.utils import (
 	F,
+	billable_qty,
 	mirror_po3_status,
 	v3_may_close_native,
 	v3_open_bo,
+	v3_recalc_totals,
 )
 
 
 class PurchaseOrderV3(Document):
+	# Not before_insert: insert() validates links -- and so rejects the
+	# cancelled twin an amendment carries -- before that hook ever runs.
+	def insert(self, *args, **kwargs):
+		reset_amended_state(self)
+		return super().insert(*args, **kwargs)
+
 	def before_insert(self):
 		shared_series_naming(self)
 
@@ -39,6 +47,79 @@ class PurchaseOrderV3(Document):
 
 
 # ---------------------------------------------------------------------------
+# Amending a cancelled order.
+#
+# Cancelling is final in Frappe - docstatus 2 is a dead end, and this workflow
+# has no transition out of Cancelled either. Amend is the way back: it opens a
+# fresh draft carrying the old order's supplier, lines and prices.
+#
+# The catch is that Amend deliberately ignores no_copy
+# (frappe/public/js/frappe/model/create_new.js: `!from_amend && df.no_copy`),
+# so the new draft arrives holding the CANCELLED order's workflow state, its
+# native twin, and every line's confirmed / shipped / received progress. Left
+# alone the insert dies on the first check it reaches -- "Cannot link cancelled
+# document: ERP Purchase Order" out of _validate_links -- and even with that
+# field empty it would die again in validate_workflow, on "Workflow State
+# transition not allowed from Draft to Cancelled".
+#
+# That first check is also why this runs from insert() rather than from a
+# before_insert hook: _validate_links goes first, ahead of every hook.
+#
+# So: put every no_copy field back to what a brand new order looks like. The
+# no_copy flags already say which fields those are, so nothing has to be listed
+# twice and a field added later is covered for free.
+#
+# Three survive on purpose:
+#   amended_from            - the link to what this replaces; the point of it
+#   material_request(_item) - cancelling the twin released those requests, and
+#                             this order is fulfilling the same ones, so the
+#                             link has to carry through for per_ordered to add
+#                             up again
+# ---------------------------------------------------------------------------
+AMEND_KEEP = ("amended_from", "material_request", "material_request_item")
+
+NUMERIC_FIELDTYPES = ("Int", "Float", "Currency", "Percent", "Check")
+
+
+def reset_amended_state(doc):
+	if not doc.get("amended_from"):
+		return
+
+	def fresh(d):
+		for df in d.meta.fields:
+			if not df.no_copy or df.fieldname in AMEND_KEEP:
+				continue
+			if df.fieldtype in NUMERIC_FIELDTYPES:
+				d.set(df.fieldname, F(df.default) if df.default else 0)
+			else:
+				d.set(df.fieldname, df.default or None)
+
+	fresh(doc)
+	for d in doc.items:
+		fresh(d)
+
+	# workflow_state is a Custom Field the Workflow creates with no_copy set, so
+	# the sweep above already cleared it - but it is the one field that MUST be
+	# right for the insert to survive validate_workflow, and it is not part of
+	# this doctype's own definition. Blank it explicitly rather than trust that.
+	# Empty is enough: validate_workflow then reads it as the workflow's first
+	# state (Draft) instead of comparing it against one.
+	doc.workflow_state = None
+
+
+def po_ship_date(doc):
+	"""The native PO's schedule_date -- its "Reqd by Date", printed as Ship Date.
+
+	The order date, i.e. as soon as the supplier can send it. ERPNext makes the
+	field mandatory (validate_schedule_date throws "Please enter Reqd by Date"
+	on a blank one) and will not accept a date before the transaction date, so
+	the order date is both the earliest legal value and the honest one: we are
+	not asking the supplier to wait, we are asking them to ship.
+	"""
+	return doc.order_date or frappe.utils.nowdate()
+
+
+# ---------------------------------------------------------------------------
 # Migrated from Server Script "PO3 Shared Series Naming"
 # (DocType Event / Before Insert on Purchase Order V3).
 #
@@ -48,21 +129,55 @@ class PurchaseOrderV3(Document):
 # ---------------------------------------------------------------------------
 def shared_series_naming(doc):
 	if not (doc.name and doc.name.startswith("PO3-")):
+		# before_insert runs ahead of validate, so the ship-to has to be worked
+		# out here too - otherwise the twin is born with a blank shipping_address
+		# and ERPNext has already filled in a company address by the time the
+		# buyer looks at it. Quietly: validate is a moment away and will warn.
+		resolve_ship_to(doc, warn=False)
+		resolve_currency(doc)
 		npo = frappe.new_doc("Purchase Order")
 		npo.supplier = doc.supplier
 		npo.company = doc.company
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
-		npo.schedule_date = doc.required_by
+		# PO3 has one date field, and it is a CANCEL date -- the point after which
+		# unfilled lines get dropped. It belongs in ais_cancel_date, which is what the
+		# print format's Cancel Date box reads and which nothing was filling, so that
+		# box came out blank on every order.
+		#
+		# schedule_date is a different promise: ERPNext's "Reqd by Date", printed as
+		# SHIP DATE. Feeding the cancel date into it told suppliers to ship by a
+		# deadline we never asked for -- and leaving it empty was worse, because
+		# get_item_details then invented one from the item's lead_time_days (order date
+		# + 14, say) and printed that. We want the goods as soon as the supplier can
+		# send them, so it is the order date: ship now.
+		#
+		# It has to be set on the LINES, not just here. validate_schedule_date
+		# overwrites the header with min(line schedule_date), so a header date alone
+		# would be replaced by whatever lead time the items carry.
+		npo.schedule_date = po_ship_date(doc)
+		npo.ais_cancel_date = doc.required_by
 		npo.currency = doc.currency
 		npo.conversion_rate = F(doc.conversion_rate) or 1
 		npo.buying_price_list = doc.buying_price_list
 		npo.set_warehouse = doc.set_warehouse
+		# Set before the save: BuyingController.set_missing_values only fills a
+		# BLANK shipping_address, so putting one here is what stops ERPNext
+		# reaching for an arbitrary company address.
+		#
+		# Guarded, because pushing a blank would be worse than leaving it alone:
+		# with nothing to resolve, someone may have corrected the address on the
+		# twin by hand, and that correction has to survive the next sync.
+		if doc.shipping_address:
+			npo.shipping_address = doc.shipping_address
+		if doc.notes_to_supplier:
+			npo.drop_ship_notes = doc.notes_to_supplier
 		for d in doc.items:
 			r = npo.append("items", {})
 			r.item_code = d.item_code
 			r.qty = F(d.qty) or 1
 			r.rate = F(d.rate)
-			r.schedule_date = d.required_by or doc.required_by
+			# see the note by schedule_date above: ship now, not on a lead-time guess
+			r.schedule_date = po_ship_date(doc)
 			r.warehouse = d.warehouse or doc.set_warehouse
 			# carry the request through: ERPNext marks a Material Request
 			# as ordered off the NATIVE PO, not off the PO3
@@ -83,6 +198,40 @@ def shared_series_naming(doc):
 # totals, derives the approval tier, fills the supplier contact + ship-to
 # defaults, and mirrors the workflow state onto the native PO twin.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Required By is optional while an order is being put together, and required the
+# moment it leaves Draft.
+#
+# A buyer starting an order does not always know the cancel date yet, so the
+# field is not mandatory on the doctype -- a half-built draft should never be
+# blocked from saving. But by the time it reaches an approver it has to be
+# there: it is what the supplier's Cancel Date is printed from, and what decides
+# which lines are candidates for backorder cancellation once it passes.
+#
+# Checked on the TRANSITION rather than on the state, so pressing "Submit for
+# Approval" is what asks for it. Orders already sitting in Pending Approval from
+# before this rule are left alone -- they can still be saved and approved,
+# rather than being trapped by a rule that did not exist when they were sent up.
+# ---------------------------------------------------------------------------
+def require_cancel_date(doc):
+	if doc.required_by:
+		return
+
+	now = doc.workflow_state or "Draft"
+	if now == "Draft":
+		return
+	was = (frappe.db.get_value(doc.doctype, doc.name, "workflow_state")
+		if not doc.is_new() else None) or "Draft"
+	if now == was:
+		return
+
+	frappe.throw("<b>Required By (Cancel Date) is required.</b><br><br>"
+		"Set it before sending this order for approval: it is the date printed "
+		"on the order as the supplier's Cancel Date, and the date unfilled lines "
+		"are measured against when deciding what to cancel.",
+		title="Required By (Cancel Date) is required")
+
+
 def mirror_status_now(erp_po, state):
 	# Before Save: the new state is only on the in-memory doc, not yet in the DB
 	if erp_po:
@@ -91,36 +240,18 @@ def mirror_status_now(erp_po, state):
 
 
 def validate(doc):
-	company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
+	require_cancel_date(doc)
 
-	# On new docs Frappe pre-fills Buying Settings' default price list and the
-	# company currency BEFORE validate runs - do not mistake those for a user's
-	# choice. The supplier's own defaults win; no supplier default = leave blank
-	# so the mandatory check forces a manual pick.
-	if doc.is_new() and doc.supplier:
-		sup = frappe.db.get_value("Supplier", doc.supplier,
-			["default_price_list", "default_currency"], as_dict=True) or {}
-		global_pl = frappe.db.get_single_value("Buying Settings", "buying_price_list")
-		if not doc.buying_price_list or doc.buying_price_list == global_pl:
-			doc.buying_price_list = supplier_buying_price_list(doc.supplier)
-		if sup.default_currency and (not doc.currency or doc.currency == company_currency):
-			doc.currency = sup.default_currency
-	if not doc.currency:
-		doc.currency = company_currency
-	if doc.currency and doc.currency != company_currency and F(doc.conversion_rate) in (0.0, 1.0):
-		rate = frappe.db.get_value("Currency Exchange",
-			{"from_currency": doc.currency, "to_currency": company_currency},
-			"exchange_rate", order_by="date desc")
-		if not rate:
-			try:
-				rate = frappe.call("erpnext.setup.utils.get_exchange_rate",
-					from_currency=doc.currency, to_currency=company_currency)
-			except Exception:
-				rate = None
-		if rate:
-			doc.conversion_rate = rate
-	if F(doc.conversion_rate) == 0:
-		doc.conversion_rate = 1
+	resolve_currency(doc)
+
+	# Changing the Ship To Warehouse has to take the lines with it. Filling only
+	# the blank ones left lines created under the old warehouse pointing at it,
+	# which meant goods were received into a warehouse nobody chose -- and
+	# because ERPNext blanks a parent set_warehouse whose lines disagree, the
+	# native PO came out with no Set Target Warehouse at all. Matches what
+	# ERPNext itself does on this field (autofill_warehouse rewrites every row).
+	moved_warehouse = bool(doc.set_warehouse) and not doc.is_new() and (
+		doc.set_warehouse != frappe.db.get_value(doc.doctype, doc.name, "set_warehouse"))
 
 	total_qty = 0.0
 	total = 0.0
@@ -131,10 +262,13 @@ def validate(doc):
 				"price_list_rate", order_by="valid_from desc")
 			if price:
 				d.rate = price
-		d.amount = F(d.qty) * F(d.rate)
-		total_qty += F(d.qty)
+		# a line the supplier will never fill is worth nothing to this order, so
+		# it drops out of the totals - see billable_qty
+		billable = billable_qty(d.qty, d.short_qty)
+		d.amount = billable * F(d.rate)
+		total_qty += billable
 		total += d.amount
-		if not d.warehouse:
+		if not d.warehouse or moved_warehouse:
 			d.warehouse = doc.set_warehouse
 		if not d.required_by:
 			d.required_by = doc.required_by
@@ -173,12 +307,7 @@ def validate(doc):
 
 	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
 
-	if doc.set_warehouse:
-		w = frappe.db.get_value("Warehouse", doc.set_warehouse,
-			["warehouse_name", "address_line_1", "address_line_2", "city", "state", "pin"], as_dict=True)
-		if w:
-			parts = [w.warehouse_name, w.address_line_1, w.address_line_2, w.city, w.state, w.pin]
-			doc.ship_to_display = ", ".join([p for p in parts if p])
+	resolve_ship_to(doc)
 
 	if not doc.ack_expected:
 		doc.confirmation_status = "Not Requested"
@@ -186,6 +315,174 @@ def validate(doc):
 		doc.confirmation_status = "Awaiting"
 
 	mirror_status_now(doc.erp_purchase_order, doc.workflow_state or "Draft")
+
+
+# ---------------------------------------------------------------------------
+# Currency, price list and the FX rate behind base_grand_total.
+#
+# Lifted out of validate so the twin can be built with the right numbers.
+# before_insert runs first, and a twin created before this has run is stamped
+# with conversion_rate 1.0 whatever the order is actually priced in -- so a
+# draft native PO for a USD order showed CAD-sized base amounts until approval
+# quietly corrected them.
+#
+# Only ever fills in what has not been decided: re-running it is a no-op.
+# ---------------------------------------------------------------------------
+def resolve_currency(doc):
+	company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
+
+	# On new docs Frappe pre-fills Buying Settings' default price list and the
+	# company currency BEFORE validate runs - do not mistake those for a user's
+	# choice. The supplier's own defaults win; no supplier default = leave blank
+	# so the mandatory check forces a manual pick.
+	if doc.is_new() and doc.supplier:
+		sup = frappe.db.get_value("Supplier", doc.supplier,
+			["default_price_list", "default_currency"], as_dict=True) or {}
+		global_pl = frappe.db.get_single_value("Buying Settings", "buying_price_list")
+		if not doc.buying_price_list or doc.buying_price_list == global_pl:
+			doc.buying_price_list = supplier_buying_price_list(doc.supplier)
+		if sup.default_currency and (not doc.currency or doc.currency == company_currency):
+			doc.currency = sup.default_currency
+	if not doc.currency:
+		doc.currency = company_currency
+	if doc.currency and doc.currency != company_currency and F(doc.conversion_rate) in (0.0, 1.0):
+		rate = frappe.db.get_value("Currency Exchange",
+			{"from_currency": doc.currency, "to_currency": company_currency},
+			"exchange_rate", order_by="date desc")
+		if not rate:
+			try:
+				rate = frappe.call("erpnext.setup.utils.get_exchange_rate",
+					from_currency=doc.currency, to_currency=company_currency)
+			except Exception:
+				rate = None
+		if rate:
+			doc.conversion_rate = rate
+	if F(doc.conversion_rate) == 0:
+		doc.conversion_rate = 1
+
+
+# ---------------------------------------------------------------------------
+# Where the order actually ships to.
+#
+# The native Purchase Order prints `shipping_address` -- a Link to an Address
+# doc -- and PO3 never set it, so ERPNext filled it in on its own. Its fallback
+# chain ends at get_company_address(): the first Address linked to the company,
+# ordered by is_primary_address, LIMIT 1. With several company addresses and no
+# clear primary, that tie is broken by whatever the database feels like, which
+# is how orders bound for the warehouse came out printed to Downtown Store or
+# to Camo VIC.
+#
+# The old native form never hit that path. A client wrapper
+# (custom_scripts/purchase_order/purchase_order.js) rerouted get_party_details
+# to metactical's own, which set shipping_address from the supplier's
+# nat_shipping_address. PO3 builds its twin server-side, where no browser code
+# runs, so the supplier default was silently dropped.
+#
+# Resolved here instead, and only ever to fill a blank -- an address the buyer
+# picked on this order is never overwritten:
+#
+#   1. the supplier's default ship-to (nat_shipping_address)
+#   2. an Address attached to the Ship To Warehouse
+#
+# The supplier goes first, and deliberately so. Ship To Warehouse says which
+# stock bucket the goods land in; it is not always where the supplier sends the
+# box. Evike ships to the FTN consolidator while the stock belongs to W01-WHS,
+# and that is exactly what nat_shipping_address records. Letting a warehouse
+# address outrank it would quietly reroute those orders the first time anyone
+# attached an Address to a warehouse.
+#
+# Nothing resolved leaves the field blank and says so out loud, because ERPNext
+# will then reach for that arbitrary company address again and a wrong ship-to
+# is expensive to discover after the fact.
+# ---------------------------------------------------------------------------
+def warehouse_ship_to_address(warehouse):
+	"""The Address attached to a Warehouse, preferring one flagged as shipping."""
+	if not warehouse:
+		return None
+	from frappe.contacts.doctype.address.address import get_default_address
+
+	return get_default_address("Warehouse", warehouse, "is_shipping_address")
+
+
+def resolve_ship_to(doc, warn=True):
+	if not doc.shipping_address:
+		doc.shipping_address = (
+			(frappe.db.get_value("Supplier", doc.supplier, "nat_shipping_address")
+				if doc.supplier else None)
+			or warehouse_ship_to_address(doc.set_warehouse))
+
+	if doc.shipping_address:
+		# one line, so it reads cleanly in the email body as well as on the form
+		a = frappe.db.get_value("Address", doc.shipping_address,
+			["address_title", "address_line1", "address_line2", "city", "state",
+			 "pincode", "country"], as_dict=True) or {}
+		parts = [a.get("address_title"), a.get("address_line1"), a.get("address_line2"),
+			a.get("city"), a.get("state"), a.get("pincode"), a.get("country")]
+	else:
+		w = frappe.db.get_value("Warehouse", doc.set_warehouse,
+			["warehouse_name", "address_line_1", "address_line_2", "city", "state", "pin"],
+			as_dict=True) or {}
+		parts = [w.get("warehouse_name"), w.get("address_line_1"), w.get("address_line_2"),
+			w.get("city"), w.get("state"), w.get("pin")]
+		if warn and doc.set_warehouse and doc.docstatus == 0:
+			frappe.msgprint("<b>No Ship To Address could be worked out for this order.</b>"
+				+ "<br><br>It will print whichever company address ERPNext picks, which may "
+				+ "not be where you want the goods delivered.<br><br>Pick one in "
+				+ "<b>Ship To Address</b> above, or set a default ship-to on <b>"
+				+ (doc.supplier or "the supplier") + "</b> so every order to them gets it.")
+
+	doc.ship_to_display = ", ".join([p for p in parts if p])
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def ship_to_address_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Addresses this order could ship to.
+
+	Every place the business actually receives goods, and nothing else:
+
+	  - Addresses attached to the Ship To Warehouse
+	  - the company's own addresses
+	  - any address already set as some supplier's default ship-to
+
+	That third source is not decoration. Most of the ship-to addresses in use
+	are not flagged is_your_company_address and are not linked to the company at
+	all, so without it the list would hide the very addresses resolve_ship_to
+	hands out -- a buyer would see one filled in that they could not have picked
+	themselves, and could not pick again after clearing it.
+
+	An unfiltered Address link is the thing to avoid: on a site with hundreds of
+	suppliers it is mostly their billing addresses, which is a long list to
+	scroll and an easy one to ship an order to by mistake.
+	"""
+	filters = filters or {}
+	return frappe.db.sql("""
+		select distinct a.name, a.address_title, a.city
+		from `tabAddress` a
+		left join `tabDynamic Link` dl
+			on dl.parent = a.name and dl.parenttype = 'Address'
+		where ifnull(a.disabled, 0) = 0
+			and (
+				(dl.link_doctype = 'Warehouse' and dl.link_name = %(warehouse)s)
+				or (dl.link_doctype = 'Company' and dl.link_name = %(company)s
+					and ifnull(a.is_your_company_address, 0) = 1)
+				or a.name in (
+					select s.nat_shipping_address from `tabSupplier` s
+					where ifnull(s.nat_shipping_address, '') != ''
+				)
+			)
+			and (a.name like %(txt)s
+				or ifnull(a.address_title, '') like %(txt)s
+				or ifnull(a.city, '') like %(txt)s)
+		order by a.is_shipping_address desc, a.name asc
+		limit %(start)s, %(page_len)s
+	""", {
+		"warehouse": filters.get("warehouse"),
+		"company": filters.get("company"),
+		"txt": "%" + (txt or "") + "%",
+		"start": start,
+		"page_len": page_len,
+	})
 
 
 # ---------------------------------------------------------------------------
@@ -206,14 +503,22 @@ def auto_send_on_approve(doc):
 			npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
 			npo.supplier = doc.supplier
 			npo.transaction_date = doc.order_date
-			npo.schedule_date = doc.required_by
+			npo.schedule_date = po_ship_date(doc)
+			npo.ais_cancel_date = doc.required_by
 			npo.currency = doc.currency
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
+			if doc.shipping_address:
+				npo.shipping_address = doc.shipping_address
 			npo.custom_purchase_order_v3 = doc.name
+			# NOT npo.notes: Purchase Order has no such field, so that assignment
+			# was thrown away on every save and the note never reached the order.
+			# drop_ship_notes is the PO's own free-text note - it is what the
+			# print format renders and what the Supplier List report reads out
+			# as "notes".
 			if doc.notes_to_supplier:
-				npo.notes = doc.notes_to_supplier
+				npo.drop_ship_notes = doc.notes_to_supplier
 			npo.items = []
 			for d in doc.items:
 				if d.line_status == "Cancelled":
@@ -222,7 +527,7 @@ def auto_send_on_approve(doc):
 				r.item_code = d.item_code
 				r.qty = F(d.qty)
 				r.rate = F(d.rate)
-				r.schedule_date = d.required_by or doc.required_by
+				r.schedule_date = po_ship_date(doc)
 				r.warehouse = d.warehouse or doc.set_warehouse
 				# carry the request through: ERPNext marks a Material Request
 				# as ordered off the NATIVE PO, not off the PO3
@@ -329,14 +634,22 @@ def submitted_updates(doc):
 			npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
 			npo.supplier = doc.supplier
 			npo.transaction_date = doc.order_date
-			npo.schedule_date = doc.required_by
+			npo.schedule_date = po_ship_date(doc)
+			npo.ais_cancel_date = doc.required_by
 			npo.currency = doc.currency
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
+			if doc.shipping_address:
+				npo.shipping_address = doc.shipping_address
 			npo.custom_purchase_order_v3 = doc.name
+			# NOT npo.notes: Purchase Order has no such field, so that assignment
+			# was thrown away on every save and the note never reached the order.
+			# drop_ship_notes is the PO's own free-text note - it is what the
+			# print format renders and what the Supplier List report reads out
+			# as "notes".
 			if doc.notes_to_supplier:
-				npo.notes = doc.notes_to_supplier
+				npo.drop_ship_notes = doc.notes_to_supplier
 			npo.items = []
 			for d in doc.items:
 				if d.line_status == "Cancelled":
@@ -345,7 +658,7 @@ def submitted_updates(doc):
 				r.item_code = d.item_code
 				r.qty = F(d.qty)
 				r.rate = F(d.rate)
-				r.schedule_date = d.required_by or doc.required_by
+				r.schedule_date = po_ship_date(doc)
 				r.warehouse = d.warehouse or doc.set_warehouse
 				# carry the request through: ERPNext marks a Material Request
 				# as ordered off the NATIVE PO, not off the PO3
@@ -427,6 +740,13 @@ def submitted_updates(doc):
 	elif doc.workflow_state in ("Closed", "Closed Short"):
 		frappe.db.set_value("Purchase Order V3", doc.name,
 			"manually_reopened", 0, update_modified=False)
+
+	# Both blocks above move short_qty -- cancelling a backorder writes one off,
+	# reopening puts it back - and validate does not run on a submitted order, so
+	# the header would otherwise keep whatever it was worth when it was placed.
+	# Unconditional: it is a handful of reads, and running on every save means any
+	# drift from an older order heals itself the next time someone touches it.
+	v3_recalc_totals(doc.name)
 
 	open_bo_now = v3_open_bo(doc.name)
 	rows = frappe.get_all("Purchase Order V3 Item", filters={"parent": doc.name},
@@ -953,6 +1273,9 @@ def v3_reset_draft_state(po3=None):
 			"accepted_qty": 0, "rejected_qty": 0, "returned_qty": 0, "short_qty": 0, "over_qty": 0,
 			"backorder_status": None, "backorder_eta": None, "backorder_cancel_reason": None,
 			"erp_po_item": None})
+	# the lines were written straight to the database, so the header still shows
+	# whatever the cleared short quantities made it worth
+	v3_recalc_totals(name)
 	frappe.response["message"] = "reset " + name
 
 
