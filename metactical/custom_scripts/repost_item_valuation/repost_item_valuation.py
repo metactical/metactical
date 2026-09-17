@@ -1,29 +1,37 @@
 import frappe
-import erpnext.stock.doctype.repost_item_valuation.repost_item_valuation as _riv
-
-_LOCK_KEY = "repost_item_valuation_running"
-_LOCK_TTL_SEC = 7200  # 2 hours; covers the longest expected single repost run
+from frappe.utils import getdate, add_days
+from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import RepostItemValuation
 
 
-def repost_entries():
-	"""
-	Serialized wrapper around ERPNext's repost_entries.
+def clamp_repost_to_open_period(doc, method=None):
+    """Move a full-history repost forward to the first open day when a Period Closing
+    Voucher would otherwise reject it.
 
-	Item valuation reposting must be strictly sequential: each SLE's valuation
-	depends on the running balance of all earlier entries.  If two repost runs
-	overlap they will read each other's in-flight state and corrupt stock values.
+    repost_actual_qty creates Repost Item Valuation entries with a hardcoded
+    posting_date of 1900-01-01. Once any Period Closing Voucher exists,
+    validate_period_closing_voucher throws because that date is inside a closed
+    period. Entries inside a closed period are frozen by design, so reposting them
+    is neither allowed nor meaningful -- reposting from the day after the closing
+    date recomputes everything that may still change, and the current bin/value stay
+    correct because the closed period's ending balance is a valid opening balance.
 
-	We use an atomic Redis NX lock so that a scheduler tick that fires while a
-	previous run is still executing exits immediately rather than starting a
-	concurrent repost.  The TTL is a safety valve in case the worker dies
-	without releasing the lock.
-	"""
-	cache = frappe.cache()
-	acquired = cache.set(_LOCK_KEY, 1, nx=True, ex=_LOCK_TTL_SEC)
-	if not acquired:
-		return  # another repost_entries call is in progress; skip this tick
+    Scoped to non-Transaction reposts (the full-history recalc type). Transaction-based
+    reposts keep throwing on a closed period, so a genuine backdated posting into a
+    closed period still surfaces instead of being silently shifted.
+    """
+    if doc.based_on == "Transaction":
+        return
 
-	try:
-		_riv._original_repost_entries()
-	finally:
-		cache.delete(_LOCK_KEY)
+    # doc.company is pre-filled with the global default company on new_doc and only
+    # corrected to the warehouse's company by set_company(), which runs inside validate()
+    # -- i.e. AFTER this before_validate hook. Trusting doc.company here would read the
+    # wrong company (and miss its closing date), so derive it from the warehouse ourselves,
+    # the same rule set_company() uses for non-Transaction reposts.
+    company = frappe.get_cached_value("Warehouse", doc.warehouse, "company") if doc.warehouse else doc.company
+    if not company:
+        return
+
+    closing_date = RepostItemValuation.get_max_period_closing_date(company)
+    if closing_date and getdate(doc.posting_date) <= getdate(closing_date):
+        doc.posting_date = add_days(getdate(closing_date), 1)
+        doc.posting_time = "00:00:00"
