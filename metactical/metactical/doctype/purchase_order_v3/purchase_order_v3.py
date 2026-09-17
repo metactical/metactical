@@ -134,6 +134,7 @@ def shared_series_naming(doc):
 		# and ERPNext has already filled in a company address by the time the
 		# buyer looks at it. Quietly: validate is a moment away and will warn.
 		resolve_ship_to(doc, warn=False)
+		resolve_currency(doc)
 		npo = frappe.new_doc("Purchase Order")
 		npo.supplier = doc.supplier
 		npo.company = doc.company
@@ -168,6 +169,8 @@ def shared_series_naming(doc):
 		# twin by hand, and that correction has to survive the next sync.
 		if doc.shipping_address:
 			npo.shipping_address = doc.shipping_address
+		if doc.notes_to_supplier:
+			npo.drop_ship_notes = doc.notes_to_supplier
 		for d in doc.items:
 			r = npo.append("items", {})
 			r.item_code = d.item_code
@@ -239,36 +242,16 @@ def mirror_status_now(erp_po, state):
 def validate(doc):
 	require_cancel_date(doc)
 
-	company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
+	resolve_currency(doc)
 
-	# On new docs Frappe pre-fills Buying Settings' default price list and the
-	# company currency BEFORE validate runs - do not mistake those for a user's
-	# choice. The supplier's own defaults win; no supplier default = leave blank
-	# so the mandatory check forces a manual pick.
-	if doc.is_new() and doc.supplier:
-		sup = frappe.db.get_value("Supplier", doc.supplier,
-			["default_price_list", "default_currency"], as_dict=True) or {}
-		global_pl = frappe.db.get_single_value("Buying Settings", "buying_price_list")
-		if not doc.buying_price_list or doc.buying_price_list == global_pl:
-			doc.buying_price_list = supplier_buying_price_list(doc.supplier)
-		if sup.default_currency and (not doc.currency or doc.currency == company_currency):
-			doc.currency = sup.default_currency
-	if not doc.currency:
-		doc.currency = company_currency
-	if doc.currency and doc.currency != company_currency and F(doc.conversion_rate) in (0.0, 1.0):
-		rate = frappe.db.get_value("Currency Exchange",
-			{"from_currency": doc.currency, "to_currency": company_currency},
-			"exchange_rate", order_by="date desc")
-		if not rate:
-			try:
-				rate = frappe.call("erpnext.setup.utils.get_exchange_rate",
-					from_currency=doc.currency, to_currency=company_currency)
-			except Exception:
-				rate = None
-		if rate:
-			doc.conversion_rate = rate
-	if F(doc.conversion_rate) == 0:
-		doc.conversion_rate = 1
+	# Changing the Ship To Warehouse has to take the lines with it. Filling only
+	# the blank ones left lines created under the old warehouse pointing at it,
+	# which meant goods were received into a warehouse nobody chose -- and
+	# because ERPNext blanks a parent set_warehouse whose lines disagree, the
+	# native PO came out with no Set Target Warehouse at all. Matches what
+	# ERPNext itself does on this field (autofill_warehouse rewrites every row).
+	moved_warehouse = bool(doc.set_warehouse) and not doc.is_new() and (
+		doc.set_warehouse != frappe.db.get_value(doc.doctype, doc.name, "set_warehouse"))
 
 	total_qty = 0.0
 	total = 0.0
@@ -285,7 +268,7 @@ def validate(doc):
 		d.amount = billable * F(d.rate)
 		total_qty += billable
 		total += d.amount
-		if not d.warehouse:
+		if not d.warehouse or moved_warehouse:
 			d.warehouse = doc.set_warehouse
 		if not d.required_by:
 			d.required_by = doc.required_by
@@ -332,6 +315,50 @@ def validate(doc):
 		doc.confirmation_status = "Awaiting"
 
 	mirror_status_now(doc.erp_purchase_order, doc.workflow_state or "Draft")
+
+
+# ---------------------------------------------------------------------------
+# Currency, price list and the FX rate behind base_grand_total.
+#
+# Lifted out of validate so the twin can be built with the right numbers.
+# before_insert runs first, and a twin created before this has run is stamped
+# with conversion_rate 1.0 whatever the order is actually priced in -- so a
+# draft native PO for a USD order showed CAD-sized base amounts until approval
+# quietly corrected them.
+#
+# Only ever fills in what has not been decided: re-running it is a no-op.
+# ---------------------------------------------------------------------------
+def resolve_currency(doc):
+	company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
+
+	# On new docs Frappe pre-fills Buying Settings' default price list and the
+	# company currency BEFORE validate runs - do not mistake those for a user's
+	# choice. The supplier's own defaults win; no supplier default = leave blank
+	# so the mandatory check forces a manual pick.
+	if doc.is_new() and doc.supplier:
+		sup = frappe.db.get_value("Supplier", doc.supplier,
+			["default_price_list", "default_currency"], as_dict=True) or {}
+		global_pl = frappe.db.get_single_value("Buying Settings", "buying_price_list")
+		if not doc.buying_price_list or doc.buying_price_list == global_pl:
+			doc.buying_price_list = supplier_buying_price_list(doc.supplier)
+		if sup.default_currency and (not doc.currency or doc.currency == company_currency):
+			doc.currency = sup.default_currency
+	if not doc.currency:
+		doc.currency = company_currency
+	if doc.currency and doc.currency != company_currency and F(doc.conversion_rate) in (0.0, 1.0):
+		rate = frappe.db.get_value("Currency Exchange",
+			{"from_currency": doc.currency, "to_currency": company_currency},
+			"exchange_rate", order_by="date desc")
+		if not rate:
+			try:
+				rate = frappe.call("erpnext.setup.utils.get_exchange_rate",
+					from_currency=doc.currency, to_currency=company_currency)
+			except Exception:
+				rate = None
+		if rate:
+			doc.conversion_rate = rate
+	if F(doc.conversion_rate) == 0:
+		doc.conversion_rate = 1
 
 
 # ---------------------------------------------------------------------------
@@ -485,8 +512,13 @@ def auto_send_on_approve(doc):
 			if doc.shipping_address:
 				npo.shipping_address = doc.shipping_address
 			npo.custom_purchase_order_v3 = doc.name
+			# NOT npo.notes: Purchase Order has no such field, so that assignment
+			# was thrown away on every save and the note never reached the order.
+			# drop_ship_notes is the PO's own free-text note - it is what the
+			# print format renders and what the Supplier List report reads out
+			# as "notes".
 			if doc.notes_to_supplier:
-				npo.notes = doc.notes_to_supplier
+				npo.drop_ship_notes = doc.notes_to_supplier
 			npo.items = []
 			for d in doc.items:
 				if d.line_status == "Cancelled":
@@ -611,8 +643,13 @@ def submitted_updates(doc):
 			if doc.shipping_address:
 				npo.shipping_address = doc.shipping_address
 			npo.custom_purchase_order_v3 = doc.name
+			# NOT npo.notes: Purchase Order has no such field, so that assignment
+			# was thrown away on every save and the note never reached the order.
+			# drop_ship_notes is the PO's own free-text note - it is what the
+			# print format renders and what the Supplier List report reads out
+			# as "notes".
 			if doc.notes_to_supplier:
-				npo.notes = doc.notes_to_supplier
+				npo.drop_ship_notes = doc.notes_to_supplier
 			npo.items = []
 			for d in doc.items:
 				if d.line_status == "Cancelled":
