@@ -90,19 +90,56 @@ function soc3_pull(frm, po, claimed) {
         var d = frm.add_child('items');
         d.po3_item = r.name;
         d.item_code = r.item_code;
+        d.item_name = r.item_name;
         d.retail_sku_suffix = r.retail_sku_suffix;
+        // the supplier's own identifiers come straight off the order line, so
+        // they read back during keying instead of appearing only after a save
+        d.supplier_part_no = r.supplier_part_no;
+        d.barcode = r.barcode;
         d.ordered_qty = flt(r.qty) - flt(r.received_qty);
         d.confirmed_qty = d.ordered_qty;
         d.line_status = 'Confirmed';
         d.confirmed_rate = r.rate;
     });
     frm.refresh_field('items');
+    soc3_totals(frm);
     var n = (frm.doc.items || []).length;
     frappe.show_alert({
         message: n ? __('Pulled {0} outstanding line(s){1}', [n, skipped ? __(' — {0} already handled', [skipped]) : ''])
                    : __('Nothing outstanding on {0}', [po.name]),
         indicator: n ? 'green' : 'orange'
     });
+}
+
+// Header totals, mirroring set_totals() in the controller so the numbers move
+// while the confirmation is being keyed in, before anything has been saved.
+function soc3_totals(frm) {
+    var ordered = 0, confirmed = 0, amount = 0;
+    (frm.doc.items || []).forEach(function(d) {
+        ordered += flt(d.ordered_qty);
+        confirmed += flt(d.confirmed_qty);
+        amount += flt(d.confirmed_qty) * flt(d.confirmed_rate);
+    });
+    // the back-order rows are rebuilt server-side on save, so before the first
+    // save the balance has to be read off the lines themselves
+    var back = 0;
+    (frm.doc.items || []).forEach(function(d) {
+        if (d.line_status === 'Back-ordered') back += flt(d.ordered_qty);
+        else if (d.line_status === 'Partial - Balance Back-ordered') {
+            back += Math.max(flt(d.ordered_qty) - flt(d.confirmed_qty), 0);
+        }
+    });
+
+    // assigned rather than set_value: these are display copies of what the
+    // controller recomputes on save, and set_value would mark an untouched
+    // document dirty every time it is opened
+    frm.doc.total_ordered_qty = ordered;
+    frm.doc.total_qty = confirmed;
+    frm.doc.total_backorder_qty = back;
+    frm.doc.total = amount;
+    frm.doc.base_total = amount * (flt(frm.doc.conversion_rate) || 1);
+    ['total_ordered_qty', 'total_qty', 'total_backorder_qty', 'total', 'base_total']
+        .forEach(function(f) { frm.refresh_field(f); });
 }
 
 function soc3_export(frm) {
@@ -213,6 +250,7 @@ function soc3_import(frm) {
 
             d.hide();
             frm.refresh_field('items');
+            soc3_totals(frm);
 
             var msg = __('Updated {0} of {1} line(s). Review, then Save.',
                          [applied, (frm.doc.items || []).length]);
@@ -231,6 +269,29 @@ function soc3_import(frm) {
     d.show();
 }
 
+frappe.ui.form.on('Supplier Order Confirmation V3 Item', {
+    confirmed_qty: function(frm) { soc3_totals(frm); },
+    confirmed_rate: function(frm) { soc3_totals(frm); },
+    line_status: function(frm) { soc3_totals(frm); },
+    items_remove: function(frm) { soc3_totals(frm); },
+    item_code: function(frm, cdt, cdn) {
+        var row = locals[cdt][cdn];
+        if (!row.item_code) return;
+        frappe.call({
+            method: 'metactical.metactical.doctype.supplier_order_confirmation_v3'
+                  + '.supplier_order_confirmation_v3.item_identifiers',
+            args: { item_code: row.item_code, supplier: frm.doc.supplier },
+            callback: function(r) {
+                var ii = r.message || {};
+                frappe.model.set_value(cdt, cdn, 'item_name', ii.item_name);
+                frappe.model.set_value(cdt, cdn, 'retail_sku_suffix', ii.retail_sku_suffix);
+                frappe.model.set_value(cdt, cdn, 'barcode', ii.barcode);
+                frappe.model.set_value(cdt, cdn, 'supplier_part_no', ii.supplier_part_no);
+            }
+        });
+    }
+});
+
 frappe.ui.form.on('Supplier Order Confirmation V3', {
     purchase_order_v3: function(frm) {
         frm._soc3_autopull = true;
@@ -239,6 +300,7 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
     onload_post_render: function(frm) { soc3_maybe_autopull(frm); },
     refresh: function(frm) {
         soc3_maybe_autopull(frm);
+        if (frm.doc.docstatus === 0) soc3_totals(frm);
         // Top-level, ungrouped: a dropdown group made these easy to miss.
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭳ Download Lines'), function() { soc3_export(frm); })

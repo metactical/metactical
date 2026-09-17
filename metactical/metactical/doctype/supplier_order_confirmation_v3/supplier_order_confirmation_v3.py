@@ -16,6 +16,17 @@ class SupplierOrderConfirmationV3(Document):
 	def on_submit(self):
 		mirror_to_po3(self)
 
+	def on_update_after_submit(self):
+		# confirmed_rate, remarks and the backorder rows stay editable after
+		# submit, so the header totals have to follow them.
+		set_totals(self)
+		frappe.db.set_value(self.doctype, self.name, {
+			"total_ordered_qty": self.total_ordered_qty,
+			"total_qty": self.total_qty,
+			"total_backorder_qty": self.total_backorder_qty,
+			"total": self.total,
+			"base_total": self.base_total}, update_modified=False)
+
 	def before_cancel(self):
 		cancel_guard(self)
 
@@ -53,6 +64,10 @@ def validate(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	if po.docstatus != 1:
 		frappe.throw("Purchase Order V3 " + po.name + " is not submitted/approved yet.")
+
+	# the confirmation is priced in whatever the order was placed in
+	doc.currency = po.currency
+	doc.conversion_rate = F(po.conversion_rate) or 1.0
 
 	rows = {}
 	for r in po.items:
@@ -214,12 +229,42 @@ def validate(doc):
 		b.ordered_qty = F(d.ordered_qty)
 		b.shipping_now = now_qty
 		b.balance_qty = bal
-		b.received_qty = F(r.received_qty)
+		b.received_qty = F(rows[d.po3_item].received_qty)
 		old = keep.get(d.po3_item)
 		b.eta = (old.eta if old and old.eta else d.backorder_eta)
 		b.status = (old.status if old else "Open")
 		b.cancel_reason = (old.cancel_reason if old else None)
 		b.remarks = (old.remarks if old else None)
+
+	set_totals(doc)
+
+
+# ---------------------------------------------------------------------------
+# Header totals, printed under the Lines grid.
+#
+# Deliberately derived and never typed: the grid is what the supplier said, and
+# a total that does not add up to the column above it is the thing people query.
+# The same arithmetic runs in the form script so the numbers move while the
+# confirmation is still being keyed in, before the first save.
+# ---------------------------------------------------------------------------
+def set_totals(doc):
+	ordered = 0.0
+	confirmed = 0.0
+	amount = 0.0
+	for d in (doc.items or []):
+		ordered += F(d.ordered_qty)
+		confirmed += F(d.confirmed_qty)
+		amount += F(d.confirmed_qty) * F(d.confirmed_rate)
+
+	backordered = 0.0
+	for b in (doc.backorders or []):
+		backordered += F(b.balance_qty)
+
+	doc.total_ordered_qty = ordered
+	doc.total_qty = confirmed
+	doc.total_backorder_qty = backordered
+	doc.total = amount
+	doc.base_total = amount * (F(doc.conversion_rate) or 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +389,24 @@ def cancel_guard(doc):
 			+ "cancelling it would leave the shipments and receipts with nothing "
 			+ "behind them. Use <b>Supplier Cancelled</b> on the order instead if "
 			+ "the supplier has withdrawn.")
+
+
+# ---------------------------------------------------------------------------
+# The supplier's own identifiers for an item, for the form script.
+#
+# validate() fills these in on save; the form calls this so a line keyed or
+# scanned in by hand carries its Supplier SKU straight away, instead of the
+# column staying blank until the first save.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def item_identifiers(item_code, supplier=None):
+	return {
+		"item_name": frappe.db.get_value("Item", item_code, "item_name"),
+		"retail_sku_suffix": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
+		"barcode": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
+		"supplier_part_no": frappe.db.get_value("Item Supplier",
+			{"parent": item_code, "supplier": supplier}, "supplier_part_no") if supplier else None,
+	}
 
 
 # ---------------------------------------------------------------------------
