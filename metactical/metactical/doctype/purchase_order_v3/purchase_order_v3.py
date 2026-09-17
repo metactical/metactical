@@ -105,6 +105,18 @@ def reset_amended_state(doc):
 	doc.workflow_state = None
 
 
+def po_ship_date(doc):
+	"""The native PO's schedule_date -- its "Reqd by Date", printed as Ship Date.
+
+	The order date, i.e. as soon as the supplier can send it. ERPNext makes the
+	field mandatory (validate_schedule_date throws "Please enter Reqd by Date"
+	on a blank one) and will not accept a date before the transaction date, so
+	the order date is both the earliest legal value and the honest one: we are
+	not asking the supplier to wait, we are asking them to ship.
+	"""
+	return doc.order_date or frappe.utils.nowdate()
+
+
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "PO3 Shared Series Naming"
 # (DocType Event / Before Insert on Purchase Order V3).
@@ -124,7 +136,23 @@ def shared_series_naming(doc):
 		npo.supplier = doc.supplier
 		npo.company = doc.company
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
-		npo.schedule_date = doc.required_by
+		# PO3 has one date field, and it is a CANCEL date -- the point after which
+		# unfilled lines get dropped. It belongs in ais_cancel_date, which is what the
+		# print format's Cancel Date box reads and which nothing was filling, so that
+		# box came out blank on every order.
+		#
+		# schedule_date is a different promise: ERPNext's "Reqd by Date", printed as
+		# SHIP DATE. Feeding the cancel date into it told suppliers to ship by a
+		# deadline we never asked for -- and leaving it empty was worse, because
+		# get_item_details then invented one from the item's lead_time_days (order date
+		# + 14, say) and printed that. We want the goods as soon as the supplier can
+		# send them, so it is the order date: ship now.
+		#
+		# It has to be set on the LINES, not just here. validate_schedule_date
+		# overwrites the header with min(line schedule_date), so a header date alone
+		# would be replaced by whatever lead time the items carry.
+		npo.schedule_date = po_ship_date(doc)
+		npo.ais_cancel_date = doc.required_by
 		npo.currency = doc.currency
 		npo.conversion_rate = F(doc.conversion_rate) or 1
 		npo.buying_price_list = doc.buying_price_list
@@ -143,7 +171,8 @@ def shared_series_naming(doc):
 			r.item_code = d.item_code
 			r.qty = F(d.qty) or 1
 			r.rate = F(d.rate)
-			r.schedule_date = d.required_by or doc.required_by
+			# see the note by schedule_date above: ship now, not on a lead-time guess
+			r.schedule_date = po_ship_date(doc)
 			r.warehouse = d.warehouse or doc.set_warehouse
 			# carry the request through: ERPNext marks a Material Request
 			# as ordered off the NATIVE PO, not off the PO3
@@ -164,6 +193,40 @@ def shared_series_naming(doc):
 # totals, derives the approval tier, fills the supplier contact + ship-to
 # defaults, and mirrors the workflow state onto the native PO twin.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Required By is optional while an order is being put together, and required the
+# moment it leaves Draft.
+#
+# A buyer starting an order does not always know the cancel date yet, so the
+# field is not mandatory on the doctype -- a half-built draft should never be
+# blocked from saving. But by the time it reaches an approver it has to be
+# there: it is what the supplier's Cancel Date is printed from, and what decides
+# which lines are candidates for backorder cancellation once it passes.
+#
+# Checked on the TRANSITION rather than on the state, so pressing "Submit for
+# Approval" is what asks for it. Orders already sitting in Pending Approval from
+# before this rule are left alone -- they can still be saved and approved,
+# rather than being trapped by a rule that did not exist when they were sent up.
+# ---------------------------------------------------------------------------
+def require_cancel_date(doc):
+	if doc.required_by:
+		return
+
+	now = doc.workflow_state or "Draft"
+	if now == "Draft":
+		return
+	was = (frappe.db.get_value(doc.doctype, doc.name, "workflow_state")
+		if not doc.is_new() else None) or "Draft"
+	if now == was:
+		return
+
+	frappe.throw("<b>Required By (Cancel Date) is required.</b><br><br>"
+		"Set it before sending this order for approval: it is the date printed "
+		"on the order as the supplier's Cancel Date, and the date unfilled lines "
+		"are measured against when deciding what to cancel.",
+		title="Required By (Cancel Date) is required")
+
+
 def mirror_status_now(erp_po, state):
 	# Before Save: the new state is only on the in-memory doc, not yet in the DB
 	if erp_po:
@@ -172,6 +235,8 @@ def mirror_status_now(erp_po, state):
 
 
 def validate(doc):
+	require_cancel_date(doc)
+
 	company_currency = frappe.db.get_value("Company", doc.company, "default_currency")
 
 	# On new docs Frappe pre-fills Buying Settings' default price list and the
@@ -406,7 +471,8 @@ def auto_send_on_approve(doc):
 			npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
 			npo.supplier = doc.supplier
 			npo.transaction_date = doc.order_date
-			npo.schedule_date = doc.required_by
+			npo.schedule_date = po_ship_date(doc)
+			npo.ais_cancel_date = doc.required_by
 			npo.currency = doc.currency
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
@@ -424,7 +490,7 @@ def auto_send_on_approve(doc):
 				r.item_code = d.item_code
 				r.qty = F(d.qty)
 				r.rate = F(d.rate)
-				r.schedule_date = d.required_by or doc.required_by
+				r.schedule_date = po_ship_date(doc)
 				r.warehouse = d.warehouse or doc.set_warehouse
 				# carry the request through: ERPNext marks a Material Request
 				# as ordered off the NATIVE PO, not off the PO3
@@ -531,7 +597,8 @@ def submitted_updates(doc):
 			npo = frappe.get_doc("Purchase Order", doc.erp_purchase_order)
 			npo.supplier = doc.supplier
 			npo.transaction_date = doc.order_date
-			npo.schedule_date = doc.required_by
+			npo.schedule_date = po_ship_date(doc)
+			npo.ais_cancel_date = doc.required_by
 			npo.currency = doc.currency
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
@@ -549,7 +616,7 @@ def submitted_updates(doc):
 				r.item_code = d.item_code
 				r.qty = F(d.qty)
 				r.rate = F(d.rate)
-				r.schedule_date = d.required_by or doc.required_by
+				r.schedule_date = po_ship_date(doc)
 				r.warehouse = d.warehouse or doc.set_warehouse
 				# carry the request through: ERPNext marks a Material Request
 				# as ordered off the NATIVE PO, not off the PO3
