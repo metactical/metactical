@@ -643,6 +643,14 @@ const templateItem = ref(null)            // resolved template Item name
 const templateVariants = ref([])          // [{ item_code, sku }] — the allowed variants
 const templateRef = ref(null)             // DOM node for the native Link control
 let templateControl = null
+
+// The item code applyTemplateFromItem is currently working on, claimed synchronously
+// before its first await. One pick fires the picker twice (see buildTemplateControl), and
+// `templateItem` is only set after that first await, so the handler's own guard cannot see
+// a load that has already started — both runs would load the same record into the same
+// grid and every card would be there twice. It doubles as the staleness marker: a run whose
+// code is no longer the claimed one has been superseded and stops.
+let templateRequest = null
 const ROLES = ['icon', 'small', 'medium', 'large']
 
 // One empty placeholder card for a (role, order) holding ALL the template's variants —
@@ -842,6 +850,13 @@ const loadRecordImages = async (recordName) => {
 // Resolve the picked Item to its template + variant set, then either load the
 // template's existing record (if one exists) or scaffold fresh upload slots.
 const applyTemplateFromItem = async (itemCode) => {
+  const code = itemCode || ''
+  if (code === templateRequest) return // second event of the same pick
+  templateRequest = code
+  // True once a later pick has claimed the picker: this run is for an item the user has
+  // already moved on from, so it must not touch the grid the newer run is building.
+  const isStale = () => templateRequest !== code
+
   if (!itemCode) {
     templateItem.value = null
     templateVariants.value = []
@@ -860,16 +875,19 @@ const applyTemplateFromItem = async (itemCode) => {
     templateVariants.value = []
     resetFiles()
     if (templateControl) templateControl.set_value('')
+    templateRequest = null // nothing was applied, so let the same item be picked again
     return
   }
 
   try {
     const res = await callBackend('get_item_family', { item_code: itemCode })
+    if (isStale()) return
     templateItem.value = (res && (res.template || itemCode)) || null
     templateVariants.value = (res && res.items) || []
   } catch (e) {
     console.error('Failed to resolve template:', e)
     frappe.show_alert({ message: `Failed to resolve ${itemCode}`, indicator: 'red' })
+    templateRequest = null // failed, so a retry on the same item is allowed
     return
   }
 
@@ -883,6 +901,7 @@ const applyTemplateFromItem = async (itemCode) => {
   } catch (e) {
     console.error('Failed to look up template record:', e)
   }
+  if (isStale()) return
 
   if (existing && existing.name) {
     isLoadingFromS3.value = true
@@ -905,6 +924,7 @@ const applyTemplateFromItem = async (itemCode) => {
     } catch (e) {
       console.error('Failed to check the old system:', e)
     }
+    if (isStale()) return
     const matches = (legacy && legacy.matches) || []
     if (matches.length === 0) {
       scaffoldAndNotify()
@@ -1345,9 +1365,10 @@ const processFiles = async (incomingFiles) => {
     }
 
     files.value.push(...newFiles)
-    // Re-sort the whole grid, not just this batch, so images dropped in several goes
-    // (e.g. one folder per size) still end up grouped per product.
-    autoSortFiles()
+    // Sort the pending tail, not the whole grid: images already on the server stay where
+    // they were loaded, and everything dropped since then is grouped per product below them
+    // — across every drop, so one folder per size still lands grouped by colour.
+    sortPendingFiles()
 
     console.log(`Successfully processed ${newFiles.length} image files from ${incomingFiles.length} total files`)
     
@@ -1503,31 +1524,55 @@ const generateS3Filename = (file) => {
   }
 }
 
-// Order the grid by filename so every size of one product sits together, instead of
+// Order two cards by filename so every size of one product sits together, instead of
 // leaving images in the arbitrary order the OS handed them over (all the larges, then
 // all the mediums…). Within a product: image order first, then icon → small → medium →
 // large, matching the order scaffolded slots are built in.
-const autoSortFiles = () => {
+const compareFiles = (a, b) => {
   const roleRank = (f) => {
     const i = ROLES.indexOf(f.role)
     return i === -1 ? ROLES.length : i // unknown/unset role sorts last
   }
 
-  files.value.sort((a, b) => {
-    // `getBaseName` drops the extension and any _icon/_small/_medium/_large suffix, so
-    // "sku1_large.jpg" and "sku1_medium.jpg" — or the same name in per-size folders —
-    // share a base and group together. Numeric-aware so img2 comes before img10.
-    const byBase = getBaseName(a.name).localeCompare(getBaseName(b.name), undefined, {
-      numeric: true,
-      sensitivity: 'base',
-    })
-    if (byBase !== 0) return byBase
-
-    const orderDiff = (a.imageOrder || 0) - (b.imageOrder || 0)
-    if (orderDiff !== 0) return orderDiff
-
-    return roleRank(a) - roleRank(b)
+  // `getBaseName` drops the extension and any _icon/_small/_medium/_large suffix, so
+  // "sku1_large.jpg" and "sku1_medium.jpg" — or the same name in per-size folders —
+  // share a base and group together. Numeric-aware so img2 comes before img10.
+  const byBase = getBaseName(a.name).localeCompare(getBaseName(b.name), undefined, {
+    numeric: true,
+    sensitivity: 'base',
   })
+  if (byBase !== 0) return byBase
+
+  const orderDiff = (a.imageOrder || 0) - (b.imageOrder || 0)
+  if (orderDiff !== 0) return orderDiff
+
+  return roleRank(a) - roleRank(b)
+}
+
+// Sort the whole grid. Used after loading a record, where every card came from the same
+// place and there is no "already reviewed" half to protect.
+const autoSortFiles = () => {
+  files.value.sort(compareFiles)
+}
+
+// Sort only the cards that are not on the server yet, keeping them below the ones that are.
+//
+// Someone adding variants to a product that already has images works from per-SIZE folders:
+// they drop the icon folder, then the small folder, and so on — four or eight drops for two
+// new colours. Sorting only each drop would leave the bottom interleaved by size
+// (blue_icon, black_icon, blue_small, black_small…), so the whole pending tail is sorted
+// every time instead: each colour ends up with its four sizes together, however many drops
+// it took to get them in.
+//
+// The cards already on the server keep the positions they were loaded in — the new images
+// are appended below them rather than mixed through them. They only merge into one sorted
+// list on the next fresh load, by which point they are on the server too.
+const sortPendingFiles = () => {
+  const onServer = []
+  const pending = []
+  files.value.forEach(f => (f.isOnServer ? onServer : pending).push(f))
+  pending.sort(compareFiles) // Array#sort is stable, so equal cards keep their drop order.
+  files.value = [...onServer, ...pending]
 }
 
 // Per-FILE records for saving — keeps each image's own sites so they can be
@@ -1594,9 +1639,11 @@ const clearAllFiles = () => {
   orderCount.value = 1
   appliedOrderCount.value = 1
 
-  // Clear the locked template + its picker.
+  // Clear the locked template + its picker. Releasing the claim too, so the same template
+  // can be picked again after a clear.
   templateItem.value = null
   templateVariants.value = []
+  templateRequest = null
   if (templateControl) templateControl.set_value('')
 }
 
@@ -2034,6 +2081,10 @@ const buildTemplateControl = () => {
     },
   })
   templateControl.refresh()
+  // Both events are needed — `awesomplete-selectcomplete` for a pick from the dropdown,
+  // `change` for a value typed and then blurred. One pick usually fires BOTH (the `change`
+  // when focus leaves the input), so applyTemplateFromItem has to be safe to call twice for
+  // the same item; the check below only catches the case where it has already finished.
   templateControl.$input.on('change awesomplete-selectcomplete', () => {
     setTimeout(() => {
       const val = templateControl.get_value() || ''
