@@ -3,7 +3,7 @@ from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseRece
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime, cint
 from frappe import _, msgprint, is_whitelisted
 from metactical.custom_scripts.utils.metactical_utils import queue_action, post_to_rocket_chat
-from metactical.procurement_v3.utils import F, mirror_po3_status, v3_reconcile
+from metactical.procurement_v3.utils import F, mirror_po3_status, v3_recalc_totals, v3_reconcile
 from frappe.model.docstatus import DocStatus
 
 class CustomPurchaseReceipt(PurchaseReceipt):
@@ -175,6 +175,11 @@ def v3_sync_to_po3(doc):
 		if hdr:
 			frappe.db.set_value("Purchase Order V3", po3_name, hdr)
 
+		# receiving can clear a line's short_qty, which puts its value back into
+		# the order - this path writes the lines directly, so nothing else re-adds
+		# the header up
+		v3_recalc_totals(po3_name)
+
 	mirror_po3_status(po3_name)
 
 	for po_name in po_names:
@@ -242,6 +247,9 @@ def v3_cancel_sync_to_po3(doc):
 		if touched and po3.workflow_state in ("Closed", "Closed Short", "Received"):
 			frappe.db.set_value("Purchase Order V3", po3_name,
 				{"workflow_state": "Partially Received", "receipt_status": "Partially Received"})
+
+		if touched:
+			v3_recalc_totals(po3_name)
 
 	mirror_po3_status(po3_name)
 

@@ -9,9 +9,11 @@ from frappe.model.document import Document
 
 from metactical.procurement_v3.utils import (
 	F,
+	billable_qty,
 	mirror_po3_status,
 	v3_may_close_native,
 	v3_open_bo,
+	v3_recalc_totals,
 )
 
 
@@ -277,8 +279,11 @@ def validate(doc):
 				"price_list_rate", order_by="valid_from desc")
 			if price:
 				d.rate = price
-		d.amount = F(d.qty) * F(d.rate)
-		total_qty += F(d.qty)
+		# a line the supplier will never fill is worth nothing to this order, so
+		# it drops out of the totals - see billable_qty
+		billable = billable_qty(d.qty, d.short_qty)
+		d.amount = billable * F(d.rate)
+		total_qty += billable
 		total += d.amount
 		if not d.warehouse:
 			d.warehouse = doc.set_warehouse
@@ -698,6 +703,13 @@ def submitted_updates(doc):
 	elif doc.workflow_state in ("Closed", "Closed Short"):
 		frappe.db.set_value("Purchase Order V3", doc.name,
 			"manually_reopened", 0, update_modified=False)
+
+	# Both blocks above move short_qty -- cancelling a backorder writes one off,
+	# reopening puts it back - and validate does not run on a submitted order, so
+	# the header would otherwise keep whatever it was worth when it was placed.
+	# Unconditional: it is a handful of reads, and running on every save means any
+	# drift from an older order heals itself the next time someone touches it.
+	v3_recalc_totals(doc.name)
 
 	open_bo_now = v3_open_bo(doc.name)
 	rows = frappe.get_all("Purchase Order V3 Item", filters={"parent": doc.name},
@@ -1224,6 +1236,9 @@ def v3_reset_draft_state(po3=None):
 			"accepted_qty": 0, "rejected_qty": 0, "returned_qty": 0, "short_qty": 0, "over_qty": 0,
 			"backorder_status": None, "backorder_eta": None, "backorder_cancel_reason": None,
 			"erp_po_item": None})
+	# the lines were written straight to the database, so the header still shows
+	# whatever the cleared short quantities made it worth
+	v3_recalc_totals(name)
 	frappe.response["message"] = "reset " + name
 
 
