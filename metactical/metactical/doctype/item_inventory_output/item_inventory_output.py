@@ -132,6 +132,7 @@ def get_all_bins_for_product_bundle(parent_item, net_available_bins = {}):
 
 	return {"all_bins": warehouse_item_qty, "bundle_items": bundle_items}
 
+@frappe.whitelist()
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None, doc=None):
 	try:	
 		if voucher_type is None:
