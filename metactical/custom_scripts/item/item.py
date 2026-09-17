@@ -133,7 +133,7 @@ class CustomItem(Item):
 
             # Inventory output must run for both plain renames and merges, regardless of
             # whether there were any reposts to process.
-            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue="long")
+            frappe.enqueue(update_item_inventory_output, item_code=new_item_code, voucher_type=self.doctype, queue="long")
             frappe.db.commit()
             
     def overwrite_item_defaults(self, old_item_code, new_item_code):
