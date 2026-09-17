@@ -273,7 +273,19 @@ frappe.ui.form.on('Purchase Order V3', {
     // an address the buyer chose by hand, and a ship-to that changes without
     // anyone noticing is the whole problem this field exists to solve.
     set_warehouse: function(frm) {
-        if (frm.doc.docstatus !== 0 || !frm.doc.shipping_address) return;
+        if (frm.doc.docstatus !== 0) return;
+
+        // Take the lines with it. A line left on the old warehouse is stock
+        // received somewhere nobody chose, and ERPNext blanks the native PO's
+        // Set Target Warehouse outright when its lines disagree. Same thing
+        // ERPNext does on this field (autofill_warehouse).
+        (frm.doc.items || []).forEach(function(row) {
+            if (row.warehouse !== frm.doc.set_warehouse) {
+                frappe.model.set_value(row.doctype, row.name, 'warehouse', frm.doc.set_warehouse);
+            }
+        });
+
+        if (!frm.doc.shipping_address) return;
         frm.set_value('shipping_address', null);
         frappe.show_alert({
             message: __('Ship To Address cleared - it will be filled in again when you save. Set it yourself if this order ships somewhere else.'),
