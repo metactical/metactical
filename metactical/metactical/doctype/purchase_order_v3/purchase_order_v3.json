@@ -21,6 +21,7 @@
   "approval_tier",
   "sec_shipto",
   "set_warehouse",
+  "shipping_address",
   "ship_to_display",
   "cb_shipto",
   "sender_email_account",
@@ -158,9 +159,16 @@
    "reqd": 1
   },
   {
+   "description": "The address printed on the order and sent to the supplier. Left blank it is filled from the supplier's default ship-to, or failing that from an address attached to the Ship To Warehouse. Set it here if this one order goes somewhere else.",
+   "fieldname": "shipping_address",
+   "fieldtype": "Link",
+   "label": "Ship To Address",
+   "options": "Address"
+  },
+  {
    "fieldname": "ship_to_display",
    "fieldtype": "Small Text",
-   "label": "Ship To Address",
+   "label": "Ship To",
    "read_only": 1
   },
   {
