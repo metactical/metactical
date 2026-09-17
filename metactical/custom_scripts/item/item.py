@@ -144,31 +144,6 @@ class CustomItem(Item):
 
             frappe.db.commit()
             
-    def recalculate_bin_qty(self, new_name):
-        """Override the base repost_stock (which hardcodes posting_date=1900-01-01 and
-        trips the period-closing ValidationError) with only_bin=True, so bins are rebuilt
-        without a full valuation repost. The correct combined quantity is then asserted by
-        _create_merge_stock_reconciliation in after_rename."""
-        from erpnext.stock.stock_balance import repost_stock
-
-        existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
-        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
-
-        repost_stock_for_warehouses = frappe.get_all(
-            "Stock Ledger Entry",
-            "warehouse",
-            filters={"item_code": new_name},
-            pluck="warehouse",
-            distinct=True,
-        )
-
-        frappe.db.delete("Bin", {"item_code": new_name})
-
-        for warehouse in repost_stock_for_warehouses:
-            repost_stock(new_name, warehouse, only_bin=True)
-
-        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
-
     def _create_merge_stock_reconciliation(self, new_item_code):
         """Assert the combined (old + new) per-warehouse quantity after a merge by
         submitting a Stock Reconciliation instead of editing bins/SLEs directly.
