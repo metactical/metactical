@@ -16,6 +16,12 @@ from metactical.procurement_v3.utils import (
 
 
 class PurchaseOrderV3(Document):
+	# Not before_insert: insert() validates links -- and so rejects the
+	# cancelled twin an amendment carries -- before that hook ever runs.
+	def insert(self, *args, **kwargs):
+		reset_amended_state(self)
+		return super().insert(*args, **kwargs)
+
 	def before_insert(self):
 		shared_series_naming(self)
 
@@ -36,6 +42,67 @@ class PurchaseOrderV3(Document):
 
 	def on_trash(self):
 		delete_native_po(self)
+
+
+# ---------------------------------------------------------------------------
+# Amending a cancelled order.
+#
+# Cancelling is final in Frappe - docstatus 2 is a dead end, and this workflow
+# has no transition out of Cancelled either. Amend is the way back: it opens a
+# fresh draft carrying the old order's supplier, lines and prices.
+#
+# The catch is that Amend deliberately ignores no_copy
+# (frappe/public/js/frappe/model/create_new.js: `!from_amend && df.no_copy`),
+# so the new draft arrives holding the CANCELLED order's workflow state, its
+# native twin, and every line's confirmed / shipped / received progress. Left
+# alone the insert dies on the first check it reaches -- "Cannot link cancelled
+# document: ERP Purchase Order" out of _validate_links -- and even with that
+# field empty it would die again in validate_workflow, on "Workflow State
+# transition not allowed from Draft to Cancelled".
+#
+# That first check is also why this runs from insert() rather than from a
+# before_insert hook: _validate_links goes first, ahead of every hook.
+#
+# So: put every no_copy field back to what a brand new order looks like. The
+# no_copy flags already say which fields those are, so nothing has to be listed
+# twice and a field added later is covered for free.
+#
+# Three survive on purpose:
+#   amended_from            - the link to what this replaces; the point of it
+#   material_request(_item) - cancelling the twin released those requests, and
+#                             this order is fulfilling the same ones, so the
+#                             link has to carry through for per_ordered to add
+#                             up again
+# ---------------------------------------------------------------------------
+AMEND_KEEP = ("amended_from", "material_request", "material_request_item")
+
+NUMERIC_FIELDTYPES = ("Int", "Float", "Currency", "Percent", "Check")
+
+
+def reset_amended_state(doc):
+	if not doc.get("amended_from"):
+		return
+
+	def fresh(d):
+		for df in d.meta.fields:
+			if not df.no_copy or df.fieldname in AMEND_KEEP:
+				continue
+			if df.fieldtype in NUMERIC_FIELDTYPES:
+				d.set(df.fieldname, F(df.default) if df.default else 0)
+			else:
+				d.set(df.fieldname, df.default or None)
+
+	fresh(doc)
+	for d in doc.items:
+		fresh(d)
+
+	# workflow_state is a Custom Field the Workflow creates with no_copy set, so
+	# the sweep above already cleared it - but it is the one field that MUST be
+	# right for the insert to survive validate_workflow, and it is not part of
+	# this doctype's own definition. Blank it explicitly rather than trust that.
+	# Empty is enough: validate_workflow then reads it as the workflow's first
+	# state (Draft) instead of comparing it against one.
+	doc.workflow_state = None
 
 
 # ---------------------------------------------------------------------------

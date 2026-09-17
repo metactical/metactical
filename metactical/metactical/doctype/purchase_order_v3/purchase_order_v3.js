@@ -191,7 +191,41 @@ function po3_paste_items(frm) {
     d.show();
 }
 
+// Amend hands back a copy of the cancelled order that deliberately keeps the
+// no_copy fields (create_new.js: `!from_amend && df.no_copy`), so the draft
+// opens showing that order's workflow state, its native PO and every line's
+// confirmed / received progress. The server clears all of it on insert; clear
+// it here as well so the buyer works on an order that already reads like a new
+// one, instead of one still claiming lines were confirmed against a PO that no
+// longer exists.
+//
+// Driven off the same no_copy flags the server uses, so the two cannot drift.
+var PO3_AMEND_KEEP = ['amended_from', 'material_request', 'material_request_item'];
+var PO3_NUMERIC = ['Int', 'Float', 'Currency', 'Percent', 'Check'];
+
+function po3_reset_amended(frm) {
+    if (!frm.is_new() || !frm.doc.amended_from) return;
+
+    var blank = function(doc) {
+        var fields = frappe.meta.docfield_list[doc.doctype]
+            || (frappe.get_meta(doc.doctype) || {}).fields || [];
+        fields.forEach(function(df) {
+            if (!cint(df.no_copy) || PO3_AMEND_KEEP.indexOf(df.fieldname) !== -1) return;
+            doc[df.fieldname] = PO3_NUMERIC.indexOf(df.fieldtype) !== -1
+                ? (flt(df.default) || 0)
+                : (df.default || null);
+        });
+    };
+
+    blank(frm.doc);
+    (frm.doc.items || []).forEach(blank);
+    frm.doc.workflow_state = null;
+}
+
+
 frappe.ui.form.on('Purchase Order V3', {
+    onload: po3_reset_amended,
+
     // Mirrors metactical's own override of this button on native Purchase
     // Order, not stock ERPNext's. get_all_items makes the server pull every
     // open Material Request for the supplier at once, so there is no document
