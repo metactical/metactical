@@ -166,6 +166,9 @@ doc_events = {
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
 	},
+	"Repost Item Valuation": {
+		"before_validate": "metactical.custom_scripts.repost_item_valuation.repost_item_valuation.clamp_repost_to_open_period"
+	},
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert"
 	}
