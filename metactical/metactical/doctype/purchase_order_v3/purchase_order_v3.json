@@ -21,7 +21,6 @@
   "approval_tier",
   "sec_shipto",
   "set_warehouse",
-  "shipping_address",
   "ship_to_display",
   "cb_shipto",
   "sender_email_account",
@@ -159,16 +158,9 @@
    "reqd": 1
   },
   {
-   "description": "The address printed on the order and sent to the supplier. Left blank it is filled from the supplier's default ship-to, or failing that from an address attached to the Ship To Warehouse. Set it here if this one order goes somewhere else.",
-   "fieldname": "shipping_address",
-   "fieldtype": "Link",
-   "label": "Ship To Address",
-   "options": "Address"
-  },
-  {
    "fieldname": "ship_to_display",
    "fieldtype": "Small Text",
-   "label": "Ship To",
+   "label": "Ship To Address",
    "read_only": 1
   },
   {
@@ -478,7 +470,7 @@
    "link_fieldname": "purchase_order_v3"
   }
  ],
- "modified": "2026-08-27 07:20:12.244439",
+ "modified": "2026-09-17 20:27:31.676548",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3",

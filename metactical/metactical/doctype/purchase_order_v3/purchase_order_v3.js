@@ -268,10 +268,7 @@ frappe.ui.form.on('Purchase Order V3', {
 
     currency: po3_fx,
 
-    // A new destination means the ship-to has to be worked out again, so clear
-    // it and let the server refill it on save. Say so out loud: this can drop
-    // an address the buyer chose by hand, and a ship-to that changes without
-    // anyone noticing is the whole problem this field exists to solve.
+    // A new destination has to take the lines with it.
     set_warehouse: function(frm) {
         if (frm.doc.docstatus !== 0) return;
 
@@ -284,13 +281,6 @@ frappe.ui.form.on('Purchase Order V3', {
                 frappe.model.set_value(row.doctype, row.name, 'warehouse', frm.doc.set_warehouse);
             }
         });
-
-        if (!frm.doc.shipping_address) return;
-        frm.set_value('shipping_address', null);
-        frappe.show_alert({
-            message: __('Ship To Address cleared - it will be filled in again when you save. Set it yourself if this order ships somewhere else.'),
-            indicator: 'orange'
-        }, 7);
     },
     supplier: function(frm) {
         if (!frm.doc.supplier) return;
@@ -318,15 +308,6 @@ frappe.ui.form.on('Purchase Order V3', {
             if (!d.rate) po3_pull_rate(frm, d.doctype, d.name);
         });
     },
-    onload_post_render: function(frm) {
-        frm.set_query('shipping_address', function() {
-            return {
-                query: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.ship_to_address_query',
-                filters: { warehouse: frm.doc.set_warehouse, company: frm.doc.company }
-            };
-        });
-    },
-
     refresh: function(frm) {
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭱ Paste Items'), function() { po3_paste_items(frm); });
