@@ -129,11 +129,6 @@ def po_ship_date(doc):
 # ---------------------------------------------------------------------------
 def shared_series_naming(doc):
 	if not (doc.name and doc.name.startswith("PO3-")):
-		# before_insert runs ahead of validate, so the ship-to has to be worked
-		# out here too - otherwise the twin is born with a blank shipping_address
-		# and ERPNext has already filled in a company address by the time the
-		# buyer looks at it. Quietly: validate is a moment away and will warn.
-		resolve_ship_to(doc, warn=False)
 		resolve_currency(doc)
 		npo = frappe.new_doc("Purchase Order")
 		npo.supplier = doc.supplier
@@ -160,15 +155,6 @@ def shared_series_naming(doc):
 		npo.conversion_rate = F(doc.conversion_rate) or 1
 		npo.buying_price_list = doc.buying_price_list
 		npo.set_warehouse = doc.set_warehouse
-		# Set before the save: BuyingController.set_missing_values only fills a
-		# BLANK shipping_address, so putting one here is what stops ERPNext
-		# reaching for an arbitrary company address.
-		#
-		# Guarded, because pushing a blank would be worse than leaving it alone:
-		# with nothing to resolve, someone may have corrected the address on the
-		# twin by hand, and that correction has to survive the next sync.
-		if doc.shipping_address:
-			npo.shipping_address = doc.shipping_address
 		if doc.notes_to_supplier:
 			npo.drop_ship_notes = doc.notes_to_supplier
 		for d in doc.items:
@@ -307,7 +293,12 @@ def validate(doc):
 
 	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
 
-	resolve_ship_to(doc)
+	if doc.set_warehouse:
+		w = frappe.db.get_value("Warehouse", doc.set_warehouse,
+			["warehouse_name", "address_line_1", "address_line_2", "city", "state", "pin"], as_dict=True)
+		if w:
+			parts = [w.warehouse_name, w.address_line_1, w.address_line_2, w.city, w.state, w.pin]
+			doc.ship_to_display = ", ".join([p for p in parts if p])
 
 	if not doc.ack_expected:
 		doc.confirmation_status = "Not Requested"
@@ -362,130 +353,6 @@ def resolve_currency(doc):
 
 
 # ---------------------------------------------------------------------------
-# Where the order actually ships to.
-#
-# The native Purchase Order prints `shipping_address` -- a Link to an Address
-# doc -- and PO3 never set it, so ERPNext filled it in on its own. Its fallback
-# chain ends at get_company_address(): the first Address linked to the company,
-# ordered by is_primary_address, LIMIT 1. With several company addresses and no
-# clear primary, that tie is broken by whatever the database feels like, which
-# is how orders bound for the warehouse came out printed to Downtown Store or
-# to Camo VIC.
-#
-# The old native form never hit that path. A client wrapper
-# (custom_scripts/purchase_order/purchase_order.js) rerouted get_party_details
-# to metactical's own, which set shipping_address from the supplier's
-# nat_shipping_address. PO3 builds its twin server-side, where no browser code
-# runs, so the supplier default was silently dropped.
-#
-# Resolved here instead, and only ever to fill a blank -- an address the buyer
-# picked on this order is never overwritten:
-#
-#   1. the supplier's default ship-to (nat_shipping_address)
-#   2. an Address attached to the Ship To Warehouse
-#
-# The supplier goes first, and deliberately so. Ship To Warehouse says which
-# stock bucket the goods land in; it is not always where the supplier sends the
-# box. Evike ships to the FTN consolidator while the stock belongs to W01-WHS,
-# and that is exactly what nat_shipping_address records. Letting a warehouse
-# address outrank it would quietly reroute those orders the first time anyone
-# attached an Address to a warehouse.
-#
-# Nothing resolved leaves the field blank and says so out loud, because ERPNext
-# will then reach for that arbitrary company address again and a wrong ship-to
-# is expensive to discover after the fact.
-# ---------------------------------------------------------------------------
-def warehouse_ship_to_address(warehouse):
-	"""The Address attached to a Warehouse, preferring one flagged as shipping."""
-	if not warehouse:
-		return None
-	from frappe.contacts.doctype.address.address import get_default_address
-
-	return get_default_address("Warehouse", warehouse, "is_shipping_address")
-
-
-def resolve_ship_to(doc, warn=True):
-	if not doc.shipping_address:
-		doc.shipping_address = (
-			(frappe.db.get_value("Supplier", doc.supplier, "nat_shipping_address")
-				if doc.supplier else None)
-			or warehouse_ship_to_address(doc.set_warehouse))
-
-	if doc.shipping_address:
-		# one line, so it reads cleanly in the email body as well as on the form
-		a = frappe.db.get_value("Address", doc.shipping_address,
-			["address_title", "address_line1", "address_line2", "city", "state",
-			 "pincode", "country"], as_dict=True) or {}
-		parts = [a.get("address_title"), a.get("address_line1"), a.get("address_line2"),
-			a.get("city"), a.get("state"), a.get("pincode"), a.get("country")]
-	else:
-		w = frappe.db.get_value("Warehouse", doc.set_warehouse,
-			["warehouse_name", "address_line_1", "address_line_2", "city", "state", "pin"],
-			as_dict=True) or {}
-		parts = [w.get("warehouse_name"), w.get("address_line_1"), w.get("address_line_2"),
-			w.get("city"), w.get("state"), w.get("pin")]
-		if warn and doc.set_warehouse and doc.docstatus == 0:
-			frappe.msgprint("<b>No Ship To Address could be worked out for this order.</b>"
-				+ "<br><br>It will print whichever company address ERPNext picks, which may "
-				+ "not be where you want the goods delivered.<br><br>Pick one in "
-				+ "<b>Ship To Address</b> above, or set a default ship-to on <b>"
-				+ (doc.supplier or "the supplier") + "</b> so every order to them gets it.")
-
-	doc.ship_to_display = ", ".join([p for p in parts if p])
-
-
-@frappe.whitelist()
-@frappe.validate_and_sanitize_search_inputs
-def ship_to_address_query(doctype, txt, searchfield, start, page_len, filters):
-	"""Addresses this order could ship to.
-
-	Every place the business actually receives goods, and nothing else:
-
-	  - Addresses attached to the Ship To Warehouse
-	  - the company's own addresses
-	  - any address already set as some supplier's default ship-to
-
-	That third source is not decoration. Most of the ship-to addresses in use
-	are not flagged is_your_company_address and are not linked to the company at
-	all, so without it the list would hide the very addresses resolve_ship_to
-	hands out -- a buyer would see one filled in that they could not have picked
-	themselves, and could not pick again after clearing it.
-
-	An unfiltered Address link is the thing to avoid: on a site with hundreds of
-	suppliers it is mostly their billing addresses, which is a long list to
-	scroll and an easy one to ship an order to by mistake.
-	"""
-	filters = filters or {}
-	return frappe.db.sql("""
-		select distinct a.name, a.address_title, a.city
-		from `tabAddress` a
-		left join `tabDynamic Link` dl
-			on dl.parent = a.name and dl.parenttype = 'Address'
-		where ifnull(a.disabled, 0) = 0
-			and (
-				(dl.link_doctype = 'Warehouse' and dl.link_name = %(warehouse)s)
-				or (dl.link_doctype = 'Company' and dl.link_name = %(company)s
-					and ifnull(a.is_your_company_address, 0) = 1)
-				or a.name in (
-					select s.nat_shipping_address from `tabSupplier` s
-					where ifnull(s.nat_shipping_address, '') != ''
-				)
-			)
-			and (a.name like %(txt)s
-				or ifnull(a.address_title, '') like %(txt)s
-				or ifnull(a.city, '') like %(txt)s)
-		order by a.is_shipping_address desc, a.name asc
-		limit %(start)s, %(page_len)s
-	""", {
-		"warehouse": filters.get("warehouse"),
-		"company": filters.get("company"),
-		"txt": "%" + (txt or "") + "%",
-		"start": start,
-		"page_len": page_len,
-	})
-
-
-# ---------------------------------------------------------------------------
 # Migrated from Server Script "PO3 Auto Send On Approve"
 # (DocType Event / After Submit on Purchase Order V3).
 #
@@ -509,8 +376,6 @@ def auto_send_on_approve(doc):
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
-			if doc.shipping_address:
-				npo.shipping_address = doc.shipping_address
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.
@@ -640,8 +505,6 @@ def submitted_updates(doc):
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
-			if doc.shipping_address:
-				npo.shipping_address = doc.shipping_address
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.

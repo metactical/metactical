@@ -29,6 +29,15 @@
   "source_document",
   "sec_items",
   "items",
+  "sec_totals",
+  "total_ordered_qty",
+  "total_qty",
+  "total_backorder_qty",
+  "cb_totals",
+  "currency",
+  "conversion_rate",
+  "total",
+  "base_total",
   "sec_backorders",
   "backorders",
   "sec_notes",
@@ -180,6 +189,65 @@
    "reqd": 1
   },
   {
+   "fieldname": "sec_totals",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "description": "Outstanding quantity on the lines above, before the supplier's answer.",
+   "fieldname": "total_ordered_qty",
+   "fieldtype": "Float",
+   "label": "Total Ordered Qty",
+   "read_only": 1
+  },
+  {
+   "description": "What the supplier has committed to ship on this confirmation.",
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "label": "Total Confirmed Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_backorder_qty",
+   "fieldtype": "Float",
+   "label": "Total Back-ordered Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "purchase_order_v3.currency",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "purchase_order_v3.conversion_rate",
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "precision": "9",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Currency",
+   "label": "Total Confirmed Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "base_total",
+   "fieldtype": "Currency",
+   "label": "Total Confirmed Amount (Company Currency)",
+   "options": "Company:company:default_currency",
+   "read_only": 1
+  },
+  {
    "collapsible": 1,
    "collapsible_depends_on": "eval:(doc.backorders||[]).length",
    "depends_on": "eval:(doc.backorders||[]).length",
@@ -232,7 +300,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:44.216153",
+ "modified": "2026-09-17 19:59:38.210789",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Order Confirmation V3",
