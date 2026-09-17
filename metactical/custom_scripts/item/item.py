@@ -5,7 +5,7 @@ from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
 import datetime
 import requests
-from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost, RepostItemValuation
+from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 
 
 def _background_repost_and_update_inventory(doc_names, item_code, doctype):
@@ -15,8 +15,8 @@ def _background_repost_and_update_inventory(doc_names, item_code, doctype):
     guaranteed to execute after the last repost completes.
     """
     for name in doc_names:
-        doc = frappe.get_doc("Repost Item Valuation", name)
         try:
+            doc = frappe.get_doc("Repost Item Valuation", name)
             doc.deduplicate_similar_repost()
             repost(doc)
         except Exception:
@@ -25,11 +25,27 @@ def _background_repost_and_update_inventory(doc_names, item_code, doctype):
                 message=frappe.get_traceback(),
             )
 
+    # Always runs, even if individual reposts failed
     update_item_inventory_output(item_code=item_code, voucher_type=doctype)
 
 
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
+        if merge:
+            # Capture both items' actual_qty per warehouse before any bins are deleted.
+            # super().before_rename deletes old bins; recalculate_bin_qty deletes new bins.
+            # We need both to compute the correct combined qty.
+            frappe.flags["_merge_old_item_bins"] = frappe.get_all(
+                "Bin",
+                filters={"item_code": old_item_code},
+                fields=["warehouse", "actual_qty"],
+            )
+            frappe.flags["_merge_new_item_bins"] = frappe.get_all(
+                "Bin",
+                filters={"item_code": new_item_code},
+                fields=["warehouse", "actual_qty"],
+            )
+
         super().before_rename(old_item_code, new_item_code, merge)
 
         try:
@@ -130,35 +146,59 @@ class CustomItem(Item):
 
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
-        finally:    
-            repost_item_valuations = frappe.get_list("Repost Item Valuation", 
-                                                    filters={"item_code": new_item_code, "status": "Queued"}, 
-                                                    fields=["name", "warehouse"],
-                                                    order_by="creation desc"
-                                                )
-            if not repost_item_valuations:
-                return
+        finally:
+            repost_item_valuations = frappe.get_list(
+                "Repost Item Valuation",
+                filters={"item_code": new_item_code, "status": "Queued"},
+                fields=["name", "warehouse"],
+                order_by="creation desc",
+            )
 
-            for repost_item_valuation in repost_item_valuations:
-                if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
+            # Collect valid (non-disabled-warehouse) repost doc names, deduplicating as we go.
+            valid_repost_names = []
+            for riv in repost_item_valuations:
+                if frappe.db.get_value("Warehouse", riv.warehouse, "disabled"):
                     continue
-                
-                doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
                 try:
+                    doc = frappe.get_doc("Repost Item Valuation", riv.name)
                     doc.deduplicate_similar_repost()
-                    frappe.enqueue(repost, doc=doc, queue='long')
-                except Exception as e:
-                    frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
-                    
-            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
+                    valid_repost_names.append(riv.name)
+                except Exception:
+                    frappe.log_error(
+                        title="Error preparing Repost Item Valuation after item rename/merge",
+                        message=frappe.get_traceback(),
+                    )
+
+            if valid_repost_names:
+                # Run all reposts sequentially in one background job, then trigger
+                # inventory output at the end — guarantees correct ordering.
+                frappe.enqueue(
+                    _background_repost_and_update_inventory,
+                    doc_names=valid_repost_names,
+                    item_code=new_item_code,
+                    doctype=self.doctype,
+                    queue="long",
+                    timeout=1800,
+                )
+            else:
+                # No pending reposts (plain rename, or all warehouses disabled) —
+                # still update inventory output for the renamed/merged item.
+                frappe.enqueue(
+                    update_item_inventory_output,
+                    item_code=new_item_code,
+                    voucher_type=self.doctype,
+                    queue="long",
+                )
+
             frappe.db.commit()
             
     def recalculate_bin_qty(self, new_name):
         """Override to use only_bin=True so repost_actual_qty (which hardcodes
         posting_date=1900-01-01) is skipped. That avoids the period-closing
         ValidationError. Actual item-valuation reposting is handled separately
-        by _repost_after_merge which respects the period-closing date."""
+        by _create_repost_entries_for_merge which respects the period-closing date."""
         from erpnext.stock.stock_balance import repost_stock
+        from frappe.utils import flt
 
         existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
@@ -176,65 +216,78 @@ class CustomItem(Item):
         for warehouse in repost_stock_for_warehouses:
             repost_stock(new_name, warehouse, only_bin=True)
 
+        # get_balance_qty_from_sle (used above via only_bin=True) picks the LAST SLE's
+        # qty_after_transaction. After a merge the SLEs from both items are interleaved
+        # under new_name but each still carries its original item's running balance, so
+        # the last SLE belongs to whichever item had the more recent transaction — NOT
+        # the combined stock. Adding just the old item's qty on top would double-count
+        # it when the old item's SLE happened to be the most recent.
+        #
+        # Correct approach: sum both items' pre-merge actual_qty per warehouse directly
+        # from the bins we captured in before_rename (before any bins were deleted).
+        old_item_bins = frappe.flags.get("_merge_old_item_bins")
+        new_item_bins = frappe.flags.get("_merge_new_item_bins")
+
+        if old_item_bins is not None or new_item_bins is not None:
+            combined_qty = {}
+            for b in (old_item_bins or []):
+                combined_qty[b.warehouse] = combined_qty.get(b.warehouse, 0) + flt(b.actual_qty)
+            for b in (new_item_bins or []):
+                combined_qty[b.warehouse] = combined_qty.get(b.warehouse, 0) + flt(b.actual_qty)
+
+            for warehouse, total_qty in combined_qty.items():
+                if not total_qty:
+                    continue
+                bin_name = frappe.db.get_value("Bin", {"item_code": new_name, "warehouse": warehouse}, "name")
+                if bin_name:
+                    frappe.db.set_value("Bin", bin_name, "actual_qty", total_qty)
+                else:
+                    frappe.get_doc({
+                        "doctype": "Bin",
+                        "item_code": new_name,
+                        "warehouse": warehouse,
+                        "actual_qty": total_qty,
+                    }).insert(ignore_permissions=True)
+
+            all_merge_warehouses = list({
+                b.warehouse for b in (old_item_bins or []) + (new_item_bins or [])
+            })
+            self._create_repost_entries_for_merge(new_name, all_merge_warehouses)
+            frappe.flags.pop("_merge_old_item_bins", None)
+            frappe.flags.pop("_merge_new_item_bins", None)
+
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
 
-    def _repost_after_merge(self, item_code):
-        from frappe.utils import getdate
-        from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import RepostItemValuation
+    def _create_repost_entries_for_merge(self, item_code, warehouses):
+        """Create Repost Item Valuation entries so SLE running balances are
+        recalculated after the merge.  Uses the earliest SLE date per warehouse
+        to avoid the period-closing-date ValidationError in repost_actual_qty."""
+        from erpnext.controllers.stock_controller import create_repost_item_valuation_entry
 
-        repost_item_valuations = frappe.get_list(
-            "Repost Item Valuation",
-            filters={"item_code": item_code, "status": "Queued"},
-            fields=["name", "warehouse", "posting_date"],
-            order_by="creation desc",
-        )
-        if not repost_item_valuations:
-            return
-
-        warehouses = [r.warehouse for r in repost_item_valuations if r.warehouse]
-        warehouse_map = {
-            r.name: r
-            for r in frappe.get_all(
-                "Warehouse",
-                filters={"name": ["in", warehouses]},
-                fields=["name", "company", "disabled"],
-            )
-        }
-        closing_date_cache = {}
-        docs_to_repost = []
-
-        for riv in repost_item_valuations:
-            wh = warehouse_map.get(riv.warehouse)
-            if not wh or wh.disabled:
-                continue
-
-            company = wh.company
-            if company:
-                if company not in closing_date_cache:
-                    closing_date_cache[company] = RepostItemValuation.get_max_period_closing_date(company)
-
-                max_closing_date = closing_date_cache[company]
-                if max_closing_date and getdate(riv.posting_date) <= getdate(max_closing_date):
-                    frappe.db.set_value("Repost Item Valuation", riv.name, "status", "Skipped")
+        for warehouse in warehouses:
+            try:
+                min_posting_date = frappe.db.sql(
+                    """select min(posting_date) from `tabStock Ledger Entry`
+                    where item_code=%s and warehouse=%s and is_cancelled=0""",
+                    (item_code, warehouse),
+                )[0][0]
+                if not min_posting_date:
                     continue
 
-            docs_to_repost.append(riv.name)
-
-        if not docs_to_repost:
-            return
-
-        # Commit the rename before handing off to the background job so the
-        # worker sees the updated item_code in the stock ledger entries.
-        frappe.db.commit()
-
-        frappe.enqueue(
-            _background_repost_and_update_inventory,
-            doc_names=docs_to_repost,
-            item_code=item_code,
-            doctype=self.doctype,
-            queue="long",
-            timeout=1800,  # set a timeout of 3000 seconds for the background job
-        )
+                company = frappe.db.get_value("Warehouse", warehouse, "company")
+                create_repost_item_valuation_entry({
+                    "based_on": "Item and Warehouse",
+                    "item_code": item_code,
+                    "warehouse": warehouse,
+                    "posting_date": min_posting_date,
+                    "posting_time": "00:00",
+                    "company": company,
+                })
+            except Exception:
+                frappe.log_error(
+                    title="Error creating Repost Item Valuation after item merge",
+                    message=frappe.get_traceback(),
+                )
 
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
@@ -292,21 +345,6 @@ class CustomItem(Item):
                     message=frappe.get_traceback()
                 )
 
-    def repost_bin_qty(self, item_code):
-        bins = frappe.get_all(
-            "Bin",
-            filters={"item_code": item_code},
-            pluck="name",
-        )
-        for bin_name in bins:
-            try:
-                frappe.get_doc("Bin", bin_name).recalculate_qty()
-            except Exception:
-                frappe.log_error(
-                    title="Error recalculating bin qty after rename",
-                    message=frappe.get_traceback(),
-                )
-        
     def copy_barcodes(self, old_item_code, new_item_code):
         old_barcodes = frappe.get_all(
             "Item Barcode",
@@ -773,181 +811,3 @@ def get_item_details(item_code):
     except Exception as e:
         frappe.log_error(title="Error in get_item_details API", message=frappe.get_traceback())
         frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
-
-
-def validate_variants_in_websites(doc):
-    """Ask every website this product is published to whether its variants are acceptable.
-
-    Called on each Item save. Warn only, never block: a website being unreachable — or rejecting a
-    variant — must not stop anyone saving an item in ERP.
-    """
-    # Bulk paths would fire a request per row, and nobody is there to read the warnings.
-    if (frappe.flags.get("item_from_excel") or frappe.flags.in_import
-            or frappe.flags.in_migrate or frappe.flags.in_install):
-        return
-
-    template = doc.variant_of or doc.item_code
-
-    # Saving a template cascades into a save of every variant (erpnext's Item.update_variants) and
-    # they all resolve to the same family, so validate it once per request.
-    validated = frappe.flags.setdefault("variant_validation_done", set())
-    if template in validated:
-        return
-
-    try:
-        variants = frappe.get_all("Item", filters={"variant_of": template}, order_by="name", pluck="name")
-        if not variants:
-            # A plain item, or a template with no variants yet — nothing to validate.
-            return
-
-        validated.add(template)
-
-        # Use the in-flight document when it is the template, so the retail SKU and price lists
-        # being validated are the ones the user is saving, not the stored copy.
-        template_doc = doc if doc.item_code == template else frappe.get_doc("Item", template)
-
-        # The product is identified by its retail SKU, but most templates carry none — fall
-        # back to the item code, which is always set, rather than skipping the validation.
-        product_external_id = template_doc.ifw_retailskusuffix or template_doc.item_code
-
-        configs = frappe.get_all(
-            "Item Import Validation",
-            filters={"parentfield": "variant_validation_apis", "enabled": 1},
-            fields=["*"]
-        )
-        if not configs:
-            return
-
-        payload = build_variant_payload(product_external_id, variants, doc)
-
-        problems_by_site = {}
-        for item_detail in template_doc.item_detail:
-            site_name = item_detail.price_list.split("-")[-1].strip()
-
-            for config in configs:
-                if item_detail.price_list == config.price_list:
-                    problems = post_variant_validation(config, payload, site_name)
-                    if problems:
-                        problems_by_site.setdefault(site_name, []).extend(problems)
-
-        if problems_by_site:
-            frappe.msgprint(
-                format_variant_problems(problems_by_site),
-                title="Variants need attention",
-                indicator="orange"
-            )
-
-    except Exception as e:
-        frappe.log_error(title="Error in variant validation API", message=frappe.get_traceback())
-        frappe.msgprint("Could not validate the variants against the websites. Please check the error log for more information.")
-
-def build_variant_payload(product_external_id, variants, in_flight_doc=None):
-    """Build the papi_validate_variants body for one product.
-
-    `in_flight_doc` is the document being saved; its own values are used in place of the stored
-    copy, so the user is warned about the edits they are making rather than the ones on disk.
-    """
-    variant_payload = []
-
-    for variant_code in variants:
-        if in_flight_doc is not None and in_flight_doc.item_code == variant_code:
-            variant = in_flight_doc
-        else:
-            variant = frappe.get_doc("Item", variant_code)
-
-        # Specifications the websites use to tell variants apart: label -> chosen description.
-        # Rows with no description carry no selector value, so they are left out.
-        specifications = {}
-        for spec in variant.get("neb_website_specifications") or []:
-            if spec.label and spec.description:
-                specifications[spec.label] = spec.description
-
-        variant_payload.append({
-            "identifier": variant.item_code,
-            "retailSkuSuffix": variant.ifw_retailskusuffix,
-            "specifications": specifications
-        })
-
-    return {
-        "productExternalId": product_external_id,
-        "variants": variant_payload
-    }
-
-def format_variant_problems(problems_by_site):
-    """Render the per-website problems as something readable in a popup.
-
-    One block per website, its problems as a plain list — no error codes, since they say nothing
-    the sentence next to them doesn't already say.
-    """
-    blocks = ["<div style='margin-bottom:6px'>The item was saved, but these websites will not accept its variants:</div>"]
-
-    for site_name, problems in problems_by_site.items():
-        # A site can report the same problem several times — once per offending variant — and the
-        # messages carry no variant name, so the repeats read as identical lines. Show each once.
-        unique_problems = list(dict.fromkeys(problems))
-
-        items = "".join("<li style='margin-bottom:2px'>{0}</li>".format(problem) for problem in unique_problems)
-        blocks.append(
-            "<div style='margin-bottom:8px'><b>{0}</b>"
-            "<ul style='margin:4px 0 0 0; padding-left:18px'>{1}</ul></div>".format(site_name, items)
-        )
-
-    return "".join(blocks)
-
-def post_variant_validation(config, payload, site_name):
-    """Send one product's variants to one website; return what it objected to, in plain words.
-
-    An empty list means the site is happy — nothing is reported on success, since this runs on
-    every save and a confirmation each time would just be noise. The site's name is added by the
-    caller, which groups the problems per website.
-    """
-    try:
-        response = requests.post(
-            config.api_url,
-            json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + config.api_key
-            },
-            # This runs inside a save, so a slow site must not hold the user's form open.
-            timeout=10
-        )
-    except Exception as e:
-        frappe.log_error(
-            title="Variant validation request failed for {0}".format(site_name),
-            message=frappe.get_traceback()
-        )
-        return ["This website could not be reached, so its variants were not checked."]
-
-    if response.status_code != 200:
-        frappe.log_error(
-            title="Variant validation failed for {0}".format(site_name),
-            message="Status: {0}\nResponse: {1}".format(response.status_code, response.text)
-        )
-        return ["This website returned an error ({0}), so its variants were not checked.".format(response.status_code)]
-
-    try:
-        data = response.json() or {}
-    except ValueError:
-        frappe.log_error(
-            title="Variant validation returned invalid JSON for {0}".format(site_name),
-            message=response.text
-        )
-        return ["This website sent back a response we could not read, so its variants were not checked."]
-
-    if data.get("valid"):
-        return []
-
-    errors = data.get("errors") or []
-    if not errors:
-        return ["The variants were rejected, but no reason was given."]
-
-    messages = []
-    for error in errors:
-        # The Message is a full sentence already; the Code repeats it in shouting case.
-        message = error.get("Message") or error.get("message")
-        if not message:
-            message = "Rejected: {0}".format(error.get("Code") or error.get("code") or "no reason given")
-        messages.append(frappe.utils.escape_html(message))
-
-    return messages
