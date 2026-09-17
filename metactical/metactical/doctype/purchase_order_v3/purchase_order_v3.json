@@ -103,7 +103,7 @@
    "reqd": 1
   },
   {
-   "description": "The PO cancel date. Lines not fulfilled by then are candidates for backorder cancellation.",
+   "description": "The PO cancel date, printed on the order the supplier receives. Lines not fulfilled by then are candidates for backorder cancellation. Optional while the order is a draft; required before it can be sent for approval.",
    "fieldname": "required_by",
    "fieldtype": "Date",
    "label": "Required By (Cancel Date)"
