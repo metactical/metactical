@@ -6,7 +6,7 @@ import json
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.utils import F, mirror_po3_status
+from metactical.procurement_v3.utils import F, mirror_po3_status, v3_recalc_totals
 
 
 class SupplierOrderConfirmationV3(Document):
@@ -303,6 +303,10 @@ def mirror_to_po3(doc):
 		hdr["workflow_state"] = "Acknowledged"
 
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
+
+	# lines just went dead (stock out, discontinued, cancelled, partial) and the
+	# order is long since submitted, so nothing else will re-add the header up
+	v3_recalc_totals(po.name)
 
 	mirror_po3_status(po.name)
 

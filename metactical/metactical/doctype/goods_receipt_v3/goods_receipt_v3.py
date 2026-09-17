@@ -9,6 +9,7 @@ from metactical.procurement_v3.utils import (
 	mirror_po3_status,
 	v3_may_close_native,
 	v3_open_bo,
+	v3_recalc_totals,
 	v3_reconcile,
 )
 
@@ -324,6 +325,7 @@ def post_to_po3(doc):
 		rows[r.name] = r
 
 	open_bo_before = v3_open_bo(po.name)
+	short_changed = False
 	for d in doc.items:
 		if not d.po3_item:
 			continue
@@ -350,6 +352,7 @@ def post_to_po3(doc):
 			upd["line_status"] = "Closed Short"
 			upd["short_qty"] = F(r.qty) - rec
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
+		short_changed = short_changed or "short_qty" in upd
 
 	# write receipts back onto the confirmation's Back Orders rows
 	for d in doc.items:
@@ -397,6 +400,10 @@ def post_to_po3(doc):
 		if po.workflow_state in ("Sent to Supplier", "Acknowledged"):
 			hdr["workflow_state"] = "Partially Received"
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
+
+	if short_changed:
+		# a line was short-closed, so the order will never be worth what it says
+		v3_recalc_totals(po.name)
 
 	frappe.db.set_value(doc.doctype, doc.name, {
 		"posted_on": frappe.utils.now_datetime(), "posted_by": frappe.session.user})

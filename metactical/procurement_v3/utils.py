@@ -21,6 +21,55 @@ def F(x):
 	return float(x or 0)
 
 
+def billable_qty(qty, short_qty):
+	"""How much of a line is still expected to cost us.
+
+	short_qty is the quantity that will never arrive, and every part of the flow
+	already maintains it with exactly that meaning: the confirmation sets it to
+	the whole line on Supplier Stock Out / Discontinued / Cancelled and to the
+	unconfirmed remainder on a partial, and a receipt sets it to the shortfall
+	only when it short-closes the line. A balance that is merely late -- a
+	back-order, or a partial receipt still expecting the rest -- leaves it at 0.
+
+	So the ordered quantity minus that is what the order is still worth, and no
+	status list has to be kept in step here to work it out.
+	"""
+	return max(F(qty) - F(short_qty), 0.0)
+
+
+def v3_recalc_totals(po3_name):
+	"""Re-derive a submitted order's totals from its lines.
+
+	The header totals are worked out in the PO3 controller's validate, which
+	stops running the moment the order is submitted -- and lines go dead well
+	after that, when the supplier answers. Without this, an order that lost half
+	its lines to a stock-out kept quoting the full price it was placed at.
+
+	approval_tier is deliberately left alone. It records the authority the order
+	needed when it was placed, which is a fact about the past; a later stock-out
+	does not retroactively make it a smaller decision.
+	"""
+	rate = F(frappe.db.get_value("Purchase Order V3", po3_name, "conversion_rate")) or 1.0
+	total_qty = 0.0
+	total = 0.0
+	for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": po3_name},
+			fields=["name", "qty", "rate", "short_qty", "amount"], limit_page_length=0):
+		qty = billable_qty(r.qty, r.short_qty)
+		amount = qty * F(r.rate)
+		if F(r.amount) != amount:
+			# keep the grid adding up to the header - a column that does not sum
+			# to the total printed under it is the thing people query
+			frappe.db.set_value("Purchase Order V3 Item", r.name, "amount", amount,
+				update_modified=False)
+		total_qty += qty
+		total += amount
+
+	frappe.db.set_value("Purchase Order V3", po3_name, {
+		"total_qty": total_qty,
+		"total": total,
+		"base_grand_total": total * rate}, update_modified=False)
+
+
 def mirror_po3_status(po3_name):
 	row = frappe.db.get_value("Purchase Order V3", po3_name,
 		["erp_purchase_order", "workflow_state"], as_dict=True)
