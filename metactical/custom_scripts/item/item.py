@@ -5,28 +5,6 @@ from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
 import datetime
 import requests
-from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
-
-
-def _background_repost_and_update_inventory(doc_names, item_code, doctype):
-    """Run repost item valuations sequentially then update inventory output.
-
-    Runs as a single background job so update_item_inventory_output is
-    guaranteed to execute after the last repost completes.
-    """
-    for name in doc_names:
-        try:
-            doc = frappe.get_doc("Repost Item Valuation", name)
-            doc.deduplicate_similar_repost()
-            repost(doc)
-        except Exception:
-            frappe.log_error(
-                title="Error during reposting item valuation after item merge",
-                message=frappe.get_traceback(),
-            )
-
-    # Always runs, even if individual reposts failed
-    update_item_inventory_output(item_code=item_code, voucher_type=doctype)
 
 
 class CustomItem(Item):
@@ -147,58 +125,31 @@ class CustomItem(Item):
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
         finally:
-            repost_item_valuations = frappe.get_list(
-                "Repost Item Valuation",
-                filters={"item_code": new_item_code, "status": "Queued"},
-                fields=["name", "warehouse"],
-                order_by="creation desc",
+            if merge:
+                # Assert the combined post-merge quantity through a Stock Reconciliation
+                # instead of poking bins/SLEs by hand. Posted at "now" it lands after any
+                # period-closing date and produces a clean ledger entry for later
+                # transactions to build on, so a delayed repost can no longer overwrite the
+                # bin with a replay of the (inconsistent) merged ledger.
+                self._create_merge_stock_reconciliation(new_item_code)
+
+            # Refresh inventory output for the renamed/merged item. For a merge this runs
+            # after the reconciliation's SLE has updated the bins.
+            frappe.enqueue(
+                update_item_inventory_output,
+                item_code=new_item_code,
+                voucher_type=self.doctype,
+                queue="long",
             )
-
-            # Collect valid (non-disabled-warehouse) repost doc names, deduplicating as we go.
-            valid_repost_names = []
-            for riv in repost_item_valuations:
-                if frappe.db.get_value("Warehouse", riv.warehouse, "disabled"):
-                    continue
-                try:
-                    doc = frappe.get_doc("Repost Item Valuation", riv.name)
-                    doc.deduplicate_similar_repost()
-                    valid_repost_names.append(riv.name)
-                except Exception:
-                    frappe.log_error(
-                        title="Error preparing Repost Item Valuation after item rename/merge",
-                        message=frappe.get_traceback(),
-                    )
-
-            if valid_repost_names:
-                # Run all reposts sequentially in one background job, then trigger
-                # inventory output at the end — guarantees correct ordering.
-                frappe.enqueue(
-                    _background_repost_and_update_inventory,
-                    doc_names=valid_repost_names,
-                    item_code=new_item_code,
-                    doctype=self.doctype,
-                    queue="long",
-                    timeout=1800,
-                )
-            else:
-                # No pending reposts (plain rename, or all warehouses disabled) —
-                # still update inventory output for the renamed/merged item.
-                frappe.enqueue(
-                    update_item_inventory_output,
-                    item_code=new_item_code,
-                    voucher_type=self.doctype,
-                    queue="long",
-                )
 
             frappe.db.commit()
             
     def recalculate_bin_qty(self, new_name):
-        """Override to use only_bin=True so repost_actual_qty (which hardcodes
-        posting_date=1900-01-01) is skipped. That avoids the period-closing
-        ValidationError. Actual item-valuation reposting is handled separately
-        by _create_repost_entries_for_merge which respects the period-closing date."""
+        """Override the base repost_stock (which hardcodes posting_date=1900-01-01 and
+        trips the period-closing ValidationError) with only_bin=True, so bins are rebuilt
+        without a full valuation repost. The correct combined quantity is then asserted by
+        _create_merge_stock_reconciliation in after_rename."""
         from erpnext.stock.stock_balance import repost_stock
-        from frappe.utils import flt
 
         existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
@@ -216,78 +167,108 @@ class CustomItem(Item):
         for warehouse in repost_stock_for_warehouses:
             repost_stock(new_name, warehouse, only_bin=True)
 
-        # get_balance_qty_from_sle (used above via only_bin=True) picks the LAST SLE's
-        # qty_after_transaction. After a merge the SLEs from both items are interleaved
-        # under new_name but each still carries its original item's running balance, so
-        # the last SLE belongs to whichever item had the more recent transaction — NOT
-        # the combined stock. Adding just the old item's qty on top would double-count
-        # it when the old item's SLE happened to be the most recent.
-        #
-        # Correct approach: sum both items' pre-merge actual_qty per warehouse directly
-        # from the bins we captured in before_rename (before any bins were deleted).
-        old_item_bins = frappe.flags.get("_merge_old_item_bins")
-        new_item_bins = frappe.flags.get("_merge_new_item_bins")
-
-        if old_item_bins is not None or new_item_bins is not None:
-            combined_qty = {}
-            for b in (old_item_bins or []):
-                combined_qty[b.warehouse] = combined_qty.get(b.warehouse, 0) + flt(b.actual_qty)
-            for b in (new_item_bins or []):
-                combined_qty[b.warehouse] = combined_qty.get(b.warehouse, 0) + flt(b.actual_qty)
-
-            for warehouse, total_qty in combined_qty.items():
-                if not total_qty:
-                    continue
-                bin_name = frappe.db.get_value("Bin", {"item_code": new_name, "warehouse": warehouse}, "name")
-                if bin_name:
-                    frappe.db.set_value("Bin", bin_name, "actual_qty", total_qty)
-                else:
-                    frappe.get_doc({
-                        "doctype": "Bin",
-                        "item_code": new_name,
-                        "warehouse": warehouse,
-                        "actual_qty": total_qty,
-                    }).insert(ignore_permissions=True)
-
-            all_merge_warehouses = list({
-                b.warehouse for b in (old_item_bins or []) + (new_item_bins or [])
-            })
-            self._create_repost_entries_for_merge(new_name, all_merge_warehouses)
-            frappe.flags.pop("_merge_old_item_bins", None)
-            frappe.flags.pop("_merge_new_item_bins", None)
-
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
 
-    def _create_repost_entries_for_merge(self, item_code, warehouses):
-        """Create Repost Item Valuation entries so SLE running balances are
-        recalculated after the merge.  Uses the earliest SLE date per warehouse
-        to avoid the period-closing-date ValidationError in repost_actual_qty."""
-        from erpnext.controllers.stock_controller import create_repost_item_valuation_entry
+    def _create_merge_stock_reconciliation(self, new_item_code):
+        """Assert the combined (old + new) per-warehouse quantity after a merge by
+        submitting a Stock Reconciliation instead of editing bins/SLEs directly.
 
-        for warehouse in warehouses:
-            try:
-                min_posting_date = frappe.db.sql(
-                    """select min(posting_date) from `tabStock Ledger Entry`
-                    where item_code=%s and warehouse=%s and is_cancelled=0""",
-                    (item_code, warehouse),
-                )[0][0]
-                if not min_posting_date:
+        The pre-merge quantities were captured in before_rename (before any bins were
+        deleted). Posting the reconciliation at the current datetime keeps it clear of the
+        period-closing date, and the resulting ledger entry becomes the running balance
+        later transactions build on -- so a delayed repost can no longer replay the
+        inconsistent merged ledger over the correct quantity."""
+        from frappe.utils import flt, nowdate, nowtime
+
+        old_item_bins = frappe.flags.pop("_merge_old_item_bins", None)
+        new_item_bins = frappe.flags.pop("_merge_new_item_bins", None)
+        if old_item_bins is None and new_item_bins is None:
+            return
+
+        combined_qty = {}
+        for b in (old_item_bins or []):
+            combined_qty[b.warehouse] = combined_qty.get(b.warehouse, 0) + flt(b.actual_qty)
+        for b in (new_item_bins or []):
+            combined_qty[b.warehouse] = combined_qty.get(b.warehouse, 0) + flt(b.actual_qty)
+
+        # A Stock Reconciliation is single-company, so group the warehouses by company.
+        # Skip warehouses whose combined qty already matches the current bin -- a
+        # reconciliation row with no change is dropped on submit, and a reconciliation
+        # with every row unchanged raises EmptyStockReconciliationItemsError.
+        rows_by_company = {}
+        for warehouse, qty in combined_qty.items():
+            company = frappe.db.get_value("Warehouse", warehouse, "company")
+            if not company:
+                continue
+            current_qty = flt(frappe.db.get_value(
+                "Bin", {"item_code": new_item_code, "warehouse": warehouse}, "actual_qty"
+            ))
+            if flt(qty) == current_qty:
+                continue
+            rows_by_company.setdefault(company, []).append((warehouse, qty))
+
+        # Reconciling to the captured qty can mean setting a warehouse negative (an item
+        # that was oversold pre-merge); allow it for the duration of the reconciliation.
+        existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
+        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
+        try:
+            for company, rows in rows_by_company.items():
+                if not rows:
                     continue
+                try:
+                    sr = frappe.new_doc("Stock Reconciliation")
+                    sr.purpose = "Stock Reconciliation"
+                    sr.company = company
+                    sr.ais_reason_for_adjustment = "Combined quantity after item merge into {0}".format(new_item_code)
+                    sr.set_posting_time = 1
+                    sr.posting_date = nowdate()
+                    sr.posting_time = nowtime()
+                    for warehouse, qty in rows:
+                        valuation_rate = self._merge_valuation_rate(new_item_code, warehouse)
+                        row = sr.append("items", {
+                            "item_code": new_item_code,
+                            "warehouse": warehouse,
+                            "qty": qty,
+                            "valuation_rate": valuation_rate,
+                        })
+                        if not valuation_rate:
+                            row.allow_zero_valuation_rate = 1
+                    sr.flags.ignore_permissions = True
+                    sr.insert()
+                    sr.submit()
+                except Exception:
+                    frappe.log_error(
+                        title="Error creating Stock Reconciliation after item merge",
+                        message=frappe.get_traceback(),
+                    )
+        finally:
+            frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
 
-                company = frappe.db.get_value("Warehouse", warehouse, "company")
-                create_repost_item_valuation_entry({
-                    "based_on": "Item and Warehouse",
-                    "item_code": item_code,
-                    "warehouse": warehouse,
-                    "posting_date": min_posting_date,
-                    "posting_time": "00:00",
-                    "company": company,
-                })
-            except Exception:
-                frappe.log_error(
-                    title="Error creating Repost Item Valuation after item merge",
-                    message=frappe.get_traceback(),
-                )
+    def _merge_valuation_rate(self, item_code, warehouse):
+        """Best-available valuation rate for a merge reconciliation row: the warehouse's
+        latest SLE rate, else the item's latest non-zero rate anywhere, else the item
+        master rate (0 is fine -- the row is flagged allow_zero_valuation_rate)."""
+        from frappe.utils import flt
+
+        rate = frappe.db.get_value(
+            "Stock Ledger Entry",
+            {"item_code": item_code, "warehouse": warehouse, "is_cancelled": 0},
+            "valuation_rate",
+            order_by="posting_date desc, posting_time desc, creation desc",
+        )
+        if rate:
+            return flt(rate)
+
+        rate = frappe.db.get_value(
+            "Stock Ledger Entry",
+            {"item_code": item_code, "is_cancelled": 0, "valuation_rate": [">", 0]},
+            "valuation_rate",
+            order_by="posting_date desc, posting_time desc, creation desc",
+        )
+        if rate:
+            return flt(rate)
+
+        return flt(frappe.db.get_value("Item", item_code, "valuation_rate"))
 
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
