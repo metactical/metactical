@@ -78,6 +78,15 @@ export const itemMergeApi = {
   getWebsitePlan: (template) => callBackend('get_website_plan', { template }),
   applyWebsites: (template) => callBackend('apply_websites', { template }),
   checkWebsites: (template) => callBackend('check_websites', { template }),
+
+  // the legacy Storebuilder products a merge consolidates away
+  legacyWebsitePlan: (products) => callBackend('legacy_website_plan', { products: json(products) }),
+  lookupLegacySlugs: (products, leadSources) =>
+    callBackend('lookup_legacy_slugs', { products: json(products), lead_sources: json(leadSources) }),
+  checkLegacySlugs: (rows) => callBackend('check_legacy_slugs', { rows: json(rows) }),
+  saveLegacySlugs: (template, rows) => callBackend('save_legacy_slugs', { template, rows: json(rows) }),
+  markNotPublished: (template, itemCode, on) =>
+    callBackend('mark_not_published', { template, item_code: itemCode, on: on ? 1 : 0 }),
 }
 
 // Realtime progress pushed by metactical.item_merge.jobs while a job runs.

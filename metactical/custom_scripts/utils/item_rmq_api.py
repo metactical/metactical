@@ -54,6 +54,46 @@ def sync_s3_images(item_code, user=None):
         )
 
 
+def _completed_batch(item_code):
+    """The logs of the drop that has just finished for this product."""
+    return frappe.get_all(
+        "Item Drop and Create Log",
+        filters={"product": item_code, "status": "Issued", "deleted": 1},
+        order_by="creation asc",
+        fields=["name", "skip_recreate"],
+    )
+
+
+def _batch_skips_recreate(item_code):
+    """Was this drop asked for without a re-create?
+
+    Every row has to say so. A mixed batch is not something any code here produces, so it means
+    something else wrote into it - re-create, which is the old behaviour, and say so in the log.
+    """
+    logs = _completed_batch(item_code)
+    if not logs:
+        return False
+    if all(log.skip_recreate for log in logs):
+        return True
+    if any(log.skip_recreate for log in logs):
+        frappe.log_error(
+            title="SB-Item Deletion Mixed Skip Recreate",
+            message=f"{item_code} has a drop batch where only some logs carry skip_recreate; "
+                    f"re-creating as usual. Logs: {[log.name for log in logs]}"
+        )
+    return False
+
+
+def _close_batch(item_code, status):
+    """Land the finished batch on its final status.
+
+    set_value, not save: it bypasses on_update, so the drop webhook does not see the flip.
+    """
+    for log in _completed_batch(item_code):
+        frappe.db.set_value("Item Drop and Create Log", log.name, "status", status)
+        frappe.db.commit()
+
+
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
     try:
@@ -118,7 +158,22 @@ def receive_deletion_message(parsedContent):
             if not remaining_logs:
                 completion_message = f"Item Deletion for {item_code} is completed in all price lists."
                 frappe.publish_realtime("msgprint", message=completion_message, user=user)
-                
+
+                # The re-create is the item.save() loop below: each save re-fires the Item
+                # on_update webhooks, which push the variants back to the sites. A merge that
+                # consolidated this product away asks for the drop without that, by setting
+                # skip_recreate on every log in the batch - there is nothing left to push back.
+                if _batch_skips_recreate(item_code):
+                    frappe.publish_realtime(
+                        "msgprint",
+                        message=f"{item_code} was dropped from the websites without being re-created.",
+                        user=user,
+                    )
+                    _close_batch(item_code, "Dropped")
+                    # Same as falling off the end of the ordinary path: this function answers
+                    # nothing on success and False when it could not act on the message.
+                    return
+
                 variants = frappe.get_all(
                     "Item",
                     filters={"variant_of": item_code},
@@ -148,16 +203,7 @@ def receive_deletion_message(parsedContent):
 
                 sync_s3_images(item_code, user=user)
 
-                all_logs = frappe.get_all(
-                    "Item Drop and Create Log",
-                    filters={"product": item_code, "status": "Issued", "deleted": 1},
-                    order_by="creation asc",
-                    fields=["name"]
-                )
-
-                for log in all_logs:
-                    frappe.db.set_value("Item Drop and Create Log", log.name, "status", "Re-Created")
-                    frappe.db.commit()
+                _close_batch(item_code, "Re-Created")
 
     except Exception as e:
         frappe.log_error(

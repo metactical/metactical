@@ -17,33 +17,77 @@
           <span class="ml-auto" :class="pillClass('old')">{{ oldCount }} old</span>
           <span :class="pillClass('ready')">{{ newCount }} with attributes</span>
         </div>
+        <p class="im-lede">
+          Every old variant is its own product on the Storebuilder sites. Open a row to record the slug it lives at on each
+          website - the merge deletes these items, and the slug is the only handle left on the product afterwards.
+        </p>
+        <div v-if="withoutSlug.length" class="im-note danger mb-2 text-xs">
+          <b>{{ withoutSlug.length }} old variant(s) have no website slug yet:</b>
+          <span class="font-mono">{{ withoutSlug.slice(0, 8).join(', ') }}{{ withoutSlug.length > 8 ? '…' : '' }}</span>.
+          Creating the new variants is blocked until every one of them is dealt with - use <b>+ Add website slug</b> on the
+          row, or mark it as not on any website. Once the merge has run these items are gone and the products they leave
+          behind on the websites cannot be found.
+        </div>
+        <div v-if="fetched" class="im-note info mb-2 text-xs">{{ fetched }}</div>
         <div v-if="loading" class="im-empty"><span class="animate-spin">⟳</span> Loading variants…</div>
         <div v-else-if="!variants.length" class="im-empty">This template has no variants.</div>
         <div v-else class="im-table-wrap mt-3" style="max-height: 420px; overflow-y: auto">
           <table class="im-table">
             <thead>
               <tr>
+                <th style="width: 28px"></th>
                 <th><button class="im-sort" :class="{ active: sortKey === 'item_code' }" @click="sortBy('item_code')">Item code <span class="arrow">{{ arrow('item_code') }}</span></button></th>
                 <th><button class="im-sort" :class="{ active: sortKey === 'item_name' }" @click="sortBy('item_name')">Item name <span class="arrow">{{ arrow('item_name') }}</span></button></th>
                 <th><button class="im-sort" :class="{ active: sortKey === 'retail_sku' }" @click="sortBy('retail_sku')">Retail SKU <span class="arrow">{{ arrow('retail_sku') }}</span></button></th>
                 <th class="r">Qty</th>
+                <th>Websites</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="v in sortedVariants" :key="v.item_code">
-                <td class="font-mono whitespace-nowrap">
-                  <a class="im-link" :href="itemUrl(v.item_code)" target="_blank" rel="noopener">{{ v.item_code }}</a>
-                </td>
-                <td>{{ v.item_name }}</td>
-                <td class="font-mono whitespace-nowrap text-muted">{{ v.retail_sku }}</td>
-                <td class="r tabular-nums">{{ num(v.qty) }}</td>
-                <td class="whitespace-nowrap">
-                  <span :class="pillClass(v.is_new ? 'ready' : 'old')">{{ v.is_new ? 'new' : 'old' }}</span>
-                  <span v-if="unreadableCodes.has(v.item_code)" class="ml-2" :class="pillClass('fix')"
-                        title="Its name has no value of the chosen attributes - add its combination with Add in bulk">not read</span>
-                </td>
-              </tr>
+              <template v-for="v in sortedVariants" :key="v.item_code">
+                <tr>
+                  <td>
+                    <button v-if="!v.is_new" class="im-expand" :aria-expanded="!!expanded[v.item_code]"
+                            :aria-label="'Storebuilder products for ' + v.item_code" @click="toggle(v.item_code)">
+                      {{ expanded[v.item_code] ? '▾' : '▸' }}
+                    </button>
+                  </td>
+                  <td class="font-mono whitespace-nowrap">
+                    <a class="im-link" :href="itemUrl(v.item_code)" target="_blank" rel="noopener">{{ v.item_code }}</a>
+                  </td>
+                  <td>{{ v.item_name }}</td>
+                  <td class="font-mono whitespace-nowrap text-muted">{{ v.retail_sku }}</td>
+                  <td class="r tabular-nums">{{ num(v.qty) }}</td>
+                  <td class="whitespace-nowrap">
+                    <template v-if="!v.is_new">
+                      <button v-if="slugCount(v.item_code)" class="btn btn-default btn-xs" @click="toggle(v.item_code)">
+                        {{ slugCount(v.item_code) }} slug(s) · edit
+                      </button>
+                      <button v-else-if="isNotPublished(v.item_code)" class="btn btn-default btn-xs" @click="toggle(v.item_code)">
+                        not on any website
+                      </button>
+                      <button v-else class="btn btn-danger btn-xs" @click="toggle(v.item_code)">+ Add website slug</button>
+                      <span v-for="p in pageStates(v.item_code)" :key="p.label" class="ml-1"
+                            :class="pillClass(p.pill)" :title="p.title">{{ p.count }} {{ p.label }}</span>
+                    </template>
+                    <span v-else class="text-faint text-xs">-</span>
+                  </td>
+                  <td class="whitespace-nowrap">
+                    <span :class="pillClass(v.is_new ? 'ready' : 'old')">{{ v.is_new ? 'new' : 'old' }}</span>
+                    <span v-if="unreadableCodes.has(v.item_code)" class="ml-2" :class="pillClass('fix')"
+                          title="Its name has no value of the chosen attributes - add its combination with Add in bulk">not read</span>
+                  </td>
+                </tr>
+                <tr v-if="expanded[v.item_code]" class="im-subrow">
+                  <td></td>
+                  <td colspan="6">
+                    <VariantSlugs :template="template" :item-code="v.item_code"
+                                  :rows="planFor(v.item_code)" :not-published="isNotPublished(v.item_code)"
+                                  @saved="reloadPlan" />
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -176,6 +220,14 @@
         </ul>
       </div>
 
+      <div v-if="withoutSlug.length" class="im-note danger mt-3">
+        <b>Blocked: {{ withoutSlug.length }} old variant(s) still have no website slug.</b>
+        Every old variant needs its slug recorded for every website it is live on - or marking as not on any website -
+        before the new variants are created. The products they leave behind cannot be found once these items are deleted.
+        Use <b>+ Add website slug</b> on the rows above
+        (<span class="font-mono">{{ withoutSlug.slice(0, 6).join(', ') }}{{ withoutSlug.length > 6 ? '…' : '' }}</span>).
+      </div>
+
       <div class="flex items-center flex-wrap gap-2 mt-3">
         <template v-if="problems.length">
           <span class="text-sm text-danger">{{ problems.length }} ticked row(s) need fixing before creating</span>
@@ -183,7 +235,9 @@
             Untick {{ problems.length }} and create the rest
           </button>
         </template>
-        <button class="btn btn-primary btn-sm ml-auto" :disabled="!toCreate.length || problems.length > 0 || creating" @click="create">
+        <button class="btn btn-primary btn-sm ml-auto"
+                :disabled="!toCreate.length || problems.length > 0 || creating || withoutSlug.length > 0"
+                :title="withoutSlug.length ? 'Record the website slugs first' : ''" @click="create">
           {{ creating ? 'Creating…' : 'Create ' + toCreate.length + ' variant(s)' }}
         </button>
       </div>
@@ -242,6 +296,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { itemMergeApi } from './api.js'
 import TemplateCode from './TemplateCode.vue'
+import VariantSlugs from './VariantSlugs.vue'
 import { BAD_CODE, pillClass, alertOk, alertWarn, confirmAction, makeLink, itemUrl, num } from './utils.js'
 
 const props = defineProps({
@@ -265,6 +320,39 @@ const styleName = ref('')
 const suggesting = ref(false)
 const creating = ref(false)
 const created = ref(null)
+
+// ---- legacy website products, captured before the new variants exist ----
+// Every old variant is its own Storebuilder product. The merge deletes these items, so the slug has
+// to be recorded now - this is the last screen on which the items still exist.
+const slugPlan = ref(null)
+const expanded = ref({})
+const fetched = ref('')
+
+const oldCodes = computed(() => variants.value.filter((v) => !v.is_new).map((v) => v.item_code))
+const planRows = computed(() => slugPlan.value?.rows || [])
+const planFor = (code) => planRows.value.filter((r) => r.product === code)
+const slugCount = (code) => planFor(code).filter((r) => r.slug).length
+
+// What each website actually answered when asked for the page. "Not found" is a real answer and
+// has to read as one - calling it "unchecked" made a 404 look like the check had not run.
+const PAGE_STATE = {
+  'Not Found': { pill: 'error', label: 'not found', title: 'The website has no page at that slug' },
+  Redirected: { pill: 'error', label: 'redirected', title: 'That slug redirects somewhere else - it is not the product page' },
+  Error: { pill: 'fix', label: 'errored', title: 'The website answered with an error' },
+  Unreachable: { pill: 'fix', label: 'unreachable', title: 'The website could not be reached' },
+  'Not Checked': { pill: 'skipped', label: 'not checked', title: 'This slug has not been checked yet' },
+}
+function pageStates(code) {
+  const counts = {}
+  planFor(code).filter((r) => r.slug && r.state !== 'Live').forEach((r) => {
+    counts[r.state] = (counts[r.state] || 0) + 1
+  })
+  return Object.keys(counts).map((state) => ({ ...(PAGE_STATE[state] || PAGE_STATE['Not Checked']), count: counts[state] }))
+}
+const withoutSlug = computed(() => (slugPlan.value?.without_slug || []).filter((c) => oldCodes.value.includes(c)))
+const notPublished = computed(() => new Set(slugPlan.value?.not_published || []))
+const isNotPublished = (code) => notPublished.value.has(code)
+const toggle = (code) => { expanded.value = { ...expanded.value, [code]: !expanded.value[code] } }
 
 const oldCount = computed(() => variants.value.filter((v) => !v.is_new).length)
 const newCount = computed(() => variants.value.filter((v) => v.is_new).length)
@@ -294,6 +382,46 @@ async function load() {
     // Frappe has shown the reason
   } finally {
     loading.value = false
+  }
+  await reloadPlan()
+}
+
+async function reloadPlan() {
+  if (!oldCodes.value.length) {
+    slugPlan.value = null
+    return
+  }
+  try {
+    slugPlan.value = await itemMergeApi.legacyWebsitePlan(oldCodes.value)
+    // Open what still needs an answer, rather than leaving it behind a control to discover.
+    const open = { ...expanded.value }
+    withoutSlug.value.forEach((code) => { if (!(code in open)) open[code] = true })
+    expanded.value = open
+  } catch (e) {
+    // Frappe has shown the reason
+  }
+}
+
+// Where a website has a product lookup API, the slugs arrive on their own; where it has none, the
+// operator types them. Only blanks are filled, and only rows the site actually answered for, so
+// running this again never touches anything already recorded.
+async function fetchSlugs() {
+  if (!slugPlan.value?.any_lookup) return
+  const blanks = planRows.value.filter((r) => !r.slug && r.can_look_up)
+  if (!blanks.length) return
+  try {
+    const res = await itemMergeApi.lookupLegacySlugs([...new Set(blanks.map((r) => r.product))], null)
+    const found = (res.rows || []).filter((r) => r.slug)
+    if (!found.length) {
+      fetched.value = 'The websites had no product for these item codes - the slugs have to be typed in.'
+      return
+    }
+    const save = await itemMergeApi.saveLegacySlugs(props.template,
+      found.map((r) => ({ product: r.product, lead_source: r.lead_source, slug: r.slug, source: 'Lookup' })))
+    fetched.value = `${save.written} slug(s) fetched from the websites and recorded.`
+    await reloadPlan()
+  } catch (e) {
+    // Frappe has shown the reason
   }
 }
 
@@ -354,9 +482,10 @@ watch(attr1, (v) => {
 // a different attribute means a different grid
 watch([attr1, attr2], () => { suggestion.value = null; rows.value = []; created.value = null })
 
-onMounted(() => {
+onMounted(async () => {
   nextTick(buildLinks)
-  load()
+  await load()
+  await fetchSlugs()
 })
 
 // ---- grid rows ----
@@ -520,6 +649,7 @@ async function create() {
   const n = toCreate.value.length
   const message = `Create ${n} new variant(s) under ${props.template} with ${attributes.value.join(' + ')}.\n` +
     (tmpl.value?.attributes.includes(attributes.value[0]) ? '' : 'These attributes are added to the template.\n') +
+    '\nEvery old variant has been accounted for on the websites.\n' +
     'This creates the new Items now.'
   const ok = await confirmAction({ title: 'Create variants?', message, label: `Create ${n}` })
   if (!ok) return

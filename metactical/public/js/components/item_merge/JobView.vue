@@ -240,6 +240,38 @@
         </div>
       </section>
 
+      <!-- what became of the legacy products this merge consolidated away -->
+      <section v-if="legacyRows.length" class="im-card">
+        <div class="flex items-center flex-wrap gap-2">
+          <div class="min-w-0">
+            <h3 class="im-card-title">Legacy website products</h3>
+            <p class="im-lede mb-0">
+              Dropped from the websites after the merge, with Skip Recreate set so they are not pushed back.
+            </p>
+          </div>
+          <span v-if="legacyIssued" :class="pillClass('deleted')" class="ml-auto">{{ legacyIssued }} dropped</span>
+        </div>
+        <div class="im-table-wrap mt-3">
+          <table class="im-table">
+            <thead>
+              <tr><th>Legacy item</th><th>Website</th><th>Slug</th><th>Status</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in legacyRows" :key="r.product + '|' + r.lead_source">
+                <td class="font-mono whitespace-nowrap">{{ r.product }}</td>
+                <td class="text-muted">{{ r.lead_source }}<div class="text-xs text-faint">{{ r.site }}</div></td>
+                <td class="font-mono">
+                  {{ r.slug }}
+                  <div v-if="!r.verified" class="text-xs text-faint">page was {{ (r.state || 'not checked').toLowerCase() }} when recorded</div>
+                </td>
+                <td><span :class="pillClass(r.status)">{{ r.status }}</span></td>
+                <td class="text-xs text-muted">{{ r.message || r.drop_log || '' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="im-card">
         <h3 class="im-card-title mb-3">Log</h3>
         <div ref="logEl" class="im-log" @scroll="onLogScroll">
@@ -412,6 +444,10 @@ async function resume() {
 const web = ref(null)
 const webBusy = ref('') // '' | 'check' | 'fill'
 const webRows = computed(() => web.value?.rows || job.value?.websites || [])
+// The legacy Storebuilder products this merge dropped. Lives on the job, so it is still there
+// long after the merge - the legacy items themselves are not.
+const legacyRows = computed(() => job.value?.legacy_products || [])
+const legacyIssued = computed(() => legacyRows.value.filter((r) => r.status === 'issued').length)
 const loadDataText = computed(() => {
   const v = web.value?.load_data_from_sb
   if (!v) return ''

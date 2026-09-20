@@ -13,9 +13,9 @@ it, and page CSS scoped under `#item_merge_ui`.
 | Step | Screen | What it does |
 |---|---|---|
 | 1 | **Templates** | The *Template SKU* and *Template name* boxes are Frappe Autocompletes fed from Item: they suggest as you type, picking one searches straight away, and a partial term still works. Tick one result to continue, or several to merge them into one (optionally renaming the survivor). Merging is **blocked** when the variants use more than one item group, and needs an explicit tick when the product names differ. |
-| 2 | **Variants** | Pick one or two Item Attributes (Frappe Link controls). *Suggest combinations* reads colour/size out of the old variants' names; add more with *Add in bulk*; edit codes and names; create the new attribute variants. The template's code and name can be edited here too. |
-| 3 | **Align** | Old variants on the left, new on the right, auto-paired by colour and size. Drag or move rows to fix pairs, choose the item name / retail SKU each new variant ends with, fix stock settings, tick leftovers to delete, then **Queue merge**. |
-| 4 | **Merge job** | An *Item Merge Job* runs in the `long` queue: align settings -> merge pair by pair -> delete leftovers -> drop Variant Number -> website slugs + Load Data From SB -> website check. Progress arrives over realtime; the page also polls. Failed or interrupted jobs **Resume** where they stopped. |
+| 2 | **Variants** | Pick one or two Item Attributes (Frappe Link controls). *Suggest combinations* reads colour/size out of the old variants' names; add more with *Add in bulk*; edit codes and names; create the new attribute variants. The template's code and name can be edited here too. Each **old** variant carries a **+ Add website slug** button that opens a *Storebuilder products* grid - Lead Source + slug - because this is the last screen on which those items still exist. Rows that still need one open by themselves. Slugs arrive on their own where a website has a lookup API, and are typed in where it has not, and **Create variants is blocked** until every old variant has one or is ticked *not on any website*. |
+| 3 | **Align** | Old variants on the left, new on the right, auto-paired by colour and size. Drag or move rows to fix pairs, choose the item name / retail SKU each new variant ends with, fix stock settings, tick leftovers to delete, then **Queue merge**. *Legacy website products* sits above the button as a last look at what the merge will drop from the websites, and says which old variants still have no slug; the slugs themselves are recorded back on **Variants**. |
+| 4 | **Merge job** | An *Item Merge Job* runs in the `long` queue: align settings -> merge pair by pair -> delete leftovers -> drop Variant Number -> website slugs + Load Data From SB -> website check -> drop legacy website products. Progress arrives over realtime; the page also polls. Failed or interrupted jobs **Resume** where they stopped. |
 | - | **Item codes** | Any time (e.g. after a merge): the template is picked with a Frappe Link on Item. Rename variant codes (one click sets each to its retail SKU, another collapses the doubled dashes `create_variant` leaves behind), change names and retail SKUs. Saved as an *Item Changes* job. Shows the website check for the template. |
 | - | **Jobs** | Every job, filtered by template with a Frappe Link on Item. Each job is also a read-only *Item Merge Job* document. |
 
@@ -49,16 +49,22 @@ metactical/item_merge/                 logic (no whitelisted methods here)
   demo_data.py  a legacy-shaped catalogue to try the page against on a test site
   catalogue.py  the price lists, deduct Lead Sources and legacy attribute, read from ERPNext
   websites.py   Item Detail slugs from the Storebuilder copies in Metabase, website check
+  legacy_products.py  the legacy Storebuilder products a merge deletes: live lookup, slug
+                      validation, and the drops issued once the merge is done
+  test_legacy_products.py  tests for it (see below)
   tests/        offline tests (see below)
 metactical/metactical/page/item_merge/ the Page: json, js (mounts the app), py (whitelisted API), css
-metactical/metactical/doctype/item_merge_job{,_pair,_leftover,_change}/
+metactical/metactical/doctype/item_merge_job{,_pair,_leftover,_change,_legacy_product}/
+metactical/metactical/doctype/legacy_website_product/       the register: one record per legacy item
+metactical/metactical/doctype/legacy_website_product_slug/  its website rows (website, slug, what the page said)
+metactical/metactical/doctype/legacy_website_slug/          the shape of the Variants screen's grid rows
 metactical/metactical/doctype/item_merge_settings/       merge fields + the Metabase URL, key and database ids
 metactical/metactical/doctype/metabase_site_database/    its child table (price list -> database id)
 metactical/public/js/item_merge.js     mounts ItemMerge.vue on #item_merge_ui
 metactical/public/js/components/item_merge/
   ItemMerge.vue  tabs, stepper, routing (/app/item-merge/<view>/<arg>)
   StepTemplates.vue StepVariants.vue StepAlign.vue JobView.vue JobsList.vue ItemCodes.vue
-  TemplateCode.vue WebsiteCheck.vue
+  TemplateCode.vue WebsiteCheck.vue VariantSlugs.vue LegacyProducts.vue
   api.js         the only place that calls the backend (frappe.call)
   utils.js       Frappe dialogs/alerts, status pills, Link/Autocomplete control helpers, routes
 ```
@@ -96,11 +102,16 @@ than mounting an app whose every call fails. The three places that name the role
 | `get_alignment` | `template` | |
 | `check_alignment` | `template`, `pairs`, `leftovers` | |
 | `fix_settings` | `template`, `pairs` | yes |
-| `queue_merge` | `template`, `pairs` (`old`, `new`, `item_name`, `retail_sku`), `leftovers`, `options` (`sku`: keep/code, `fix_names`) | job |
+| `queue_merge` | `template`, `pairs` (`old`, `new`, `item_name`, `retail_sku`), `leftovers`, `options` (`sku`: keep/code, `fix_names`), `legacy` (`product`, `price_list`, `slug`) | job |
 | `queue_item_changes` | `template`, `changes` (`item_code`, `new_code`, `item_name`, `retail_sku`) | job |
 | `list_jobs` / `get_job` / `resume_job` | `template` / `job`, `live` / `job` | |
 | `get_reposts` | `template` | |
 | `get_website_plan` / `apply_websites` / `check_websites` | `template` | apply: yes |
+| `legacy_website_plan` | `products` | no |
+| `lookup_legacy_slugs` | `products`, `price_lists` | no |
+| `check_legacy_slugs` | `rows` (`product`, `lead_source`, `slug`) | no |
+| `save_legacy_slugs` | `template`, `rows` (`product`, `price_list`, `slug`) | yes |
+| `mark_not_published` | `template`, `item_code`, `on` | yes |
 
 Realtime event: `item_merge_progress` `{job, template, status, processed, total, line}` to the user who queued the job.
 
@@ -135,7 +146,9 @@ unconditional ones plus one on `doc.variant_of`, i.e. every variant save. None o
 while a family is half restructured.
 
 So both entry points - `_api()` for every whitelisted call, and `run_job` for the background job -
-set two flags around their work and restore them afterwards:
+set two flags around their work and restore them afterwards (the one deliberate exception is the
+legacy drop step, which puts them back for the length of its inserts through `jobs.with_webhooks()` -
+reaching the websites is the whole point of it):
 
 ```python
 WEBHOOK_FLAGS = ("in_import", "item_from_excel")
@@ -191,6 +204,114 @@ code. `websites.py` reads each site's Storebuilder database from its **Metabase*
 `as_of` and the screens show it in a *Copy as of* column. A mismatch found right after a merge is
 expected until the copy catches up.
 
+### Legacy products: the ones the merge deletes
+
+The rules above are about the product that **survives**. Every template consolidated away is its own
+Storebuilder product, with its own External ID and its own slug, and ERPNext deletes those templates
+during the merge - after which nothing is left to tick *Drop and Create In Websites* on and the
+product is stranded on the site, duplicating the consolidated one. `legacy_products.py` handles them,
+and unlike `websites.py` it never reads Metabase: a copy that is days old is not good enough to
+authorise a deletion.
+
+- **Captured on the Variants screen, before the new variants are created.** Every old variant's row
+  opens onto a native Frappe grid of website + slug - the same `make_control` table the S3 uploader
+  uses for item code + SKU, with nothing cascading: picking a website fills nothing in and touches no
+  other row. That screen is the last place the old items are all still there, which is why the
+  capture lives there rather than on Align.
+- **A website is a Lead Source with a domain set** (`catalogue.storefronts()`), which is what an
+  operator picking one actually names. That is a different question from `catalogue.websites()`,
+  which answers "which price lists does a merge touch" and is what the Item Detail rows and the sync
+  key off; both lists hold the same five sites today. The register keys on the Lead Source and
+  **derives the price list from it**, because the drop travels by price list - the fanout payload
+  carries it and `receive_deletion_message` matches the confirmation on it. A storefront with no
+  price list can be named but nothing can be routed to it, so it is refused when saved and fails the
+  row at drop time rather than looking like it worked.
+- **Typing the slugs in is the way this works.** `legacy_products.plan()` builds the grid asking the
+  websites nothing, so it depends on no endpoint and works with none of this configured.
+- **The lookup only saves keystrokes.** Where a website has a *Product Lookup APIs (by External ID)*
+  row on **Storebuilder Sync Settings** (another table of `Item Import Validation` rows, like the
+  three next to it), the Variants screen asks it on load which product carries each item code as its
+  External ID, records what comes back, and says how many it filled. It only ever fills blanks, so
+  it cannot overwrite something an operator recorded; it is skipped entirely when no website has
+  such a row; and a 404 just leaves the row to be typed. A slug the website itself handed back is
+  proof enough on its own.
+- **The slugs live in `Legacy Website Product`, not on the Item.** **One record per item**, named
+  after the item code, with a row per website underneath it (`Legacy Website Product Slug`: website,
+  price list, slug, source, what the page said, whether it is live, when it was checked, and once it
+  has been dropped its log). An item on three websites is one record with three rows, so opening it
+  shows the whole picture. It is deliberately outside the Item: the Item is what the merge deletes,
+  and this has to outlive it - by days, if the capture and the merge happen in different sittings.
+  `create_merge_job` reads the register for the old codes in the merge and never trusts the browser
+  for them; `issue_drops` closes each row it used, and the record once every row is dropped.
+- **An item accounted for is a record that exists**, with either websites on it or `Not Published`.
+  Clearing an item's last slug deletes the record rather than leaving an empty one behind, because
+  an empty one would count as an answer when it is not one.
+- **The key is the template item code and nothing else.** It is mandatory, so it is always populated,
+  and it is the identity the website check already requires the External ID to equal. (The three
+  other Storebuilder callers in this app send `ifw_retailskusuffix or item_code`; that disagreement
+  is older than this module. A legacy product registered under a retail SKU comes back 404 and falls
+  through to manual entry.)
+- **Check and save asks the storefront for the page**, not an API: `GET https://<Lead Source
+  Domain>/<slug>`, exactly the URL a person would paste into a browser. Camo plus `qwer1234` is
+  `https://camouflage.ca/qwer1234`. It needs nothing configured beyond the domain already on the
+  Lead Source, so unlike the old `item_detail_apis` check it works on every website - which is why
+  that check is gone. The request carries a browser User-Agent, because a missing one is the first
+  thing a CDN turns away, and follows redirects.
+- **A slug the website has no page for is refused, not saved.** A 404 means the drop would go out
+  for a product that is not there: it would take the wrong one down, or nothing at all. The row is
+  reported and the website it names keeps whatever it had.
+- **A website that could not answer still saves.** An error, a timeout, an outage - that is not the
+  slug's fault, and a transient 503 must not stop the work. Those warn instead, and the row records
+  what happened so nobody has to remember.
+- **Every row says what the website answered**, not just whether it was checked: *Live*,
+  *Not Found*, *Redirected*, *Error*, *Unreachable*, *Not Checked*. That distinction is the whole
+  point - a row that said "unchecked" after a 404 read as if the check had never run, so saving a
+  wrong slug looked like nothing had happened.
+- **One website, one slug, one item.** No two legacy items may claim the same slug on the same
+  website: that would issue two drops for one product, the second could never be confirmed, and
+  whichever item is wrong would take a live product down with it. Checked against the register and
+  within the save itself, since two colliding rows in one save are not in the database yet, and
+  again in the doctype. The same slug on a *different* website is fine and common.
+- **A refused row is not a deleted one.** Only a blank slug clears a website; a refusal leaves it
+  exactly as it was, so a typo cannot take a good slug down with it. The one exception is a slug
+  already on the record that has since stopped resolving: it is kept, because it is the only handle
+  left on that product, but marked *Not Found* rather than left claiming to be live.
+- **A redirect away from the slug is not a live product page.** A store that sends dead slugs to its
+  homepage answers 200 for anything, so the landing URL is compared too - by **path only**.
+  `catalogue` strips `www` from the domain and these stores redirect the apex to `www`, so comparing
+  whole URLs would call every single live page a redirect.
+- **A blank slug is not an error.** It means that website has no legacy product to remove, which is
+  the ordinary case for something published on one site only. Drops go out per (product, website)
+  pair that has a slug, so a product on Camo and Gorilla gets two and a Camo-only one gets one.
+  Clearing a slug that was saved removes it from the register - deciding an item was never on a site
+  after all has to be undoable.
+- **An old variant with no slug recorded blocks Create variants.** That is the point of no return:
+  after it the family is being restructured, and after the merge those items are gone and whatever
+  they left on a website can never be found again. The screen disables the button and names the
+  variants; `create_variants` refuses the same thing server-side, because the screen is reachable
+  around.
+- **"Not on any website" is how an unpublished item gets past that block.** Plenty of old variants
+  were never on a site, and with no way to say so the block would be impossible to satisfy and
+  someone would end up loosening it. Ticking it writes a `Not Published` row - the register carrying
+  a decision rather than a product, so it has no website and no slug. It accounts for the item and
+  issues no drop. Recording a real slug for that item retires the marker: a product on a website
+  means it was published after all.
+- **After the merge**, as the job's last step: one `Item Drop and Create Log` per row, and the drop
+  webhook that has always existed does the rest. Nothing about that webhook changes. The log carries
+  the **legacy** item code in `product`, not the survivor's - `item_rmq_api` groups logs by product
+  when it decides a drop is complete, and these must not join a real drop and create on the survivor.
+- **Two guards.** A slug a live Item still publishes for that price list is never dropped: the
+  website steps run first and fill the survivor's Item Detail rows from the snapshot, so a stale copy
+  could have handed it a legacy product's slug. And the step runs inside `jobs.with_webhooks()` -
+  everything else in a merge runs with the webhook flags set, so a drop log inserted without putting
+  them back would quietly tell nobody.
+- **Skip Recreate.** `Item Drop and Create Log.skip_recreate` is what stops the product coming back.
+  The re-create is the `item.save()` loop in `receive_deletion_message`: once every website has
+  confirmed, it re-saves each variant, and each save re-fires the Item webhooks that push the product
+  to the sites. When every log in the finished batch carries the flag, that loop, the image re-sync
+  and the inventory push are all skipped and the batch lands on **Dropped** instead of *Re-Created*.
+  A mixed batch is not something this code produces, so it re-creates as before and logs an error.
+
 ## Tests
 
 ```bash
@@ -209,6 +330,31 @@ python -m unittest discover -s metactical/item_merge/tests -t . -v
 Note `fake_frappe._dict.__getattr__` must raise on a missing dunder, as frappe's own `_dict` does:
 returning `None` for `__getstate__` makes `copy.deepcopy` call `None` on Python < 3.11, which is what
 this bench runs.
+
+The legacy website products are tested **on a bench** instead, because what they are about is real
+records - the Single the endpoints are configured on, the Item Detail row the survivor guard reads,
+the Item Drop and Create Log a drop writes. The websites themselves are stubbed.
+
+```bash
+bench --site <site> set-config allow_tests true
+bench --site <site> run-tests --module metactical.item_merge.test_legacy_products
+bench --site <site> run-tests --module metactical.metactical.doctype.item_drop_and_create_log.test_item_drop_and_create_log
+```
+
+- `test_legacy_products.py` - the grid (built without calling anything, saying what each website can
+  do, and showing what is already saved), the lookup (found / 404 / no URL / no config, one row per
+  product per website), the validation (a 404 **and** `{"Found": false}` at HTTP 200 both refused, an
+  unaskable website saying so rather than no, the slug URL-encoded), `accept()` (a checked slug
+  marked verified, an unaskable one taken unverified, one a website refused rejected), the register
+  (a bad slug never written, a good one read back, saving twice updating rather than duplicating,
+  clearing removing), the Not Published marker (accounting for an item, undoable, retired by a real
+  slug, dropping nothing), that the queue reads the register rather than the browser, that the price
+  list is derived from the Lead Source and a storefront without one fails rather than looking
+  dropped, and `issue_drops`:
+  skip_recreate set, the legacy code in `product`, the survivor guard, and that issuing twice does
+  not drop twice.
+- `test_item_drop_and_create_log.py` - the confirmation side: skip_recreate drops without re-creating,
+  an ordinary drop still re-creates, a batch waits for every website, a mixed batch re-creates.
 
 ## Nothing site-specific is hard-coded
 
@@ -282,6 +428,22 @@ site without it fails every pair. **Never run any of this on production.**
 - Confirm `is_job_enqueued` marks a killed worker's job as Interrupted, and Resume continues it.
 - Confirm the Storebuilder product API payload (`found`, `products[].externalId/slug/variants`, and
   whether `name`/`description` are included).
+- The legacy drops need **no** product lookup endpoint: open each old variant on Variants, type the
+  slugs into the grid, Check and save, then merge. Confirm that path first - it is the one that has
+  to work. Driven on a bench: the grid renders inside the variants table, its Website picker is
+  filtered to the five website price lists, saving turns the row's button into *N slug(s) · edit*,
+  and the block clears. Note Frappe gives a grid **ten column units in total** and silently drops a
+  column past that - Website 4 + Slug 6 is exactly ten. The tests patch `requests.get` for the whole
+  class: without that they really do fetch camouflage.ca, which is slow and answers differently
+  depending on what is published that day.
+- Then, once Storebuilder ships the lookup endpoint: a mapped template code returns the product and
+  its slug, an unmapped one returns 404. `legacy_products._product_of` reads both response shapes the
+  other endpoints use, and `SLUG_KEYS` / `EXTERNAL_ID_KEYS` cover the spellings seen so far - trim
+  them to whatever it really sends. Adding the config row is the only change needed.
+- Run a merge with a legacy product on more than one website: check one `Item Drop and Create Log`
+  per (product, website) with `skip_recreate = 1`, that the drop webhook fires for each (it is
+  `enabled: 0` on a fresh local site), and that the confirmation lands the batch on **Dropped**
+  without re-saving any variant of the surviving template.
 - Metabase stays off until someone fills in the Metabase section of Item Merge Settings; then use
   **Test Metabase connection** to confirm the URL, key and each database id, and check the snapshot
   table names (`Products`, `ProductVariants`, `ProductTranslations`, `Locales`) match the queries in

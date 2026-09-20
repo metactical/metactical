@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from metactical.item_merge import family, jobs, websites
+from metactical.item_merge import family, jobs, legacy_products, websites
 from metactical.item_merge.rules import UserError
 
 ROLES = ("System Manager", "Item Manager")
@@ -143,6 +143,16 @@ def suggest_combinations(template, attributes):
 @frappe.whitelist()
 def create_variants(template, attributes, combinations, style_name=None, dry_run=0):
 	with _api():
+		# The websites come first: after the merge the old items are gone, and a Storebuilder
+		# product nobody wrote a slug for can never be found again. The screen blocks the button,
+		# but the screen is a convenience - this method is reachable without it.
+		missing = legacy_products.missing_slugs(template)
+		if missing and not cint(dry_run):
+			raise UserError(
+				"Record the website slugs first. {0} old variant(s) have nothing on them yet: {1}. "
+				"Open each one under Variants under this template and add its slug for every website "
+				"it is live on, or mark it as not on any website.".format(
+					len(missing), ", ".join(missing[:8]) + ("…" if len(missing) > 8 else "")))
 		return family.create_variants(template, _list(attributes), _list(combinations), style_name, cint(dry_run))
 
 
@@ -175,7 +185,8 @@ def fix_settings(template, pairs):
 @frappe.whitelist()
 def queue_merge(template, pairs, leftovers=None, options=None):
 	with _api():
-		return {"job": jobs.create_merge_job(template, _list(pairs), _list(leftovers), frappe.parse_json(options or "{}"))}
+		return {"job": jobs.create_merge_job(template, _list(pairs), _list(leftovers),
+											 frappe.parse_json(options or "{}"))}
 
 
 @frappe.whitelist()
@@ -230,3 +241,47 @@ def apply_websites(template):
 def check_websites(template):
 	with _api():
 		return websites.check(template)
+
+
+# ---------- legacy website products ----------
+
+@frappe.whitelist()
+def legacy_website_plan(products):
+	"""One row per legacy product per website, asking the websites nothing. Reads only."""
+	with _api():
+		return legacy_products.plan(_list(products))
+
+
+@frappe.whitelist()
+def lookup_legacy_slugs(products, lead_sources=None):
+	"""What slug each website has for these legacy item codes. Reads only."""
+	with _api():
+		return legacy_products.lookup(_list(products), _list(lead_sources) or None)
+
+
+@frappe.whitelist()
+def check_legacy_slugs(rows):
+	"""Ask each website for the page its slug points at. Reads only, writes nothing."""
+	with _api():
+		return legacy_products.check(_list(rows))
+
+
+@frappe.whitelist()
+def mark_not_published(template, item_code, on=1):
+	"""Record that a legacy item has no Storebuilder product at all, so it stops blocking."""
+	with _api():
+		result = legacy_products.not_published(item_code, on=bool(cint(on)))
+		family.add_activity(template, "{0} marked as {1} on the websites".format(
+			item_code, "not published" if cint(on) else "published"))
+		return result
+
+
+@frappe.whitelist()
+def save_legacy_slugs(template, rows):
+	"""Check the operator's slugs and write them to the Legacy Website Product register."""
+	with _api():
+		result = legacy_products.save(template, _list(rows))
+		if result["written"] or result["removed"]:
+			family.add_activity(template, "legacy website slugs: {0} saved, {1} removed".format(
+				result["written"], result["removed"]))
+		return result

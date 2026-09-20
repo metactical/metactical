@@ -1,0 +1,125 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-20 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "product",
+  "lead_source",
+  "price_list",
+  "site",
+  "slug",
+  "source",
+  "verified",
+  "state",
+  "status",
+  "drop_log",
+  "message"
+ ],
+ "fields": [
+  {
+   "fieldname": "product",
+   "fieldtype": "Data",
+   "label": "Legacy Product",
+   "description": "The legacy template code. It no longer exists as an Item once the merge has run.",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_source",
+   "fieldtype": "Link",
+   "options": "Lead Source",
+   "label": "Website",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "options": "Price List",
+   "label": "Price List",
+   "in_list_view": 0,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "site",
+   "fieldtype": "Data",
+   "label": "Website",
+   "read_only": 1
+  },
+  {
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Slug",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Lookup\nManual",
+   "default": "Lookup",
+   "read_only": 1
+  },
+  {
+   "fieldname": "verified",
+   "fieldtype": "Check",
+   "label": "Slug Verified",
+   "default": "1",
+   "description": "The website confirmed this slug. 0 means the website has no slug endpoint and the operator vouched for it instead.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "Page When Recorded",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Validated\nIssued\nSkipped\nFailed",
+   "default": "Validated",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "drop_log",
+   "fieldtype": "Data",
+   "label": "Drop Log",
+   "description": "The Item Drop and Create Log this row issued",
+   "read_only": 1
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "label": "Message",
+   "in_list_view": 1,
+   "columns": 3,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-20 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Merge Job Legacy Product",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
