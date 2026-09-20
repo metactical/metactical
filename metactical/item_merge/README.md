@@ -51,7 +51,6 @@ metactical/item_merge/                 logic (no whitelisted methods here)
   websites.py   Item Detail slugs from the Storebuilder copies in Metabase, website check
   legacy_products.py  the legacy Storebuilder products a merge deletes: live lookup, slug
                       validation, and the drops issued once the merge is done
-  test_legacy_products.py  tests for it (see below)
   tests/        offline tests (see below)
 metactical/metactical/page/item_merge/ the Page: json, js (mounts the app), py (whitelisted API), css
 metactical/metactical/doctype/item_merge_job{,_pair,_leftover,_change,_legacy_product}/
@@ -331,31 +330,6 @@ Note `fake_frappe._dict.__getattr__` must raise on a missing dunder, as frappe's
 returning `None` for `__getstate__` makes `copy.deepcopy` call `None` on Python < 3.11, which is what
 this bench runs.
 
-The legacy website products are tested **on a bench** instead, because what they are about is real
-records - the Single the endpoints are configured on, the Item Detail row the survivor guard reads,
-the Item Drop and Create Log a drop writes. The websites themselves are stubbed.
-
-```bash
-bench --site <site> set-config allow_tests true
-bench --site <site> run-tests --module metactical.item_merge.test_legacy_products
-bench --site <site> run-tests --module metactical.metactical.doctype.item_drop_and_create_log.test_item_drop_and_create_log
-```
-
-- `test_legacy_products.py` - the grid (built without calling anything, saying what each website can
-  do, and showing what is already saved), the lookup (found / 404 / no URL / no config, one row per
-  product per website), the validation (a 404 **and** `{"Found": false}` at HTTP 200 both refused, an
-  unaskable website saying so rather than no, the slug URL-encoded), `accept()` (a checked slug
-  marked verified, an unaskable one taken unverified, one a website refused rejected), the register
-  (a bad slug never written, a good one read back, saving twice updating rather than duplicating,
-  clearing removing), the Not Published marker (accounting for an item, undoable, retired by a real
-  slug, dropping nothing), that the queue reads the register rather than the browser, that the price
-  list is derived from the Lead Source and a storefront without one fails rather than looking
-  dropped, and `issue_drops`:
-  skip_recreate set, the legacy code in `product`, the survivor guard, and that issuing twice does
-  not drop twice.
-- `test_item_drop_and_create_log.py` - the confirmation side: skip_recreate drops without re-creating,
-  an ordinary drop still re-creates, a batch waits for every website, a mixed batch re-creates.
-
 ## Nothing site-specific is hard-coded
 
 Everything the stand-alone app carried as a literal is now read from ERPNext (`catalogue.py`), cached
@@ -433,9 +407,7 @@ site without it fails every pair. **Never run any of this on production.**
   to work. Driven on a bench: the grid renders inside the variants table, its Website picker is
   filtered to the five website price lists, saving turns the row's button into *N slug(s) · edit*,
   and the block clears. Note Frappe gives a grid **ten column units in total** and silently drops a
-  column past that - Website 4 + Slug 6 is exactly ten. The tests patch `requests.get` for the whole
-  class: without that they really do fetch camouflage.ca, which is slow and answers differently
-  depending on what is published that day.
+  column past that - Website 4 + Slug 6 is exactly ten.
 - Then, once Storebuilder ships the lookup endpoint: a mapped template code returns the product and
   its slug, an unmapped one returns 404. `legacy_products._product_of` reads both response shapes the
   other endpoints use, and `SLUG_KEYS` / `EXTERNAL_ID_KEYS` cover the spellings seen so far - trim
