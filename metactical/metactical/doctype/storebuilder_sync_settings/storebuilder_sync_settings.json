@@ -9,7 +9,9 @@
   "section_break_itpt",
   "item_detail_apis",
   "section_break_imgap",
-  "image_apis"
+  "image_apis",
+  "section_break_pldap",
+  "product_lookup_apis"
  ],
  "fields": [
   {
@@ -39,13 +41,24 @@
    "fieldtype": "Table",
    "label": "Product Image APIs",
    "options": "Item Import Validation"
+  },
+  {
+   "fieldname": "section_break_pldap",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Retrieves a StoreBuilder product by its External ID (the ERP template item code). Returns 404 when no product maps to it. Used by Item Merge to find the legacy products a merge consolidates away.",
+   "fieldname": "product_lookup_apis",
+   "fieldtype": "Table",
+   "label": "Product Lookup APIs (by External ID)",
+   "options": "Item Import Validation"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-13 09:40:45.164276",
+ "modified": "2026-09-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Storebuilder Sync Settings",
