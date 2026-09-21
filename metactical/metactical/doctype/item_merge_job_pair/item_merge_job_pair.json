@@ -1,0 +1,114 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-15 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "old_item",
+  "new_item",
+  "item_name",
+  "retail_sku",
+  "status",
+  "message",
+  "column_break_qty",
+  "old_qty",
+  "new_qty_before",
+  "expected_qty",
+  "snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "old_item",
+   "fieldtype": "Data",
+   "label": "Old Item",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_item",
+   "fieldtype": "Data",
+   "label": "New Item",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name After Merge",
+   "read_only": 1
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "label": "Retail SKU After Merge",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Queued\nRunning\nOk\nSkipped\nFailed",
+   "default": "Queued",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "label": "Message",
+   "in_list_view": 1,
+   "columns": 3,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "old_qty",
+   "fieldtype": "Float",
+   "label": "Old Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_qty_before",
+   "fieldtype": "Float",
+   "label": "New Qty Before",
+   "read_only": 1
+  },
+  {
+   "fieldname": "expected_qty",
+   "fieldtype": "Float",
+   "label": "Expected Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "snapshot",
+   "fieldtype": "Long Text",
+   "label": "Snapshot",
+   "description": "The old and new items and their bins, as they were right before the merge",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-15 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Merge Job Pair",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
