@@ -1,0 +1,221 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:IMJ-{YY}{MM}{DD}-{####}",
+ "creation": "2026-09-15 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "job_type",
+  "template",
+  "status",
+  "column_break_progress",
+  "total",
+  "processed",
+  "started_on",
+  "finished_on",
+  "section_error",
+  "error",
+  "section_rows",
+  "pairs",
+  "leftovers",
+  "changes",
+  "section_result",
+  "steps",
+  "options",
+  "websites",
+  "website_check",
+  "deleted_pricing_rules",
+  "section_log",
+  "log"
+ ],
+ "fields": [
+  {
+   "fieldname": "job_type",
+   "fieldtype": "Select",
+   "label": "Job Type",
+   "options": "Merge\nItem Changes",
+   "default": "Merge",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "template",
+   "fieldtype": "Data",
+   "label": "Template",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "reqd": 1,
+   "description": "Plain text, not a link: merges and renames rewrite links, and this must keep the code the job ran on",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Queued\nRunning\nDone\nFailed\nInterrupted",
+   "default": "Queued",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total",
+   "fieldtype": "Int",
+   "label": "Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "processed",
+   "fieldtype": "Int",
+   "label": "Processed",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_on",
+   "fieldtype": "Datetime",
+   "label": "Started On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "finished_on",
+   "fieldtype": "Datetime",
+   "label": "Finished On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_error",
+   "fieldtype": "Section Break",
+   "depends_on": "error"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_rows",
+   "fieldtype": "Section Break",
+   "label": "Rows"
+  },
+  {
+   "fieldname": "pairs",
+   "fieldtype": "Table",
+   "label": "Pairs",
+   "options": "Item Merge Job Pair",
+   "depends_on": "eval:doc.job_type=='Merge'",
+   "read_only": 1
+  },
+  {
+   "fieldname": "leftovers",
+   "fieldtype": "Table",
+   "label": "Leftovers",
+   "options": "Item Merge Job Leftover",
+   "depends_on": "eval:doc.job_type=='Merge'",
+   "read_only": 1
+  },
+  {
+   "fieldname": "changes",
+   "fieldtype": "Table",
+   "label": "Changes",
+   "options": "Item Merge Job Change",
+   "depends_on": "eval:doc.job_type=='Item Changes'",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_result",
+   "fieldtype": "Section Break",
+   "label": "Result",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "steps",
+   "fieldtype": "JSON",
+   "label": "Steps",
+   "read_only": 1
+  },
+  {
+   "fieldname": "options",
+   "fieldtype": "JSON",
+   "label": "Options",
+   "read_only": 1
+  },
+  {
+   "fieldname": "websites",
+   "fieldtype": "JSON",
+   "label": "Website Slugs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "website_check",
+   "fieldtype": "JSON",
+   "label": "Website Check",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deleted_pricing_rules",
+   "fieldtype": "JSON",
+   "label": "Deleted Pricing Rules",
+   "description": "Backup of each per-item Pricing Rule removed so a leftover could be deleted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_log",
+   "fieldtype": "Section Break",
+   "label": "Log",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "log",
+   "fieldtype": "Long Text",
+   "label": "Log",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-15 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Merge Job",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Item Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "template,job_type,status",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "template",
+ "track_changes": 0
+}
