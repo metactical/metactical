@@ -10,7 +10,7 @@ from collections import Counter
 
 import frappe
 
-from metactical.item_merge import catalogue, legacy_products, rules
+from metactical.item_merge import attribute_ai, catalogue, legacy_products, rules
 from metactical.item_merge.pairing import plan_pairs, variant_attribute
 from metactical.item_merge.rules import UserError
 
@@ -367,7 +367,15 @@ def _attribute_tables(attrs):
 
 
 def suggest_combinations(template, attributes):
-	"""Combinations read from the old variants' names, ready for the variants grid."""
+	"""Combinations read from the old variants' names, ready for the variants grid.
+
+	One reading per old variant, so the grid can never offer more combinations than there are
+	variants behind them: several old variants collapsing into one combination is the normal case
+	(that is what a merge is), but an eleventh combination for ten variants would be one nothing
+	pairs to.
+
+	The reading is `attribute_ai`; when it cannot answer, `rules.read_values` does it the old way
+	and the caller is told so, so the screen can say the values need checking."""
 	tdoc, docs, stock, legacy = load_family(template)
 	attrs = rules.check_attributes(attributes, legacy)
 	vals, allowed, abbr = _attribute_tables(attrs)
@@ -376,10 +384,12 @@ def suggest_combinations(template, attributes):
 	existing = {tuple((a, variant_view(d, stock, legacy)["attributes"].get(a)) for a in attrs): d["name"]
 				for d in docs if is_new(d, legacy)}
 
+	read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed)
+
 	combos, unread = {}, []
 	for d in olds:
-		got = rules.read_values(d, attrs, allowed)
-		if not got:
+		got = read.get(d["name"]) or rules.read_values(d, attrs, allowed)
+		if not got or any(got.get(a) is None for a in attrs):
 			unread.append({"item_code": d["name"], "item_name": d.get("item_name")})
 			continue
 		combos.setdefault(tuple((a, got[a]) for a in attrs), []).append(d["name"])
@@ -404,7 +414,8 @@ def suggest_combinations(template, attributes):
 					# variants become leftovers to delete (merge when there is data, delete when not).
 					"suggested": bool(ledger or qty)})
 	return {"template": template, "attributes": attrs, "style_name": style, "combinations": out,
-			"unreadable": unread, "values": vals}
+			"unreadable": unread, "values": vals, "ai_warning": ai_warning,
+			"read_by_ai": sum(1 for d in olds if d["name"] in read)}
 
 
 def plan_variants(template, attrs, combinations, style_name, tdoc, docs, allowed, abbr, legacy=None):
@@ -508,7 +519,17 @@ def message_of(e):
 def alignment(template):
 	tdoc, docs, stock, legacy = load_family(template)
 	empty = {c: s["ledger"] == 0 and s["qty"] == 0 for c, s in stock.items()}
-	plan = plan_pairs(tdoc, docs, empty)
+
+	# The same reading the variants grid used: what each old variant's name says its colour and
+	# size are. Pairing on those, rather than on the name, is the whole of the AI's part here.
+	olds = [d for d in docs if not is_new(d, legacy)]
+	attrs = [a["attribute"] for a in tdoc.get("attributes") or [] if a.get("attribute") != legacy]
+	read, ai_warning = ({}, None)
+	if attrs and olds:
+		_vals, allowed, _abbr = _attribute_tables(attrs)
+		read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed)
+
+	plan = plan_pairs(tdoc, docs, empty, values=read)
 	by = {d["name"]: d for d in docs}
 	rows = []
 	for p in plan["pairs"]:
@@ -530,6 +551,8 @@ def alignment(template):
 						 "attributes": [a["attribute"] for a in tdoc.get("attributes") or []]},
 			"rows": rows, "unpaired_new": [variant_view(by[n], stock, legacy) for n in plan["unused_new"]],
 			"attribute_roles": {"colour": plan["colour_attribute"], "size": plan["size_attribute"]},
+			"ai_warning": ai_warning,
+			"read_by_ai": sum(1 for d in olds if d["name"] in read),
 			# so the screen's "names differ" check reads the same wordings the pairing did
 			"name_aliases": rules.alias_map()}
 

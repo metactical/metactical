@@ -8,6 +8,10 @@
       <button class="btn btn-default btn-xs ml-auto" @click="emit('back')">Back to variants</button>
     </div>
 
+    <div v-if="aiWarning" class="im-note warn">
+      <b>The AI alignment is not working.</b> {{ aiWarning }}
+    </div>
+
     <!-- the aligner -->
     <section class="im-card">
       <div class="flex items-center flex-wrap gap-2">
@@ -211,6 +215,7 @@ const hints = ref({}) // old item_code -> why the server couldn't pair it
 function place(data) {
   tmpl.value = data.template
   nameAliases.value = data.name_aliases || {}
+  aiWarning.value = data.ai_warning || ''
   const l = []
   const r = []
   for (const row of data.rows) { l.push(row.old); r.push(row.new) }
@@ -262,6 +267,8 @@ function settingsDiff(o, n) {
 // tables the server pairs with - it had lost S, M, L and XXS, so every single-letter size raised a
 // "names differ" warning on a pair the server had matched perfectly well.
 const nameAliases = ref({})
+// Set when the pairing fell back to the built-in name matching, so the operator knows to check it.
+const aiWarning = ref('')
 function nameHas(name, value) {
   const parts = String(name || '').split(' - ').map((s) => s.trim().toLowerCase())
   return [value, ...(nameAliases.value[value] || [])].some((v) => parts.includes(String(v).toLowerCase()))
