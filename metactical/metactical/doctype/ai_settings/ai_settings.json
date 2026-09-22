@@ -19,9 +19,7 @@
   "section_break_cost",
   "input_cost_per_million",
   "column_break_cost",
-  "output_cost_per_million",
-  "section_break_log",
-  "log_retention_days"
+  "output_cost_per_million"
  ],
  "fields": [
   {
@@ -117,18 +115,6 @@
    "fieldtype": "Float",
    "label": "Output Cost Per Million Tokens",
    "precision": "6"
-  },
-  {
-   "fieldname": "section_break_log",
-   "fieldtype": "Section Break",
-   "label": "Logging"
-  },
-  {
-   "default": "90",
-   "description": "AI Request Log rows older than this are cleared by the daily scheduler. 0 keeps them for ever.",
-   "fieldname": "log_retention_days",
-   "fieldtype": "Int",
-   "label": "Log Retention (days)"
   }
  ],
  "grid_page_length": 50,

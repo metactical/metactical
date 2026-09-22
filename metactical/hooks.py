@@ -211,7 +211,6 @@ scheduler_events = {
 #	],
 	"daily": [
 		"metactical.reserved_calculation.recalculate_reserved_qty",
-		"metactical.metactical.doctype.ai_request_log.ai_request_log.clear_old_logs",
 		# "metactical.custom_scripts.email_campaign.email_campaign.send_email_to_leads_or_contacts"
 	],
 #	"hourly": [
