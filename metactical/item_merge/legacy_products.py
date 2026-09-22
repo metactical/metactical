@@ -147,8 +147,17 @@ def for_template(template):
 	names = frappe.get_all(REGISTER, filters={"template": template, "status": "Captured"},
 						   pluck="name")
 	for name in sorted(names):
+		if name == template:
+			# The survivor is not a legacy product. product_details.save never registers it, but a
+			# record written before that rule existed would otherwise put the consolidated product
+			# in the drop list.
+			continue
 		doc = frappe.get_doc(REGISTER, name)
 		for row in doc.websites:
+			# A row already dropped is history; re-reading it issues a second drop for a product
+			# that is not there, and keeps the record out of a terminal state for ever.
+			if row.status == "Dropped":
+				continue
 			if row.slug and row.price_list:
 				out.append({"product": doc.item_code, "lead_source": row.lead_source,
 							"price_list": row.price_list,
@@ -206,9 +215,19 @@ def issue_drops(job, log=None):
 
 	log = log or (lambda m: None)
 	counts = {"issued": 0, "skipped": 0, "failed": 0}
+	survivor = job.get("template")
 
 	for row in job.get("legacy_products") or []:
 		if row.status == "Issued":
+			continue
+		if row.product and row.product == survivor:
+			# Belt and braces on top of for_template: the surviving template's own product is the
+			# one this merge consolidated *into*. Dropping it deletes the live product, and the
+			# _still_owned guard below cannot catch it when the website steps were skipped.
+			message = "{0} is the surviving template - its product is kept".format(row.product)
+			_set_row(row, status="Skipped", message=message)
+			log("legacy drop {0}: SKIPPED - {1}".format(row.product, message))
+			counts["skipped"] += 1
 			continue
 		slug = (row.slug or "").strip()
 		if not slug:

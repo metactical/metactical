@@ -60,9 +60,12 @@ def _log(feature, reference, settings, payload, response, usage, started, error=
 			"response": _clip(response),
 			"error": (error or "")[:1000] or None,
 		}).insert(ignore_permissions=True)
-		# Its own transaction: the log has to survive whatever the caller does next, including a
-		# rollback, or a failed run leaves no trace of the call that caused it.
-		frappe.db.commit()
+		# The log has to survive whatever the caller does next, including a rollback, or a failed
+		# run leaves no trace of the call that caused it. But a commit here would also make
+		# permanent whatever else the caller has pending, so it only commits when the log row is
+		# the only thing in the transaction. Callers today are read paths, so it always is.
+		if frappe.db.transaction_writes <= 1:
+			frappe.db.commit()
 	except Exception:
 		frappe.log_error(title="AI Request Log", message=frappe.get_traceback())
 

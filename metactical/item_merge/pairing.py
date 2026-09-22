@@ -148,12 +148,21 @@ def plan_pairs(template_doc, variants, emptiness=None, values=None):
 		if colour is not None and colour not in allowed_colour:
 			colour = None
 
+		# What was read, and by what, so the message says what actually happened rather than
+		# blaming the name when the value came from the AI and simply is not on a new variant.
 		reason = None
 		if size_attr and size is None:
-			reason = f"size '{tokens[-1] if tokens else ''}' not among new variants {sorted(allowed_size)}"
+			said = read.get(size_attr)
+			reason = (f"size '{said}' is not on any new variant {sorted(allowed_size)}" if said
+					  else f"size '{tokens[-1] if tokens else ''}' not among new variants {sorted(allowed_size)}")
 		elif colour_attr and colour is None:
-			reason = (f"colour '{colour_token}' not among new variants {sorted(allowed_colour)}"
-					  if colour_token else "no colour in item_name or template suffix")
+			said = read.get(colour_attr)
+			if said:
+				reason = f"colour '{said}' is not on any new variant {sorted(allowed_colour)}"
+			elif colour_token:
+				reason = f"colour '{colour_token}' not among new variants {sorted(allowed_colour)}"
+			else:
+				reason = "no colour in item_name or template suffix"
 		if reason:
 			unmatched.append({"old": o["name"], "old_name": o.get("item_name"),
 							  "reason": reason, "empty": bool(emptiness.get(o["name"]))})

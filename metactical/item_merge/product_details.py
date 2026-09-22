@@ -29,18 +29,26 @@ Storebuilder itself, which is the system the drop is sent to, so there is nothin
 """
 import frappe
 import requests
-from frappe.utils import flt, format_datetime, now_datetime
+from frappe.utils import add_days, flt, format_datetime, now_datetime
 
 from metactical.item_merge import catalogue, family, legacy_products, websites
+from metactical.item_merge.rules import UserError
 
 DETAIL_FIELD = "product_detail_apis"
 
-# The statuses step 1 is allowed to move on from. `full` is an answer from Storebuilder; `nowebsite`
-# is the absence of a question - a template nothing is priced on has no product to drop, and there
-# would be no price list on the row to take off with the ✕ either, so treating it as a problem would
-# be a dead end rather than something to fix.
+# Three states, not two. `full` is an answer from Storebuilder. `nowebsite` and `zeroprice` are the
+# absence of a question - nothing is priced there, so there is no product to drop and no price list
+# on the row to take off with the ✕ either. Everything else needs attention.
+#
+# The distinction matters: counting "nothing to check" as "checked" is what made the screen report
+# every template green when the site had no Item Prices at all.
 CLEAN = "full"
-SETTLED = (CLEAN, "nowebsite")
+NOTHING_TO_CHECK = ("nowebsite", "zeroprice")
+SETTLED = (CLEAN,) + NOTHING_TO_CHECK
+
+# A capture read from the register rather than from Storebuilder is only trusted for so long. Past
+# this, the row asks to be checked again rather than opening the gate on a month-old answer.
+CAPTURE_MAX_AGE_DAYS = 7
 
 
 # ---------- talking to the sites ----------
@@ -135,17 +143,21 @@ def storefronts_by_price_list():
 
 
 def priced_lists(codes, sites):
-	"""{price list: how many Item Price rows the family has on it} for the websites it is sold on.
+	"""({price list: row count} sold on, {price list: row count} priced only at zero).
 
 	Sold on means **an Item Price above zero**. Templates on this catalogue carry no price of their
 	own, so the variants are what answer this. The count is every row on that price list, zero-rate
 	ones included, because that is what the ✕ would delete and what its warning has to say.
 
+	A family priced entirely at zero on a website is reported separately rather than folded into
+	"not sold anywhere": it *is* on that price list, and saying otherwise sends the operator looking
+	for a missing price list that is not missing.
+
 	`price_list_rate` carries a permlevel, so it is read through frappe.get_all rather than a
 	permission-checked get_doc.
 	"""
 	if not codes or not sites:
-		return {}
+		return {}, {}
 	rows = frappe.get_all("Item Price",
 						  filters={"item_code": ["in", codes], "price_list": ["in", sorted(sites)]},
 						  fields=["price_list", "price_list_rate"])
@@ -154,7 +166,8 @@ def priced_lists(codes, sites):
 		counts[row.price_list] = counts.get(row.price_list, 0) + 1
 		if flt(row.price_list_rate) > 0:
 			sold.add(row.price_list)
-	return {pl: counts[pl] for pl in sorted(sold)}
+	return ({pl: counts[pl] for pl in sorted(sold)},
+			{pl: n for pl, n in sorted(counts.items()) if pl not in sold})
 
 
 def _family_codes(template):
@@ -194,15 +207,30 @@ def _rows_for(templates):
 	for template in templates:
 		meta = info.get(template) or {"item_name": "", "retail_sku": ""}
 		slugs = _erp_slugs(template)
-		lists = priced_lists(_family_codes(template), sites)
+		lists, zero = priced_lists(_family_codes(template), sites)
+
+		def _blank(status, message, price_list=None, price_rows=0):
+			lead_source = sites.get(price_list) if price_list else None
+			return {"template": template, "item_name": meta["item_name"],
+					"retail_sku": meta["retail_sku"], "price_list": price_list,
+					"lead_source": lead_source,
+					"site": catalogue.storefront_domain(lead_source) if lead_source else None,
+					"external_id": "", "slug": "", "erp_slug": slugs.get(price_list, "") if price_list else "",
+					"price_rows": price_rows, "can_look_up": False,
+					"status": status, "message": message}
+
+		# Priced at zero is not the same as not priced. Say which, and name the price list, so the
+		# ✕ is there to take it off if it really is not sold on that site.
+		for price_list, price_rows in zero.items():
+			rows.append(_blank("zeroprice", "Priced at 0 on {0} - not treated as sold there, so "
+									  "nothing is read from Storebuilder or dropped from it"
+									  .format(price_list), price_list, price_rows))
 		if not lists:
-			rows.append({"template": template, "item_name": meta["item_name"],
-						 "retail_sku": meta["retail_sku"], "price_list": None, "lead_source": None,
-						 "site": None, "external_id": "", "slug": "", "erp_slug": "",
-						 "price_rows": 0, "can_look_up": False, "status": "nowebsite",
-						 "message": "Not sold on any website - no price list above zero whose Lead "
-									"Source has a Lead Source Domain, so there is nothing on "
-									"Storebuilder to drop"})
+			if not zero:
+				rows.append(_blank("nowebsite",
+								   "Not sold on any website - no Item Price on a price list whose "
+								   "Lead Source has a Lead Source Domain, so there is nothing on "
+								   "Storebuilder to drop"))
 			continue
 		for price_list, price_rows in lists.items():
 			lead_source = sites[price_list]
@@ -224,7 +252,18 @@ def _configs():
 
 
 def _ok(rows):
+	"""Nothing on the screen needs attention. **Not** the same as "everything was verified".
+
+	A selection that is entirely "nothing to check" is ok to move on from - there is no product to
+	drop and no price list on the row to take off - but nothing was read from Storebuilder either.
+	Callers that want to say something reassuring have to look at `verified`, not at this.
+	"""
 	return bool(rows) and all(r["status"] in SETTLED for r in rows)
+
+
+def _verified(rows):
+	"""How many rows Storebuilder actually answered for."""
+	return sum(1 for r in rows if r["status"] == CLEAN)
 
 
 # ---------- what the page asks for ----------
@@ -237,20 +276,28 @@ def plan(templates):
 	"""
 	rows, configs = _rows_for(templates)
 	kept = _saved_slugs({r["template"] for r in rows})
+	cutoff = add_days(now_datetime(), -CAPTURE_MAX_AGE_DAYS)
 
 	for row in rows:
-		if row["status"] in ("nowebsite", "notconfigured"):
+		if row["status"] in NOTHING_TO_CHECK or row["status"] == "notconfigured":
 			continue
 		saved = kept.get((row["template"], row["lead_source"]))
-		if saved:
-			row.update({"external_id": row["template"], "slug": saved.slug, "status": CLEAN,
-						"message": "Captured {0}".format(
-							format_datetime(saved.checked_on) if saved.checked_on else "earlier")})
+		if not saved:
+			row.update({"status": "unchecked", "message": "Not checked yet - press Check Storebuilder"})
+			continue
+		when = format_datetime(saved.checked_on) if saved.checked_on else "at some point"
+		# Show what Storebuilder actually answered, not the item code we hoped it matched. Rows
+		# captured before external_id was recorded have none, and say so rather than invent one.
+		row.update({"external_id": saved.get("external_id") or "", "slug": saved.slug})
+		if saved.checked_on and saved.checked_on < cutoff:
+			row.update({"status": "stale",
+						"message": "Captured {0}, more than {1} days ago - check it again before "
+								   "relying on it".format(when, CAPTURE_MAX_AGE_DAYS)})
 		else:
-			row.update({"status": "unchecked", "message": "Not checked yet"})
+			row.update({"status": CLEAN, "message": "Captured {0}".format(when)})
 
 	return {"templates": sorted({r["template"] for r in rows}), "rows": rows, "ok": _ok(rows),
-			"any_config": bool(configs)}
+			"verified": _verified(rows), "any_config": bool(configs), "checked_now": False}
 
 
 def lookup(templates):
@@ -260,9 +307,14 @@ def lookup(templates):
 
 	pending, calls = [], []
 	for row in rows:
+		# A row with nothing to check keeps what it says. A zero-priced one carries a price list, so
+		# without this it would be looked up, come back `full`, and then be recorded and dropped for
+		# a website the family is not sold on.
+		if row["status"] in NOTHING_TO_CHECK:
+			continue
 		config = configs.get(row["price_list"]) if row["price_list"] else None
 		if not config:
-			continue  # nowebsite and notconfigured rows already say what is wrong
+			continue  # notconfigured rows already say what is wrong
 		pending.append(row)
 		calls.append(lambda c=config, h=headers[row["price_list"]], t=row["template"],
 							r=row["retail_sku"], s=row["erp_slug"]: _detail_one(c, h, t, r, s))
@@ -274,7 +326,8 @@ def lookup(templates):
 		else:
 			row.update(result)
 
-	return {"templates": sorted({r["template"] for r in rows}), "rows": rows, "ok": _ok(rows)}
+	return {"templates": sorted({r["template"] for r in rows}), "rows": rows, "ok": _ok(rows),
+			"verified": _verified(rows), "checked_now": True}
 
 
 # ---------- the register ----------
@@ -288,18 +341,36 @@ def _saved_slugs(templates):
 	return out
 
 
-def save(survivor, rows):
-	"""Write what Storebuilder answered to the register, one record per template.
+def save(survivor, rows, commit=True, under=None):
+	"""Write what Storebuilder answered to the register, one record per consolidated-away template.
 
 	This runs **before** the templates are consolidated, because consolidate_templates deletes them
 	and the record is the only thing that outlives them. `template` is the survivor on every record,
 	which is what jobs._legacy_rows reads the batch back by.
 
-	The survivor is written along with the sources on purpose: it is one of the old products too, and
-	issue_drops' `_still_owned` guard is what decides at drop time that its slug is still published
-	by a live Item and leaves it alone.
+	**The survivor is never registered.** It is not a legacy product: the merge consolidates into it
+	and its Storebuilder product is meant to stay and be updated. Registering it put it in the drop
+	list and left it resting on `issue_drops._still_owned`, a guard that only holds when the
+	survivor's Item Detail already carries that slug - which the website steps fill from Metabase,
+	and which are skipped whenever Metabase is unreachable. A survivor with no Item Detail slug and
+	no Metabase would have had its live product deleted.
+
+	Returns {"written", "removed", "templates", "problems"}. A slug another item already claims is
+	reported in `problems` rather than thrown: one bad row must not stop the rest being written, and
+	it is something the operator can fix on the row.
+
+	`commit=False` leaves the write in the caller's transaction, so a consolidation that fails
+	afterwards rolls the register back with it instead of leaving records for a merge that never
+	happened.
+
+	`survivor` is the code the rows call the survivor - the one to leave out. `under` is the code to
+	file the records against, which differs when the merge renames the survivor on its way through:
+	the records have to name the code the job will look them up by, not the one being replaced.
 	"""
 	rows = rows or []
+	survivor = str(survivor or "").strip()
+	under = str(under or "").strip() or survivor
+
 	# Every template on the screen, not only the ones with an answer: what is sent replaces what is
 	# recorded, so a website the operator has since taken off the template with the ✕ has to stop
 	# being recorded rather than sit there waiting to issue a drop for a site nothing is sold on.
@@ -308,8 +379,33 @@ def save(survivor, rows):
 		if row.get("status") == CLEAN and str(row.get("slug") or "").strip():
 			by_template[str(row["template"])].append(row)
 
+	# One website, one slug, one item: two records pointing at the same page would issue two drops
+	# for the same product. Caught here so it reads as a row problem, not a raw validation dialog.
+	owners, problems = {}, []
+	for template in sorted(by_template):
+		if template == survivor:
+			continue
+		for row in by_template[template]:
+			owners.setdefault((row.get("lead_source"), str(row["slug"]).strip()), set()).add(template)
+	blocked = {key for key, templates in owners.items() if len(templates) > 1}
+	for key in sorted(blocked):
+		problems.append("{0} all point at {1} on {2} - only one item can own a page, so it was not "
+						"recorded for any of them. Fix the External IDs in Storebuilder so each "
+						"template finds its own product."
+						.format(", ".join(sorted(owners[key])), key[1], key[0]))
+
 	written, removed = 0, 0
 	for template, good in sorted(by_template.items()):
+		if template == survivor:
+			# It survives, so it is not a legacy product. Clear any record an earlier save made
+			# under a different survivor, or it stays in the drop list for ever.
+			if frappe.db.get_value(legacy_products.REGISTER, template, "status") == "Captured":
+				frappe.delete_doc(legacy_products.REGISTER, template, ignore_permissions=True)
+				removed += 1
+			continue
+
+		good = [r for r in good
+				if (r.get("lead_source"), str(r["slug"]).strip()) not in blocked]
 		if not good:
 			# Only a record still waiting to be dropped. One that has already been dropped, or that
 			# somebody marked as never published, is history and is left alone.
@@ -317,24 +413,62 @@ def save(survivor, rows):
 				frappe.delete_doc(legacy_products.REGISTER, template, ignore_permissions=True)
 				removed += 1
 			continue
-		doc = legacy_products._record_for(template, survivor)
+
+		doc = legacy_products._record_for(template, under)
 		doc.status = "Captured"
 		doc.websites = []
 		for row in good:
 			doc.append("websites", {
 				"lead_source": row["lead_source"],
 				"slug": str(row["slug"]).strip(),
+				"external_id": row.get("external_id") or "",
 				"source": "Lookup",
 				"verified": 1,
 				"state": "Live",
 				"checked_on": now_datetime(),
 				"note": row.get("message") or "found in Storebuilder",
 			})
-		legacy_products._store(doc)
+		try:
+			legacy_products._store(doc)
+		except Exception as e:
+			problems.append("{0}: {1}".format(template, frappe.utils.strip_html(str(e))[:200]))
+			continue
 		written += len(good)
 
-	frappe.db.commit()
-	return {"written": written, "removed": removed, "templates": sorted(by_template)}
+	if commit:
+		frappe.db.commit()
+	return {"written": written, "removed": removed, "templates": sorted(by_template),
+			"problems": problems}
+
+
+def ensure_captured(survivor, sources):
+	"""Refuse a consolidation whose sources nobody captured. Raises UserError.
+
+	The screen blocks this too, but the screen is a convenience - consolidate_templates is
+	whitelisted and reachable without it, and once it has run the source templates are gone and
+	their Storebuilder products can never be found again. This is the check that actually holds.
+	"""
+	sources = [str(c).strip() for c in (sources or []) if str(c or "").strip() and str(c).strip() != survivor]
+	if not sources:
+		return
+
+	sites = storefronts_by_price_list()
+	have = set(frappe.get_all(legacy_products.REGISTER,
+							  filters={"item_code": ["in", sources]}, pluck="name"))
+	missing = []
+	for template in sources:
+		if template in have:
+			continue
+		sold, _zero = priced_lists(_family_codes(template), sites)
+		if sold:  # nothing recorded, and it is sold somewhere - that product would be stranded
+			missing.append(template)
+	if missing:
+		raise UserError(
+			"Storebuilder was never read for {0}: {1}. Open the Storebuilder products table under "
+			"Find Template, press Check Storebuilder, and fix anything that is not green - once "
+			"these templates are merged away their products can no longer be found."
+			.format("{0} template(s)".format(len(missing)) if len(missing) > 1 else "one template",
+					", ".join(sorted(missing)[:8])))
 
 
 # ---------- taking a website off a template ----------
@@ -350,7 +484,16 @@ def remove_price_list(template, price_list):
 	template = str(template or "").strip()
 	price_list = str(price_list or "").strip()
 	if not (template and price_list):
-		frappe.throw("A template and a price list are both needed")
+		raise UserError("A template and a price list are both needed")
+
+	# This deletes real prices with the website webhooks on, and it is whitelisted, so it checks
+	# what it was handed rather than trusting the caller: a template, and a price list that is one
+	# of the websites this screen is about.
+	if not frappe.db.get_value("Item", template, "has_variants"):
+		raise UserError("{0} is not a template".format(template))
+	if price_list not in storefronts_by_price_list():
+		raise UserError("{0} is not a website price list - its Lead Source has no Lead Source Domain"
+						.format(price_list))
 
 	names = frappe.get_all("Item Price",
 						   filters={"item_code": ["in", _family_codes(template)],

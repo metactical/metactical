@@ -8,6 +8,7 @@
  "field_order": [
   "lead_source",
   "slug",
+  "external_id",
   "state",
   "column_break_lwps1",
   "price_list",
@@ -37,6 +38,13 @@
    "in_list_view": 1,
    "columns": 3,
    "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The External ID Storebuilder answered with when this slug was captured. Recorded so the screen can show what was actually read rather than assuming it matched the item code.",
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "External ID",
    "read_only": 1
   },
   {

@@ -293,10 +293,11 @@ async function consolidate() {
   if (!ok) return
   busy.value = true
   try {
-    // The register's `template` has to be the code the merge job will look the batch up by, which
-    // is the renamed one when a rename is part of this.
-    await products.value.save(finalCode)
-    const res = await itemMergeApi.consolidateTemplates(survivor.value, sources, renameTo.value.trim() || null, confirmSame.value)
+    // The rows go with the call rather than in a save of their own: consolidate_templates records
+    // them in the same transaction as the renames, so a consolidation that fails does not leave
+    // register records behind for a merge that never happened.
+    const res = await itemMergeApi.consolidateTemplates(survivor.value, sources,
+      renameTo.value.trim() || null, confirmSame.value, products.value.rows)
     alertOk(`${res.variants_moved} variant(s) now under ${res.template}`)
     emit('chosen', res.template)
   } catch (e) {

@@ -140,8 +140,13 @@ def _ask(template, attrs, allowed, short, codes, suffixes):
 
 
 def _cache_key(template, attrs, allowed, short):
-	"""Identifies the exact question. Any change to it is a different question."""
-	payload = json.dumps([template, attrs, {a: sorted(allowed[a]) for a in attrs},
+	"""Identifies the exact question. Any change to it is a different question.
+
+	The model is in the key: switching it in AI Settings and still being served yesterday's answers
+	from the model you switched away from is the opposite of what changing it is for.
+	"""
+	model = frappe.db.get_single_value("AI Settings", "model") or ""
+	payload = json.dumps([model, template, attrs, {a: sorted(allowed[a]) for a in attrs},
 						  sorted(short.items())], separators=(",", ":"))
 	return "{0}:{1}".format(CACHE_PREFIX, hashlib.sha1(payload.encode("utf-8")).hexdigest())
 
