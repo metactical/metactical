@@ -1,7 +1,7 @@
 import base64
 import random
 import frappe
-from frappe.utils import add_days, nowdate, flt
+from frappe.utils import add_days, nowdate, flt, now_datetime
 from metactical.custom_scripts.pick_list.pick_list import create_pick_list
 from erpnext.stock.doctype.delivery_note.delivery_note import make_packing_slip
 import json
@@ -126,6 +126,19 @@ def create_sales_order(*args, **kwargs):
 @frappe.whitelist()
 def pack_order_complete(*args, **kwargs):
     """
+    Packs an order: creates the Pick List, Delivery Note, Packing Slips and Shipment
+    as one unit, synchronously.
+
+    Runs inline on purpose. This method never publishes to RabbitMQ, so it carries no
+    broker configuration - PPS owns those settings in its own appsettings, and having
+    a second copy here would be a place for them to drift. ERPNext publishes to PPS
+    only through the Webhook doctype, where the routing is configured per environment.
+    """
+    return _pack_order_complete_run(dict(frappe.form_dict))
+
+
+def _pack_order_complete_run(form_data: dict):
+    """
     Packs an order using nested packing_slips payload structure: creates
     the Pick List, Delivery Note, Packing Slips and Shipment as one unit.
 
@@ -141,7 +154,6 @@ def pack_order_complete(*args, **kwargs):
     `frappe.session.user` — this endpoint isn't `allow_guest`, so it only
     runs in a real signed-in PPS user's session (see `authenticate`).
     """
-    form_data = dict(frappe.form_dict)
     log = create_log(form_data, "Pack Order")
     order_id = form_data.get("order_id")
 
@@ -705,8 +717,16 @@ def authenticate(*args, **kwargs):
         reason = "user_disabled" if frappe.local.response.get("message") == "User disabled or missing" else "invalid_credentials"
         return {"authenticated": False, "reason": reason}
     except Exception:
+        # NOT "invalid_credentials". The password is verified inside
+        # LoginManager.authenticate before anything else runs, so an exception that
+        # is not AuthenticationError means the credential was fine and something
+        # else broke - most often the login-attempt tracker, which keys its Redis
+        # hash on `frappe.local.request_ip` and throws when that is None.
+        #
+        # Reporting a system fault as a bad password sends every worker to reset a
+        # password that was never wrong, and hides the real outage.
         frappe.log_error(frappe.get_traceback(), "PPS Authenticate Error")
-        return {"authenticated": False, "reason": "invalid_credentials"}
+        return {"authenticated": False, "reason": "system_error"}
 
     user = login_manager.user
 
@@ -794,7 +814,6 @@ def search_inventory(*args, **kwargs):
     )
 
     next_cursor = _encode_cursor(fuzzy_item_codes[-1]) if has_more and fuzzy_item_codes else None
-
     return {
         "results": results,
         "next_cursor": next_cursor,
@@ -932,7 +951,14 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
         for row in frappe.db.get_all(
             "Item",
             filters={"name": ["in", item_codes]},
-            fields=["name", "item_name", "item_group", "stock_uom", "disabled"],
+            fields=[
+                "name", "item_name", "item_group", "stock_uom", "disabled",
+                # PPS renders these on the item detail panel and the measurements
+                # screen; without them it has to read the Item doctype directly.
+                "image", "description",
+                "valuation_rate", "last_purchase_rate", "standard_rate",
+                "weight_per_unit", "weight_uom",
+            ],
         )
     }
 
@@ -952,7 +978,13 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
     for row in frappe.db.get_all(
         "Bin",
         filters=bin_filters,
-        fields=["item_code", "warehouse", "actual_qty", "reserved_qty"],
+        # projected_qty and ordered_qty are already displayed by PPS - without
+        # them the UI renders zeroes rather than falling back to a live read.
+        fields=[
+            "item_code", "warehouse", "actual_qty", "reserved_qty",
+            "projected_qty", "ordered_qty", "indented_qty", "planned_qty",
+            "valuation_rate",
+        ],
     ):
         bin_site = _warehouse_site(row.warehouse)
         if site_filter and bin_site != site_filter:
@@ -969,6 +1001,13 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
             "actual_qty": actual_qty,
             "reserved_qty": reserved_qty,
             "available_qty": actual_qty - reserved_qty,
+            "projected_qty": row.projected_qty or 0.0,
+            "ordered_qty": row.ordered_qty or 0.0,
+            "indented_qty": row.indented_qty or 0.0,
+            "planned_qty": row.planned_qty or 0.0,
+            # Bin valuation takes precedence over the item-level rate when set,
+            # which is what stock reconciliation prices against.
+            "valuation_rate": row.valuation_rate or 0.0,
         })
 
     results = []
@@ -988,6 +1027,13 @@ def _load_items_with_locations(item_codes: list, site_filter, warehouse_filter, 
             "stock_uom": item.stock_uom,
             "barcodes": barcodes_by_item.get(item_code, []),
             "disabled": bool(item.disabled),
+            "image": item.image,
+            "description": item.description,
+            "valuation_rate": item.valuation_rate or 0.0,
+            "last_purchase_rate": item.last_purchase_rate or 0.0,
+            "standard_rate": item.standard_rate or 0.0,
+            "weight_per_unit": item.weight_per_unit or 0.0,
+            "weight_uom": item.weight_uom,
             "locations": locations,
         })
 
@@ -1057,21 +1103,40 @@ def _clear_created_documents(packing_slip_docs, pick_list_name, delivery_note, s
         frappe.db.rollback()
 
 
-def _attribute_pps_write(doctype: str, docname: str, action: str = "Created"):
+def _pps_actor() -> str:
+    """
+    Who to attribute a PPS write to.
+
+    `frappe.session.user` is the owner of the API key PPS authenticated with -
+    one shared integration account, the same value for every worker. The
+    person who actually did the work is only known to PPS, so it sends
+    `pps_user` on the request and that wins when present.
+    """
+    actor = (frappe.form_dict or {}).get("pps_user")
+    if actor and isinstance(actor, str) and actor.strip():
+        return actor.strip()
+    return frappe.session.user
+
+
+def _attribute_pps_write(doctype: str, docname: str, action: str = "Created", actor: str = None):
     """
     W4: stamp a Comment ("{action} through PPS by {user}") on every document
     a PPS write method creates or mutates. Must be a Comment, never the
     `remarks` field — a caller-supplied remark would silently overwrite it.
     A failed comment must never roll back the real write, so this only
     ever logs.
+
+    `actor` is the worker PPS names on the request; without it the comment
+    records the shared API-key account and every pack looks identical.
     """
     try:
+        user = actor or _pps_actor()
         frappe.get_doc({
             "doctype": "Comment",
             "comment_type": "Comment",
             "reference_doctype": doctype,
             "reference_name": docname,
-            "content": f"{action} through PPS by {frappe.session.user}",
+            "content": f"{action} through PPS by {user}",
         }).insert(ignore_permissions=True)
     except Exception:
         frappe.log_error(
