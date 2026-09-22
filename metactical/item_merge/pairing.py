@@ -1,8 +1,13 @@
 """Old -> new variant pairing for the item-merge project. Pure functions, no network.
 
 An "old" variant is a legacy Variant-Number item whose real size/colour lives only in
-its item_name. A "new" variant carries proper Item Attributes. Pairing reads the old
-variant's name tail and matches it to the new variant's attribute values.
+its item_name. A "new" variant carries proper Item Attributes. Pairing takes the old
+variant's values - read by `attribute_ai`, or off the name tail here when the AI could
+not answer - and matches them to the new variant's attribute values.
+
+The matching, the conflict detection and the ambiguity split below are deliberately not
+the AI's job. Getting a pair wrong moves an item's stock and ledger onto another item,
+so what decides that stays here, where it is the same answer every time.
 
 Never pair by the numeric suffix: legacy `-0001..-0006` is offset by one from the size
 abbreviations `0002..0007`, so suffix matching silently moves stock to the wrong size.
@@ -95,14 +100,20 @@ def name_tokens(item_name):
 	return [t.strip() for t in str(item_name or "").split(" - ") if t.strip()]
 
 
-def plan_pairs(template_doc, variants, emptiness=None):
+def plan_pairs(template_doc, variants, emptiness=None, values=None):
 	"""Pair old variants to new ones.
 
 	variants: item docs (dicts) that are variants of the template or of named source
 			  templates. emptiness: optional {item_code: True} for zero-bin, zero-ledger items.
+	values:   optional {item_code: {attribute: value}} read by attribute_ai. Where an old variant
+			  is in there, those values are used instead of picking the name apart here - reading
+			  the name is the part that was inaccurate. An old variant the AI did not answer for
+			  falls back to the tables below, so a partial answer still pairs the rest.
+
 	Returns a dict describing pairs and everything that could not be paired safely.
 	"""
 	emptiness = emptiness or {}
+	values = values or {}
 	legacy = variant_attribute(template_doc)
 	colour_attr, size_attr = attribute_roles(template_doc)
 	news = [v for v in variants if is_new(v, legacy)]
@@ -114,17 +125,28 @@ def plan_pairs(template_doc, variants, emptiness=None):
 	pairs, unmatched, ambiguous = [], [], []
 	for o in olds:
 		tokens = name_tokens(o.get("item_name"))
-		size = resolve(tokens[-1] if tokens else None, allowed_size, SIZE_ALIASES) if size_attr else None
-		colour = None
-		# "Style - Colour - Size" puts the colour second from last; a colour-only family
-		# ("Style - 3Pcs - Black") ends in it, so try the last part first there.
-		colour_tokens = tokens[-2:-1] if size_attr else tokens[-1:] + tokens[-2:-1]
-		colour_token = colour_tokens[0] if colour_tokens else None
-		if colour_attr:
+		read = values.get(o["name"]) or {}
+		size = read.get(size_attr) if size_attr else None
+		colour = read.get(colour_attr) if colour_attr else None
+		colour_token = None
+
+		if size_attr and size is None:
+			size = resolve(tokens[-1] if tokens else None, allowed_size, SIZE_ALIASES)
+		if colour_attr and colour is None:
+			# "Style - Colour - Size" puts the colour second from last; a colour-only family
+			# ("Style - 3Pcs - Black") ends in it, so try the last part first there.
+			colour_tokens = tokens[-2:-1] if size_attr else tokens[-1:] + tokens[-2:-1]
+			colour_token = colour_tokens[0] if colour_tokens else None
 			colour = next((c for c in (resolve(t, allowed_colour, COLOUR_ALIASES) for t in colour_tokens) if c), None)
 			if colour is None:
 				suffix = re.sub(r"^.*\d", "", o.get("variant_of") or "")   # greedy: after the LAST digit
 				colour = resolve(SUFFIX_COLOUR.get(suffix), allowed_colour, COLOUR_ALIASES)
+
+		# A value the AI read has to be one the new variants actually carry, or it pairs nothing.
+		if size is not None and size not in allowed_size:
+			size = None
+		if colour is not None and colour not in allowed_colour:
+			colour = None
 
 		reason = None
 		if size_attr and size is None:

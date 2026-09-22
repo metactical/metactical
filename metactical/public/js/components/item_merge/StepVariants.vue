@@ -102,6 +102,10 @@
         Add their combinations with <b>Add in bulk</b>.
       </div>
 
+      <div v-if="aiWarning" class="im-note warn mb-2">
+        <b>The AI suggestion is not working.</b> {{ aiWarning }}
+      </div>
+
       <div class="flex items-center flex-wrap gap-2 mb-2">
         <button class="btn btn-default btn-sm" @click="openBulk">+ Add in bulk</button>
         <button class="btn btn-default btn-xs" @click="tickAll(true)">Tick all</button>
@@ -278,6 +282,9 @@ const newCount = computed(() => variants.value.filter((v) => v.is_new).length)
 const attributes = computed(() => [attr1.value, attr2.value].filter(Boolean))
 const existingCount = computed(() => rows.value.filter((r) => r.existing).length)
 const unreadableCodes = computed(() => new Set((suggestion.value?.unreadable || []).map((u) => u.item_code)))
+// Set when the combinations were read by the old name matching instead of the AI, so the operator
+// knows to check the values rather than trusting the grid.
+const aiWarning = computed(() => suggestion.value?.ai_warning || '')
 
 // ---- variants table ----
 const sortKey = ref('item_code')
