@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from metactical.item_merge import family, jobs, legacy_products, websites
+from metactical.item_merge import family, jobs, legacy_products, product_details, websites
 from metactical.item_merge.rules import UserError
 
 ROLES = ("System Manager", "Item Manager")
@@ -33,15 +33,20 @@ WEBHOOK_FLAGS = ("in_import", "item_from_excel")
 
 
 @contextmanager
-def _api():
+def _api(webhooks=False):
 	"""Role check, a readable message for anything the user can fix, and no outbound Webhooks.
 
 	The page restructures a catalogue in steps; pushing each half-finished step to the websites is
-	never wanted. They are brought back in step by the website slugs step at the end of the job."""
+	never wanted. They are brought back in step by the website slugs step at the end of the job.
+
+	`webhooks=True` leaves them alone. One call wants that: taking a price list off a template is not
+	a half-finished restructuring step, it is a finished catalogue change the websites have to hear
+	about, and the operator asked for it by name."""
 	_require_roles()
 	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
 	for name in WEBHOOK_FLAGS:
-		frappe.local.flags[name] = True
+		if not webhooks:
+			frappe.local.flags[name] = True
 	try:
 		yield
 	except (UserError, websites.NotConfigured) as e:
@@ -120,6 +125,42 @@ def rename_template(template, new_code=None, item_name=None):
 		return result
 
 
+# ---------- step 1: the Storebuilder products behind the templates ----------
+
+@frappe.whitelist()
+def template_website_plan(templates):
+	"""The grid under Find Template, asking the websites nothing - see product_details.plan."""
+	with _api():
+		return product_details.plan(_list(templates))
+
+
+@frappe.whitelist()
+def lookup_template_products(templates):
+	"""Ask every website what it holds for these templates. Live papi_product_details calls."""
+	with _api():
+		return product_details.lookup(_list(templates))
+
+
+@frappe.whitelist()
+def save_template_products(survivor, rows):
+	"""Write the captured External IDs and slugs to the Legacy Website Product register.
+
+	Called before consolidate_templates, because that deletes the source templates and the register
+	is the only thing that outlives them."""
+	with _api():
+		return product_details.save(survivor, _list(rows))
+
+
+@frappe.whitelist()
+def remove_template_price_list(template, price_list):
+	"""Take a website off a template by deleting its Item Price rows.
+
+	The one call on this page that runs with the outbound Webhooks left on: the sites have to be told
+	the item is no longer priced for them."""
+	with _api(webhooks=True):
+		return product_details.remove_price_list(template, price_list)
+
+
 # ---------- step 2: variants ----------
 
 @frappe.whitelist()
@@ -143,16 +184,9 @@ def suggest_combinations(template, attributes):
 @frappe.whitelist()
 def create_variants(template, attributes, combinations, style_name=None, dry_run=0):
 	with _api():
-		# The websites come first: after the merge the old items are gone, and a Storebuilder
-		# product nobody wrote a slug for can never be found again. The screen blocks the button,
-		# but the screen is a convenience - this method is reachable without it.
-		missing = legacy_products.missing_slugs(template)
-		if missing and not cint(dry_run):
-			raise UserError(
-				"Record the website slugs first. {0} old variant(s) have nothing on them yet: {1}. "
-				"Open each one under Variants under this template and add its slug for every website "
-				"it is live on, or mark it as not on any website.".format(
-					len(missing), ", ".join(missing[:8]) + ("…" if len(missing) > 8 else "")))
+		# The websites were dealt with in step 1: the External ID and slug of every template this
+		# merge consolidates away are already in the register, captured from Storebuilder before
+		# anything was combined.
 		return family.create_variants(template, _list(attributes), _list(combinations), style_name, cint(dry_run))
 
 
@@ -246,42 +280,7 @@ def check_websites(template):
 # ---------- legacy website products ----------
 
 @frappe.whitelist()
-def legacy_website_plan(products):
-	"""One row per legacy product per website, asking the websites nothing. Reads only."""
+def legacy_drop_plan(template):
+	"""What this merge will drop from the websites: the register rows step 1 captured. Reads only."""
 	with _api():
-		return legacy_products.plan(_list(products))
-
-
-@frappe.whitelist()
-def lookup_legacy_slugs(products, lead_sources=None):
-	"""What slug each website has for these legacy item codes. Reads only."""
-	with _api():
-		return legacy_products.lookup(_list(products), _list(lead_sources) or None)
-
-
-@frappe.whitelist()
-def check_legacy_slugs(rows):
-	"""Ask each website for the page its slug points at. Reads only, writes nothing."""
-	with _api():
-		return legacy_products.check(_list(rows))
-
-
-@frappe.whitelist()
-def mark_not_published(template, item_code, on=1):
-	"""Record that a legacy item has no Storebuilder product at all, so it stops blocking."""
-	with _api():
-		result = legacy_products.not_published(item_code, on=bool(cint(on)))
-		family.add_activity(template, "{0} marked as {1} on the websites".format(
-			item_code, "not published" if cint(on) else "published"))
-		return result
-
-
-@frappe.whitelist()
-def save_legacy_slugs(template, rows):
-	"""Check the operator's slugs and write them to the Legacy Website Product register."""
-	with _api():
-		result = legacy_products.save(template, _list(rows))
-		if result["written"] or result["removed"]:
-			family.add_activity(template, "legacy website slugs: {0} saved, {1} removed".format(
-				result["written"], result["removed"]))
-		return result
+		return {"template": template, "rows": legacy_products.for_template(template)}

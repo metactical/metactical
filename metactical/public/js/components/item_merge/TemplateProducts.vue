@@ -1,0 +1,176 @@
+<template>
+  <section class="im-card mt-3">
+    <div class="flex items-center gap-2">
+      <h3 class="im-card-title mb-0">Storebuilder products</h3>
+      <span v-if="rows.length" class="text-xs text-muted">
+        {{ cleanCount }} of {{ rows.length }} ready
+      </span>
+      <button class="btn btn-default btn-sm ml-auto" :disabled="busy || !templates.length" @click="check">
+        {{ busy ? 'Checking…' : 'Check Storebuilder' }}
+      </button>
+    </div>
+    <p class="im-lede">
+      The External ID and slug each website holds for these templates, read from
+      <span class="font-mono">papi_product_details</span>. The merge deletes the templates it
+      consolidates away, so this is the only chance to take the handle on their Storebuilder
+      products - without it they stay live on the sites as duplicates.
+    </p>
+
+    <div v-if="loading" class="im-empty"><span class="animate-spin">⟳</span> Loading…</div>
+    <div v-else-if="!templates.length" class="im-empty">Tick a template to see what the websites hold for it.</div>
+    <div v-else-if="!rows.length" class="im-empty">Nothing to check for this selection.</div>
+    <template v-else>
+      <div class="im-table-wrap">
+        <table class="im-table">
+          <thead>
+            <tr>
+              <th>Template</th>
+              <th>Retail SKU</th>
+              <th>External ID</th>
+              <th>Slug</th>
+              <th>Price list</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in rows" :key="r.template + '|' + (r.price_list || '-')" :class="{ bad: r.status === 'missing' || r.status === 'error' }">
+              <td class="font-mono whitespace-nowrap">{{ r.template }}</td>
+              <td class="font-mono text-muted whitespace-nowrap">{{ r.retail_sku || '—' }}</td>
+              <td class="font-mono whitespace-nowrap">{{ r.external_id || '—' }}</td>
+              <td class="font-mono">{{ r.slug || r.erp_slug || '—' }}</td>
+              <td class="whitespace-nowrap">
+                <template v-if="r.price_list">
+                  <span class="flex items-center gap-1">
+                    {{ r.price_list }}
+                    <button class="im-row-remove ml-auto" :disabled="busy"
+                            :title="'Remove ' + r.price_list + ' from ' + r.template"
+                            :aria-label="'Remove ' + r.price_list + ' from ' + r.template"
+                            @click="removePriceList(r)">✕</button>
+                  </span>
+                  <span v-if="r.site" class="text-xs text-faint">{{ r.site }}</span>
+                </template>
+                <span v-else class="text-faint">—</span>
+              </td>
+              <td>
+                <span :class="pillClass(r.status)">{{ label(r.status) }}</span>
+                <div class="text-xs text-muted">{{ r.message }}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="!anyConfig" class="im-note warn mt-2">
+        No <b>Product Detail APIs</b> are configured. Add one row per website under
+        Storebuilder Sync Settings before this screen can ask anything.
+      </div>
+      <div v-else-if="!ok" class="im-note warn mt-2">
+        <b>{{ rows.length - cleanCount }} row(s) still need attention.</b>
+        Fix them in Storebuilder and check again, or remove the price list with ✕ if the template
+        isn't sold on that website after all.
+      </div>
+      <div v-else class="im-note ok mt-2">
+        Every template has its External ID and slug on every website it is sold on.
+      </div>
+    </template>
+  </section>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { itemMergeApi } from './api.js'
+import { alertOk, confirmAction, pillClass } from './utils.js'
+
+const props = defineProps({ templates: { type: Array, default: () => [] } })
+const emit = defineEmits(['update:ok'])
+
+const rows = ref([])
+const anyConfig = ref(true)
+const loading = ref(false)
+const busy = ref(false)
+
+const LABELS = {
+  full: 'Item has full information',
+  noexternalid: 'No External ID',
+  wrongexternalid: 'Wrong External ID',
+  noslug: 'The slug is not found',
+  notconfigured: 'No API for this website',
+  missing: "Can't find the item",
+  nowebsite: 'Not on any website',
+  error: 'The website could not answer',
+  unchecked: 'Not checked',
+}
+const label = (status) => LABELS[status] || 'Not checked'
+
+// `nowebsite` settles a row without an answer: nothing is sold there, so nothing is dropped.
+const SETTLED = ['full', 'nowebsite']
+const cleanCount = computed(() => rows.value.filter((r) => SETTLED.includes(r.status)).length)
+const ok = computed(() => rows.value.length > 0 && cleanCount.value === rows.value.length)
+watch(ok, (v) => emit('update:ok', v), { immediate: true })
+
+// The plan is a read - it never calls the websites - so it can follow the tick boxes. The live
+// check is a button, because it is N templates x M sites of real HTTP.
+let seq = 0
+async function load() {
+  if (!props.templates.length) { rows.value = []; return }
+  const mine = ++seq
+  loading.value = true
+  try {
+    const res = await itemMergeApi.templateWebsitePlan(props.templates)
+    if (mine !== seq) return
+    rows.value = res.rows || []
+    anyConfig.value = !!res.any_config
+  } catch (e) {
+    // Frappe has shown the reason
+    if (mine === seq) rows.value = []
+  } finally {
+    if (mine === seq) loading.value = false
+  }
+}
+watch(() => props.templates, load, { deep: true, immediate: true })
+
+async function check() {
+  const mine = ++seq
+  busy.value = true
+  try {
+    const res = await itemMergeApi.lookupTemplateProducts(props.templates)
+    if (mine === seq) rows.value = res.rows || []
+  } catch (e) {
+    // Frappe has shown the reason
+  } finally {
+    if (mine === seq) busy.value = false
+  }
+}
+
+async function removePriceList(row) {
+  const n = row.price_rows || 0
+  const confirmed = await confirmAction({
+    title: 'Remove price list',
+    message: `Remove ${row.price_list} from ${row.template}?\n\n` +
+      `This deletes ${n} Item Price record(s) - the template and its variants - and the websites ` +
+      `are told about it. It cannot be undone.`,
+    label: 'Delete price list',
+    danger: true,
+  })
+  if (!confirmed) return
+  busy.value = true
+  try {
+    const res = await itemMergeApi.removeTemplatePriceList(row.template, row.price_list)
+    alertOk(`${res.deleted} Item Price row(s) removed from ${row.price_list}`)
+    await load()
+  } catch (e) {
+    // Frappe has shown the reason
+  } finally {
+    busy.value = false
+  }
+}
+
+// Called by StepTemplates before it leaves the step - and, when templates are being combined,
+// before consolidate_templates deletes the sources this has just read.
+async function save(survivor) {
+  const res = await itemMergeApi.saveTemplateProducts(survivor, rows.value)
+  return res
+}
+
+defineExpose({ refresh: load, save })
+</script>

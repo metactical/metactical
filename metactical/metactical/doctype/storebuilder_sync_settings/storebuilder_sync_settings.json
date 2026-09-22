@@ -8,10 +8,12 @@
   "validation_apis",
   "section_break_itpt",
   "item_detail_apis",
+  "section_break_vvap",
+  "variant_validation_apis",
   "section_break_imgap",
   "image_apis",
-  "section_break_pldap",
-  "product_lookup_apis"
+  "section_break_pdap",
+  "product_detail_apis"
  ],
  "fields": [
   {
@@ -32,25 +34,33 @@
    "options": "Item Import Validation"
   },
   {
+   "fieldname": "section_break_vvap",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "variant_validation_apis",
+   "fieldtype": "Table",
+   "label": "Variant Validation APIs",
+   "options": "Item Import Validation"
+  },
+  {
    "fieldname": "section_break_imgap",
    "fieldtype": "Section Break"
   },
   {
-   "description": "papi_product_images endpoint and CDN base URL per website. Called from Load Data From SB to import product images into S3.",
    "fieldname": "image_apis",
    "fieldtype": "Table",
    "label": "Product Image APIs",
    "options": "Item Import Validation"
   },
   {
-   "fieldname": "section_break_pldap",
+   "fieldname": "section_break_pdap",
    "fieldtype": "Section Break"
   },
   {
-   "description": "Retrieves a StoreBuilder product by its External ID (the ERP template item code). Returns 404 when no product maps to it. Used by Item Merge to find the legacy products a merge consolidates away.",
-   "fieldname": "product_lookup_apis",
+   "fieldname": "product_detail_apis",
    "fieldtype": "Table",
-   "label": "Product Lookup APIs (by External ID)",
+   "label": "Product Detail APIs",
    "options": "Item Import Validation"
   }
  ],
@@ -58,7 +68,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-20 10:00:00.000000",
+ "modified": "2026-09-22 06:12:15.100317",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Storebuilder Sync Settings",

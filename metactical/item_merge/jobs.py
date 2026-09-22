@@ -42,9 +42,10 @@ def with_webhooks():
 	"""Let webhooks fire again inside a job.
 
 	Everything in a merge runs with in_import and item_from_excel set, which is what stops frappe
-	queueing a webhook for the hundreds of saves, renames and deletes a merge makes. The legacy
-	drop is the exception: reaching the websites is the whole point of it, and a drop log inserted
-	with the flags still on would sit there having quietly told nobody.
+	queueing a webhook for the hundreds of saves, renames and deletes a merge makes. Two things are
+	the exception: the legacy drop, where reaching the websites is the whole point and a drop log
+	inserted with the flags still on would sit there having quietly told nobody, and an item changes
+	job, which is a set of finished edits rather than a half-finished restructuring.
 	"""
 	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
 	restore = getattr(frappe.local, SAVED_FLAGS, None) or {name: None for name in WEBHOOK_FLAGS}
@@ -123,16 +124,19 @@ def _active_job(template):
 
 # ---------- merge jobs ----------
 
-def _legacy_rows(pairs, leftovers):
-	"""The legacy Storebuilder products this merge will drop.
+def _legacy_rows(template):
+	"""The legacy Storebuilder products this merge will drop: one per template it consolidated away,
+	per website.
 
-	Read from the Legacy Website Product register, not from whatever the browser sent: the slugs are
-	captured on the Variants screen, long before this, and the register is what outlives the items
-	the merge is about to delete. An item with nothing registered has no legacy product to remove -
-	the ordinary case for something published on one site only, or on none.
+	Read from the Legacy Website Product register by the **surviving** template, not from whatever
+	the browser sent: the External IDs and slugs are captured on the Find Template screen, before
+	anything is combined, and by now the templates they name are deleted - the register is all that
+	outlives them. A merge with nothing registered has no legacy product to remove.
+
+	The survivor is in there too, and stays: `_still_owned` is what decides at drop time that its
+	slug is published by a live Item and leaves it alone.
 	"""
-	codes = {p["old"] for p in pairs if p.get("old")} | {c for c in (leftovers or []) if c}
-	return legacy_products.for_products(sorted(codes))
+	return legacy_products.for_template(template)
 
 
 def create_merge_job(template, pairs, leftovers, options):
@@ -145,7 +149,7 @@ def create_merge_job(template, pairs, leftovers, options):
 	blocking += rules.pair_edit_problems(pairs)
 	if blocking:
 		raise UserError("Fix these before queueing: " + " · ".join(blocking[:6]))
-	legacy_rows = _legacy_rows(pairs, leftovers)
+	legacy_rows = _legacy_rows(template)
 	options = options or {}
 	job = frappe.get_doc({
 		"doctype": DOCTYPE, "job_type": "Merge", "template": template, "status": "Queued",
@@ -176,8 +180,17 @@ def run_job(merge_job):
 	for name in WEBHOOK_FLAGS:
 		frappe.local.flags[name] = True
 	try:
-		log("website webhooks held back for this job - the sites are updated once, at the end")
-		(run_changes if job.job_type == "Item Changes" else run_merge)(job, log)
+		if job.job_type == "Item Changes":
+			# An item changes job is not a restructuring: it renames variants and edits their names
+			# and retail SKUs, one finished edit at a time, and every one of them is something the
+			# websites have to hear about. It has no website step at the end to put them back in
+			# step either - unlike a merge - so held-back webhooks here would never be made up for.
+			log("website webhooks left on for this job - each change is sent as it is made")
+			with with_webhooks():
+				run_changes(job, log)
+		else:
+			log("website webhooks held back for this job - the sites are updated once, at the end")
+			run_merge(job, log)
 	except Exception as e:  # surfaced on the job rather than lost in the worker log
 		frappe.db.rollback()
 		frappe.log_error(title=f"Item Merge Job {job_name}", message=frappe.get_traceback())
