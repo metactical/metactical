@@ -5,16 +5,25 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "merge_section",
   "use_old_item_price",
   "fields_to_copy",
-  "fields_to_overwrite"
+  "fields_to_overwrite",
+  "metabase_section",
+  "metabase_enabled",
+  "column_break_metabase",
+  "metabase_timeout",
+  "metabase_url",
+  "column_break_metabase_key",
+  "metabase_api_key",
+  "metabase_databases_help",
+  "metabase_databases"
  ],
  "fields": [
   {
-   "fieldname": "fields_to_overwrite",
-   "fieldtype": "Table",
-   "label": "Fields to Overwrite",
-   "options": "Variant Field"
+   "fieldname": "merge_section",
+   "fieldtype": "Section Break",
+   "label": "Merge"
   },
   {
    "default": "0",
@@ -27,13 +36,78 @@
    "fieldtype": "Table",
    "label": "Fields to Copy If Not Exist",
    "options": "Variant Field"
+  },
+  {
+   "fieldname": "fields_to_overwrite",
+   "fieldtype": "Table",
+   "label": "Fields to Overwrite",
+   "options": "Variant Field"
+  },
+  {
+   "fieldname": "metabase_section",
+   "fieldtype": "Section Break",
+   "label": "Metabase",
+   "description": "Where the Item Merge page reads each website's Storebuilder data from."
+  },
+  {
+   "default": "0",
+   "fieldname": "metabase_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Metabase",
+   "description": "While this is off the website steps on the Item Merge page report that they need setup, and nothing is written."
+  },
+  {
+   "fieldname": "column_break_metabase",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "120",
+   "fieldname": "metabase_timeout",
+   "fieldtype": "Int",
+   "label": "Query Timeout (seconds)",
+   "description": "How long to wait for one Metabase query. Blank or 0 means 120.",
+   "depends_on": "metabase_enabled"
+  },
+  {
+   "fieldname": "metabase_url",
+   "fieldtype": "Data",
+   "label": "Metabase URL",
+   "options": "URL",
+   "description": "Base URL only, e.g. https://metabase.metactical.com - /api/dataset is appended.",
+   "depends_on": "metabase_enabled",
+   "mandatory_depends_on": "metabase_enabled"
+  },
+  {
+   "fieldname": "column_break_metabase_key",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metabase_api_key",
+   "fieldtype": "Password",
+   "label": "Metabase API Key",
+   "description": "Sent as the x-api-key header. Metabase > Settings > Authentication > API keys.",
+   "depends_on": "metabase_enabled",
+   "mandatory_depends_on": "metabase_enabled"
+  },
+  {
+   "fieldname": "metabase_databases_help",
+   "fieldtype": "HTML",
+   "depends_on": "metabase_enabled",
+   "options": "<p class=\"text-muted small\">One row per website: the price list that site sells on, and the id of that site's Storebuilder snapshot database in Metabase. The Item Merge page uses these to find a product by any of its SKUs, and to show how old each snapshot is.</p>"
+  },
+  {
+   "fieldname": "metabase_databases",
+   "fieldtype": "Table",
+   "label": "Metabase Site Databases",
+   "options": "Metabase Site Database",
+   "depends_on": "metabase_enabled"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-23 05:01:35.781314",
+ "modified": "2026-09-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Merge Settings",
