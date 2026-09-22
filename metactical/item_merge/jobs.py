@@ -7,11 +7,12 @@ Progress is pushed to the page with publish_realtime; the page also polls while 
 """
 import json
 import time
+from contextlib import contextmanager
 
 import frappe
 from frappe.utils import now_datetime, time_diff_in_seconds
 
-from metactical.item_merge import family, merge, rules, websites
+from metactical.item_merge import family, legacy_products, merge, rules, websites
 from metactical.item_merge.family import exists, message_of
 from metactical.item_merge.pairing import variant_attribute
 from metactical.item_merge.rules import UserError
@@ -30,6 +31,31 @@ ACTIVE = ("Queued", "Running")
 # request in this worker keeps its webhooks.
 WEBHOOK_FLAGS = ("in_import", "item_from_excel")
 LOG_LINES = 400
+
+# Where run_job parks the flag values it found, so the one step that is *supposed* to reach the
+# websites can put them back for as long as it needs. frappe.local is thread-local, like the flags.
+SAVED_FLAGS = "_item_merge_webhook_flags"
+
+
+@contextmanager
+def with_webhooks():
+	"""Let webhooks fire again inside a job.
+
+	Everything in a merge runs with in_import and item_from_excel set, which is what stops frappe
+	queueing a webhook for the hundreds of saves, renames and deletes a merge makes. Two things are
+	the exception: the legacy drop, where reaching the websites is the whole point and a drop log
+	inserted with the flags still on would sit there having quietly told nobody, and an item changes
+	job, which is a set of finished edits rather than a half-finished restructuring.
+	"""
+	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
+	restore = getattr(frappe.local, SAVED_FLAGS, None) or {name: None for name in WEBHOOK_FLAGS}
+	for name in WEBHOOK_FLAGS:
+		frappe.local.flags[name] = restore.get(name)
+	try:
+		yield
+	finally:
+		for name, value in before.items():
+			frappe.local.flags[name] = value
 
 
 # ---------- small helpers ----------
@@ -98,6 +124,21 @@ def _active_job(template):
 
 # ---------- merge jobs ----------
 
+def _legacy_rows(template):
+	"""The legacy Storebuilder products this merge will drop: one per template it consolidated away,
+	per website.
+
+	Read from the Legacy Website Product register by the **surviving** template, not from whatever
+	the browser sent: the External IDs and slugs are captured on the Find Template screen, before
+	anything is combined, and by now the templates they name are deleted - the register is all that
+	outlives them. A merge with nothing registered has no legacy product to remove.
+
+	The survivor is in there too, and stays: `_still_owned` is what decides at drop time that its
+	slug is published by a live Item and leaves it alone.
+	"""
+	return legacy_products.for_template(template)
+
+
 def create_merge_job(template, pairs, leftovers, options):
 	running = _active_job(template)
 	if running:
@@ -108,6 +149,7 @@ def create_merge_job(template, pairs, leftovers, options):
 	blocking += rules.pair_edit_problems(pairs)
 	if blocking:
 		raise UserError("Fix these before queueing: " + " · ".join(blocking[:6]))
+	legacy_rows = _legacy_rows(template)
 	options = options or {}
 	job = frappe.get_doc({
 		"doctype": DOCTYPE, "job_type": "Merge", "template": template, "status": "Queued",
@@ -118,8 +160,10 @@ def create_merge_job(template, pairs, leftovers, options):
 				   "item_name": str(p.get("item_name") or "").strip() or None,
 				   "retail_sku": str(p.get("retail_sku") or "").strip() or None} for p in pairs],
 		"leftovers": [{"item_code": c, "status": "Queued"} for c in leftovers or []],
+		"legacy_products": legacy_rows,
 	}).insert()
-	family.add_activity(template, f"queued merge job {job.name}: {len(pairs)} pair(s), {len(leftovers or [])} leftover(s)")
+	family.add_activity(template, f"queued merge job {job.name}: {len(pairs)} pair(s), {len(leftovers or [])} leftover(s)"
+								  + (f", {len(legacy_rows)} legacy website product(s) to drop" if legacy_rows else ""))
 	_enqueue(job)
 	return job.name
 
@@ -132,11 +176,21 @@ def run_job(merge_job):
 	_set(job, status="Running", started_on=job.started_on or now_datetime(), error=None)
 	log = JobLog(job)
 	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
+	setattr(frappe.local, SAVED_FLAGS, before)
 	for name in WEBHOOK_FLAGS:
 		frappe.local.flags[name] = True
 	try:
-		log("website webhooks held back for this job - the sites are updated once, at the end")
-		(run_changes if job.job_type == "Item Changes" else run_merge)(job, log)
+		if job.job_type == "Item Changes":
+			# An item changes job is not a restructuring: it renames variants and edits their names
+			# and retail SKUs, one finished edit at a time, and every one of them is something the
+			# websites have to hear about. It has no website step at the end to put them back in
+			# step either - unlike a merge - so held-back webhooks here would never be made up for.
+			log("website webhooks left on for this job - each change is sent as it is made")
+			with with_webhooks():
+				run_changes(job, log)
+		else:
+			log("website webhooks held back for this job - the sites are updated once, at the end")
+			run_merge(job, log)
 	except Exception as e:  # surfaced on the job rather than lost in the worker log
 		frappe.db.rollback()
 		frappe.log_error(title=f"Item Merge Job {job_name}", message=frappe.get_traceback())
@@ -145,6 +199,7 @@ def run_job(merge_job):
 	finally:
 		for name, value in before.items():
 			frappe.local.flags[name] = value
+		setattr(frappe.local, SAVED_FLAGS, None)
 
 
 def run_merge(job, log):
@@ -191,6 +246,9 @@ def run_merge(job, log):
 		_delete_leftovers(job, log)
 		_drop_variant_number(job, template, log)
 		_website_steps(job, template, log)
+		# Last, and only once the survivor's own website rows are filled: the guard in issue_drops
+		# reads them to make sure a legacy slug is not the one the consolidated product now uses.
+		_drop_legacy_products(job, log)
 
 	_set(job, status="Failed" if failed else "Done", finished_on=now_datetime())
 	family.add_activity(template, f"merge job {job.name} {job.status.lower()}: {job.processed}/{len(job.pairs)} merged")
@@ -235,6 +293,34 @@ def _delete_leftovers(job, log):
 	if backup:
 		_set(job, deleted_pricing_rules=json.dumps(backup, default=str))
 	_step(job, "Delete leftover bad data", "done", f"{sum(x.status == 'Deleted' for x in job.leftovers)} deleted")
+
+
+def _drop_legacy_products(job, log):
+	"""Remove the Storebuilder products this merge consolidated away.
+
+	Nothing new talks to the sites here: each row inserts an Item Drop and Create Log, and the drop
+	webhook that has always existed does the rest. The rows carry skip_recreate, so the confirmation
+	path deletes the product instead of pushing it straight back.
+	"""
+	step = "Drop legacy website products"
+	rows = job.get("legacy_products") or []
+	if not rows:
+		return
+	try:
+		with with_webhooks():  # the one step in a merge that is meant to reach the websites
+			counts = legacy_products.issue_drops(job, log)
+	except Exception as e:  # the merge itself is done; report and carry on
+		frappe.db.rollback()
+		frappe.log_error(title=f"Item Merge Job {job.name} legacy drops", message=frappe.get_traceback())
+		_step(job, step, "failed", message_of(e)[:300])
+		log(f"FAIL legacy drops: {message_of(e)}")
+		return
+	message = f"{counts['issued']} drop(s) issued"
+	if counts["skipped"]:
+		message += f" · {counts['skipped']} left alone"
+	if counts["failed"]:
+		message += f" · {counts['failed']} failed"
+	_step(job, step, "failed" if counts["failed"] else "attention" if counts["skipped"] else "done", message)
 
 
 def _website_steps(job, template, log):
@@ -399,6 +485,11 @@ def job_status(job_name, live=True):
 				   "status": p.status.lower(), "message": p.message, "expected_qty": p.expected_qty if p.status == "Ok" else None}
 				  for p in job.pairs],
 		"leftovers": [{"item_code": x.item_code, "status": x.status.lower(), "message": x.message} for x in job.leftovers],
+		"legacy_products": [{"product": r.product, "lead_source": r.lead_source, "price_list": r.price_list,
+							 "site": r.site, "slug": r.slug, "source": r.source, "verified": r.verified,
+							 "state": r.state, "status": r.status.lower(), "drop_log": r.drop_log,
+							 "message": r.message}
+							for r in job.get("legacy_products") or []],
 		"changes": [{"item_code": c.item_code, "new_code": c.new_code, "new_item_name": c.new_item_name,
 					 "new_retail_sku": c.new_retail_sku, "status": c.status.lower(), "message": c.message} for c in job.changes],
 		"live": None,

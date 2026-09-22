@@ -20,6 +20,7 @@
   "pairs",
   "leftovers",
   "changes",
+  "legacy_products",
   "section_result",
   "steps",
   "options",
@@ -133,6 +134,15 @@
    "read_only": 1
   },
   {
+   "fieldname": "legacy_products",
+   "fieldtype": "Table",
+   "label": "Legacy Website Products",
+   "options": "Item Merge Job Legacy Product",
+   "description": "The StoreBuilder products this merge consolidates away, one row per website with a slug. Dropped from the sites after the merge.",
+   "depends_on": "eval:doc.job_type=='Merge'",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_result",
    "fieldtype": "Section Break",
    "label": "Result",
@@ -184,7 +194,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-09-15 09:00:00.000000",
+ "modified": "2026-09-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Merge Job",

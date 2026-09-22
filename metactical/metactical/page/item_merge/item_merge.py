@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from metactical.item_merge import family, jobs, websites
+from metactical.item_merge import family, jobs, legacy_products, product_details, websites
 from metactical.item_merge.rules import UserError
 
 ROLES = ("System Manager", "Item Manager")
@@ -33,15 +33,20 @@ WEBHOOK_FLAGS = ("in_import", "item_from_excel")
 
 
 @contextmanager
-def _api():
+def _api(webhooks=False):
 	"""Role check, a readable message for anything the user can fix, and no outbound Webhooks.
 
 	The page restructures a catalogue in steps; pushing each half-finished step to the websites is
-	never wanted. They are brought back in step by the website slugs step at the end of the job."""
+	never wanted. They are brought back in step by the website slugs step at the end of the job.
+
+	`webhooks=True` leaves them alone. One call wants that: taking a price list off a template is not
+	a half-finished restructuring step, it is a finished catalogue change the websites have to hear
+	about, and the operator asked for it by name."""
 	_require_roles()
 	before = {name: frappe.local.flags.get(name) for name in WEBHOOK_FLAGS}
 	for name in WEBHOOK_FLAGS:
-		frappe.local.flags[name] = True
+		if not webhooks:
+			frappe.local.flags[name] = True
 	try:
 		yield
 	except (UserError, websites.NotConfigured) as e:
@@ -103,10 +108,15 @@ def check_consolidation(target, sources):
 
 
 @frappe.whitelist()
-def consolidate_templates(target, sources, rename_to=None, confirm_different_products=0):
+def consolidate_templates(target, sources, rename_to=None, confirm_different_products=0,
+						  product_rows=None):
+	"""`product_rows` is the Storebuilder products table. It is recorded inside this call so a
+	consolidation that fails takes the register write down with it."""
 	with _api():
 		lines = []
-		result = family.consolidate_templates(target, _list(sources), rename_to, cint(confirm_different_products), log=_logger(lines))
+		result = family.consolidate_templates(target, _list(sources), rename_to,
+											  cint(confirm_different_products),
+											  product_rows=_list(product_rows), log=_logger(lines))
 		family.add_activity(result["template"], "; ".join(lines))
 		return result
 
@@ -118,6 +128,42 @@ def rename_template(template, new_code=None, item_name=None):
 		result = family.rename_template(template, new_code, item_name, log=_logger(lines))
 		family.add_activity(result["template"], "; ".join(lines))
 		return result
+
+
+# ---------- step 1: the Storebuilder products behind the templates ----------
+
+@frappe.whitelist()
+def template_website_plan(templates):
+	"""The grid under Find Template, asking the websites nothing - see product_details.plan."""
+	with _api():
+		return product_details.plan(_list(templates))
+
+
+@frappe.whitelist()
+def lookup_template_products(templates):
+	"""Ask every website what it holds for these templates. Live papi_product_details calls."""
+	with _api():
+		return product_details.lookup(_list(templates))
+
+
+@frappe.whitelist()
+def save_template_products(survivor, rows):
+	"""Write the captured External IDs and slugs to the Legacy Website Product register.
+
+	Called before consolidate_templates, because that deletes the source templates and the register
+	is the only thing that outlives them."""
+	with _api():
+		return product_details.save(survivor, _list(rows))
+
+
+@frappe.whitelist()
+def remove_template_price_list(template, price_list):
+	"""Take a website off a template by deleting its Item Price rows.
+
+	The one call on this page that runs with the outbound Webhooks left on: the sites have to be told
+	the item is no longer priced for them."""
+	with _api(webhooks=True):
+		return product_details.remove_price_list(template, price_list)
 
 
 # ---------- step 2: variants ----------
@@ -143,6 +189,9 @@ def suggest_combinations(template, attributes):
 @frappe.whitelist()
 def create_variants(template, attributes, combinations, style_name=None, dry_run=0):
 	with _api():
+		# The websites were dealt with in step 1: the External ID and slug of every template this
+		# merge consolidates away are already in the register, captured from Storebuilder before
+		# anything was combined.
 		return family.create_variants(template, _list(attributes), _list(combinations), style_name, cint(dry_run))
 
 
@@ -175,7 +224,8 @@ def fix_settings(template, pairs):
 @frappe.whitelist()
 def queue_merge(template, pairs, leftovers=None, options=None):
 	with _api():
-		return {"job": jobs.create_merge_job(template, _list(pairs), _list(leftovers), frappe.parse_json(options or "{}"))}
+		return {"job": jobs.create_merge_job(template, _list(pairs), _list(leftovers),
+											 frappe.parse_json(options or "{}"))}
 
 
 @frappe.whitelist()
@@ -230,3 +280,12 @@ def apply_websites(template):
 def check_websites(template):
 	with _api():
 		return websites.check(template)
+
+
+# ---------- legacy website products ----------
+
+@frappe.whitelist()
+def legacy_drop_plan(template):
+	"""What this merge will drop from the websites: the register rows step 1 captured. Reads only."""
+	with _api():
+		return {"template": template, "rows": legacy_products.for_template(template)}

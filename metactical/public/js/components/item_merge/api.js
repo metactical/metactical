@@ -46,11 +46,19 @@ export const itemMergeApi = {
   // step 1: templates
   searchTemplates: (sku, name) => callBackend('search_templates', { sku, name }),
   checkConsolidation: (target, sources) => callBackend('check_consolidation', { target, sources: json(sources) }),
-  consolidateTemplates: (target, sources, renameTo, confirmDifferentProducts = false) =>
+  consolidateTemplates: (target, sources, renameTo, confirmDifferentProducts = false, productRows = []) =>
     callBackend('consolidate_templates', {
-      target, sources: json(sources), rename_to: renameTo, confirm_different_products: confirmDifferentProducts ? 1 : 0,
+      target, sources: json(sources), rename_to: renameTo,
+      confirm_different_products: confirmDifferentProducts ? 1 : 0, product_rows: json(productRows),
     }),
   renameTemplate: (template, newCode, itemName) => callBackend('rename_template', { template, new_code: newCode, item_name: itemName }),
+
+  // step 1: what Storebuilder holds for each ticked template, captured before anything is merged
+  templateWebsitePlan: (templates) => callBackend('template_website_plan', { templates: json(templates) }),
+  lookupTemplateProducts: (templates) => callBackend('lookup_template_products', { templates: json(templates) }),
+  saveTemplateProducts: (survivor, rows) => callBackend('save_template_products', { survivor, rows: json(rows) }),
+  removeTemplatePriceList: (template, priceList) =>
+    callBackend('remove_template_price_list', { template, price_list: priceList }),
 
   // step 2: variants
   getVariants: (template) => callBackend('get_variants', { template }),
@@ -78,6 +86,10 @@ export const itemMergeApi = {
   getWebsitePlan: (template) => callBackend('get_website_plan', { template }),
   applyWebsites: (template) => callBackend('apply_websites', { template }),
   checkWebsites: (template) => callBackend('check_websites', { template }),
+
+  // the legacy Storebuilder products this merge will drop, captured in step 1
+  legacyDropPlan: (template) => callBackend('legacy_drop_plan', { template }),
+
 }
 
 // Realtime progress pushed by metactical.item_merge.jobs while a job runs.
