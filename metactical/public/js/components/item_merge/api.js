@@ -52,6 +52,13 @@ export const itemMergeApi = {
     }),
   renameTemplate: (template, newCode, itemName) => callBackend('rename_template', { template, new_code: newCode, item_name: itemName }),
 
+  // step 1: what Storebuilder holds for each ticked template, captured before anything is merged
+  templateWebsitePlan: (templates) => callBackend('template_website_plan', { templates: json(templates) }),
+  lookupTemplateProducts: (templates) => callBackend('lookup_template_products', { templates: json(templates) }),
+  saveTemplateProducts: (survivor, rows) => callBackend('save_template_products', { survivor, rows: json(rows) }),
+  removeTemplatePriceList: (template, priceList) =>
+    callBackend('remove_template_price_list', { template, price_list: priceList }),
+
   // step 2: variants
   getVariants: (template) => callBackend('get_variants', { template }),
   getAttributeValues: (attribute) => callBackend('get_attribute_values', { attribute }),
@@ -79,14 +86,9 @@ export const itemMergeApi = {
   applyWebsites: (template) => callBackend('apply_websites', { template }),
   checkWebsites: (template) => callBackend('check_websites', { template }),
 
-  // the legacy Storebuilder products a merge consolidates away
-  legacyWebsitePlan: (products) => callBackend('legacy_website_plan', { products: json(products) }),
-  lookupLegacySlugs: (products, leadSources) =>
-    callBackend('lookup_legacy_slugs', { products: json(products), lead_sources: json(leadSources) }),
-  checkLegacySlugs: (rows) => callBackend('check_legacy_slugs', { rows: json(rows) }),
-  saveLegacySlugs: (template, rows) => callBackend('save_legacy_slugs', { template, rows: json(rows) }),
-  markNotPublished: (template, itemCode, on) =>
-    callBackend('mark_not_published', { template, item_code: itemCode, on: on ? 1 : 0 }),
+  // the legacy Storebuilder products this merge will drop, captured in step 1
+  legacyDropPlan: (template) => callBackend('legacy_drop_plan', { template }),
+
 }
 
 // Realtime progress pushed by metactical.item_merge.jobs while a job runs.

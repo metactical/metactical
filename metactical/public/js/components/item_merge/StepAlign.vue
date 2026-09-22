@@ -133,7 +133,7 @@
     </section>
 
     <!-- the Storebuilder products this merge deletes, collected before it runs -->
-    <LegacyProducts :products="legacyCodes" @change="onLegacy" @edit="go('variants', template)" />
+    <LegacyProducts :template="template" @change="onLegacy" />
 
     <!-- merge options + actions -->
     <section class="im-card">
@@ -162,9 +162,6 @@
           <div class="text-muted tabular-nums">
             {{ pairs.length }} to merge · {{ leftovers.length }} to delete
             <span v-if="legacy.dropping"> · {{ legacy.dropping }} website product(s) to drop</span>
-          </div>
-          <div v-if="legacy.withoutSlug" class="text-xs text-muted">
-            {{ legacy.withoutSlug }} old variant(s) have no website slug recorded.
           </div>
           <div class="flex flex-wrap gap-2 justify-end">
             <button v-if="needsFix.length" class="btn btn-warning btn-sm" :disabled="busy" @click="fixSettings">
@@ -351,8 +348,7 @@ const noNew = computed(() => !loading.value && right.value.every((v) => !v))
 // ---- legacy website products ----
 // The items this merge deletes: the OLD side of every pair, plus the leftovers. Each is its own
 // product on the Storebuilder sites and has to be dropped by hand once ERPNext has let go of it.
-const legacyCodes = computed(() => [...new Set(pairs.value.map((p) => p.old).concat(leftovers.value))].sort())
-const legacy = ref({ dropping: 0, unchecked: 0, withoutSlug: 0 })
+const legacy = ref({ dropping: 0 })
 const onLegacy = (v) => { legacy.value = v }
 
 const canQueue = computed(() => pairs.value.length > 0 && counts.value.blocked === 0 && !editProblems.value.length
@@ -453,12 +449,8 @@ async function queue() {
     ` ${changedSkus.value || 'no'} retail SKU(s) change as shown.` +
     (mismatches.value ? ` ${mismatches.value} pair(s) have names that don't match - make sure they're lined up right.` : '') +
     (legacy.value.dropping
-      ? ` Afterwards, ${legacy.value.dropping} legacy product(s) are dropped from the websites and not re-created.` +
-        (legacy.value.unchecked ? ` ${legacy.value.unchecked} of those slug(s) no website could check.` : '')
-      : ' No legacy website products are dropped - no slugs were recorded on the Variants screen.') +
-    (legacy.value.withoutSlug
-      ? ` ${legacy.value.withoutSlug} old variant(s) have no slug recorded at all; anything they left on a website stays there.`
-      : '') +
+      ? ` Afterwards, ${legacy.value.dropping} legacy product(s) are dropped from the websites and not re-created.`
+      : ' No legacy website products are dropped - nothing was captured on the Find Template screen.') +
     ' Old variants disappear once merged. This writes to ERPNext.'
   const ok = await confirmAction({ title: 'Queue the merge?', message, label: 'Queue merge', danger: true })
   if (!ok) return

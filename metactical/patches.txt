@@ -30,3 +30,4 @@ metactical.patches.migrate_to_warehouse_user_permissions
 metactical.patches.backfill_warehouse_root_and_role
 metactical.patches.backfill_item_inventory_output_retail_sku
 metactical.patches.regroup_legacy_website_products
+metactical.patches.drop_product_lookup_apis

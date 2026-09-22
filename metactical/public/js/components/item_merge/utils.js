@@ -10,6 +10,9 @@ const PILL = {
   running: 'blue', syncing: 'blue', unused: 'blue', planned: 'blue', added: 'blue', new: 'blue', issued: 'blue',
   queued: 'gray', skipped: 'gray', kept: 'gray', leftover: 'gray', waiting: 'gray', empty: 'gray', old: 'gray',
   validated: 'gray',
+  // step 1, what Storebuilder holds for a template
+  full: 'green', noexternalid: 'orange', wrongexternalid: 'orange', noslug: 'orange',
+  notconfigured: 'orange', missing: 'red', unchecked: 'gray', nowebsite: 'gray',
 }
 export const pillClass = (status) => `indicator-pill ${PILL[String(status || '').toLowerCase()] || 'gray'}`
 

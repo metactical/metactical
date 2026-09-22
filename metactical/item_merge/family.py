@@ -10,7 +10,7 @@ from collections import Counter
 
 import frappe
 
-from metactical.item_merge import catalogue, rules
+from metactical.item_merge import catalogue, legacy_products, rules
 from metactical.item_merge.pairing import plan_pairs, variant_attribute
 from metactical.item_merge.rules import UserError
 
@@ -258,6 +258,11 @@ def rename_template(template, new_code=None, item_name=None, log=None):
 		if len(moved) != len(kids):
 			raise UserError(f"{new_code} now has {len(moved)} variant(s), expected {len(kids)} - check the template")
 		log(f"template {template} renamed to {new_code} ({len(kids)} variant(s) follow)")
+		# The register points at the surviving template by code, and a rename after step 1 captured
+		# it would otherwise orphan every record it names.
+		moved_records = legacy_products.retarget(template, new_code)
+		if moved_records:
+			log(f"{moved_records} legacy website product record(s) now point at {new_code}")
 	if rename_name:
 		update_template(new_code, {"item_name": item_name}, log)
 		log(f"template {new_code}: item name '{tdoc.get('item_name')}' -> '{item_name}'")
