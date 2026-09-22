@@ -46,9 +46,10 @@ export const itemMergeApi = {
   // step 1: templates
   searchTemplates: (sku, name) => callBackend('search_templates', { sku, name }),
   checkConsolidation: (target, sources) => callBackend('check_consolidation', { target, sources: json(sources) }),
-  consolidateTemplates: (target, sources, renameTo, confirmDifferentProducts = false) =>
+  consolidateTemplates: (target, sources, renameTo, confirmDifferentProducts = false, productRows = []) =>
     callBackend('consolidate_templates', {
-      target, sources: json(sources), rename_to: renameTo, confirm_different_products: confirmDifferentProducts ? 1 : 0,
+      target, sources: json(sources), rename_to: renameTo,
+      confirm_different_products: confirmDifferentProducts ? 1 : 0, product_rows: json(productRows),
     }),
   renameTemplate: (template, newCode, itemName) => callBackend('rename_template', { template, new_code: newCode, item_name: itemName }),
 

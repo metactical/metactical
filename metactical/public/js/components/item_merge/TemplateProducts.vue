@@ -3,7 +3,7 @@
     <div class="flex items-center gap-2">
       <h3 class="im-card-title mb-0">Storebuilder products</h3>
       <span v-if="rows.length" class="text-xs text-muted">
-        {{ cleanCount }} of {{ rows.length }} ready
+        {{ verifiedCount }} read from Storebuilder<span v-if="skippedCount">, {{ skippedCount }} with nothing to check</span><span v-if="attentionCount">, {{ attentionCount }} needing attention</span>
       </span>
       <button class="btn btn-default btn-sm ml-auto" :disabled="busy || !templates.length" @click="check">
         {{ busy ? 'Checking…' : 'Check Storebuilder' }}
@@ -60,17 +60,29 @@
         </table>
       </div>
 
+      <div v-if="problems.length" class="im-note danger mt-2">
+        <div v-for="p in problems" :key="p" class="issue">{{ p }}</div>
+      </div>
+
       <div v-if="!anyConfig" class="im-note warn mt-2">
         No <b>Product Detail APIs</b> are configured. Add one row per website under
         Storebuilder Sync Settings before this screen can ask anything.
       </div>
-      <div v-else-if="!ok" class="im-note warn mt-2">
-        <b>{{ rows.length - cleanCount }} row(s) still need attention.</b>
+      <div v-else-if="attentionCount" class="im-note warn mt-2">
+        <b>{{ attentionCount }} row(s) still need attention.</b>
         Fix them in Storebuilder and check again, or remove the price list with ✕ if the template
         isn't sold on that website after all.
       </div>
+      <!-- Nothing needing attention is not the same as everything verified. A selection that is
+           only "nothing to check" has no External ID and no slug behind it, and saying it was all
+           fine is how a stranded product gets past this screen. -->
+      <div v-else-if="!verifiedCount" class="im-note warn mt-2">
+        <b>Nothing was read from Storebuilder.</b>
+        None of these templates is priced above zero on a website, so there is no product to drop
+        after the merge. If that is wrong, add the Item Price first.
+      </div>
       <div v-else class="im-note ok mt-2">
-        Every template has its External ID and slug on every website it is sold on.
+        {{ verifiedCount }} website product(s) recorded<span v-if="skippedCount">; {{ skippedCount }} row(s) had nothing to check</span>.
       </div>
     </template>
   </section>
@@ -85,12 +97,15 @@ const props = defineProps({ templates: { type: Array, default: () => [] } })
 const emit = defineEmits(['update:ok'])
 
 const rows = ref([])
+const problems = ref([])
 const anyConfig = ref(true)
 const loading = ref(false)
 const busy = ref(false)
 
 const LABELS = {
   full: 'Item has full information',
+  stale: 'Checked a while ago',
+  zeroprice: 'Priced at 0',
   noexternalid: 'No External ID',
   wrongexternalid: 'Wrong External ID',
   noslug: 'The slug is not found',
@@ -102,11 +117,21 @@ const LABELS = {
 }
 const label = (status) => LABELS[status] || 'Not checked'
 
-// `nowebsite` settles a row without an answer: nothing is sold there, so nothing is dropped.
-const SETTLED = ['full', 'nowebsite']
-const cleanCount = computed(() => rows.value.filter((r) => SETTLED.includes(r.status)).length)
-const ok = computed(() => rows.value.length > 0 && cleanCount.value === rows.value.length)
+// Three states, not two. `full` is an answer from Storebuilder; `nowebsite` and `zeroprice` are
+// the absence of a question; everything else needs attention. Counting the middle group as
+// verified is what made an unpriced selection report green.
+const NOTHING_TO_CHECK = ['nowebsite', 'zeroprice']
+const verifiedCount = computed(() => rows.value.filter((r) => r.status === 'full').length)
+const skippedCount = computed(() => rows.value.filter((r) => NOTHING_TO_CHECK.includes(r.status)).length)
+const attentionCount = computed(() => rows.value.length - verifiedCount.value - skippedCount.value)
+const ok = computed(() => rows.value.length > 0 && attentionCount.value === 0)
 watch(ok, (v) => emit('update:ok', v), { immediate: true })
+
+// What a live check answered, kept by row so a reload - after a ✕, say - does not throw the
+// check away and make the operator run it again.
+const checked = ref({})
+const rowKey = (r) => r.template + '|' + (r.price_list || '-')
+const merge = (list) => list.map((r) => ({ ...r, ...(checked.value[rowKey(r)] || {}) }))
 
 // The plan is a read - it never calls the websites - so it can follow the tick boxes. The live
 // check is a button, because it is N templates x M sites of real HTTP.
@@ -118,7 +143,7 @@ async function load() {
   try {
     const res = await itemMergeApi.templateWebsitePlan(props.templates)
     if (mine !== seq) return
-    rows.value = res.rows || []
+    rows.value = merge(res.rows || [])
     anyConfig.value = !!res.any_config
   } catch (e) {
     // Frappe has shown the reason
@@ -134,7 +159,12 @@ async function check() {
   busy.value = true
   try {
     const res = await itemMergeApi.lookupTemplateProducts(props.templates)
-    if (mine === seq) rows.value = res.rows || []
+    if (mine !== seq) return
+    const fresh = res.rows || []
+    const keep = {}
+    fresh.forEach((r) => { keep[rowKey(r)] = r })
+    checked.value = keep
+    rows.value = fresh
   } catch (e) {
     // Frappe has shown the reason
   } finally {
@@ -157,6 +187,7 @@ async function removePriceList(row) {
   try {
     const res = await itemMergeApi.removeTemplatePriceList(row.template, row.price_list)
     alertOk(`${res.deleted} Item Price row(s) removed from ${row.price_list}`)
+    delete checked.value[rowKey(row)]
     await load()
   } catch (e) {
     // Frappe has shown the reason
@@ -169,8 +200,13 @@ async function removePriceList(row) {
 // before consolidate_templates deletes the sources this has just read.
 async function save(survivor) {
   const res = await itemMergeApi.saveTemplateProducts(survivor, rows.value)
+  if (res.problems && res.problems.length) {
+    problems.value = res.problems
+    throw new Error(res.problems[0])
+  }
+  problems.value = []
   return res
 }
 
-defineExpose({ refresh: load, save })
+defineExpose({ refresh: load, save, rows })
 </script>

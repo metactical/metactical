@@ -108,10 +108,15 @@ def check_consolidation(target, sources):
 
 
 @frappe.whitelist()
-def consolidate_templates(target, sources, rename_to=None, confirm_different_products=0):
+def consolidate_templates(target, sources, rename_to=None, confirm_different_products=0,
+						  product_rows=None):
+	"""`product_rows` is the Storebuilder products table. It is recorded inside this call so a
+	consolidation that fails takes the register write down with it."""
 	with _api():
 		lines = []
-		result = family.consolidate_templates(target, _list(sources), rename_to, cint(confirm_different_products), log=_logger(lines))
+		result = family.consolidate_templates(target, _list(sources), rename_to,
+											  cint(confirm_different_products),
+											  product_rows=_list(product_rows), log=_logger(lines))
 		family.add_activity(result["template"], "; ".join(lines))
 		return result
 

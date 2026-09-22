@@ -288,11 +288,19 @@ def consolidation_check(target, sources):
 	return rules.consolidation_summary(rows)
 
 
-def consolidate_templates(target, sources, rename_to=None, confirm_different_products=False, log=None):
+def consolidate_templates(target, sources, rename_to=None, confirm_different_products=False,
+						  product_rows=None, log=None):
 	"""Merge each source template into target so every variant sits under one template.
 
 	rename_doc updates every Link, including variants' variant_of, so a template merge carries its
-	variants along. That is verified afterwards rather than assumed."""
+	variants along. That is verified afterwards rather than assumed.
+
+	`product_rows` is what the Storebuilder products table read for these templates. It is written
+	to the register **here**, in the same call, so a consolidation that fails afterwards rolls the
+	register back with it rather than leaving records for a merge that never happened. Passing none
+	is allowed only when nothing needs capturing - `ensure_captured` decides that, not the caller."""
+	from metactical.item_merge import product_details
+
 	log = log or (lambda m: None)
 	sources = [s for s in dict.fromkeys(sources or []) if s and s != target]
 	rename_to = (rename_to or "").strip() or None
@@ -310,7 +318,20 @@ def consolidate_templates(target, sources, rename_to=None, confirm_different_pro
 		raise UserError("These templates look like different products (" + " / ".join(check["product_names"])
 						+ ") - tick the confirmation if they really are one product")
 
-	result = {"template": target, "merged": [], "variants_moved": 0, "renamed_from": None}
+	# The sources are about to be deleted, so their Storebuilder products have to be on record
+	# first. Written under the code the merge will end up with, which is what jobs._legacy_rows
+	# reads the batch back by.
+	final_code = rename_to if (rename_to and rename_to != target) else target
+	# `target` is what the rows call the survivor; `final_code` is what the job will look the
+	# records up by once the rename at the end of this function has run.
+	capture = product_details.save(target, product_rows or [], commit=False, under=final_code)
+	if capture["problems"]:
+		raise UserError("Storebuilder products could not be recorded: "
+						+ " · ".join(capture["problems"][:4]))
+	product_details.ensure_captured(final_code, sources)
+
+	result = {"template": target, "merged": [], "variants_moved": 0, "renamed_from": None,
+			  "captured": capture["written"]}
 	for src in sources:
 		sdoc = load_template(src)
 		kids = variant_codes(src)
@@ -357,6 +378,21 @@ def attribute_values(attribute):
 	return [{"value": r.attribute_value, "abbr": r.abbr} for r in
 			frappe.get_all("Item Attribute Value", filters={"parent": attribute, "parenttype": "Item Attribute"},
 						   fields=["attribute_value", "abbr"], order_by="idx asc")]
+
+
+def value_list_attributes(attrs):
+	"""The attributes that have a value list, i.e. the ones attribute_values() will answer for.
+
+	`variant_attribute()` only names the *first* numeric attribute on a template. A family carrying
+	a second one would send it to attribute_values(), which refuses numeric ranges - and take the
+	whole align screen down with it.
+	"""
+	attrs = [a for a in (attrs or []) if a]
+	if not attrs:
+		return []
+	numeric = set(frappe.get_all("Item Attribute", filters={"name": ["in", attrs], "numeric_values": 1},
+								 pluck="name"))
+	return [a for a in attrs if a not in numeric]
 
 
 def _attribute_tables(attrs):
@@ -523,7 +559,8 @@ def alignment(template):
 	# The same reading the variants grid used: what each old variant's name says its colour and
 	# size are. Pairing on those, rather than on the name, is the whole of the AI's part here.
 	olds = [d for d in docs if not is_new(d, legacy)]
-	attrs = [a["attribute"] for a in tdoc.get("attributes") or [] if a.get("attribute") != legacy]
+	attrs = value_list_attributes([a["attribute"] for a in tdoc.get("attributes") or []
+								   if a.get("attribute") != legacy])
 	read, ai_warning = ({}, None)
 	if attrs and olds:
 		_vals, allowed, _abbr = _attribute_tables(attrs)
