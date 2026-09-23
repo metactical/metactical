@@ -18,9 +18,11 @@ this template been dealt with" is answered by the record existing at all. `templ
 is the **surviving** code, which is how the merge job reads its batch back after the sources are
 gone; the record's own name is the legacy code, which is what Storebuilder knows the product by.
 
-A snapshot is never good enough to authorise a deletion, which is why none of this goes through
-Metabase the way `websites.py` does: every value here was read live from the site.
+A snapshot is never good enough to authorise a deletion: every value here was read live from the
+site, from the product that is about to be dropped.
 """
+from concurrent.futures import ThreadPoolExecutor
+
 import frappe
 
 from metactical.item_merge import catalogue
@@ -40,6 +42,25 @@ EXTERNAL_ID_KEYS = ("externalId", "ExternalId", "external_id", "ExternalID")
 
 
 # ---------- talking to the sites ----------
+
+# One site being slow must not hold up the others: every Storebuilder fan-out in item_merge goes
+# through _parallel.
+QUERY_WORKERS = 5
+
+
+def _parallel(calls):
+	if not calls:
+		return []
+	with ThreadPoolExecutor(max_workers=min(QUERY_WORKERS, len(calls))) as pool:
+		out = []
+		for f in [pool.submit(c) for c in calls]:
+			try:
+				out.append((f.result(), None))
+			except Exception as e:  # one unreachable site must not sink the others
+				out.append((None, str(e) or e.__class__.__name__))
+		return out
+
+
 
 def _configs(parentfield):
 	"""The per-website API rows, by price list.
@@ -74,6 +95,25 @@ def _first(data, keys):
 		if value not in (None, ""):
 			return str(value).strip()
 	return ""
+
+
+def _products_of(data):
+	"""Every product in a response, in the order the site returned them.
+
+	Storebuilder can answer with more than one product for a template - the same item listed twice,
+	or an older copy nobody cleaned up. The first is the product; the rest are orphans that still
+	have to be dropped, so none of them may be thrown away here.
+	"""
+	if not isinstance(data, dict):
+		return []
+	if data.get("Found") is False or data.get("found") is False:
+		return []
+	if data.get("error"):
+		return []
+	products = data.get("products") or data.get("Products")
+	if isinstance(products, list):
+		return [p for p in products if isinstance(p, dict)]
+	return [data] if data else []
 
 
 def _product_of(data):
@@ -143,6 +183,15 @@ def for_template(template):
 	of templates a previous merge already dropped stay under it too. Re-reading those would send a
 	second drop for a product that is not there any more.
 	"""
+	# What the survivor itself holds on each website, so every row carries both halves of the
+	# mapping. A failed drop can then be retried, or its images re-loaded, straight off the job
+	# without going back to the screen or to Storebuilder.
+	survivor = {}
+	if frappe.db.exists("Item", template):
+		for row in frappe.get_doc("Item", template).get("item_detail") or []:
+			if row.price_list:
+				survivor[row.price_list] = (row.slug or "").strip()
+
 	out = []
 	names = frappe.get_all(REGISTER, filters={"template": template, "status": "Captured"},
 						   pluck="name")
@@ -159,21 +208,33 @@ def for_template(template):
 			if row.status == "Dropped":
 				continue
 			if row.slug and row.price_list:
-				out.append({"product": doc.item_code, "lead_source": row.lead_source,
+				out.append({"product": doc.item_code,
+							"external_id": row.get("external_id") or "",
+							"kind": row.get("kind") or "Primary",
+							"lead_source": row.lead_source,
 							"price_list": row.price_list,
 							"site": catalogue.storefront_domain(row.lead_source), "slug": row.slug,
+							"new_template": template,
+							"new_external_id": template,
+							"new_slug": survivor.get(row.price_list, ""),
 							"source": row.source, "verified": row.verified, "state": row.state,
 							"status": "Validated"})
 	return out
 
 
-def mark_dropped(item_code, lead_source, drop_log):
-	"""Close the register row a drop was issued from, so the register says what happened."""
+def mark_dropped(item_code, lead_source, drop_log, slug=None):
+	"""Close the register row a drop was issued from, so the register says what happened.
+
+	The slug is part of the key. A website can hold several rows for one item - the product and the
+	orphans Storebuilder returned beside it - and closing them all on the first drop would mark
+	products dropped that nothing was ever sent for, and then hide them from `for_template` so the
+	retry never finds them either.
+	"""
 	if not frappe.db.exists(REGISTER, item_code):
 		return
 	doc = frappe.get_doc(REGISTER, item_code)
 	for row in doc.websites:
-		if row.lead_source == lead_source:
+		if row.lead_source == lead_source and (slug is None or row.slug == slug):
 			row.db_set("status", "Dropped", update_modified=False)
 			row.db_set("drop_log", drop_log, update_modified=False)
 	if doc.websites and all(row.status == "Dropped" for row in doc.websites):
@@ -185,10 +246,9 @@ def mark_dropped(item_code, lead_source, drop_log):
 def _still_owned(slug, price_list):
 	"""The live Item, if any, that still publishes this slug on this website.
 
-	The guard that matters: the website steps fill the surviving template's Item Detail rows from
-	the Metabase snapshot just before this runs, and if the snapshot handed it a legacy product's
-	slug then dropping that slug would delete the product the merge has just consolidated into.
-	Anything still owned by a live Item is left alone and reported.
+	The guard that matters: if a live Item still publishes this slug on this website then dropping it
+	would delete that Item's product, not the legacy one. Anything still owned is left alone and
+	reported.
 	"""
 	parents = frappe.get_all("Item Detail", filters={"slug": slug, "price_list": price_list},
 							 pluck="parent")
@@ -277,7 +337,7 @@ def issue_drops(job, log=None):
 
 		unproven = "" if row.verified else " - slug taken on the operator's word, this website could not check it"
 		_set_row(row, status="Issued", drop_log=drop.name, message=None)
-		mark_dropped(row.product, row.lead_source, drop.name)
+		mark_dropped(row.product, row.lead_source, drop.name, slug=slug)
 		log("legacy drop {0} {1}: {2} issued ({3}){4}".format(row.product, row.lead_source, slug,
 															  drop.name, unproven))
 		counts["issued"] += 1

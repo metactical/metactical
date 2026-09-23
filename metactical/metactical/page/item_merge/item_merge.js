@@ -48,7 +48,7 @@ class ItemMergePage {
 		// Single doctypes: the Form route needs the docname too, which for a Single is its own name.
 		// frappe.set_route("Form", "X") alone lands on a blank form (show_doc reads route.slice(2)).
 		const open_single = (doctype) => frappe.set_route("Form", doctype, doctype);
-		// what the merge carries between items, and the Metabase credentials the website steps use
+		// what the merge carries between items, and which websites it may read from Storebuilder
 		this.page.add_menu_item(__("Item Merge Settings"), () => open_single("Item Merge Settings"));
 	}
 }

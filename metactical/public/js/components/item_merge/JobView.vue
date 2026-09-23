@@ -196,47 +196,41 @@
         </div>
       </section>
 
+
+      <!-- what the websites hold for the consolidated product, after the push -->
       <section v-if="!isChanges && merged > 0 && !active" class="im-card">
         <div class="flex items-center flex-wrap gap-2">
           <div class="min-w-0">
-            <h3 class="im-card-title">Website slugs</h3>
-            <p class="im-lede mb-0">Item Detail rows (price list + slug) for each website the product is on, then Load Data From SB.</p>
+            <h3 class="im-card-title">Website check</h3>
+            <p class="im-lede mb-0">
+              What each website answers for <span class="font-mono">{{ job.template }}</span> now.
+              The push travels by queue, so a site that has not caught up reads <b>pending</b> - check again in a moment.
+            </p>
           </div>
-          <span class="ml-auto"></span>
-          <button class="btn btn-default btn-sm" :disabled="webBusy" @click="checkWebsites">
-            {{ webBusy === 'check' ? 'Checking…' : 'Check' }}
-          </button>
-          <button class="btn btn-danger btn-sm" :disabled="webBusy" @click="fillWebsites">
-            {{ webBusy === 'fill' ? 'Filling…' : 'Fill website slugs' }}
+          <button class="btn btn-default btn-sm ml-auto" :disabled="checking" @click="recheck">
+            {{ checking ? 'Checking…' : 'Check again' }}
           </button>
         </div>
-        <div v-if="webRows.length" class="mt-3">
-          <div class="im-table-wrap">
-            <table class="im-table">
-              <thead>
-                <tr><th>Price list</th><th>Website</th><th>Item Price</th><th>Slug</th><th>Result</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in webRows" :key="r.price_list">
-                  <td class="whitespace-nowrap">{{ r.price_list }}</td>
-                  <td class="text-muted">{{ r.site }}</td>
-                  <td>{{ r.has_item_price ? 'yes' : 'no' }}</td>
-                  <td class="font-mono">{{ r.slug || r.current_slug || '' }}</td>
-                  <td>
-                    <span :class="pillClass(r.action === 'skip' ? 'kept' : 'done')">{{ r.action }}</span>
-                    <span class="text-xs text-muted ml-2">{{ r.note }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="web && web.load_data_from_sb" class="text-xs text-muted mt-2">Load Data From SB: {{ loadDataText }}</div>
-          <div v-if="web && web.filled_gaps && web.filled_gaps.length" class="text-xs text-muted mt-1">
-            Name and description filled for: {{ web.filled_gaps.join(', ') }}
-          </div>
-        </div>
-        <div class="mt-4">
-          <WebsiteCheck :template="job.template" :initial="(web && web.check) || job.website_check || null" />
+        <div v-if="!check" class="im-empty mt-3">Not checked yet.</div>
+        <div v-else class="im-table-wrap mt-3">
+          <table class="im-table">
+            <thead>
+              <tr><th>Price list</th><th>External ID</th><th class="r">Variants site / ERP</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in check.rows" :key="r.price_list" :class="{ bad: r.status === 'mismatch' || r.status === 'error' }">
+                <td class="whitespace-nowrap">{{ r.price_list }}</td>
+                <td class="font-mono whitespace-nowrap" :class="{ 'text-danger': r.external_id_match === false }">
+                  {{ r.external_id || '—' }}
+                </td>
+                <td class="r tabular-nums">{{ r.sb_variants }} / {{ r.erp_variants }}</td>
+                <td>
+                  <span :class="pillClass(r.status)">{{ r.status }}</span>
+                  <div class="text-xs text-muted">{{ r.message }}</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -285,7 +279,6 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import WebsiteCheck from './WebsiteCheck.vue'
 import { itemMergeApi, PROGRESS_EVENT } from './api.js'
 import { alertOk, confirmAction, fmtDateTime, go, itemUrl, num, pillClass, prettyDate } from './utils.js'
 
@@ -405,7 +398,6 @@ watch(() => props.job, () => {
   clearTimeout(timer)
   clearTimeout(pending)
   job.value = null
-  web.value = null
   lastLive = 0
   applied = 0
   failures = 0
@@ -440,51 +432,25 @@ async function resume() {
   }
 }
 
-// ---------- website Item Detail rows (price list + slug) ----------
-const web = ref(null)
-const webBusy = ref('') // '' | 'check' | 'fill'
-const webRows = computed(() => web.value?.rows || job.value?.websites || [])
 // The legacy Storebuilder products this merge dropped. Lives on the job, so it is still there
 // long after the merge - the legacy items themselves are not.
 const legacyRows = computed(() => job.value?.legacy_products || [])
+// The websites' own answer after the push. Re-runnable: the upsert is queued, so the first
+// reading after a merge is often "not yet" rather than "wrong".
+const checked = ref(null)
+const checking = ref(false)
+const check = computed(() => checked.value || job.value?.website_check || null)
+async function recheck() {
+  checking.value = true
+  try {
+    checked.value = await itemMergeApi.verifyTemplateProducts(job.value.template)
+  } catch (e) {
+    // Frappe has shown the reason
+  } finally {
+    checking.value = false
+  }
+}
 const legacyIssued = computed(() => legacyRows.value.filter((r) => r.status === 'issued').length)
-const loadDataText = computed(() => {
-  const v = web.value?.load_data_from_sb
-  if (!v) return ''
-  return typeof v === 'string' ? v : v.map((m) => String(m?.message || '').replace(/<[^>]+>/g, '')).join(' · ')
-})
-
-async function checkWebsites() {
-  webBusy.value = 'check'
-  try {
-    web.value = await itemMergeApi.getWebsitePlan(job.value.template)
-  } catch (e) {
-    // Frappe has shown the reason
-  } finally {
-    webBusy.value = ''
-  }
-}
-
-async function fillWebsites() {
-  const template = job.value.template
-  const ok = await confirmAction({
-    title: 'Fill website slugs?',
-    message: `Look up ${template} on each website it has an Item Price for, add the slugs found to Item Detail, ` +
-      'then run Load Data From SB (skipped if any row has a blank slug).\nThis writes to ERPNext.',
-    label: 'Fill slugs',
-    danger: true,
-  })
-  if (!ok) return
-  webBusy.value = 'fill'
-  try {
-    web.value = await itemMergeApi.applyWebsites(template)
-    alertOk(`${(web.value.applied || []).length} website row(s) added or filled`)
-  } catch (e) {
-    // Frappe has shown the reason
-  } finally {
-    webBusy.value = ''
-  }
-}
 
 defineExpose({ refresh })
 </script>

@@ -82,11 +82,6 @@ export const itemMergeApi = {
   resumeJob: (job) => callBackend('resume_job', { job }),
   getReposts: (template) => callBackend('get_reposts', { template }),
 
-  // website Item Detail rows (price list + slug) from the Storebuilder sites
-  getWebsitePlan: (template) => callBackend('get_website_plan', { template }),
-  applyWebsites: (template) => callBackend('apply_websites', { template }),
-  checkWebsites: (template) => callBackend('check_websites', { template }),
-
   // the legacy Storebuilder products this merge will drop, captured in step 1
   legacyDropPlan: (template) => callBackend('legacy_drop_plan', { template }),
 

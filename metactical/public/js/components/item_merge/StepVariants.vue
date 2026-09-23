@@ -102,6 +102,19 @@
         Add their combinations with <b>Add in bulk</b>.
       </div>
 
+      <!-- one old variant per new variant is a hard rule, so a second claim on the same values
+           is set aside rather than folded into the row -->
+      <div v-if="taken.length" class="im-note warn mb-3">
+        <b>{{ taken.length }} old variant(s) read as values another variant already has</b>, so they
+        were left out - one old variant per new variant, or the Align screen cannot pair them.
+        <div v-for="t in taken.slice(0, 5)" :key="t.item_code" class="issue">
+          <span class="font-mono">{{ t.item_code }}</span> read as
+          {{ Object.values(t.values).join(' / ') }} by {{ t.source }}, already taken by
+          <span class="font-mono">{{ t.claimed_by }}</span>.
+        </div>
+        Fix their names so they differ, or add them with <b>Add in bulk</b>.
+      </div>
+
       <div v-if="aiWarning" class="im-note warn mb-2">
         <b>The AI suggestion is not working.</b> {{ aiWarning }}
       </div>
@@ -285,6 +298,8 @@ const unreadableCodes = computed(() => new Set((suggestion.value?.unreadable || 
 // Set when the combinations were read by the old name matching instead of the AI, so the operator
 // knows to check the values rather than trusting the grid.
 const aiWarning = computed(() => suggestion.value?.ai_warning || '')
+// Variants whose values were already claimed by another variant. They never reach the grid.
+const taken = computed(() => suggestion.value?.taken || [])
 
 // ---- variants table ----
 const sortKey = ref('item_code')
@@ -450,6 +465,10 @@ const rowProblems = computed(() => {
         p = have.get(code)
           ? `${code} already exists under this template`
           : `${code} is still an old variant here`
+      } else if ((r.from_old || []).length > 1) {
+        // One old variant per new variant. Two olds reading the same values cannot both merge
+        // into it - the Align screen refuses that pairing - so it has to be resolved here.
+        p = `${r.from_old.length} old variants read the same values`
       } else if (!(r.item_name || '').trim()) p = 'Item name is empty'
     }
     out.set(r, p)

@@ -420,15 +420,46 @@ def suggest_combinations(template, attributes):
 	existing = {tuple((a, variant_view(d, stock, legacy)["attributes"].get(a)) for a in attrs): d["name"]
 				for d in docs if is_new(d, legacy)}
 
-	read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed)
+	# The names first. Whatever they answer costs nothing and is never wrong about exact wording,
+	# so only what is left over is worth asking a model about.
+	by_name = {d["name"]: dict(rules.read_values(d, attrs, allowed) or {}) for d in olds}
+	read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed, known=by_name)
 
-	combos, unread = {}, []
+	# ---- read every variant, remembering what answered ----
+	# Per attribute, not all-or-nothing. The AI routinely answers for one attribute and leaves the
+	# other null - a family whose colour it could not see, say - and a partial answer is still a
+	# truthy dict, so `read.get(...) or read_values(...)` never reached the name matching at all
+	# and marked every variant unread. The AI wins where it answered; the name fills the rest,
+	# which is exactly what plan_pairs has always done for the align screen.
+	unread, resolved = [], []
 	for d in olds:
-		got = read.get(d["name"]) or rules.read_values(d, attrs, allowed)
+		known = by_name.get(d["name"]) or {}
+		got = dict(known)
+		got.update({a: v for a, v in (read.get(d["name"]) or {}).items() if v})
 		if not got or any(got.get(a) is None for a in attrs):
 			unread.append({"item_code": d["name"], "item_name": d.get("item_name")})
 			continue
-		combos.setdefault(tuple((a, got[a]) for a in attrs), []).append(d["name"])
+		# Read entirely off the name, or did the AI have to fill something in?
+		by_the_name = all(known.get(a) for a in attrs)
+		resolved.append((d, tuple((a, got[a]) for a in attrs), by_the_name))
+
+	# ---- one old variant per new variant, and the name wins ----
+	# Two olds on one new is not a merge, it is an unresolved ambiguity: plan_pairs on the next
+	# screen refuses to pair them, so a row built from both walks straight into a dead end. The
+	# first claim keeps the combination and later ones are set aside. Name-read variants claim
+	# before AI-read ones on purpose - the name is the evidence that is actually in the data, so
+	# where the two disagree the AI is the one that gives way.
+	combos, taken = {}, []
+	for by_the_name in (True, False):
+		for d, key, from_name in resolved:
+			if from_name is not by_the_name:
+				continue
+			if key in combos:
+				taken.append({"item_code": d["name"], "item_name": d.get("item_name"),
+							  "values": dict(key), "claimed_by": combos[key][0],
+							  "source": "the name" if from_name else "the AI"})
+				continue
+			combos[key] = [d["name"]]
 
 	order = {a: [v["value"] for v in vals[a]] for a in attrs}
 	out = []
@@ -450,7 +481,7 @@ def suggest_combinations(template, attributes):
 					# variants become leftovers to delete (merge when there is data, delete when not).
 					"suggested": bool(ledger or qty)})
 	return {"template": template, "attributes": attrs, "style_name": style, "combinations": out,
-			"unreadable": unread, "values": vals, "ai_warning": ai_warning,
+			"unreadable": unread, "taken": taken, "values": vals, "ai_warning": ai_warning,
 			"read_by_ai": sum(1 for d in olds if d["name"] in read)}
 
 
@@ -564,7 +595,13 @@ def alignment(template):
 	read, ai_warning = ({}, None)
 	if attrs and olds:
 		_vals, allowed, _abbr = _attribute_tables(attrs)
-		read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed)
+		by_name = {d["name"]: dict(rules.read_values(d, attrs, allowed) or {}) for d in olds}
+		read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed, known=by_name)
+		# plan_pairs falls back to the name itself per attribute, so it only needs what the AI
+		# added on top - but handing it the names too saves it re-deriving them.
+		for code, values in by_name.items():
+			read.setdefault(code, {}).update({a: v for a, v in values.items()
+											  if v and not read[code].get(a)})
 
 	plan = plan_pairs(tdoc, docs, empty, values=read)
 	by = {d["name"]: d for d in docs}
