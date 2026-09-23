@@ -44,7 +44,10 @@ DETAIL_FIELD = "product_detail_apis"
 # every template green when the site had no Item Prices at all.
 CLEAN = "full"
 NOTHING_TO_CHECK = ("nowebsite", "zeroprice")
-SETTLED = (CLEAN,) + NOTHING_TO_CHECK
+# Asked, and Storebuilder has no product under the External ID, and ERP has no slug to look one up
+# by. Not an error: there is no product to drop and nothing the operator could fix on the row.
+NOT_ON_SB = "notonsb"
+SETTLED = (CLEAN, NOT_ON_SB) + NOTHING_TO_CHECK
 
 # A capture read from the register rather than from Storebuilder is only trusted for so long. Past
 # this, the row asks to be checked again rather than opening the gate on a month-old answer.
@@ -141,10 +144,9 @@ def _detail_one(config, headers, template, retail_sku, erp_slug):
 					duplicates=_duplicates(products))
 
 	if not erp_slug:
-		return {"status": "noslug", "external_id": "", "slug": "", "duplicates": [], "variants": [],
-				"message": "No Storebuilder product carries the External ID {0}, and there is no slug "
-						   "on the Item Detail row for this price list to look it up with - add the "
-						   "slug here, or set the External ID in Storebuilder".format(template)}
+		return {"status": NOT_ON_SB, "external_id": "", "slug": "", "duplicates": [], "variants": [],
+				"message": "Not on Storebuilder - no product carries the External ID {0} and there is "
+						   "no slug for this price list, so there is nothing to drop".format(template)}
 
 	products, error = _ask(config, headers, {"slug": erp_slug})
 	if error:
@@ -597,12 +599,44 @@ def ensure_captured(survivor, sources):
 		if sold:  # nothing recorded, and it is sold somewhere - that product would be stranded
 			missing.append(template)
 	if missing:
+		# Nothing recorded is also what a template with no Storebuilder product looks like - save
+		# only records products. Ask again rather than take the screen's word for it, and let
+		# through the ones that really have nothing on any website.
+		live = lookup(missing)["rows"]
+		missing = [t for t in missing
+				   if not all(r["status"] in (NOT_ON_SB,) + NOTHING_TO_CHECK
+							  for r in live if r["template"] == t)]
+	if missing:
 		raise UserError(
 			"Storebuilder was never read for {0}: {1}. Open the Storebuilder products table under "
 			"Find Template, press Check Storebuilder, and fix anything that is not green - once "
 			"these templates are merged away their products can no longer be found."
 			.format("{0} template(s)".format(len(missing)) if len(missing) > 1 else "one template",
 					", ".join(sorted(missing)[:8])))
+
+
+def on_storebuilder(rows):
+	"""The templates these rows show a Storebuilder product for: an External ID and a slug."""
+	return {str(r["template"]) for r in rows or []
+			if r.get("template") and r.get("status") == CLEAN
+			and str(r.get("slug") or "").strip() and str(r.get("external_id") or "").strip()}
+
+
+def check_survivor(target, sources, rows):
+	"""Refuse a survivor with no Storebuilder product when another selected template has one.
+
+	The survivor's product is the one that is kept and updated; every other template's product is
+	dropped after the merge. Surviving with a template the sites do not have throws away the only
+	live product and starts the merged one again from nothing.
+	"""
+	live = on_storebuilder(rows) & ({target} | set(sources or []))
+	if not live or target in live:
+		return
+	if len(live) == 1:
+		raise UserError("{0} is the only selected template with a Storebuilder product, so it has to "
+						"be the surviving template".format(next(iter(live))))
+	raise UserError("{0} has no Storebuilder product - choose one of the templates that has one to "
+					"survive: {1}".format(target, ", ".join(sorted(live))))
 
 
 # ---------- after the push: did the websites take it? ----------
@@ -633,7 +667,7 @@ def verify(template):
 			continue
 		entry = {"price_list": row.price_list, "lead_source": sites[row.price_list],
 				 "slug": (row.slug or "").strip(), "external_id": "", "external_id_match": None,
-				 "sb_variants": 0, "erp_variants": len(erp), "missing": [], "extra": [],
+				 "sb_variants": 0, "erp_variants": len(erp), "missing": [],
 				 "status": "notconfigured",
 				 "message": "No Product Detail API for this price list"}
 		rows.append(entry)
@@ -651,7 +685,7 @@ def verify(template):
 			continue
 		entry["external_id"] = result.get("external_id") or ""
 		entry["external_id_match"] = entry["external_id"] == template
-		if result["status"] in ("missing", "noslug"):
+		if result["status"] in ("missing", "noslug", NOT_ON_SB):
 			entry.update({"status": "pending",
 						  "message": "the website does not have this product yet - the update may "
 									 "still be queued, check again in a moment"})
@@ -663,16 +697,17 @@ def verify(template):
 			  for v in (result.get("variants") or [])}
 		sb.discard("")
 		entry["sb_variants"] = len(sb)
-		entry["missing"] = sorted(erp - sb)[:20]
-		entry["extra"] = sorted(sb - erp)[:20]
+		# Only what the website is missing counts. A site holding variants ERP does not is left
+		# alone: older variants stay on the product, and that is not something a merge breaks.
+		missing = sorted(erp - sb)
+		entry["missing"] = missing[:20]
 		if not entry["external_id_match"]:
 			entry.update({"status": "mismatch",
 						  "message": "the website has External ID {0}, not {1}".format(
 							  entry["external_id"] or "(none)", template)})
-		elif entry["missing"] or entry["extra"]:
+		elif missing:
 			entry.update({"status": "mismatch",
-						  "message": "{0} variant(s) the website is missing, {1} it has that ERP "
-									 "does not".format(len(entry["missing"]), len(entry["extra"]))})
+						  "message": "{0} variant(s) the website is missing".format(len(missing))})
 		else:
 			entry.update({"status": "ok",
 						  "message": "matches {0} with {1} variant(s)".format(template, len(sb))})
