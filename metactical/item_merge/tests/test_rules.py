@@ -7,7 +7,7 @@ or, with no bench at all: python -m unittest metactical.item_merge.tests.test_ru
 """
 import unittest
 
-from metactical.item_merge import pairing, rules
+from metactical.item_merge import attribute_ai, pairing, rules
 
 
 class TestCodes(unittest.TestCase):
@@ -139,6 +139,45 @@ class TestPlanPairs(unittest.TestCase):
 		variants = [self.new("N1", "Olive", "Large"), self.new("N2", "Black", "Small")]
 		plan = pairing.plan_pairs(self.TEMPLATE, variants, values={})
 		self.assertEqual(plan["unused_new"], ["N1", "N2"])
+
+
+class TestShortNames(unittest.TestCase):
+	"""What the AI is actually shown. The prompt is the part that was wrong, not the model."""
+
+	ALLOWED = {"Colour": {"Shadow", "Black"}, "Size": {"30 x 30", "30 x 32"}}
+
+	def olds(self, *names):
+		return [{"name": "V%d" % i, "item_name": n} for i, n in enumerate(names)]
+
+	def test_a_one_colour_family_keeps_its_colour(self):
+		"""The bug: every variant of a per-colour template shares the colour, so it lands in the
+		common prefix and used to be stripped as style - leaving the model to read a colour out of
+		"30 x 30", which it correctly answered null for."""
+		olds = self.olds("Work Pant - Shadow - 30 x 30", "Work Pant - Shadow - 30 x 32")
+		short = attribute_ai._short_names(olds, self.ALLOWED)
+		self.assertEqual(sorted(short.values()), ["Shadow - 30 x 30", "Shadow - 30 x 32"])
+
+	def test_the_style_is_still_stripped(self):
+		olds = self.olds("Work Pant - Shadow - 30 x 30", "Work Pant - Black - 30 x 32")
+		short = attribute_ai._short_names(olds, self.ALLOWED)
+		self.assertEqual(sorted(short.values()), ["Black - 30 x 32", "Shadow - 30 x 30"])
+
+	def test_an_alias_in_the_prefix_is_kept_too(self):
+		"""OD means Olive, so it is an answer and must not be mistaken for style."""
+		allowed = {"Colour": {"Olive"}, "Size": {"Large", "Small"}}
+		olds = self.olds("Tac Pant - OD - L", "Tac Pant - OD - S")
+		short = attribute_ai._short_names(olds, allowed)
+		self.assertEqual(sorted(short.values()), ["OD - L", "OD - S"])
+
+	def test_without_allowed_values_nothing_is_protected(self):
+		olds = self.olds("Work Pant - Shadow - 30 x 30", "Work Pant - Shadow - 30 x 32")
+		self.assertEqual(sorted(attribute_ai._short_names(olds).values()),
+						 ["30 x 30", "30 x 32"])
+
+	def test_a_single_variant_is_left_whole(self):
+		olds = self.olds("Work Pant - Shadow - 30 x 30")
+		self.assertEqual(list(attribute_ai._short_names(olds, self.ALLOWED).values()),
+						 ["Work Pant - Shadow - 30 x 30"])
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ const PILL = {
   // step 1, what Storebuilder holds for a template
   full: 'green', noexternalid: 'orange', wrongexternalid: 'orange', noslug: 'orange',
   notconfigured: 'orange', missing: 'red', unchecked: 'gray', nowebsite: 'gray',
-  zeroprice: 'gray', stale: 'orange',
+  zeroprice: 'gray', stale: 'orange', pending: 'blue', ok: 'green',
 }
 export const pillClass = (status) => `indicator-pill ${PILL[String(status || '').toLowerCase()] || 'gray'}`
 

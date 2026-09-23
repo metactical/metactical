@@ -12,7 +12,8 @@ from contextlib import contextmanager
 import frappe
 from frappe.utils import now_datetime, time_diff_in_seconds
 
-from metactical.item_merge import family, legacy_images, legacy_products, merge, rules
+from metactical.item_merge import (family, inventory, legacy_images, legacy_products, merge,
+								   product_details, rules)
 from metactical.item_merge.family import exists, message_of
 from metactical.item_merge.pairing import variant_attribute
 from metactical.item_merge.rules import UserError
@@ -251,6 +252,12 @@ def run_merge(job, log):
 		# Last, and only once the survivor's own website rows are filled: the guard in issue_drops
 		# reads them to make sure a legacy slug is not the one the consolidated product now uses.
 		_drop_legacy_products(job, log)
+		# Stock first, so the push carries the right quantities.
+		_settle_inventory(job, log)
+		# Then the push, and only then the check - the drops have to land before the consolidated
+		# product goes out, or a drop queued behind it would delete what was just sent.
+		_push_to_websites(job, template, log)
+		_verify_websites(job, template, log)
 
 	_set(job, status="Failed" if failed else "Done", finished_on=now_datetime())
 	family.add_activity(template, f"merge job {job.name} {job.status.lower()}: {job.processed}/{len(job.pairs)} merged")
@@ -332,6 +339,96 @@ def _pull_legacy_images(job, log):
 		message += " · " + "; ".join(counts["notes"][:3])
 	_step(job, step, "failed" if counts["failed"] else "attention" if counts["skipped"] else "done",
 		  message[:600])
+
+
+def _settle_inventory(job, log):
+	"""Recalculate Bins and rebuild the Item Inventory Output for every item the merge wrote to.
+
+	`CustomItem.before_rename` deletes both items' inventory output records during a merge, because
+	item_code is that doctype's autoname and unique. Nothing put them back.
+	"""
+	step = "Settle inventory"
+	items = [p.new_item for p in (job.get("pairs") or []) if p.status == "Ok" and p.new_item]
+	if not items:
+		return
+	try:
+		counts = inventory.settle(items, log)
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(title=f"Item Merge Job {job.name} inventory", message=frappe.get_traceback())
+		_step(job, step, "failed", message_of(e)[:300])
+		return
+	message = (f"{counts['bins']} item(s) recalculated · {counts['outputs']} inventory output(s) "
+			   f"rebuilt")
+	if counts["skipped"]:
+		message += f" · {counts['skipped']} with no stock history"
+	if counts["failed"]:
+		message += f" · {counts['failed']} failed"
+	if counts["notes"]:
+		message += " · " + "; ".join(counts["notes"][:3])
+	_step(job, step, "failed" if counts["failed"] else "done", message[:600])
+
+
+def _push_to_websites(job, template, log):
+	"""Send the consolidated product to the websites, by saving it with the webhooks back on.
+
+	There is no separate upsert message: the Item `on_update` webhook is the upsert, and a merge
+	runs with `in_import` set for its whole length precisely so that webhook does *not* fire on
+	every half-finished step. So the push is a deliberate save at the end, with the flags put back.
+
+	The template and its new variants, in that order - the template carries the product and the
+	variants carry what hangs off it.
+	"""
+	step = "Push to websites"
+	if not exists(template):
+		return
+	tdoc = frappe.get_doc("Item", template).as_dict()
+	legacy = variant_attribute(tdoc)
+	docs = family.load_items(family.variant_codes(template))
+	new_variants = sorted(c for c, d in docs.items() if family.is_new(d, legacy))
+
+	sent, failed = 0, []
+	try:
+		with with_webhooks():
+			for code in [template] + new_variants:
+				try:
+					doc = frappe.get_doc("Item", code)
+					# Never push the template's own child tables down onto its variants; each
+					# variant is saved on its own right after.
+					family.save_template(doc) if code == template else doc.save()
+					frappe.db.commit()
+					sent += 1
+				except Exception as e:
+					frappe.db.rollback()
+					failed.append(f"{code}: {message_of(e)[:90]}")
+					frappe.log_error(title=f"Item Merge push {code}", message=frappe.get_traceback())
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(title=f"Item Merge Job {job.name} push", message=frappe.get_traceback())
+		_step(job, step, "failed", message_of(e)[:300])
+		return
+
+	message = f"{sent} item(s) sent ({len(new_variants)} variant(s))"
+	if failed:
+		message += " · " + "; ".join(failed[:3])
+	log(f"pushed {sent} item(s) to the websites")
+	_step(job, step, "failed" if failed else "done", message[:600])
+
+
+def _verify_websites(job, template, log):
+	"""Ask the websites what they now hold. The queue is asynchronous, so `pending` is a real answer."""
+	step = "Website check"
+	try:
+		result = product_details.verify(template)
+	except Exception as e:
+		_step(job, step, "skipped", message_of(e)[:300])
+		return
+	_set(job, website_check=json.dumps(result, default=str))
+	bad = [r for r in result["rows"] if r["status"] in ("mismatch", "error")]
+	status = "failed" if bad else ("attention" if result["pending"] else "done")
+	message = "; ".join(f"{r['price_list']}: {r['message']}" for r in (bad or result["rows"]))[:600]
+	log(f"website check: {message[:200]}")
+	_step(job, step, status, message)
 
 
 def _drop_legacy_products(job, log):
@@ -467,6 +564,7 @@ def job_status(job_name, live=True):
 		"user": job.owner, "created": job.creation, "started": job.started_on, "finished": job.finished_on,
 		"error": job.error, "total": job.total, "processed": job.processed,
 		"options": json.loads(job.options or "{}"), "steps": _steps(job),
+		"website_check": json.loads(job.website_check or "null"),
 		"log": (job.log or "").splitlines(),
 		"pairs": [{"old": p.old_item, "new": p.new_item, "item_name": p.item_name, "retail_sku": p.retail_sku,
 				   "status": p.status.lower(), "message": p.message, "expected_qty": p.expected_qty if p.status == "Ok" else None}

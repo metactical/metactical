@@ -57,8 +57,17 @@ SYSTEM = (
 )
 
 
-def _common_prefix(names):
-	"""The " - " separated head every name shares - the style, which carries no attribute value."""
+def _common_prefix(names, allowed=None):
+	"""The " - " separated head every name shares, minus anything that is itself an answer.
+
+	The shared head is normally the style, which carries no attribute value and is pure cost to
+	send. But a legacy family is often **all one colour** - that is what a per-colour template is -
+	so the colour is in every name and therefore in the shared head. Stripping it asks the model to
+	read a colour out of "30 x 30", which it cannot do, and it correctly answers null for every row.
+
+	So trailing tokens that resolve to one of the values being asked about are put back.
+	`rules.style_name` has guarded against the same thing since the start; this did not.
+	"""
 	token_lists = [rules.name_tokens(n) for n in names if n]
 	if len(token_lists) < 2:
 		return []
@@ -67,15 +76,20 @@ def _common_prefix(names):
 		if len(set(group)) != 1:
 			break
 		prefix.append(group[0])
+
+	values = set().union(*allowed.values()) if allowed else set()
+	while prefix and rules.resolve_loose(prefix[-1], values, rules.ALIASES):
+		prefix.pop()
+
 	# Never strip a whole name: a family where two variants share everything but the last token
 	# would otherwise send an empty string.
 	return prefix[:min(len(t) for t in token_lists) - 1]
 
 
-def _short_names(olds):
-	"""{item_code: the part of the name that actually varies}."""
+def _short_names(olds, allowed=None):
+	"""{item_code: the part of the name that carries an answer}."""
 	names = [d.get("item_name") or "" for d in olds]
-	drop = len(_common_prefix(names))
+	drop = len(_common_prefix(names, allowed))
 	out = {}
 	for d in olds:
 		tokens = rules.name_tokens(d.get("item_name"))
@@ -165,7 +179,7 @@ def read_values(template, olds, attrs, allowed, refresh=False):
 	if not olds or not attrs:
 		return {}, None
 
-	short = _short_names(olds)
+	short = _short_names(olds, allowed)
 	key = _cache_key(template, attrs, allowed, short)
 	if not refresh:
 		# expires=True because this key has a TTL. Without it a miss is written back into
