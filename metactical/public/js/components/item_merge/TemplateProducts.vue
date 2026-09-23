@@ -86,8 +86,9 @@
            fine is how a stranded product gets past this screen. -->
       <div v-else-if="!verifiedCount" class="im-note warn mt-2">
         <b>Nothing was read from Storebuilder.</b>
-        None of these templates is priced above zero on a website, so there is no product to drop
-        after the merge. If that is wrong, add the Item Price first.
+        None of these templates has a product on Storebuilder - either it is not priced above zero on
+        a website, or no product carries its External ID or slug - so there is nothing to drop after
+        the merge. If that is wrong, add the Item Price or fix the product in Storebuilder first.
       </div>
       <div v-else class="im-note ok mt-2">
         {{ verifiedCount }} website product(s) recorded<span v-if="skippedCount">; {{ skippedCount }} row(s) had nothing to check</span>.
@@ -102,7 +103,7 @@ import { itemMergeApi } from './api.js'
 import { alertOk, confirmAction, pillClass } from './utils.js'
 
 const props = defineProps({ templates: { type: Array, default: () => [] } })
-const emit = defineEmits(['update:ok'])
+const emit = defineEmits(['update:ok', 'update:live'])
 
 const rows = ref([])
 const problems = ref([])
@@ -121,6 +122,7 @@ const LABELS = {
   notconfigured: 'No API for this website',
   missing: "Can't find the item",
   nowebsite: 'Not on any website',
+  notonsb: 'Not on Storebuilder',
   error: 'The website could not answer',
   unchecked: 'Not checked',
 }
@@ -129,12 +131,19 @@ const label = (status) => LABELS[status] || 'Not checked'
 // Three states, not two. `full` is an answer from Storebuilder; `nowebsite` and `zeroprice` are
 // the absence of a question; everything else needs attention. Counting the middle group as
 // verified is what made an unpriced selection report green.
-const NOTHING_TO_CHECK = ['nowebsite', 'zeroprice']
+// `notonsb` was asked about and has nothing on Storebuilder - no product to drop, so not a problem.
+const NOTHING_TO_CHECK = ['nowebsite', 'zeroprice', 'notonsb']
 const verifiedCount = computed(() => rows.value.filter((r) => r.status === 'full').length)
 const skippedCount = computed(() => rows.value.filter((r) => NOTHING_TO_CHECK.includes(r.status)).length)
 const attentionCount = computed(() => rows.value.length - verifiedCount.value - skippedCount.value)
 const ok = computed(() => rows.value.length > 0 && attentionCount.value === 0)
 watch(ok, (v) => emit('update:ok', v), { immediate: true })
+// The templates Storebuilder has a product for (External ID and slug). Only one of these may
+// survive a merge - the others' products are dropped afterwards.
+const live = computed(() => [...new Set(rows.value
+  .filter((r) => r.status === 'full' && r.external_id && (r.slug || '').trim())
+  .map((r) => r.template))])
+watch(live, (v) => emit('update:live', v), { immediate: true })
 
 // What a live check answered, kept by row so a reload - after a ✕, say - does not throw the
 // check away and make the operator run it again.

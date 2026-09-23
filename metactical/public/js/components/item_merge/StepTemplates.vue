@@ -79,10 +79,21 @@
           <div>
             <label class="control-label-sm block">Surviving template</label>
             <div class="space-y-1">
-              <label v-for="r in selectedRows" :key="r.item_code" class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="im-survivor" :value="r.item_code" v-model="survivor" />
+              <label v-for="r in selectedRows" :key="r.item_code" class="flex items-center gap-2"
+                     :class="canSurvive(r.item_code) ? 'cursor-pointer' : 'text-muted'">
+                <input type="radio" name="im-survivor" :value="r.item_code" v-model="survivor"
+                       :disabled="!canSurvive(r.item_code)" />
                 <span class="font-mono">{{ r.item_code }}</span><span class="text-faint text-xs">{{ r.variant_count }}</span>
+                <span v-if="liveSelected.length && !canSurvive(r.item_code)" class="text-faint text-xs">not on Storebuilder</span>
               </label>
+            </div>
+            <div v-if="liveSelected.length === 1" class="im-note info mt-2">
+              <span class="font-mono">{{ liveSelected[0] }}</span> is the only one with a Storebuilder
+              product, so it survives - the others have no product to keep.
+            </div>
+            <div v-else-if="liveSelected.length > 1" class="im-note warn mt-2">
+              <b>{{ liveSelected.length }} templates have a Storebuilder product.</b> Pick the one to keep -
+              the others' products are dropped from the websites after the merge.
             </div>
           </div>
           <div>
@@ -128,7 +139,8 @@
       </aside>
     </div>
 
-    <TemplateProducts v-if="selected.length" ref="products" :templates="selected" @update:ok="(v) => productsOk = v" />
+    <TemplateProducts v-if="selected.length" ref="products" :templates="selected"
+                      @update:ok="(v) => productsOk = v" @update:live="(v) => live = v" />
   </div>
 </template>
 
@@ -152,6 +164,8 @@ const renameTo = ref('')
 const busy = ref(false)
 const products = ref(null)
 const productsOk = ref(false)
+// Templates Storebuilder has a product for, as the products table last read them.
+const live = ref([])
 
 // ---- the two search boxes, both native Frappe Autocompletes fed from Item ----
 // Autocomplete rather than Link: they suggest what exists, but a partial term ("RVX418") is a valid
@@ -215,9 +229,18 @@ async function search() {
   }
 }
 
+// The survivor keeps its Storebuilder product; every other template's is dropped. So when any
+// selected template has one, only those may survive - one of them is taken for you, several are
+// left for you to choose between.
+const liveSelected = computed(() => selected.value.filter((c) => live.value.includes(c)))
+const canSurvive = (code) => !liveSelected.value.length || liveSelected.value.includes(code)
 function keepSurvivor() {
-  if (!selected.value.includes(survivor.value)) survivor.value = selected.value[0] || null
+  if (liveSelected.value.length === 1) survivor.value = liveSelected.value[0]
+  else if (liveSelected.value.length > 1) {
+    if (!liveSelected.value.includes(survivor.value)) survivor.value = null
+  } else if (!selected.value.includes(survivor.value)) survivor.value = selected.value[0] || null
 }
+watch(liveSelected, keepSurvivor)
 function toggle(code) {
   const i = selected.value.indexOf(code)
   if (i >= 0) selected.value.splice(i, 1)
