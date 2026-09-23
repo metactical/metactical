@@ -290,7 +290,21 @@ const mergeAllowed = computed(() => !!check.value && !check.value.blocked
 
 // Both ways out of this step write the register first: consolidate_templates deletes the source
 // templates, and after that their Storebuilder products can never be found again.
+// Nothing selected has a Storebuilder product (no slug, no External ID). Allowed, but the job then
+// has nothing to read images from and nothing to drop, so the operator is told before going on.
+const NOT_ON_SB_WARNING = "Storebuilder didn't return a website product (slug or External ID) for " +
+  'any of these templates. The merge job will not be able to load their images from Storebuilder, ' +
+  'and no Storebuilder products will be dropped for the merged items.'
+
 async function chooseOne() {
+  if (!liveSelected.value.length) {
+    const ok = await confirmAction({
+      title: 'No Storebuilder product found',
+      message: NOT_ON_SB_WARNING + '\n\nContinue anyway?',
+      label: 'Continue',
+    })
+    if (!ok) return
+  }
   busy.value = true
   try {
     await products.value.save(selected.value[0])
@@ -309,7 +323,8 @@ async function consolidate() {
     title: 'Merge templates?',
     message: `Merge ${sources.length} template(s) into ${survivor.value}` +
       (renameTo.value.trim() ? `, then rename it to ${finalCode}` : '') +
-      `.\n${totalVariants.value} variants will sit under ${finalCode}. The other templates are removed.`,
+      `.\n${totalVariants.value} variants will sit under ${finalCode}. The other templates are removed.` +
+      (liveSelected.value.length ? '' : '\n\n' + NOT_ON_SB_WARNING),
     label: 'Merge templates',
     danger: true,
   })
