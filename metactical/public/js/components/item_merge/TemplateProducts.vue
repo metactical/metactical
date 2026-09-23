@@ -47,7 +47,6 @@
                             :aria-label="'Remove ' + r.price_list + ' from ' + r.template"
                             @click="removePriceList(r)">✕</button>
                   </span>
-                  <span v-if="r.site" class="text-xs text-faint">{{ r.site }}</span>
                 </template>
                 <span v-else class="text-faint">—</span>
               </td>
@@ -64,7 +63,16 @@
         <div v-for="p in problems" :key="p" class="issue">{{ p }}</div>
       </div>
 
-      <div v-if="!anyConfig" class="im-note warn mt-2">
+      <!-- Empty Storebuilder Websites means nothing is read and nothing is ever dropped. That is
+           a quiet way to lose every legacy product, so it is said first and plainly. -->
+      <div v-if="!websitesConfigured" class="im-note danger mt-2">
+        <b>No Storebuilder website is set up.</b>
+        Add the price lists Item Merge may read under <b>Storebuilder Websites</b> on
+        Item Merge Settings. Until then nothing is read from Storebuilder, and no legacy
+        product is dropped after a merge.
+      </div>
+
+      <div v-else-if="!anyConfig" class="im-note warn mt-2">
         No <b>Product Detail APIs</b> are configured. Add one row per website under
         Storebuilder Sync Settings before this screen can ask anything.
       </div>
@@ -99,6 +107,7 @@ const emit = defineEmits(['update:ok'])
 const rows = ref([])
 const problems = ref([])
 const anyConfig = ref(true)
+const websitesConfigured = ref(true)
 const loading = ref(false)
 const busy = ref(false)
 
@@ -145,6 +154,7 @@ async function load() {
     if (mine !== seq) return
     rows.value = merge(res.rows || [])
     anyConfig.value = !!res.any_config
+    websitesConfigured.value = !!res.websites_configured
   } catch (e) {
     // Frappe has shown the reason
     if (mine === seq) rows.value = []
@@ -160,6 +170,7 @@ async function check() {
   try {
     const res = await itemMergeApi.lookupTemplateProducts(props.templates)
     if (mine !== seq) return
+    websitesConfigured.value = !!res.websites_configured
     const fresh = res.rows || []
     const keep = {}
     fresh.forEach((r) => { keep[rowKey(r)] = r })

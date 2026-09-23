@@ -31,7 +31,7 @@ import frappe
 import requests
 from frappe.utils import add_days, flt, format_datetime, now_datetime
 
-from metactical.item_merge import catalogue, family, legacy_products, websites
+from metactical.item_merge import catalogue, family, legacy_products
 from metactical.item_merge.rules import UserError
 
 DETAIL_FIELD = "product_detail_apis"
@@ -128,17 +128,36 @@ def _detail_one(config, headers, template, retail_sku, erp_slug):
 
 # ---------- what a template is asked about ----------
 
-def storefronts_by_price_list():
-	"""{price list: Lead Source} for every storefront that has a Lead Source Domain.
+def allowed_price_lists():
+	"""The price lists **Storebuilder Websites** on Item Merge Settings says may be read.
 
-	`catalogue.storefronts()` is already "every Lead Source with a domain set"; a storefront with no
-	price list can be named but nothing can be routed to it - the drop message and its confirmation
-	both key on the price list - so those are left out here.
+	A Lead Source Domain is not enough on its own. Plenty of websites have one and no product API
+	behind it, or point at a store rather than a catalogue; asking those blocks step 1 on a row the
+	operator can do nothing about but delete real prices. So the list is explicit.
+
+	Empty means none - nothing is read from Storebuilder and nothing is dropped after a merge. That
+	is a real state to be in on a fresh site, so every caller surfaces it rather than looking like
+	there simply are no websites.
 	"""
+	rows = frappe.get_all("Item Merge Website",
+						  filters={"parenttype": "Item Merge Settings", "enabled": 1},
+						  pluck="price_list")
+	return {r for r in rows if r}
+
+
+def storefronts_by_price_list():
+	"""{price list: Lead Source} for every storefront Item Merge is allowed to read.
+
+	`catalogue.storefronts()` is "every Lead Source with a domain set"; a storefront with no price
+	list can be named but nothing can be routed to it - the drop message and its confirmation both
+	key on the price list - so those are left out, and so is anything not on the allow list above.
+	"""
+	allowed = allowed_price_lists()
 	out = {}
 	for lead_source, site in catalogue.storefronts().items():
-		if site.get("price_list"):
-			out[site["price_list"]] = lead_source
+		price_list = site.get("price_list")
+		if price_list and price_list in allowed:
+			out[price_list] = lead_source
 	return out
 
 
@@ -200,8 +219,13 @@ def _rows_for(templates):
 	"""
 	templates = [str(t).strip() for t in (templates or []) if str(t or "").strip()]
 	sites = storefronts_by_price_list()
+	configured = bool(sites)
 	configs = _configs()
 	info = _template_info(templates)
+
+	unset = ("No Storebuilder website is set up - add the price lists Item Merge may read under "
+			 "Storebuilder Websites on Item Merge Settings. Until then nothing is read from "
+			 "Storebuilder and nothing is dropped from it after a merge.")
 
 	rows = []
 	for template in templates:
@@ -227,10 +251,10 @@ def _rows_for(templates):
 									  .format(price_list), price_list, price_rows))
 		if not lists:
 			if not zero:
-				rows.append(_blank("nowebsite",
-								   "Not sold on any website - no Item Price on a price list whose "
-								   "Lead Source has a Lead Source Domain, so there is nothing on "
-								   "Storebuilder to drop"))
+				rows.append(_blank("nowebsite", unset if not configured else
+								   "Not sold on any website - no Item Price on a price list Item "
+								   "Merge is set up to read, so there is nothing on Storebuilder "
+								   "to drop"))
 			continue
 		for price_list, price_rows in lists.items():
 			lead_source = sites[price_list]
@@ -244,7 +268,7 @@ def _rows_for(templates):
 						 "message": ("No Product Detail API for this price list - add one under "
 									 "Product Detail APIs on Storebuilder Sync Settings")
 									if price_list not in configs else ""})
-	return rows, configs
+	return rows, configs, configured
 
 
 def _configs():
@@ -274,7 +298,7 @@ def plan(templates):
 	Opening step 1 must not fire a round of live calls at every site for every template the operator
 	happens to tick, so this reads the register instead and leaves the asking to lookup().
 	"""
-	rows, configs = _rows_for(templates)
+	rows, configs, configured = _rows_for(templates)
 	kept = _saved_slugs({r["template"] for r in rows})
 	cutoff = add_days(now_datetime(), -CAPTURE_MAX_AGE_DAYS)
 
@@ -297,12 +321,13 @@ def plan(templates):
 			row.update({"status": CLEAN, "message": "Captured {0}".format(when)})
 
 	return {"templates": sorted({r["template"] for r in rows}), "rows": rows, "ok": _ok(rows),
-			"verified": _verified(rows), "any_config": bool(configs), "checked_now": False}
+			"verified": _verified(rows), "any_config": bool(configs),
+			"websites_configured": configured, "checked_now": False}
 
 
 def lookup(templates):
 	"""Ask every website about every ticked template, in parallel. This is the live call."""
-	rows, configs = _rows_for(templates)
+	rows, configs, configured = _rows_for(templates)
 	headers = {pl: legacy_products._headers(config) for pl, config in configs.items()}
 
 	pending, calls = [], []
@@ -319,7 +344,7 @@ def lookup(templates):
 		calls.append(lambda c=config, h=headers[row["price_list"]], t=row["template"],
 							r=row["retail_sku"], s=row["erp_slug"]: _detail_one(c, h, t, r, s))
 
-	for row, (result, error) in zip(pending, websites._parallel(calls)):
+	for row, (result, error) in zip(pending, legacy_products._parallel(calls)):
 		if error:
 			row.update({"status": "error", "external_id": "", "slug": "",
 						"message": "could not reach the website: {0}".format(error)})
@@ -327,7 +352,7 @@ def lookup(templates):
 			row.update(result)
 
 	return {"templates": sorted({r["template"] for r in rows}), "rows": rows, "ok": _ok(rows),
-			"verified": _verified(rows), "checked_now": True}
+			"verified": _verified(rows), "websites_configured": configured, "checked_now": True}
 
 
 # ---------- the register ----------
@@ -351,9 +376,8 @@ def save(survivor, rows, commit=True, under=None):
 	**The survivor is never registered.** It is not a legacy product: the merge consolidates into it
 	and its Storebuilder product is meant to stay and be updated. Registering it put it in the drop
 	list and left it resting on `issue_drops._still_owned`, a guard that only holds when the
-	survivor's Item Detail already carries that slug - which the website steps fill from Metabase,
-	and which are skipped whenever Metabase is unreachable. A survivor with no Item Detail slug and
-	no Metabase would have had its live product deleted.
+	survivor's Item Detail already carries that slug - which is not something this can rely on. A
+	survivor with no Item Detail row for a website would have had its live product deleted.
 
 	Returns {"written", "removed", "templates", "problems"}. A slug another item already claims is
 	reported in `problems` rather than thrown: one bad row must not stop the rest being written, and
@@ -435,10 +459,49 @@ def save(survivor, rows, commit=True, under=None):
 			continue
 		written += len(good)
 
+	filled = _fill_item_detail(survivor, [r for r in rows if str(r.get("template")) == survivor])
+
 	if commit:
 		frappe.db.commit()
 	return {"written": written, "removed": removed, "templates": sorted(by_template),
-			"problems": problems}
+			"problems": problems, "item_detail_filled": filled}
+
+
+def _fill_item_detail(survivor, rows):
+	"""Put the survivor's own slugs on its Item Detail rows. Returns the price lists filled.
+
+	The slugs are the ones Storebuilder just answered with, so this is the moment they are known to
+	be right - and the surviving template is the only one worth writing them to. The templates being
+	consolidated away are about to be deleted along with their products, so their slugs are for the
+	drop and nothing else.
+
+	It matters beyond tidiness: `create_item_deletion_log` refuses to run a Drop and Create while
+	any Item Detail row has a blank slug, so a row without one would block the operator's re-push
+	of the whole consolidated product.
+
+	Never overwrites. A slug already on a row is the one the site is actually serving, and a row
+	this did not put there is somebody's decision.
+	"""
+	rows = [r for r in rows
+			if r.get("status") == CLEAN and r.get("price_list") and str(r.get("slug") or "").strip()]
+	if not survivor or not rows or not frappe.db.exists("Item", survivor):
+		return []
+
+	doc = frappe.get_doc("Item", survivor)
+	have = {r.price_list for r in doc.get("item_detail") or []}
+	added = []
+	for row in rows:
+		if row["price_list"] in have:
+			continue
+		doc.append("item_detail", {"price_list": row["price_list"],
+								   "slug": str(row["slug"]).strip()})
+		have.add(row["price_list"])
+		added.append(row["price_list"])
+	if added:
+		# Through save_template so ERPNext's update_variants does not push the template's rows
+		# onto every variant.
+		family.save_template(doc)
+	return added
 
 
 def ensure_captured(survivor, sources):
