@@ -384,6 +384,7 @@ def get_subtree_available_qty(item_code, warehouse_names, net_available_bins=Non
 
 	return total
 
+@frappe.whitelist()
 def update_item_inventory_output(item_code, net_available_bins = {}, voucher_type=None, bundle=False, last_sle=None, doc=None):
 	try:	
 		if voucher_type is None:
