@@ -100,8 +100,12 @@ class JobLog:
 		_publish(self.job, line)
 
 
+# Steps a job no longer runs. Jobs from before they were removed still carry them in `steps`.
+RETIRED_STEPS = ("Website check",)
+
+
 def _steps(job):
-	return json.loads(job.steps or "[]")
+	return [s for s in json.loads(job.steps or "[]") if s.get("name") not in RETIRED_STEPS]
 
 
 def _step(job, name, status, message=""):
@@ -254,12 +258,11 @@ def run_merge(job, log):
 		_drop_legacy_products(job, log)
 		# Stock first, so the push carries the right quantities.
 		_settle_inventory(job, log)
-		# Then the push, and only then the check - the drops have to land before the consolidated
-		# product goes out, or a drop queued behind it would delete what was just sent.
+		# Then the push - the drops have to land before the consolidated product goes out, or a
+		# drop queued behind it would delete what was just sent.
 		_push_to_websites(job, template, log)
 		# The images go after the product: they hang off its variants' SKUs.
 		_push_images(job, template, log)
-		_verify_websites(job, template, log)
 
 	_set(job, status="Failed" if failed else "Done", finished_on=now_datetime())
 	family.add_activity(template, f"merge job {job.name} {job.status.lower()}: {job.processed}/{len(job.pairs)} merged")
@@ -449,22 +452,6 @@ def _push_images(job, template, log):
 	_step(job, step, "done", message)
 
 
-def _verify_websites(job, template, log):
-	"""Ask the websites what they now hold. The queue is asynchronous, so `pending` is a real answer."""
-	step = "Website check"
-	try:
-		result = product_details.verify(template)
-	except Exception as e:
-		_step(job, step, "skipped", message_of(e)[:300])
-		return
-	_set(job, website_check=json.dumps(result, default=str))
-	bad = [r for r in result["rows"] if r["status"] in ("mismatch", "error")]
-	status = "failed" if bad else ("attention" if result["pending"] else "done")
-	message = "; ".join(f"{r['price_list']}: {r['message']}" for r in (bad or result["rows"]))[:600]
-	log(f"website check: {message[:200]}")
-	_step(job, step, status, message)
-
-
 def _drop_legacy_products(job, log):
 	"""Remove the Storebuilder products this merge consolidated away.
 
@@ -598,7 +585,6 @@ def job_status(job_name, live=True):
 		"user": job.owner, "created": job.creation, "started": job.started_on, "finished": job.finished_on,
 		"error": job.error, "total": job.total, "processed": job.processed,
 		"options": json.loads(job.options or "{}"), "steps": _steps(job),
-		"website_check": json.loads(job.website_check or "null"),
 		"log": (job.log or "").splitlines(),
 		"pairs": [{"old": p.old_item, "new": p.new_item, "item_name": p.item_name, "retail_sku": p.retail_sku,
 				   "status": p.status.lower(), "message": p.message, "expected_qty": p.expected_qty if p.status == "Ok" else None}
