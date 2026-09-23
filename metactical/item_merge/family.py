@@ -424,7 +424,13 @@ def suggest_combinations(template, attributes):
 
 	combos, unread = {}, []
 	for d in olds:
-		got = read.get(d["name"]) or rules.read_values(d, attrs, allowed)
+		# Per attribute, not all-or-nothing. The AI routinely answers for one attribute and leaves
+		# the other null - a family whose colour it could not see, say - and a partial answer is
+		# still a truthy dict, so `read.get(...) or read_values(...)` never reached the name
+		# matching at all and marked every variant unread. The AI wins where it answered; the name
+		# fills the rest, which is exactly what plan_pairs has always done for the align screen.
+		got = dict(rules.read_values(d, attrs, allowed) or {})
+		got.update({a: v for a, v in (read.get(d["name"]) or {}).items() if v})
 		if not got or any(got.get(a) is None for a in attrs):
 			unread.append({"item_code": d["name"], "item_name": d.get("item_name")})
 			continue

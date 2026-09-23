@@ -7,10 +7,15 @@
  "engine": "InnoDB",
  "field_order": [
   "product",
+  "external_id",
+  "kind",
   "lead_source",
   "price_list",
   "site",
   "slug",
+  "new_template",
+  "new_external_id",
+  "new_slug",
   "source",
   "verified",
   "state",
@@ -20,30 +25,45 @@
  ],
  "fields": [
   {
+   "columns": 2,
+   "description": "The legacy template code. It no longer exists as an Item once the merge has run.",
    "fieldname": "product",
    "fieldtype": "Data",
-   "label": "Legacy Product",
-   "description": "The legacy template code. It no longer exists as an Item once the merge has run.",
    "in_list_view": 1,
-   "columns": 2,
+   "label": "Legacy Product",
    "read_only": 1
   },
   {
+   "description": "The External ID Storebuilder answered with for this legacy product.",
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "Old External ID"
+  },
+  {
+   "default": "Primary",
+   "description": "Duplicate: Storebuilder returned more than one product for this template. The first is kept as the product; every other one is an orphan and is dropped.",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kind",
+   "options": "Primary\nDuplicate"
+  },
+  {
+   "columns": 2,
    "fieldname": "lead_source",
    "fieldtype": "Link",
-   "options": "Lead Source",
-   "label": "Website",
    "in_list_view": 1,
-   "columns": 2,
+   "label": "Website",
+   "options": "Lead Source",
    "read_only": 1
   },
   {
+   "columns": 2,
    "fieldname": "price_list",
    "fieldtype": "Link",
-   "options": "Price List",
-   "label": "Price List",
    "in_list_view": 0,
-   "columns": 2,
+   "label": "Price List",
+   "options": "Price List",
    "read_only": 1
   },
   {
@@ -53,27 +73,44 @@
    "read_only": 1
   },
   {
+   "columns": 2,
    "fieldname": "slug",
    "fieldtype": "Data",
-   "label": "Slug",
    "in_list_view": 1,
-   "columns": 2,
+   "label": "Slug",
    "read_only": 1
   },
   {
+   "description": "The surviving template this legacy product was consolidated into.",
+   "fieldname": "new_template",
+   "fieldtype": "Data",
+   "label": "New Template"
+  },
+  {
+   "fieldname": "new_external_id",
+   "fieldtype": "Data",
+   "label": "New External ID"
+  },
+  {
+   "description": "The surviving product's slug on this website, so a failed drop can be retried or its images re-loaded without going back to the screen.",
+   "fieldname": "new_slug",
+   "fieldtype": "Data",
+   "label": "New Slug"
+  },
+  {
+   "default": "Lookup",
    "fieldname": "source",
    "fieldtype": "Select",
    "label": "Source",
    "options": "Lookup\nManual",
-   "default": "Lookup",
    "read_only": 1
   },
   {
+   "default": "1",
+   "description": "The website confirmed this slug. 0 means the website has no slug endpoint and the operator vouched for it instead.",
    "fieldname": "verified",
    "fieldtype": "Check",
    "label": "Slug Verified",
-   "default": "1",
-   "description": "The website confirmed this slug. 0 means the website has no slug endpoint and the operator vouched for it instead.",
    "read_only": 1
   },
   {
@@ -83,28 +120,28 @@
    "read_only": 1
   },
   {
+   "columns": 1,
+   "default": "Validated",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Status",
    "options": "Validated\nIssued\nSkipped\nFailed",
-   "default": "Validated",
-   "in_list_view": 1,
-   "columns": 1,
    "read_only": 1
   },
   {
+   "description": "The Item Drop and Create Log this row issued",
    "fieldname": "drop_log",
    "fieldtype": "Data",
    "label": "Drop Log",
-   "description": "The Item Drop and Create Log this row issued",
    "read_only": 1
   },
   {
+   "columns": 3,
    "fieldname": "message",
    "fieldtype": "Small Text",
-   "label": "Message",
    "in_list_view": 1,
-   "columns": 3,
+   "label": "Message",
    "read_only": 1
   }
  ],

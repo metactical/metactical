@@ -9,6 +9,7 @@
   "lead_source",
   "slug",
   "external_id",
+  "kind",
   "state",
   "column_break_lwps1",
   "price_list",
@@ -45,6 +46,15 @@
    "fieldname": "external_id",
    "fieldtype": "Data",
    "label": "External ID",
+   "read_only": 1
+  },
+  {
+   "default": "Primary",
+   "description": "Duplicate: Storebuilder returned more than one product for this template. The first is the product; the others are orphans, kept only so they can be dropped.",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Primary\nDuplicate",
    "read_only": 1
   },
   {

@@ -23,6 +23,7 @@
   "legacy_products",
   "section_result",
   "steps",
+  "website_check",
   "options",
   "deleted_pricing_rules",
   "section_log",
@@ -150,6 +151,13 @@
    "fieldname": "steps",
    "fieldtype": "JSON",
    "label": "Steps",
+   "read_only": 1
+  },
+  {
+   "description": "What each website held for the consolidated product the last time it was asked, after the push.",
+   "fieldname": "website_check",
+   "fieldtype": "JSON",
+   "label": "Website Check",
    "read_only": 1
   },
   {
