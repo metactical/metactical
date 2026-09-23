@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from metactical.item_merge import family, jobs, legacy_products, product_details, websites
+from metactical.item_merge import family, jobs, legacy_products, product_details
 from metactical.item_merge.rules import UserError
 
 ROLES = ("System Manager", "Item Manager")
@@ -49,7 +49,7 @@ def _api(webhooks=False):
 			frappe.local.flags[name] = True
 	try:
 		yield
-	except (UserError, websites.NotConfigured) as e:
+	except UserError as e:
 		frappe.db.rollback()
 		frappe.throw(str(e), title=_("Item Merge"))
 	finally:
@@ -257,29 +257,6 @@ def get_reposts(template):
 	with _api():
 		return family.reposts(template)
 
-
-# ---------- websites ----------
-
-@frappe.whitelist()
-def get_website_plan(template):
-	with _api():
-		return websites.plan(template)
-
-
-@frappe.whitelist()
-def apply_websites(template):
-	with _api():
-		lines = []
-		result = websites.apply(template, log=_logger(lines))
-		if lines:
-			family.add_activity(template, "; ".join(lines))
-		return result
-
-
-@frappe.whitelist()
-def check_websites(template):
-	with _api():
-		return websites.check(template)
 
 
 # ---------- legacy website products ----------

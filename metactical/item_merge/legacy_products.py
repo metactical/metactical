@@ -18,9 +18,11 @@ this template been dealt with" is answered by the record existing at all. `templ
 is the **surviving** code, which is how the merge job reads its batch back after the sources are
 gone; the record's own name is the legacy code, which is what Storebuilder knows the product by.
 
-A snapshot is never good enough to authorise a deletion, which is why none of this goes through
-Metabase the way `websites.py` does: every value here was read live from the site.
+A snapshot is never good enough to authorise a deletion: every value here was read live from the
+site, from the product that is about to be dropped.
 """
+from concurrent.futures import ThreadPoolExecutor
+
 import frappe
 
 from metactical.item_merge import catalogue
@@ -40,6 +42,25 @@ EXTERNAL_ID_KEYS = ("externalId", "ExternalId", "external_id", "ExternalID")
 
 
 # ---------- talking to the sites ----------
+
+# One site being slow must not hold up the others: every Storebuilder fan-out in item_merge goes
+# through _parallel.
+QUERY_WORKERS = 5
+
+
+def _parallel(calls):
+	if not calls:
+		return []
+	with ThreadPoolExecutor(max_workers=min(QUERY_WORKERS, len(calls))) as pool:
+		out = []
+		for f in [pool.submit(c) for c in calls]:
+			try:
+				out.append((f.result(), None))
+			except Exception as e:  # one unreachable site must not sink the others
+				out.append((None, str(e) or e.__class__.__name__))
+		return out
+
+
 
 def _configs(parentfield):
 	"""The per-website API rows, by price list.
@@ -185,10 +206,9 @@ def mark_dropped(item_code, lead_source, drop_log):
 def _still_owned(slug, price_list):
 	"""The live Item, if any, that still publishes this slug on this website.
 
-	The guard that matters: the website steps fill the surviving template's Item Detail rows from
-	the Metabase snapshot just before this runs, and if the snapshot handed it a legacy product's
-	slug then dropping that slug would delete the product the merge has just consolidated into.
-	Anything still owned by a live Item is left alone and reported.
+	The guard that matters: if a live Item still publishes this slug on this website then dropping it
+	would delete that Item's product, not the legacy one. Anything still owned is left alone and
+	reported.
 	"""
 	parents = frappe.get_all("Item Detail", filters={"slug": slug, "price_list": price_list},
 							 pluck="parent")

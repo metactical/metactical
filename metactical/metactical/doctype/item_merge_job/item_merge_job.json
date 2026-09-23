@@ -24,45 +24,43 @@
   "section_result",
   "steps",
   "options",
-  "websites",
-  "website_check",
   "deleted_pricing_rules",
   "section_log",
   "log"
  ],
  "fields": [
   {
+   "default": "Merge",
    "fieldname": "job_type",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Job Type",
    "options": "Merge\nItem Changes",
-   "default": "Merge",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "reqd": 1,
-   "read_only": 1
+   "read_only": 1,
+   "reqd": 1
   },
   {
+   "description": "Plain text, not a link: merges and renames rewrite links, and this must keep the code the job ran on",
    "fieldname": "template",
    "fieldtype": "Data",
-   "label": "Template",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "search_index": 1,
+   "label": "Template",
+   "read_only": 1,
    "reqd": 1,
-   "description": "Plain text, not a link: merges and renames rewrite links, and this must keep the code the job ran on",
-   "read_only": 1
+   "search_index": 1
   },
   {
+   "default": "Queued",
    "fieldname": "status",
    "fieldtype": "Select",
-   "label": "Status",
-   "options": "Queued\nRunning\nDone\nFailed\nInterrupted",
-   "default": "Queued",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "search_index": 1,
-   "read_only": 1
+   "label": "Status",
+   "options": "Queued\nRunning\nDone\nFailed\nInterrupted",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_progress",
@@ -77,8 +75,8 @@
   {
    "fieldname": "processed",
    "fieldtype": "Int",
-   "label": "Processed",
    "in_list_view": 1,
+   "label": "Processed",
    "read_only": 1
   },
   {
@@ -94,9 +92,9 @@
    "read_only": 1
   },
   {
+   "depends_on": "error",
    "fieldname": "section_error",
-   "fieldtype": "Section Break",
-   "depends_on": "error"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "error",
@@ -110,43 +108,43 @@
    "label": "Rows"
   },
   {
+   "depends_on": "eval:doc.job_type=='Merge'",
    "fieldname": "pairs",
    "fieldtype": "Table",
    "label": "Pairs",
    "options": "Item Merge Job Pair",
-   "depends_on": "eval:doc.job_type=='Merge'",
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.job_type=='Merge'",
    "fieldname": "leftovers",
    "fieldtype": "Table",
    "label": "Leftovers",
    "options": "Item Merge Job Leftover",
-   "depends_on": "eval:doc.job_type=='Merge'",
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.job_type=='Item Changes'",
    "fieldname": "changes",
    "fieldtype": "Table",
    "label": "Changes",
    "options": "Item Merge Job Change",
-   "depends_on": "eval:doc.job_type=='Item Changes'",
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.job_type=='Merge'",
+   "description": "The StoreBuilder products this merge consolidates away, one row per website with a slug. Dropped from the sites after the merge.",
    "fieldname": "legacy_products",
    "fieldtype": "Table",
    "label": "Legacy Website Products",
    "options": "Item Merge Job Legacy Product",
-   "description": "The StoreBuilder products this merge consolidates away, one row per website with a slug. Dropped from the sites after the merge.",
-   "depends_on": "eval:doc.job_type=='Merge'",
    "read_only": 1
   },
   {
+   "collapsible": 1,
    "fieldname": "section_result",
    "fieldtype": "Section Break",
-   "label": "Result",
-   "collapsible": 1
+   "label": "Result"
   },
   {
    "fieldname": "steps",
@@ -161,29 +159,17 @@
    "read_only": 1
   },
   {
-   "fieldname": "websites",
-   "fieldtype": "JSON",
-   "label": "Website Slugs",
-   "read_only": 1
-  },
-  {
-   "fieldname": "website_check",
-   "fieldtype": "JSON",
-   "label": "Website Check",
-   "read_only": 1
-  },
-  {
+   "description": "Backup of each per-item Pricing Rule removed so a leftover could be deleted",
    "fieldname": "deleted_pricing_rules",
    "fieldtype": "JSON",
    "label": "Deleted Pricing Rules",
-   "description": "Backup of each per-item Pricing Rule removed so a leftover could be deleted",
    "read_only": 1
   },
   {
+   "collapsible": 1,
    "fieldname": "section_log",
    "fieldtype": "Section Break",
-   "label": "Log",
-   "collapsible": 1
+   "label": "Log"
   },
   {
    "fieldname": "log",
