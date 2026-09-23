@@ -51,6 +51,7 @@ def sync_s3_images(item_code, user=None):
 
 @frappe.whitelist()
 def receive_deletion_message(parsedContent):
+    switched_user = False
     try:
         lead_source = parsedContent.get("publisher_site")
 
@@ -79,6 +80,14 @@ def receive_deletion_message(parsedContent):
                 message="Missing item_code or price_list in the message.",
             )
             return False
+
+        # This runs from the message consumer, i.e. as Administrator, so every save below
+        # would otherwise be stamped "last updated by Administrator". Act as the user who
+        # created the log instead, so the person who triggered the drop and create is the
+        # one recorded on the documents it touches.
+        if user and user != frappe.session.user:
+            frappe.set_user(user)
+            switched_user = True
 
         lock_key = f"item_deletion:{item_code}"
 
@@ -121,7 +130,9 @@ def receive_deletion_message(parsedContent):
                 pending_inventory_syncs = []
                 for variant in variants:
                     item = frappe.get_doc("Item", variant)
-                    item.save()
+                    # ignore_permissions because we're now acting as the log's owner, who
+                    # isn't necessarily allowed to write Items.
+                    item.save(ignore_permissions=True)
 
                     # Webhooks queue on frappe.db.after_commit and aren't actually enqueued
                     # until the next commit. Without this, the item's on_update webhook can
@@ -176,3 +187,6 @@ def receive_deletion_message(parsedContent):
             message=f"Error processing deletion message: {str(e)} \nContent: {parsedContent} \n{frappe.get_traceback()}",
         )
         return False
+    finally:
+        if switched_user:
+            frappe.set_user("Administrator")
