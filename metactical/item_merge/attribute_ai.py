@@ -46,12 +46,20 @@ CACHE_TTL = 24 * 60 * 60
 
 SYSTEM = (
 	"You map product variant names onto a fixed list of attribute values.\n"
-	"For each numbered name, pick exactly one value per attribute, copied verbatim from the "
-	"allowed list for that attribute.\n"
-	"The name uses trade wording: OD and Olive Drab mean Olive, L means Large, XXL means 2XLarge, "
-	"Woodland means a woodland camo value, and so on. Match on meaning, not on spelling.\n"
-	"Use null for an attribute you cannot determine from the name. Never invent a value that is "
-	"not in the allowed list, and never guess to avoid a null.\n"
+	"For each numbered name, pick one value per attribute, copied verbatim from that attribute's "
+	"allowed list.\n"
+	"If part of the name is one of the allowed values, that is the answer - take it. Otherwise "
+	"match on meaning, not spelling: OD and Olive Drab mean Olive, L means Large, XXL means "
+	"2XLarge, Woodland means a woodland camo value.\n"
+	"A name carries the values in any order and may carry other words as well; ignore the words "
+	"that are not values.\n"
+	"Use null only when nothing in the name corresponds to that attribute at all. Never answer "
+	"with a value that is not in the allowed list.\n"
+	"Example - attributes [Colour, Size], Colour allowed [Olive, Shadow], Size allowed "
+	"[Large, 30 x 30]:\n"
+	"  1 Shadow - 30 x 30   -> [\"Shadow\", \"30 x 30\"]   (both appear in the name)\n"
+	"  2 OD - L             -> [\"Olive\", \"Large\"]      (trade wording)\n"
+	"  3 30 x 30            -> [null, \"30 x 30\"]         (no colour in the name at all)\n"
 	"Answer with JSON only: {\"items\":{\"<number>\":[<value for attribute 1>,...]}}. "
 	"Include every number you were given, and no others."
 )
@@ -165,18 +173,31 @@ def _cache_key(template, attrs, allowed, short):
 	return "{0}:{1}".format(CACHE_PREFIX, hashlib.sha1(payload.encode("utf-8")).hexdigest())
 
 
-def read_values(template, olds, attrs, allowed, refresh=False):
+def read_values(template, olds, attrs, allowed, known=None, refresh=False):
 	"""{item_code: {attribute: value}} for these old variants, and a warning when the AI was no help.
 
-	Returns (values, warning). `warning` is None when the AI answered; otherwise it is a sentence
-	for the operator saying what went wrong, and `values` holds whatever was read before it stopped
-	so the caller falls back to `rules.read_values` for the rest. A variant the model left out
-	simply falls back with the others.
+	`known` is what the plain name matching already read. **Only the variants it could not fully
+	read are sent.** That is the whole point of the call: exact wording is something
+	`rules.read_values` gets right every time and for nothing, and asking a model to re-do it is
+	both a cost and a risk - gpt-4o-mini reads "Shadow - 30 x 30" against a 150-value colour list
+	and returns null for the colour, because the instruction not to guess outweighs a match it is
+	not sure about. So the AI is given the hard remainder and nothing else, and a family the name
+	matching handled entirely costs no request at all.
+
+	Returns (values, warning). `warning` is None when there was nothing to ask or the AI answered;
+	otherwise it is a sentence for the operator, and `values` holds whatever was read before it
+	stopped so the caller falls back to `rules.read_values` for the rest.
 
 	`refresh=True` asks again rather than reusing the cached answer.
 	"""
 	olds = [d for d in olds if d.get("name")]
 	if not olds or not attrs:
+		return {}, None
+
+	known = known or {}
+	olds = [d for d in olds
+			if any((known.get(d["name"]) or {}).get(a) in (None, "") for a in attrs)]
+	if not olds:
 		return {}, None
 
 	short = _short_names(olds, allowed)
