@@ -163,6 +163,7 @@ function po3_paste_items(frm) {
                         row.uom = it.uom;
                         row.retail_sku_suffix = it.retail_sku_suffix;
                         if (it.supplier_part_no) row.supplier_part_no = it.supplier_part_no;
+                        if (it.barcode) row.barcode = it.barcode;
                         row.qty = it.qty;
                         if (it.rate) row.rate = it.rate;
                         row.amount = flt(it.qty) * flt(it.rate);
@@ -418,8 +419,27 @@ frappe.ui.form.on('Purchase Order V3', {
     }
 });
 
+// A new item on the line means a new barcode and supplier SKU -- replace, not
+// keep, whatever the previous item left there.
+function po3_pull_identifiers(frm, cdt, cdn) {
+    var row = locals[cdt][cdn];
+    if (!row.item_code) return;
+    frappe.call({
+        method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.get_item_identifiers',
+        args: { item_code: row.item_code, supplier: frm.doc.supplier },
+        callback: function(r) {
+            var v = r.message || {};
+            frappe.model.set_value(cdt, cdn, 'barcode', v.barcode || null);
+            frappe.model.set_value(cdt, cdn, 'supplier_part_no', v.supplier_part_no || null);
+        }
+    });
+}
+
 frappe.ui.form.on('Purchase Order V3 Item', {
-    item_code: po3_pull_rate,
+    item_code: function(frm, cdt, cdn) {
+        po3_pull_rate(frm, cdt, cdn);
+        po3_pull_identifiers(frm, cdt, cdn);
+    },
     qty: po3_amount,
     rate: po3_amount
 });
