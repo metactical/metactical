@@ -10,7 +10,7 @@ from collections import Counter
 
 import frappe
 
-from metactical.item_merge import catalogue, rules
+from metactical.item_merge import attribute_ai, catalogue, legacy_products, rules
 from metactical.item_merge.pairing import plan_pairs, variant_attribute
 from metactical.item_merge.rules import UserError
 
@@ -258,6 +258,11 @@ def rename_template(template, new_code=None, item_name=None, log=None):
 		if len(moved) != len(kids):
 			raise UserError(f"{new_code} now has {len(moved)} variant(s), expected {len(kids)} - check the template")
 		log(f"template {template} renamed to {new_code} ({len(kids)} variant(s) follow)")
+		# The register points at the surviving template by code, and a rename after step 1 captured
+		# it would otherwise orphan every record it names.
+		moved_records = legacy_products.retarget(template, new_code)
+		if moved_records:
+			log(f"{moved_records} legacy website product record(s) now point at {new_code}")
 	if rename_name:
 		update_template(new_code, {"item_name": item_name}, log)
 		log(f"template {new_code}: item name '{tdoc.get('item_name')}' -> '{item_name}'")
@@ -283,11 +288,19 @@ def consolidation_check(target, sources):
 	return rules.consolidation_summary(rows)
 
 
-def consolidate_templates(target, sources, rename_to=None, confirm_different_products=False, log=None):
+def consolidate_templates(target, sources, rename_to=None, confirm_different_products=False,
+						  product_rows=None, log=None):
 	"""Merge each source template into target so every variant sits under one template.
 
 	rename_doc updates every Link, including variants' variant_of, so a template merge carries its
-	variants along. That is verified afterwards rather than assumed."""
+	variants along. That is verified afterwards rather than assumed.
+
+	`product_rows` is what the Storebuilder products table read for these templates. It is written
+	to the register **here**, in the same call, so a consolidation that fails afterwards rolls the
+	register back with it rather than leaving records for a merge that never happened. Passing none
+	is allowed only when nothing needs capturing - `ensure_captured` decides that, not the caller."""
+	from metactical.item_merge import product_details
+
 	log = log or (lambda m: None)
 	sources = [s for s in dict.fromkeys(sources or []) if s and s != target]
 	rename_to = (rename_to or "").strip() or None
@@ -305,7 +318,22 @@ def consolidate_templates(target, sources, rename_to=None, confirm_different_pro
 		raise UserError("These templates look like different products (" + " / ".join(check["product_names"])
 						+ ") - tick the confirmation if they really are one product")
 
-	result = {"template": target, "merged": [], "variants_moved": 0, "renamed_from": None}
+	product_details.check_survivor(target, sources, product_rows)
+
+	# The sources are about to be deleted, so their Storebuilder products have to be on record
+	# first. Written under the code the merge will end up with, which is what jobs._legacy_rows
+	# reads the batch back by.
+	final_code = rename_to if (rename_to and rename_to != target) else target
+	# `target` is what the rows call the survivor; `final_code` is what the job will look the
+	# records up by once the rename at the end of this function has run.
+	capture = product_details.save(target, product_rows or [], commit=False, under=final_code)
+	if capture["problems"]:
+		raise UserError("Storebuilder products could not be recorded: "
+						+ " · ".join(capture["problems"][:4]))
+	product_details.ensure_captured(final_code, sources)
+
+	result = {"template": target, "merged": [], "variants_moved": 0, "renamed_from": None,
+			  "captured": capture["written"]}
 	for src in sources:
 		sdoc = load_template(src)
 		kids = variant_codes(src)
@@ -354,6 +382,21 @@ def attribute_values(attribute):
 						   fields=["attribute_value", "abbr"], order_by="idx asc")]
 
 
+def value_list_attributes(attrs):
+	"""The attributes that have a value list, i.e. the ones attribute_values() will answer for.
+
+	`variant_attribute()` only names the *first* numeric attribute on a template. A family carrying
+	a second one would send it to attribute_values(), which refuses numeric ranges - and take the
+	whole align screen down with it.
+	"""
+	attrs = [a for a in (attrs or []) if a]
+	if not attrs:
+		return []
+	numeric = set(frappe.get_all("Item Attribute", filters={"name": ["in", attrs], "numeric_values": 1},
+								 pluck="name"))
+	return [a for a in attrs if a not in numeric]
+
+
 def _attribute_tables(attrs):
 	vals = {a: attribute_values(a) for a in attrs}
 	allowed = {a: {v["value"] for v in vals[a]} for a in attrs}
@@ -362,7 +405,15 @@ def _attribute_tables(attrs):
 
 
 def suggest_combinations(template, attributes):
-	"""Combinations read from the old variants' names, ready for the variants grid."""
+	"""Combinations read from the old variants' names, ready for the variants grid.
+
+	One reading per old variant, so the grid can never offer more combinations than there are
+	variants behind them: several old variants collapsing into one combination is the normal case
+	(that is what a merge is), but an eleventh combination for ten variants would be one nothing
+	pairs to.
+
+	The reading is `attribute_ai`; when it cannot answer, `rules.read_values` does it the old way
+	and the caller is told so, so the screen can say the values need checking."""
 	tdoc, docs, stock, legacy = load_family(template)
 	attrs = rules.check_attributes(attributes, legacy)
 	vals, allowed, abbr = _attribute_tables(attrs)
@@ -371,13 +422,46 @@ def suggest_combinations(template, attributes):
 	existing = {tuple((a, variant_view(d, stock, legacy)["attributes"].get(a)) for a in attrs): d["name"]
 				for d in docs if is_new(d, legacy)}
 
-	combos, unread = {}, []
+	# The names first. Whatever they answer costs nothing and is never wrong about exact wording,
+	# so only what is left over is worth asking a model about.
+	by_name = {d["name"]: dict(rules.read_values(d, attrs, allowed) or {}) for d in olds}
+	read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed, known=by_name)
+
+	# ---- read every variant, remembering what answered ----
+	# Per attribute, not all-or-nothing. The AI routinely answers for one attribute and leaves the
+	# other null - a family whose colour it could not see, say - and a partial answer is still a
+	# truthy dict, so `read.get(...) or read_values(...)` never reached the name matching at all
+	# and marked every variant unread. The AI wins where it answered; the name fills the rest,
+	# which is exactly what plan_pairs has always done for the align screen.
+	unread, resolved = [], []
 	for d in olds:
-		got = rules.read_values(d, attrs, allowed)
-		if not got:
+		known = by_name.get(d["name"]) or {}
+		got = dict(known)
+		got.update({a: v for a, v in (read.get(d["name"]) or {}).items() if v})
+		if not got or any(got.get(a) is None for a in attrs):
 			unread.append({"item_code": d["name"], "item_name": d.get("item_name")})
 			continue
-		combos.setdefault(tuple((a, got[a]) for a in attrs), []).append(d["name"])
+		# Read entirely off the name, or did the AI have to fill something in?
+		by_the_name = all(known.get(a) for a in attrs)
+		resolved.append((d, tuple((a, got[a]) for a in attrs), by_the_name))
+
+	# ---- one old variant per new variant, and the name wins ----
+	# Two olds on one new is not a merge, it is an unresolved ambiguity: plan_pairs on the next
+	# screen refuses to pair them, so a row built from both walks straight into a dead end. The
+	# first claim keeps the combination and later ones are set aside. Name-read variants claim
+	# before AI-read ones on purpose - the name is the evidence that is actually in the data, so
+	# where the two disagree the AI is the one that gives way.
+	combos, taken = {}, []
+	for by_the_name in (True, False):
+		for d, key, from_name in resolved:
+			if from_name is not by_the_name:
+				continue
+			if key in combos:
+				taken.append({"item_code": d["name"], "item_name": d.get("item_name"),
+							  "values": dict(key), "claimed_by": combos[key][0],
+							  "source": "the name" if from_name else "the AI"})
+				continue
+			combos[key] = [d["name"]]
 
 	order = {a: [v["value"] for v in vals[a]] for a in attrs}
 	out = []
@@ -399,7 +483,8 @@ def suggest_combinations(template, attributes):
 					# variants become leftovers to delete (merge when there is data, delete when not).
 					"suggested": bool(ledger or qty)})
 	return {"template": template, "attributes": attrs, "style_name": style, "combinations": out,
-			"unreadable": unread, "values": vals}
+			"unreadable": unread, "taken": taken, "values": vals, "ai_warning": ai_warning,
+			"read_by_ai": sum(1 for d in olds if d["name"] in read)}
 
 
 def plan_variants(template, attrs, combinations, style_name, tdoc, docs, allowed, abbr, legacy=None):
@@ -503,7 +588,24 @@ def message_of(e):
 def alignment(template):
 	tdoc, docs, stock, legacy = load_family(template)
 	empty = {c: s["ledger"] == 0 and s["qty"] == 0 for c, s in stock.items()}
-	plan = plan_pairs(tdoc, docs, empty)
+
+	# The same reading the variants grid used: what each old variant's name says its colour and
+	# size are. Pairing on those, rather than on the name, is the whole of the AI's part here.
+	olds = [d for d in docs if not is_new(d, legacy)]
+	attrs = value_list_attributes([a["attribute"] for a in tdoc.get("attributes") or []
+								   if a.get("attribute") != legacy])
+	read, ai_warning = ({}, None)
+	if attrs and olds:
+		_vals, allowed, _abbr = _attribute_tables(attrs)
+		by_name = {d["name"]: dict(rules.read_values(d, attrs, allowed) or {}) for d in olds}
+		read, ai_warning = attribute_ai.read_values(template, olds, attrs, allowed, known=by_name)
+		# plan_pairs falls back to the name itself per attribute, so it only needs what the AI
+		# added on top - but handing it the names too saves it re-deriving them.
+		for code, values in by_name.items():
+			read.setdefault(code, {}).update({a: v for a, v in values.items()
+											  if v and not read[code].get(a)})
+
+	plan = plan_pairs(tdoc, docs, empty, values=read)
 	by = {d["name"]: d for d in docs}
 	rows = []
 	for p in plan["pairs"]:
@@ -525,6 +627,8 @@ def alignment(template):
 						 "attributes": [a["attribute"] for a in tdoc.get("attributes") or []]},
 			"rows": rows, "unpaired_new": [variant_view(by[n], stock, legacy) for n in plan["unused_new"]],
 			"attribute_roles": {"colour": plan["colour_attribute"], "size": plan["size_attribute"]},
+			"ai_warning": ai_warning,
+			"read_by_ai": sum(1 for d in olds if d["name"] in read),
 			# so the screen's "names differ" check reads the same wordings the pairing did
 			"name_aliases": rules.alias_map()}
 

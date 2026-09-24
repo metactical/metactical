@@ -17,6 +17,10 @@
           <span class="ml-auto" :class="pillClass('old')">{{ oldCount }} old</span>
           <span :class="pillClass('ready')">{{ newCount }} with attributes</span>
         </div>
+        <p class="im-lede">
+          The old variants and, once they exist, the ones built from the attributes below. What Storebuilder
+          holds for the templates this merge consolidates away was captured on the Find Template screen.
+        </p>
         <div v-if="loading" class="im-empty"><span class="animate-spin">⟳</span> Loading variants…</div>
         <div v-else-if="!variants.length" class="im-empty">This template has no variants.</div>
         <div v-else class="im-table-wrap mt-3" style="max-height: 420px; overflow-y: auto">
@@ -31,19 +35,21 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="v in sortedVariants" :key="v.item_code">
-                <td class="font-mono whitespace-nowrap">
-                  <a class="im-link" :href="itemUrl(v.item_code)" target="_blank" rel="noopener">{{ v.item_code }}</a>
-                </td>
-                <td>{{ v.item_name }}</td>
-                <td class="font-mono whitespace-nowrap text-muted">{{ v.retail_sku }}</td>
-                <td class="r tabular-nums">{{ num(v.qty) }}</td>
-                <td class="whitespace-nowrap">
-                  <span :class="pillClass(v.is_new ? 'ready' : 'old')">{{ v.is_new ? 'new' : 'old' }}</span>
-                  <span v-if="unreadableCodes.has(v.item_code)" class="ml-2" :class="pillClass('fix')"
-                        title="Its name has no value of the chosen attributes - add its combination with Add in bulk">not read</span>
-                </td>
-              </tr>
+              <template v-for="v in sortedVariants" :key="v.item_code">
+                <tr>
+                  <td class="font-mono whitespace-nowrap">
+                    <a class="im-link" :href="itemUrl(v.item_code)" target="_blank" rel="noopener">{{ v.item_code }}</a>
+                  </td>
+                  <td>{{ v.item_name }}</td>
+                  <td class="font-mono whitespace-nowrap text-muted">{{ v.retail_sku }}</td>
+                  <td class="r tabular-nums">{{ num(v.qty) }}</td>
+                  <td class="whitespace-nowrap">
+                    <span :class="pillClass(v.is_new ? 'ready' : 'old')">{{ v.is_new ? 'new' : 'old' }}</span>
+                    <span v-if="unreadableCodes.has(v.item_code)" class="ml-2" :class="pillClass('fix')"
+                          title="Its name has no value of the chosen attributes - add its combination with Add in bulk">not read</span>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -94,6 +100,23 @@
         (marked <b>not read</b> above):
         <span class="font-mono">{{ suggestion.unreadable.slice(0, 4).map((u) => u.item_code).join(', ') }}{{ suggestion.unreadable.length > 4 ? '…' : '' }}</span>.
         Add their combinations with <b>Add in bulk</b>.
+      </div>
+
+      <!-- one old variant per new variant is a hard rule, so a second claim on the same values
+           is set aside rather than folded into the row -->
+      <div v-if="taken.length" class="im-note warn mb-3">
+        <b>{{ taken.length }} old variant(s) read as values another variant already has</b>, so they
+        were left out - one old variant per new variant, or the Align screen cannot pair them.
+        <div v-for="t in taken.slice(0, 5)" :key="t.item_code" class="issue">
+          <span class="font-mono">{{ t.item_code }}</span> read as
+          {{ Object.values(t.values).join(' / ') }} by {{ t.source }}, already taken by
+          <span class="font-mono">{{ t.claimed_by }}</span>.
+        </div>
+        Fix their names so they differ, or add them with <b>Add in bulk</b>.
+      </div>
+
+      <div v-if="aiWarning" class="im-note warn mb-2">
+        <b>The AI suggestion is not working.</b> {{ aiWarning }}
       </div>
 
       <div class="flex items-center flex-wrap gap-2 mb-2">
@@ -183,7 +206,8 @@
             Untick {{ problems.length }} and create the rest
           </button>
         </template>
-        <button class="btn btn-primary btn-sm ml-auto" :disabled="!toCreate.length || problems.length > 0 || creating" @click="create">
+        <button class="btn btn-primary btn-sm ml-auto"
+                :disabled="!toCreate.length || problems.length > 0 || creating" @click="create">
           {{ creating ? 'Creating…' : 'Create ' + toCreate.length + ' variant(s)' }}
         </button>
       </div>
@@ -271,6 +295,11 @@ const newCount = computed(() => variants.value.filter((v) => v.is_new).length)
 const attributes = computed(() => [attr1.value, attr2.value].filter(Boolean))
 const existingCount = computed(() => rows.value.filter((r) => r.existing).length)
 const unreadableCodes = computed(() => new Set((suggestion.value?.unreadable || []).map((u) => u.item_code)))
+// Set when the combinations were read by the old name matching instead of the AI, so the operator
+// knows to check the values rather than trusting the grid.
+const aiWarning = computed(() => suggestion.value?.ai_warning || '')
+// Variants whose values were already claimed by another variant. They never reach the grid.
+const taken = computed(() => suggestion.value?.taken || [])
 
 // ---- variants table ----
 const sortKey = ref('item_code')
@@ -354,9 +383,9 @@ watch(attr1, (v) => {
 // a different attribute means a different grid
 watch([attr1, attr2], () => { suggestion.value = null; rows.value = []; created.value = null })
 
-onMounted(() => {
+onMounted(async () => {
   nextTick(buildLinks)
-  load()
+  await load()
 })
 
 // ---- grid rows ----
@@ -436,6 +465,10 @@ const rowProblems = computed(() => {
         p = have.get(code)
           ? `${code} already exists under this template`
           : `${code} is still an old variant here`
+      } else if ((r.from_old || []).length > 1) {
+        // One old variant per new variant. Two olds reading the same values cannot both merge
+        // into it - the Align screen refuses that pairing - so it has to be resolved here.
+        p = `${r.from_old.length} old variants read the same values`
       } else if (!(r.item_name || '').trim()) p = 'Item name is empty'
     }
     out.set(r, p)
@@ -520,7 +553,7 @@ async function create() {
   const n = toCreate.value.length
   const message = `Create ${n} new variant(s) under ${props.template} with ${attributes.value.join(' + ')}.\n` +
     (tmpl.value?.attributes.includes(attributes.value[0]) ? '' : 'These attributes are added to the template.\n') +
-    'This creates the new Items now.'
+    '\nThis creates the new Items now.'
   const ok = await confirmAction({ title: 'Create variants?', message, label: `Create ${n}` })
   if (!ok) return
   creating.value = true
