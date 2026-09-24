@@ -196,47 +196,36 @@
         </div>
       </section>
 
-      <section v-if="!isChanges && merged > 0 && !active" class="im-card">
+
+      <!-- what became of the legacy products this merge consolidated away -->
+      <section v-if="legacyRows.length" class="im-card">
         <div class="flex items-center flex-wrap gap-2">
           <div class="min-w-0">
-            <h3 class="im-card-title">Website slugs</h3>
-            <p class="im-lede mb-0">Item Detail rows (price list + slug) for each website the product is on, then Load Data From SB.</p>
+            <h3 class="im-card-title">Legacy website products</h3>
+            <p class="im-lede mb-0">
+              Dropped from the websites after the merge, with Skip Recreate set so they are not pushed back.
+            </p>
           </div>
-          <span class="ml-auto"></span>
-          <button class="btn btn-default btn-sm" :disabled="webBusy" @click="checkWebsites">
-            {{ webBusy === 'check' ? 'Checking…' : 'Check' }}
-          </button>
-          <button class="btn btn-danger btn-sm" :disabled="webBusy" @click="fillWebsites">
-            {{ webBusy === 'fill' ? 'Filling…' : 'Fill website slugs' }}
-          </button>
+          <span v-if="legacyIssued" :class="pillClass('deleted')" class="ml-auto">{{ legacyIssued }} dropped</span>
         </div>
-        <div v-if="webRows.length" class="mt-3">
-          <div class="im-table-wrap">
-            <table class="im-table">
-              <thead>
-                <tr><th>Price list</th><th>Website</th><th>Item Price</th><th>Slug</th><th>Result</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in webRows" :key="r.price_list">
-                  <td class="whitespace-nowrap">{{ r.price_list }}</td>
-                  <td class="text-muted">{{ r.site }}</td>
-                  <td>{{ r.has_item_price ? 'yes' : 'no' }}</td>
-                  <td class="font-mono">{{ r.slug || r.current_slug || '' }}</td>
-                  <td>
-                    <span :class="pillClass(r.action === 'skip' ? 'kept' : 'done')">{{ r.action }}</span>
-                    <span class="text-xs text-muted ml-2">{{ r.note }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="web && web.load_data_from_sb" class="text-xs text-muted mt-2">Load Data From SB: {{ loadDataText }}</div>
-          <div v-if="web && web.filled_gaps && web.filled_gaps.length" class="text-xs text-muted mt-1">
-            Name and description filled for: {{ web.filled_gaps.join(', ') }}
-          </div>
-        </div>
-        <div class="mt-4">
-          <WebsiteCheck :template="job.template" :initial="(web && web.check) || job.website_check || null" />
+        <div class="im-table-wrap mt-3">
+          <table class="im-table">
+            <thead>
+              <tr><th>Legacy item</th><th>Website</th><th>Slug</th><th>Status</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in legacyRows" :key="r.product + '|' + r.lead_source">
+                <td class="font-mono whitespace-nowrap">{{ r.product }}</td>
+                <td class="text-muted">{{ r.lead_source }}<div class="text-xs text-faint">{{ r.site }}</div></td>
+                <td class="font-mono">
+                  {{ r.slug }}
+                  <div v-if="!r.verified" class="text-xs text-faint">page was {{ (r.state || 'not checked').toLowerCase() }} when recorded</div>
+                </td>
+                <td><span :class="pillClass(r.status)">{{ r.status }}</span></td>
+                <td class="text-xs text-muted">{{ r.message || r.drop_log || '' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -253,7 +242,6 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import WebsiteCheck from './WebsiteCheck.vue'
 import { itemMergeApi, PROGRESS_EVENT } from './api.js'
 import { alertOk, confirmAction, fmtDateTime, go, itemUrl, num, pillClass, prettyDate } from './utils.js'
 
@@ -373,7 +361,6 @@ watch(() => props.job, () => {
   clearTimeout(timer)
   clearTimeout(pending)
   job.value = null
-  web.value = null
   lastLive = 0
   applied = 0
   failures = 0
@@ -408,47 +395,10 @@ async function resume() {
   }
 }
 
-// ---------- website Item Detail rows (price list + slug) ----------
-const web = ref(null)
-const webBusy = ref('') // '' | 'check' | 'fill'
-const webRows = computed(() => web.value?.rows || job.value?.websites || [])
-const loadDataText = computed(() => {
-  const v = web.value?.load_data_from_sb
-  if (!v) return ''
-  return typeof v === 'string' ? v : v.map((m) => String(m?.message || '').replace(/<[^>]+>/g, '')).join(' · ')
-})
-
-async function checkWebsites() {
-  webBusy.value = 'check'
-  try {
-    web.value = await itemMergeApi.getWebsitePlan(job.value.template)
-  } catch (e) {
-    // Frappe has shown the reason
-  } finally {
-    webBusy.value = ''
-  }
-}
-
-async function fillWebsites() {
-  const template = job.value.template
-  const ok = await confirmAction({
-    title: 'Fill website slugs?',
-    message: `Look up ${template} on each website it has an Item Price for, add the slugs found to Item Detail, ` +
-      'then run Load Data From SB (skipped if any row has a blank slug).\nThis writes to ERPNext.',
-    label: 'Fill slugs',
-    danger: true,
-  })
-  if (!ok) return
-  webBusy.value = 'fill'
-  try {
-    web.value = await itemMergeApi.applyWebsites(template)
-    alertOk(`${(web.value.applied || []).length} website row(s) added or filled`)
-  } catch (e) {
-    // Frappe has shown the reason
-  } finally {
-    webBusy.value = ''
-  }
-}
+// The legacy Storebuilder products this merge dropped. Lives on the job, so it is still there
+// long after the merge - the legacy items themselves are not.
+const legacyRows = computed(() => job.value?.legacy_products || [])
+const legacyIssued = computed(() => legacyRows.value.filter((r) => r.status === 'issued').length)
 
 defineExpose({ refresh })
 </script>

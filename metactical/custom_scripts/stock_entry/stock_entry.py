@@ -114,7 +114,6 @@ class CustomStockEntry(StockEntry):
 					try:
 						_ensure_warehouse_exists(item.t_warehouse)
 					except Exception:
-						frappe.log_error(frappe.get_traceback(), f"_ensure_warehouse_exists failed: {item.t_warehouse}")
 						raise
 		super(CustomStockEntry, self)._validate_links()
 
@@ -341,7 +340,6 @@ def _ensure_site_bins_warehouse(site: str, company: str, company_abbr: str, site
 	wh.company = company
 	wh.is_group = 1
 	wh.insert(ignore_permissions=True)
-	frappe.log_error(f"Created '{site_bins_name}' under '{main_wh_name}'", "StorageBin Debug")
 
 
 def _ensure_warehouse_exists(warehouse_name: str) -> None:
@@ -358,11 +356,9 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 	chain[0] ("W01 - ICL") does NOT exist in this structure — it is skipped.
 	The zone level (chain[1]) is parented to the site group found by querying.
 	"""
-	frappe.log_error(f"Ensuring warehouse: {warehouse_name}", "StorageBin Debug")
 	sep = " - "
 	idx = warehouse_name.rfind(sep)
 	if idx < 0:
-		frappe.log_error(f"No ' - ' separator, skipping: {warehouse_name}", "StorageBin Debug")
 		return
 
 	code = warehouse_name[:idx]
@@ -371,11 +367,9 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 
 	# chain[0] = "W01 - ICL", chain[1] = "W01-D - ICL", ..., chain[-1] = full target
 	chain = ["-".join(parts[:i]) + sep + company_abbr for i in range(1, len(parts) + 1)]
-	frappe.log_error(f"Chain: {chain}", "StorageBin Debug")
 
 	company = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
 	if not company:
-		frappe.log_error(f"No company with abbr '{company_abbr}'", "StorageBin Debug")
 		frappe.throw(f"No company found with abbreviation '{company_abbr}'")
 
 	# Scan ALL chain entries to find the deepest existing one.
@@ -385,10 +379,7 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 		if frappe.db.exists("Warehouse", name):
 			anchor_idx = i
 
-	frappe.log_error(f"anchor_idx={anchor_idx}, chain_len={len(chain)}", "StorageBin Debug")
-
 	if anchor_idx == len(chain) - 1:
-		frappe.log_error(f"Leaf already exists: {warehouse_name}", "StorageBin Debug")
 		return
 
 	if anchor_idx >= 0:
@@ -418,13 +409,7 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 			wh.company = company
 			wh.is_group = 0 if is_leaf else 1
 			wh.insert(ignore_permissions=True)
-			frappe.log_error(
-				f"Created '{level_name}' (is_group={wh.is_group}, parent='{parent}')",
-				"StorageBin Debug"
-			)
 		except frappe.DuplicateEntryError:
 			frappe.db.rollback(save_point="before_warehouse_insert")
-			frappe.log_error(f"'{level_name}' already exists (concurrent), skipping", "StorageBin Debug")
 		except Exception:
-			frappe.log_error(frappe.get_traceback(), f"Failed to create warehouse '{level_name}'")
 			raise
