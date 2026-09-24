@@ -190,7 +190,7 @@ function soc3_export(frm) {
                        flt(d.ordered_qty), flt(d.confirmed_qty),
                        // no rate given = the order price, as on save
                        flt(d.confirmed_rate) || flt(x.po3_rate),
-                       d.line_status || '', d.backorder_eta || '', d.remarks || '']);
+                       d.line_status || '', d.backorder_eta || (d.eta_tbd ? 'TBD' : ''), d.remarks || '']);
         });
         // quotes doubled per CSV rules; the barcode's leading zeros survive in
         // the file, though Excel may still show it as a number when opened
@@ -233,7 +233,7 @@ function soc3_import(frm) {
               '<p style="margin-bottom:8px">Paste straight from Excel (tab separated) or a CSV, '
               + '<b>including the header row</b>. Recognised columns: '
               + '<code>item_code</code>, <code>retail_sku</code>, <code>barcode</code>, <code>confirmed_qty</code>, '
-              + '<code>line_status</code>, <code>backorder_eta</code>, <code>confirmed_rate</code>, '
+              + '<code>line_status</code>, <code>backorder_eta</code> (a date, or TBD), <code>confirmed_rate</code>, '
               + '<code>remarks</code>.<br>Rows are matched on item code, retail SKU or barcode. '
               + 'Only lines already on this confirmation are touched — nothing is added or removed.</p>' },
             { fieldtype: 'Small Text', fieldname: 'data', label: __('Pasted rows'), reqd: 1 }
@@ -288,7 +288,10 @@ function soc3_import(frm) {
                 } else if (rec.line_status === 'Confirmed') {
                     frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', flt(row.ordered_qty));
                 }
-                if (rec.backorder_eta) {
+                if (String(rec.backorder_eta || '').toUpperCase() === 'TBD') {
+                    frappe.model.set_value(row.doctype, row.name, 'backorder_eta', null);
+                    frappe.model.set_value(row.doctype, row.name, 'eta_tbd', 1);
+                } else if (rec.backorder_eta) {
                     frappe.model.set_value(row.doctype, row.name, 'backorder_eta', rec.backorder_eta);
                 }
                 if (rec.confirmed_rate !== undefined) {
@@ -337,6 +340,17 @@ frappe.ui.form.on('Supplier Order Confirmation V3 Item', {
         }
     },
     items_remove: function(frm) { soc3_totals(frm); },
+    // a date and "to be determined" exclude each other
+    backorder_eta: function(frm, cdt, cdn) {
+        if (locals[cdt][cdn].backorder_eta && locals[cdt][cdn].eta_tbd) {
+            frappe.model.set_value(cdt, cdn, 'eta_tbd', 0);
+        }
+    },
+    eta_tbd: function(frm, cdt, cdn) {
+        if (locals[cdt][cdn].eta_tbd && locals[cdt][cdn].backorder_eta) {
+            frappe.model.set_value(cdt, cdn, 'backorder_eta', null);
+        }
+    },
     item_code: function(frm, cdt, cdn) {
         var row = locals[cdt][cdn];
         if (!row.item_code) return;
