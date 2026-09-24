@@ -47,6 +47,11 @@ class SupplierOrderConfirmationV3(Document):
 # SOC3_ZERO_QTY_STATUSES in the form script.
 ZERO_QTY_STATUSES = ("Back-ordered", "Supplier Stock Out", "Discontinued", "Cancelled by Supplier")
 
+# Line statuses that need a Backorder ETA -- the date the goods are expected
+# after all. The field's mandatory_depends_on only holds in the form; this is
+# what holds for pasted rows and the bulk-status API.
+ETA_REQUIRED_STATUSES = ("Back-ordered", "Supplier Stock Out")
+
 
 def validate(doc):
 	def resolve_item(val):
@@ -209,6 +214,12 @@ def validate(doc):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): 'Substituted' requires the Substitute Item.")
 		if d.confirmed_rate and F(r.rate):
 			d.rate_variance_pct = (F(d.confirmed_rate) - F(r.rate)) / F(r.rate) * 100.0
+
+	no_eta = [d for d in doc.items if d.line_status in ETA_REQUIRED_STATUSES and not d.backorder_eta]
+	if no_eta:
+		frappe.throw("Backorder ETA is required for Back-ordered and Supplier Stock Out lines:<br>"
+			+ "<br>".join("Row " + str(d.idx) + " (" + (d.item_code or "") + "): " + d.line_status
+				for d in no_eta))
 
 	# --- rebuild the Back Orders tab from the lines ---
 	keep = {}
