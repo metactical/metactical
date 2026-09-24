@@ -48,7 +48,8 @@ class SupplierOrderConfirmationV3(Document):
 ZERO_QTY_STATUSES = ("Back-ordered", "Supplier Stock Out", "Discontinued", "Cancelled by Supplier")
 
 # Line statuses that need a Backorder ETA -- the date the goods are expected
-# after all. The field's mandatory_depends_on only holds in the form; this is
+# after all -- or, when the supplier will not commit to one, To Be Determined
+# (eta_tbd). The field's mandatory_depends_on only holds in the form; this is
 # what holds for pasted rows and the bulk-status API.
 ETA_REQUIRED_STATUSES = ("Back-ordered", "Supplier Stock Out")
 
@@ -215,9 +216,15 @@ def validate(doc):
 		if d.confirmed_rate and F(r.rate):
 			d.rate_variance_pct = (F(d.confirmed_rate) - F(r.rate)) / F(r.rate) * 100.0
 
-	no_eta = [d for d in doc.items if d.line_status in ETA_REQUIRED_STATUSES and not d.backorder_eta]
+	for d in doc.items:
+		# a real date beats "to be determined"
+		if d.backorder_eta:
+			d.eta_tbd = 0
+	no_eta = [d for d in doc.items
+		if d.line_status in ETA_REQUIRED_STATUSES and not d.backorder_eta and not d.eta_tbd]
 	if no_eta:
-		frappe.throw("Backorder ETA is required for Back-ordered and Supplier Stock Out lines:<br>"
+		frappe.throw("Backorder ETA (or To Be Determined) is required for Back-ordered and "
+			+ "Supplier Stock Out lines:<br>"
 			+ "<br>".join("Row " + str(d.idx) + " (" + (d.item_code or "") + "): " + d.line_status
 				for d in no_eta))
 
@@ -465,7 +472,7 @@ def v3_soc_bulk_status(soc=None, rows=None):
 	# v3_soc_bulk_status
 	#   GET  ?soc=SOC3-...            -> rows for export
 	#   POST {"soc": "...", "rows": [{"item_code": "...", "confirmed_qty": 5,
-	#         "line_status": "...", "backorder_eta": "YYYY-MM-DD", "remarks": "..."}]}
+	#         "line_status": "...", "backorder_eta": "YYYY-MM-DD" or "TBD", "remarks": "..."}]}
 	def F(x):
 		return float(x or 0)
 
@@ -493,7 +500,7 @@ def v3_soc_bulk_status(soc=None, rows=None):
 				"ordered_qty": F(d.ordered_qty),
 				"confirmed_qty": F(d.confirmed_qty),
 				"line_status": d.line_status,
-				"backorder_eta": str(d.backorder_eta or ""),
+				"backorder_eta": str(d.backorder_eta or ("TBD" if d.eta_tbd else "")),
 				"confirmed_rate": F(d.confirmed_rate),
 				"remarks": d.remarks or ""})
 		frappe.response["message"] = {"soc": doc.name, "docstatus": doc.docstatus,
@@ -520,7 +527,10 @@ def v3_soc_bulk_status(soc=None, rows=None):
 				d.line_status = str(r.get("line_status")).strip()
 			if r.get("confirmed_qty") is not None:
 				d.confirmed_qty = F(r.get("confirmed_qty"))
-			if r.get("backorder_eta"):
+			if str(r.get("backorder_eta") or "").strip().upper() == "TBD":
+				d.backorder_eta = None
+				d.eta_tbd = 1
+			elif r.get("backorder_eta"):
 				d.backorder_eta = r.get("backorder_eta")
 			if r.get("remarks") is not None:
 				d.remarks = r.get("remarks")
