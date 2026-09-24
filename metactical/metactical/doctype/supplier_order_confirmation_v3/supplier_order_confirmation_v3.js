@@ -3,6 +3,10 @@
 
 // Migrated from Client Script "Supplier Order Confirmation V3 Form" (Form view).
 
+// Line statuses where nothing ships now, so Confirmed Qty is 0. Mirrors
+// ZERO_QTY_STATUSES in the controller, which enforces the same on save.
+var SOC3_ZERO_QTY_STATUSES = ['Back-ordered', 'Supplier Stock Out', 'Discontinued', 'Cancelled by Supplier'];
+
 function soc3_maybe_autopull(frm) {
     if (frm._soc3_autopull) return;
     if (!frm.is_new() || !frm.doc.purchase_order_v3) return;
@@ -103,6 +107,7 @@ function soc3_pull(frm, po, claimed) {
     });
     frm.refresh_field('items');
     soc3_totals(frm);
+    soc3_fill_blanks(frm);
     var n = (frm.doc.items || []).length;
     frappe.show_alert({
         message: n ? __('Pulled {0} outstanding line(s){1}', [n, skipped ? __(' — {0} already handled', [skipped]) : ''])
@@ -142,23 +147,62 @@ function soc3_totals(frm) {
         .forEach(function(f) { frm.refresh_field(f); });
 }
 
-function soc3_export(frm) {
-    var rows = [['item_code', 'item_name', 'retail_sku', 'supplier_sku', 'ordered_qty',
-                 'confirmed_qty', 'line_status', 'backorder_eta', 'remarks']];
-    (frm.doc.items || []).forEach(function(d) {
-        rows.push([d.item_code, (d.item_name || '').replace(/"/g, "'"),
-                   d.retail_sku_suffix || '', d.supplier_part_no || '',
-                   flt(d.ordered_qty), flt(d.confirmed_qty), d.line_status || '',
-                   d.backorder_eta || '', (d.remarks || '').replace(/"/g, "'")]);
+// Server-side details for every grid line, in grid order. A pulled confirmation
+// that has not been saved yet only has what its PO3 lines carried.
+function soc3_line_details(frm, then) {
+    var items = frm.doc.items || [];
+    if (!items.length) { then([]); return; }
+    frappe.call({
+        method: 'metactical.metactical.doctype.supplier_order_confirmation_v3'
+              + '.supplier_order_confirmation_v3.line_details',
+        args: {
+            lines: items.map(function(d) { return { item_code: d.item_code, po3_item: d.po3_item }; }),
+            supplier: frm.doc.supplier
+        },
+        callback: function(r) { then(r.message || []); }
     });
-    var csv = rows.map(function(r) {
-        return r.map(function(c) { return '"' + String(c) + '"'; }).join(',');
-    }).join('\n');
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = frm.doc.name + '_lines.csv';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// Fill whatever a pull left blank. Assigned rather than set_value, like the
+// totals: these are display copies the controller rewrites on save anyway.
+function soc3_fill_blanks(frm) {
+    soc3_line_details(frm, function(details) {
+        (frm.doc.items || []).forEach(function(d, i) {
+            var x = details[i] || {};
+            ['item_name', 'retail_sku_suffix', 'barcode', 'supplier_part_no'].forEach(function(f) {
+                if (!d[f] && x[f]) d[f] = x[f];
+            });
+        });
+        frm.refresh_field('items');
+    });
+}
+
+function soc3_export(frm) {
+    soc3_line_details(frm, function(details) {
+        var rows = [['item_code', 'item_name', 'retail_sku', 'supplier_sku', 'barcode', 'ordered_qty',
+                     'confirmed_qty', 'confirmed_rate', 'line_status', 'backorder_eta', 'remarks']];
+        (frm.doc.items || []).forEach(function(d, i) {
+            var x = details[i] || {};
+            rows.push([d.item_code || '', d.item_name || x.item_name || '',
+                       d.retail_sku_suffix || x.retail_sku_suffix || '',
+                       d.supplier_part_no || x.supplier_part_no || '',
+                       d.barcode || x.barcode || '',
+                       flt(d.ordered_qty), flt(d.confirmed_qty),
+                       // no rate given = the order price, as on save
+                       flt(d.confirmed_rate) || flt(x.po3_rate),
+                       d.line_status || '', d.backorder_eta || (d.eta_tbd ? 'TBD' : ''), d.remarks || '']);
+        });
+        // quotes doubled per CSV rules; the barcode's leading zeros survive in
+        // the file, though Excel may still show it as a number when opened
+        var csv = rows.map(function(r) {
+            return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+        }).join('\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (frm.doc.name || 'confirmation') + '_lines.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    });
 }
 
 function soc3_split(line, sep) {
@@ -188,9 +232,9 @@ function soc3_import(frm) {
             { fieldtype: 'HTML', options:
               '<p style="margin-bottom:8px">Paste straight from Excel (tab separated) or a CSV, '
               + '<b>including the header row</b>. Recognised columns: '
-              + '<code>item_code</code>, <code>retail_sku</code>, <code>confirmed_qty</code>, '
-              + '<code>line_status</code>, <code>backorder_eta</code>, <code>confirmed_rate</code>, '
-              + '<code>remarks</code>.<br>Rows are matched on item code or retail SKU. '
+              + '<code>item_code</code>, <code>retail_sku</code>, <code>barcode</code>, <code>confirmed_qty</code>, '
+              + '<code>line_status</code>, <code>backorder_eta</code> (a date, or TBD), <code>confirmed_rate</code>, '
+              + '<code>remarks</code>.<br>Rows are matched on item code, retail SKU or barcode. '
               + 'Only lines already on this confirmation are touched — nothing is added or removed.</p>' },
             { fieldtype: 'Small Text', fieldname: 'data', label: __('Pasted rows'), reqd: 1 }
         ],
@@ -201,8 +245,9 @@ function soc3_import(frm) {
             var sep = lines[0].indexOf('\t') !== -1 ? '\t' : ',';
             var clean = function(x) { return String(x == null ? '' : x).trim().replace(/^"|"$/g, ''); };
             var hdr = soc3_split(lines[0], sep).map(function(h) { return clean(h).toLowerCase(); });
-            if (hdr.indexOf('item_code') === -1 && hdr.indexOf('retail_sku') === -1) {
-                frappe.msgprint(__('The first row must be a header containing item_code or retail_sku.'));
+            if (hdr.indexOf('item_code') === -1 && hdr.indexOf('retail_sku') === -1
+                    && hdr.indexOf('barcode') === -1) {
+                frappe.msgprint(__('The first row must be a header containing item_code, retail_sku or barcode.'));
                 return;
             }
 
@@ -211,6 +256,7 @@ function soc3_import(frm) {
             (frm.doc.items || []).forEach(function(row) {
                 if (row.item_code) byKey[String(row.item_code).toUpperCase()] = row;
                 if (row.retail_sku_suffix) byKey[String(row.retail_sku_suffix).toUpperCase()] = row;
+                if (row.barcode) byKey[String(row.barcode).toUpperCase()] = row;
             });
 
             var applied = 0, unknown = [], badStatus = [];
@@ -222,10 +268,10 @@ function soc3_import(frm) {
                 var cells = soc3_split(l, sep).map(clean);
                 var rec = {};
                 hdr.forEach(function(h, i) { if (cells[i] !== undefined && cells[i] !== '') rec[h] = cells[i]; });
-                var key = (rec.item_code || rec.retail_sku || '').toUpperCase();
+                var key = (rec.item_code || rec.retail_sku || rec.barcode || '').toUpperCase();
                 if (!key) return;
                 var row = byKey[key];
-                if (!row) { unknown.push(rec.item_code || rec.retail_sku); return; }
+                if (!row) { unknown.push(rec.item_code || rec.retail_sku || rec.barcode); return; }
                 if (rec.line_status) {
                     if (VALID.length && VALID.indexOf(rec.line_status) === -1) {
                         badStatus.push(rec.line_status);
@@ -233,10 +279,19 @@ function soc3_import(frm) {
                         frappe.model.set_value(row.doctype, row.name, 'line_status', rec.line_status);
                     }
                 }
-                if (rec.confirmed_qty !== undefined) {
+                // a nothing-ships status wins over a pasted quantity, as on save
+                if (SOC3_ZERO_QTY_STATUSES.indexOf(row.line_status) !== -1
+                        || SOC3_ZERO_QTY_STATUSES.indexOf(rec.line_status) !== -1) {
+                    frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', 0);
+                } else if (rec.confirmed_qty !== undefined) {
                     frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', flt(rec.confirmed_qty));
+                } else if (rec.line_status === 'Confirmed') {
+                    frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', flt(row.ordered_qty));
                 }
-                if (rec.backorder_eta) {
+                if (String(rec.backorder_eta || '').toUpperCase() === 'TBD') {
+                    frappe.model.set_value(row.doctype, row.name, 'backorder_eta', null);
+                    frappe.model.set_value(row.doctype, row.name, 'eta_tbd', 1);
+                } else if (rec.backorder_eta) {
                     frappe.model.set_value(row.doctype, row.name, 'backorder_eta', rec.backorder_eta);
                 }
                 if (rec.confirmed_rate !== undefined) {
@@ -272,8 +327,30 @@ function soc3_import(frm) {
 frappe.ui.form.on('Supplier Order Confirmation V3 Item', {
     confirmed_qty: function(frm) { soc3_totals(frm); },
     confirmed_rate: function(frm) { soc3_totals(frm); },
-    line_status: function(frm) { soc3_totals(frm); },
+    line_status: function(frm, cdt, cdn) {
+        var row = locals[cdt][cdn];
+        // confirmed_qty's own handler recomputes the totals
+        if (SOC3_ZERO_QTY_STATUSES.indexOf(row.line_status) !== -1 && flt(row.confirmed_qty) !== 0) {
+            frappe.model.set_value(cdt, cdn, 'confirmed_qty', 0);
+        } else if (row.line_status === 'Confirmed' && flt(row.confirmed_qty) !== flt(row.ordered_qty)) {
+            // Confirmed always means the full outstanding qty
+            frappe.model.set_value(cdt, cdn, 'confirmed_qty', flt(row.ordered_qty));
+        } else {
+            soc3_totals(frm);
+        }
+    },
     items_remove: function(frm) { soc3_totals(frm); },
+    // a date and "to be determined" exclude each other
+    backorder_eta: function(frm, cdt, cdn) {
+        if (locals[cdt][cdn].backorder_eta && locals[cdt][cdn].eta_tbd) {
+            frappe.model.set_value(cdt, cdn, 'eta_tbd', 0);
+        }
+    },
+    eta_tbd: function(frm, cdt, cdn) {
+        if (locals[cdt][cdn].eta_tbd && locals[cdt][cdn].backorder_eta) {
+            frappe.model.set_value(cdt, cdn, 'backorder_eta', null);
+        }
+    },
     item_code: function(frm, cdt, cdn) {
         var row = locals[cdt][cdn];
         if (!row.item_code) return;

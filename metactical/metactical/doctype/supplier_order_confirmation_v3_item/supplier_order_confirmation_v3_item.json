@@ -16,6 +16,7 @@
   "line_status",
   "supplier_part_no",
   "backorder_eta",
+  "eta_tbd",
   "substitute_item_code",
   "confirmed_rate",
   "rate_variance_pct",
@@ -95,10 +96,19 @@
   },
   {
    "allow_on_submit": 1,
-   "description": "Optional \u2014 suppliers often will not commit to a date.",
+   "description": "Required for Back-ordered and Supplier Stock Out unless To Be Determined (TBD) is ticked.",
    "fieldname": "backorder_eta",
    "fieldtype": "Date",
-   "label": "Backorder ETA"
+   "label": "Backorder ETA",
+   "mandatory_depends_on": "eval:in_list(['Back-ordered', 'Supplier Stock Out'], doc.line_status) && !doc.eta_tbd"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "description": "The supplier has not given a date yet. Stands in for the Backorder ETA.",
+   "fieldname": "eta_tbd",
+   "fieldtype": "Check",
+   "label": "To Be Determined (TBD)"
   },
   {
    "fieldname": "substitute_item_code",
@@ -131,7 +141,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:44.749518",
+ "modified": "2026-09-24 16:28:43.694349",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Order Confirmation V3 Item",

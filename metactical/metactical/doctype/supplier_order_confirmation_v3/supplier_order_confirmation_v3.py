@@ -6,7 +6,7 @@ import json
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.utils import F, mirror_po3_status, v3_recalc_totals
+from metactical.procurement_v3.utils import F, item_supplier_part_no, mirror_po3_status, v3_recalc_totals
 
 
 class SupplierOrderConfirmationV3(Document):
@@ -43,6 +43,17 @@ class SupplierOrderConfirmationV3(Document):
 # its own resolve_item and ident with different bodies, so these are NOT
 # interchangeable and must not be hoisted into procurement_v3.utils.
 # ---------------------------------------------------------------------------
+# Line statuses where nothing ships now: Confirmed Qty is always 0. Mirrored as
+# SOC3_ZERO_QTY_STATUSES in the form script.
+ZERO_QTY_STATUSES = ("Back-ordered", "Supplier Stock Out", "Discontinued", "Cancelled by Supplier")
+
+# Line statuses that need a Backorder ETA -- the date the goods are expected
+# after all -- or, when the supplier will not commit to one, To Be Determined
+# (eta_tbd). The field's mandatory_depends_on only holds in the form; this is
+# what holds for pasted rows and the bulk-status API.
+ETA_REQUIRED_STATUSES = ("Back-ordered", "Supplier Stock Out")
+
+
 def validate(doc):
 	def resolve_item(val):
 		if frappe.db.exists("Item", val):
@@ -51,12 +62,6 @@ def validate(doc):
 		if not hit:
 			hit = frappe.db.get_value("Item Barcode", {"barcode": val}, "parent")
 		return hit
-
-	def ident(item_code, supplier):
-		return {
-			"rs": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
-			"bc": frappe.db.get_value("Item Barcode", {"barcode": ("!=", "")}, "barcode") if False else frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
-			"sp": frappe.db.get_value("Item Supplier", {"parent": item_code, "supplier": supplier}, "supplier_part_no")}
 
 	if doc.ai_parsed and not doc.source_document:
 		frappe.throw("AI-parsed confirmations must have the source document attached.")
@@ -176,18 +181,29 @@ def validate(doc):
 
 		d.item_code = r.item_code
 		d.ordered_qty = balance_qty(r, claimed)
-		d.item_name = frappe.db.get_value("Item", d.item_code, "item_name")
-		ii = ident(d.item_code, doc.supplier)
-		d.retail_sku_suffix = ii["rs"]
-		d.barcode = ii["bc"]
-		d.supplier_part_no = ii["sp"]
+		ii = item_identifiers(d.item_code, doc.supplier)
+		d.item_name = ii["item_name"]
+		d.retail_sku_suffix = ii["retail_sku_suffix"]
+		d.barcode = ii["barcode"]
+		d.supplier_part_no = ii["supplier_part_no"]
+		# a row keyed or pasted in by item code arrives without a rate; the
+		# supplier holding the order price is the same default a pulled line gets
+		if not F(d.confirmed_rate):
+			d.confirmed_rate = r.rate
+
+		# nothing ships now on these, so there is no quantity to confirm -- set
+		# it rather than make the user zero it by hand (the form does the same)
+		if d.line_status in ZERO_QTY_STATUSES:
+			d.confirmed_qty = 0
+		# Confirmed with no quantity = the full outstanding qty. A different
+		# non-zero quantity is left alone for the check below to catch: it is more
+		# likely a partial with the wrong status than a typo worth overwriting.
+		elif d.line_status == "Confirmed" and not F(d.confirmed_qty):
+			d.confirmed_qty = d.ordered_qty
 
 		q = F(d.confirmed_qty)
 		o = F(d.ordered_qty)
 		s = d.line_status
-		if s in ("Supplier Stock Out", "Discontinued", "Cancelled by Supplier") and q != 0:
-			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): status '" + s
-				+ "' requires Confirmed Qty = 0, got " + str(q))
 		if s == "Confirmed" and q != o:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "")
 				+ "): 'Confirmed' means the full outstanding qty (" + str(o) + "), got " + str(q)
@@ -195,14 +211,22 @@ def validate(doc):
 		if s in ("Partial - Balance Cancelled", "Partial - Balance Back-ordered") and not (0 < q < o):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + s
 				+ "' requires 0 < Confirmed Qty < " + str(o))
-		if s == "Back-ordered" and q != 0:
-			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "")
-				+ "): 'Back-ordered' means nothing ships now, so Confirmed Qty must be 0 (the full "
-				+ str(o) + " follows later). Use 'Partial - Balance Back-ordered' if some of it ships now.")
 		if s == "Substituted" and not d.substitute_item_code:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): 'Substituted' requires the Substitute Item.")
 		if d.confirmed_rate and F(r.rate):
 			d.rate_variance_pct = (F(d.confirmed_rate) - F(r.rate)) / F(r.rate) * 100.0
+
+	for d in doc.items:
+		# a real date beats "to be determined"
+		if d.backorder_eta:
+			d.eta_tbd = 0
+	no_eta = [d for d in doc.items
+		if d.line_status in ETA_REQUIRED_STATUSES and not d.backorder_eta and not d.eta_tbd]
+	if no_eta:
+		frappe.throw("Backorder ETA (or To Be Determined) is required for Back-ordered and "
+			+ "Supplier Stock Out lines:<br>"
+			+ "<br>".join("Row " + str(d.idx) + " (" + (d.item_code or "") + "): " + d.line_status
+				for d in no_eta))
 
 	# --- rebuild the Back Orders tab from the lines ---
 	keep = {}
@@ -403,10 +427,33 @@ def item_identifiers(item_code, supplier=None):
 	return {
 		"item_name": frappe.db.get_value("Item", item_code, "item_name"),
 		"retail_sku_suffix": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
-		"barcode": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
-		"supplier_part_no": frappe.db.get_value("Item Supplier",
-			{"parent": item_code, "supplier": supplier}, "supplier_part_no") if supplier else None,
+		# the item's first barcode, the same one PO3 puts on the order line
+		"barcode": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode", order_by="idx asc"),
+		"supplier_part_no": item_supplier_part_no(item_code, supplier),
 	}
+
+
+# ---------------------------------------------------------------------------
+# Everything a line shows, for lines the form holds but the server has not
+# filled yet -- a freshly pulled, unsaved confirmation only carries what its
+# PO3 lines had, and those were often missing barcode and supplier SKU.
+# Used to complete the grid after a pull and every row of the download.
+#
+# lines: [{"item_code": ..., "po3_item": ...}], answered in the same order.
+# po3_rate is the order price, the default when no confirmed rate was given.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def line_details(lines, supplier=None):
+	if isinstance(lines, str):
+		lines = json.loads(lines)
+	out = []
+	for ln in lines or []:
+		item_code = ln.get("item_code")
+		d = item_identifiers(item_code, supplier) if item_code else {}
+		d["po3_rate"] = F(frappe.db.get_value("Purchase Order V3 Item", ln.get("po3_item"), "rate")) \
+			if ln.get("po3_item") else 0
+		out.append(d)
+	return out
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +471,7 @@ def v3_soc_bulk_status(soc=None, rows=None):
 	# v3_soc_bulk_status
 	#   GET  ?soc=SOC3-...            -> rows for export
 	#   POST {"soc": "...", "rows": [{"item_code": "...", "confirmed_qty": 5,
-	#         "line_status": "...", "backorder_eta": "YYYY-MM-DD", "remarks": "..."}]}
+	#         "line_status": "...", "backorder_eta": "YYYY-MM-DD" or "TBD", "remarks": "..."}]}
 	def F(x):
 		return float(x or 0)
 
@@ -448,10 +495,11 @@ def v3_soc_bulk_status(soc=None, rows=None):
 				"item_code": d.item_code,
 				"retail_sku": d.retail_sku_suffix,
 				"supplier_sku": d.supplier_part_no,
+				"barcode": d.barcode,
 				"ordered_qty": F(d.ordered_qty),
 				"confirmed_qty": F(d.confirmed_qty),
 				"line_status": d.line_status,
-				"backorder_eta": str(d.backorder_eta or ""),
+				"backorder_eta": str(d.backorder_eta or ("TBD" if d.eta_tbd else "")),
 				"confirmed_rate": F(d.confirmed_rate),
 				"remarks": d.remarks or ""})
 		frappe.response["message"] = {"soc": doc.name, "docstatus": doc.docstatus,
@@ -478,7 +526,10 @@ def v3_soc_bulk_status(soc=None, rows=None):
 				d.line_status = str(r.get("line_status")).strip()
 			if r.get("confirmed_qty") is not None:
 				d.confirmed_qty = F(r.get("confirmed_qty"))
-			if r.get("backorder_eta"):
+			if str(r.get("backorder_eta") or "").strip().upper() == "TBD":
+				d.backorder_eta = None
+				d.eta_tbd = 1
+			elif r.get("backorder_eta"):
 				d.backorder_eta = r.get("backorder_eta")
 			if r.get("remarks") is not None:
 				d.remarks = r.get("remarks")
