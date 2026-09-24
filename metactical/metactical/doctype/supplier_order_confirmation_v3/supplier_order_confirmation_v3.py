@@ -52,12 +52,6 @@ def validate(doc):
 			hit = frappe.db.get_value("Item Barcode", {"barcode": val}, "parent")
 		return hit
 
-	def ident(item_code, supplier):
-		return {
-			"rs": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
-			"bc": frappe.db.get_value("Item Barcode", {"barcode": ("!=", "")}, "barcode") if False else frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
-			"sp": frappe.db.get_value("Item Supplier", {"parent": item_code, "supplier": supplier}, "supplier_part_no")}
-
 	if doc.ai_parsed and not doc.source_document:
 		frappe.throw("AI-parsed confirmations must have the source document attached.")
 
@@ -176,11 +170,15 @@ def validate(doc):
 
 		d.item_code = r.item_code
 		d.ordered_qty = balance_qty(r, claimed)
-		d.item_name = frappe.db.get_value("Item", d.item_code, "item_name")
-		ii = ident(d.item_code, doc.supplier)
-		d.retail_sku_suffix = ii["rs"]
-		d.barcode = ii["bc"]
-		d.supplier_part_no = ii["sp"]
+		ii = item_identifiers(d.item_code, doc.supplier)
+		d.item_name = ii["item_name"]
+		d.retail_sku_suffix = ii["retail_sku_suffix"]
+		d.barcode = ii["barcode"]
+		d.supplier_part_no = ii["supplier_part_no"]
+		# a row keyed or pasted in by item code arrives without a rate; the
+		# supplier holding the order price is the same default a pulled line gets
+		if not F(d.confirmed_rate):
+			d.confirmed_rate = r.rate
 
 		q = F(d.confirmed_qty)
 		o = F(d.ordered_qty)
@@ -403,10 +401,34 @@ def item_identifiers(item_code, supplier=None):
 	return {
 		"item_name": frappe.db.get_value("Item", item_code, "item_name"),
 		"retail_sku_suffix": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
-		"barcode": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
+		# the item's first barcode, the same one PO3 puts on the order line
+		"barcode": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode", order_by="idx asc"),
 		"supplier_part_no": frappe.db.get_value("Item Supplier",
 			{"parent": item_code, "supplier": supplier}, "supplier_part_no") if supplier else None,
 	}
+
+
+# ---------------------------------------------------------------------------
+# Everything a line shows, for lines the form holds but the server has not
+# filled yet -- a freshly pulled, unsaved confirmation only carries what its
+# PO3 lines had, and those were often missing barcode and supplier SKU.
+# Used to complete the grid after a pull and every row of the download.
+#
+# lines: [{"item_code": ..., "po3_item": ...}], answered in the same order.
+# po3_rate is the order price, the default when no confirmed rate was given.
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def line_details(lines, supplier=None):
+	if isinstance(lines, str):
+		lines = json.loads(lines)
+	out = []
+	for ln in lines or []:
+		item_code = ln.get("item_code")
+		d = item_identifiers(item_code, supplier) if item_code else {}
+		d["po3_rate"] = F(frappe.db.get_value("Purchase Order V3 Item", ln.get("po3_item"), "rate")) \
+			if ln.get("po3_item") else 0
+		out.append(d)
+	return out
 
 
 # ---------------------------------------------------------------------------
@@ -448,6 +470,7 @@ def v3_soc_bulk_status(soc=None, rows=None):
 				"item_code": d.item_code,
 				"retail_sku": d.retail_sku_suffix,
 				"supplier_sku": d.supplier_part_no,
+				"barcode": d.barcode,
 				"ordered_qty": F(d.ordered_qty),
 				"confirmed_qty": F(d.confirmed_qty),
 				"line_status": d.line_status,
