@@ -44,7 +44,10 @@ DETAIL_FIELD = "product_detail_apis"
 # every template green when the site had no Item Prices at all.
 CLEAN = "full"
 NOTHING_TO_CHECK = ("nowebsite", "zeroprice")
-SETTLED = (CLEAN,) + NOTHING_TO_CHECK
+# Asked, and Storebuilder has no product under the External ID, and ERP has no slug to look one up
+# by. Not an error: there is no product to drop and nothing the operator could fix on the row.
+NOT_ON_SB = "notonsb"
+SETTLED = (CLEAN, NOT_ON_SB) + NOTHING_TO_CHECK
 
 # A capture read from the register rather than from Storebuilder is only trusted for so long. Past
 # this, the row asks to be checked again rather than opening the gate on a month-old answer.
@@ -78,17 +81,12 @@ def _ask(config, headers, body):
 
 
 def _grade(template, retail_sku, erp_slug, product, found_by):
-	"""One website's answer, turned into a status the screen can colour and a message to act on.
-
-	`variants` rides along untouched: the capture has no use for it, but the verification after the
-	push compares the site's variant list against ERP's and that is the only place it comes from.
-	"""
+	"""One website's answer, turned into a status the screen can colour and a message to act on."""
 	external_id = legacy_products._first(product, legacy_products.EXTERNAL_ID_KEYS)
 	slug = legacy_products._first(product, legacy_products.SLUG_KEYS) or erp_slug
-	variants = [v for v in (product.get("variants") or []) if isinstance(v, dict)]
 
 	if not external_id:
-		return {"status": "noexternalid", "external_id": "", "slug": slug, "variants": variants,
+		return {"status": "noexternalid", "external_id": "", "slug": slug,
 				"message": "No External ID in Storebuilder - open this product in SB and set its "
 						   "External ID to {0}".format(template)}
 
@@ -100,13 +98,13 @@ def _grade(template, retail_sku, erp_slug, product, found_by):
 			message = ("Storebuilder has the External ID {0} - it should be {1}".format(external_id,
 																						template))
 		return {"status": "wrongexternalid", "external_id": external_id, "slug": slug,
-				"variants": variants, "message": message}
+				"message": message}
 
 	if not slug:
-		return {"status": "noslug", "external_id": external_id, "slug": "", "variants": variants,
+		return {"status": "noslug", "external_id": external_id, "slug": "",
 				"message": "The product is on the website but has no URL - set its slug in Storebuilder"}
 
-	return {"status": CLEAN, "external_id": external_id, "slug": slug, "variants": variants,
+	return {"status": CLEAN, "external_id": external_id, "slug": slug,
 			"message": "Item has full information (found by {0})".format(found_by)}
 
 
@@ -134,27 +132,26 @@ def _detail_one(config, headers, template, retail_sku, erp_slug):
 	"""
 	products, error = _ask(config, headers, {"externalId": template})
 	if error:
-		return {"status": "error", "external_id": "", "slug": "", "duplicates": [], "variants": [],
+		return {"status": "error", "external_id": "", "slug": "", "duplicates": [],
 				"message": error}
 	if products:
 		return dict(_grade(template, retail_sku, erp_slug, products[0], "External ID"),
 					duplicates=_duplicates(products))
 
 	if not erp_slug:
-		return {"status": "noslug", "external_id": "", "slug": "", "duplicates": [], "variants": [],
-				"message": "No Storebuilder product carries the External ID {0}, and there is no slug "
-						   "on the Item Detail row for this price list to look it up with - add the "
-						   "slug here, or set the External ID in Storebuilder".format(template)}
+		return {"status": NOT_ON_SB, "external_id": "", "slug": "", "duplicates": [],
+				"message": "Not on Storebuilder - no product carries the External ID {0} and there is "
+						   "no slug for this price list, so there is nothing to drop".format(template)}
 
 	products, error = _ask(config, headers, {"slug": erp_slug})
 	if error:
-		return {"status": "error", "external_id": "", "slug": "", "duplicates": [], "variants": [],
+		return {"status": "error", "external_id": "", "slug": "", "duplicates": [],
 				"message": error}
 	if products:
 		return dict(_grade(template, retail_sku, erp_slug, products[0], "slug"),
 					duplicates=_duplicates(products))
 
-	return {"status": "missing", "external_id": "", "slug": "", "duplicates": [], "variants": [],
+	return {"status": "missing", "external_id": "", "slug": "", "duplicates": [],
 			"message": "Can't find the item on this website - not by the External ID {0}, and not at "
 					   "the slug {1}".format(template, erp_slug)}
 
@@ -385,9 +382,7 @@ def lookup(templates):
 			row.update({"status": "error", "external_id": "", "slug": "",
 						"message": "could not reach the website: {0}".format(error)})
 		else:
-			# The variant list is only for verify(); sending it to the browser would put the whole
-			# catalogue in the response for no reader.
-			row.update({k: v for k, v in result.items() if k != "variants"})
+			row.update(result)
 
 	return {"templates": sorted({r["template"] for r in rows}), "rows": rows, "ok": _ok(rows),
 			"verified": _verified(rows), "websites_configured": configured, "checked_now": True}
@@ -597,6 +592,14 @@ def ensure_captured(survivor, sources):
 		if sold:  # nothing recorded, and it is sold somewhere - that product would be stranded
 			missing.append(template)
 	if missing:
+		# Nothing recorded is also what a template with no Storebuilder product looks like - save
+		# only records products. Ask again rather than take the screen's word for it, and let
+		# through the ones that really have nothing on any website.
+		live = lookup(missing)["rows"]
+		missing = [t for t in missing
+				   if not all(r["status"] in (NOT_ON_SB,) + NOTHING_TO_CHECK
+							  for r in live if r["template"] == t)]
+	if missing:
 		raise UserError(
 			"Storebuilder was never read for {0}: {1}. Open the Storebuilder products table under "
 			"Find Template, press Check Storebuilder, and fix anything that is not green - once "
@@ -605,81 +608,28 @@ def ensure_captured(survivor, sources):
 					", ".join(sorted(missing)[:8])))
 
 
-# ---------- after the push: did the websites take it? ----------
+def on_storebuilder(rows):
+	"""The templates these rows show a Storebuilder product for: an External ID and a slug."""
+	return {str(r["template"]) for r in rows or []
+			if r.get("template") and r.get("status") == CLEAN
+			and str(r.get("slug") or "").strip() and str(r.get("external_id") or "").strip()}
 
-def verify(template):
-	"""Ask every website what it now holds for the surviving template, and say whether it matches.
 
-	Run **after** the upsert messages have been sent, so it answers the only question that matters
-	at the end of a merge: did the sites actually end up with this product, under this External ID,
-	with these variants. It is the same `papi_product_details` call the capture uses - the queue is
-	asynchronous, so a site that has not caught up yet reads as `pending` rather than as wrong, and
-	the check is worth re-running rather than trusting once.
+def check_survivor(target, sources, rows):
+	"""Refuse a survivor with no Storebuilder product when another selected template has one.
+
+	The survivor's product is the one that is kept and updated; every other template's product is
+	dropped after the merge. Surviving with a template the sites do not have throws away the only
+	live product and starts the merged one again from nothing.
 	"""
-	template = str(template or "").strip()
-	if not template or not frappe.db.exists("Item", template):
-		raise UserError("{0} does not exist".format(template))
-
-	configs = _configs()
-	headers = {pl: legacy_products._headers(config) for pl, config in configs.items()}
-	sites = storefronts_by_price_list()
-	erp = set(frappe.get_all("Item", filters={"variant_of": template}, pluck="ifw_retailskusuffix"))
-	erp.discard(None)
-	erp.discard("")
-
-	rows, pending, calls = [], [], []
-	for row in frappe.get_doc("Item", template).get("item_detail") or []:
-		if not row.price_list or row.price_list not in sites:
-			continue
-		entry = {"price_list": row.price_list, "lead_source": sites[row.price_list],
-				 "slug": (row.slug or "").strip(), "external_id": "", "external_id_match": None,
-				 "sb_variants": 0, "erp_variants": len(erp), "missing": [], "extra": [],
-				 "status": "notconfigured",
-				 "message": "No Product Detail API for this price list"}
-		rows.append(entry)
-		config = configs.get(row.price_list)
-		if config:
-			pending.append(entry)
-			# Headers here, not inside the lambda: _headers reads the custom_header Password from
-			# the database, and these run on a thread pool where there is no connection to do it on.
-			calls.append(lambda c=config, h=headers[row.price_list], t=template, s=entry["slug"]:
-						 _detail_one(c, h, t, "", s))
-
-	for entry, (result, error) in zip(pending, legacy_products._parallel(calls)):
-		if error:
-			entry.update({"status": "error", "message": "could not reach the website: {0}".format(error)})
-			continue
-		entry["external_id"] = result.get("external_id") or ""
-		entry["external_id_match"] = entry["external_id"] == template
-		if result["status"] in ("missing", "noslug"):
-			entry.update({"status": "pending",
-						  "message": "the website does not have this product yet - the update may "
-									 "still be queued, check again in a moment"})
-			continue
-		if result["status"] == "error":
-			entry.update({"status": "error", "message": result["message"]})
-			continue
-		sb = {str(v.get("fullRetailSku") or v.get("retailSkuSuffix") or "").strip()
-			  for v in (result.get("variants") or [])}
-		sb.discard("")
-		entry["sb_variants"] = len(sb)
-		entry["missing"] = sorted(erp - sb)[:20]
-		entry["extra"] = sorted(sb - erp)[:20]
-		if not entry["external_id_match"]:
-			entry.update({"status": "mismatch",
-						  "message": "the website has External ID {0}, not {1}".format(
-							  entry["external_id"] or "(none)", template)})
-		elif entry["missing"] or entry["extra"]:
-			entry.update({"status": "mismatch",
-						  "message": "{0} variant(s) the website is missing, {1} it has that ERP "
-									 "does not".format(len(entry["missing"]), len(entry["extra"]))})
-		else:
-			entry.update({"status": "ok",
-						  "message": "matches {0} with {1} variant(s)".format(template, len(sb))})
-
-	return {"template": template, "rows": rows,
-			"ok": bool(rows) and all(r["status"] == "ok" for r in rows),
-			"pending": sum(1 for r in rows if r["status"] == "pending")}
+	live = on_storebuilder(rows) & ({target} | set(sources or []))
+	if not live or target in live:
+		return
+	if len(live) == 1:
+		raise UserError("{0} is the only selected template with a Storebuilder product, so it has to "
+						"be the surviving template".format(next(iter(live))))
+	raise UserError("{0} has no Storebuilder product - choose one of the templates that has one to "
+					"survive: {1}".format(target, ", ".join(sorted(live))))
 
 
 # ---------- taking a website off a template ----------

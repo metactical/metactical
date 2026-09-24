@@ -197,43 +197,6 @@
       </section>
 
 
-      <!-- what the websites hold for the consolidated product, after the push -->
-      <section v-if="!isChanges && merged > 0 && !active" class="im-card">
-        <div class="flex items-center flex-wrap gap-2">
-          <div class="min-w-0">
-            <h3 class="im-card-title">Website check</h3>
-            <p class="im-lede mb-0">
-              What each website answers for <span class="font-mono">{{ job.template }}</span> now.
-              The push travels by queue, so a site that has not caught up reads <b>pending</b> - check again in a moment.
-            </p>
-          </div>
-          <button class="btn btn-default btn-sm ml-auto" :disabled="checking" @click="recheck">
-            {{ checking ? 'Checking…' : 'Check again' }}
-          </button>
-        </div>
-        <div v-if="!check" class="im-empty mt-3">Not checked yet.</div>
-        <div v-else class="im-table-wrap mt-3">
-          <table class="im-table">
-            <thead>
-              <tr><th>Price list</th><th>External ID</th><th class="r">Variants site / ERP</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in check.rows" :key="r.price_list" :class="{ bad: r.status === 'mismatch' || r.status === 'error' }">
-                <td class="whitespace-nowrap">{{ r.price_list }}</td>
-                <td class="font-mono whitespace-nowrap" :class="{ 'text-danger': r.external_id_match === false }">
-                  {{ r.external_id || '—' }}
-                </td>
-                <td class="r tabular-nums">{{ r.sb_variants }} / {{ r.erp_variants }}</td>
-                <td>
-                  <span :class="pillClass(r.status)">{{ r.status }}</span>
-                  <div class="text-xs text-muted">{{ r.message }}</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       <!-- what became of the legacy products this merge consolidated away -->
       <section v-if="legacyRows.length" class="im-card">
         <div class="flex items-center flex-wrap gap-2">
@@ -435,21 +398,6 @@ async function resume() {
 // The legacy Storebuilder products this merge dropped. Lives on the job, so it is still there
 // long after the merge - the legacy items themselves are not.
 const legacyRows = computed(() => job.value?.legacy_products || [])
-// The websites' own answer after the push. Re-runnable: the upsert is queued, so the first
-// reading after a merge is often "not yet" rather than "wrong".
-const checked = ref(null)
-const checking = ref(false)
-const check = computed(() => checked.value || job.value?.website_check || null)
-async function recheck() {
-  checking.value = true
-  try {
-    checked.value = await itemMergeApi.verifyTemplateProducts(job.value.template)
-  } catch (e) {
-    // Frappe has shown the reason
-  } finally {
-    checking.value = false
-  }
-}
 const legacyIssued = computed(() => legacyRows.value.filter((r) => r.status === 'issued').length)
 
 defineExpose({ refresh })

@@ -318,6 +318,8 @@ def consolidate_templates(target, sources, rename_to=None, confirm_different_pro
 		raise UserError("These templates look like different products (" + " / ".join(check["product_names"])
 						+ ") - tick the confirmation if they really are one product")
 
+	product_details.check_survivor(target, sources, product_rows)
+
 	# The sources are about to be deleted, so their Storebuilder products have to be on record
 	# first. Written under the code the merge will end up with, which is what jobs._legacy_rows
 	# reads the batch back by.

@@ -100,8 +100,12 @@ class JobLog:
 		_publish(self.job, line)
 
 
+# Steps a job no longer runs. Jobs from before they were removed still carry them in `steps`.
+RETIRED_STEPS = ("Website check",)
+
+
 def _steps(job):
-	return json.loads(job.steps or "[]")
+	return [s for s in json.loads(job.steps or "[]") if s.get("name") not in RETIRED_STEPS]
 
 
 def _step(job, name, status, message=""):
@@ -254,10 +258,11 @@ def run_merge(job, log):
 		_drop_legacy_products(job, log)
 		# Stock first, so the push carries the right quantities.
 		_settle_inventory(job, log)
-		# Then the push, and only then the check - the drops have to land before the consolidated
-		# product goes out, or a drop queued behind it would delete what was just sent.
+		# Then the push - the drops have to land before the consolidated product goes out, or a
+		# drop queued behind it would delete what was just sent.
 		_push_to_websites(job, template, log)
-		_verify_websites(job, template, log)
+		# The images go after the product: they hang off its variants' SKUs.
+		_push_images(job, template, log)
 
 	_set(job, status="Failed" if failed else "Done", finished_on=now_datetime())
 	family.add_activity(template, f"merge job {job.name} {job.status.lower()}: {job.processed}/{len(job.pairs)} merged")
@@ -312,8 +317,8 @@ def _pull_legacy_images(job, log):
 	products, which is the worse of the two failures.
 	"""
 	step = "Keep legacy product images"
-	if not (job.get("legacy_products") or []):
-		return
+	# No early return on an empty legacy list: the survivor's own product is read too, and a merge
+	# that consolidated nothing still has its variants' photography to re-point.
 	try:
 		counts = legacy_images.pull_and_remap(job, log)
 	except Exception as e:
@@ -324,6 +329,7 @@ def _pull_legacy_images(job, log):
 		log(f"FAIL legacy images: {message_of(e)}")
 		return
 	if not counts["products"] and not counts["skipped"] and not counts["failed"]:
+		_step(job, step, "skipped", "no website product with a slug to read images from")
 		return
 	message = (f"{counts['images']} image row(s) from {counts['products']} product(s) · "
 			   f"{counts['mapped']} mapped to a new variant")
@@ -415,20 +421,35 @@ def _push_to_websites(job, template, log):
 	_step(job, step, "failed" if failed else "done", message[:600])
 
 
-def _verify_websites(job, template, log):
-	"""Ask the websites what they now hold. The queue is asynchronous, so `pending` is a real answer."""
-	step = "Website check"
-	try:
-		result = product_details.verify(template)
-	except Exception as e:
-		_step(job, step, "skipped", message_of(e)[:300])
+def _push_images(job, template, log):
+	"""Send the product's images to the websites, by saving its S3 Uploader record with the
+	webhooks back on.
+
+	Nothing else does it. `pull_and_remap` saves the record with the push suppressed, since it runs
+	before the drops and the product push, and `_push_to_websites` only saves Items - so without
+	this the sites get the merged product and none of its pictures.
+	"""
+	step = "Push images to websites"
+	names = frappe.get_all("S3 Product Image Meta Data", filters={"nat_product_template": template},
+						   order_by="creation desc", limit=1, pluck="name")
+	if not names:
+		_step(job, step, "skipped", f"no S3 Uploader record for {template}")
 		return
-	_set(job, website_check=json.dumps(result, default=str))
-	bad = [r for r in result["rows"] if r["status"] in ("mismatch", "error")]
-	status = "failed" if bad else ("attention" if result["pending"] else "done")
-	message = "; ".join(f"{r['price_list']}: {r['message']}" for r in (bad or result["rows"]))[:600]
-	log(f"website check: {message[:200]}")
-	_step(job, step, status, message)
+	try:
+		with with_webhooks():
+			doc = frappe.get_doc("S3 Product Image Meta Data", names[0])
+			doc.nat_skip_website_push = 0
+			doc.save(ignore_permissions=True)
+			frappe.db.commit()
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(title=f"Item Merge Job {job.name} images", message=frappe.get_traceback())
+		_step(job, step, "failed", message_of(e)[:300])
+		log(f"FAIL image push: {message_of(e)}")
+		return
+	message = f"{len(doc.nat_skus)} SKU(s), {len(doc.nat_images)} image row(s) sent from {doc.name}"
+	log(f"pushed images: {message}")
+	_step(job, step, "done", message)
 
 
 def _drop_legacy_products(job, log):
@@ -564,7 +585,6 @@ def job_status(job_name, live=True):
 		"user": job.owner, "created": job.creation, "started": job.started_on, "finished": job.finished_on,
 		"error": job.error, "total": job.total, "processed": job.processed,
 		"options": json.loads(job.options or "{}"), "steps": _steps(job),
-		"website_check": json.loads(job.website_check or "null"),
 		"log": (job.log or "").splitlines(),
 		"pairs": [{"old": p.old_item, "new": p.new_item, "item_name": p.item_name, "retail_sku": p.retail_sku,
 				   "status": p.status.lower(), "message": p.message, "expected_qty": p.expected_qty if p.status == "Ok" else None}
