@@ -221,7 +221,10 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 			method: "metactical.custom_scripts.purchase_order.purchase_order.make_purchase_order_based_on_supplier",
 			args: {
 				supplier: this.frm.doc.supplier,
-				get_all_items: true
+				get_all_items: true,
+				// Metactical Customization: only requests for the Set Target
+				// Warehouse; blank = every warehouse
+				warehouse: this.frm.doc.set_warehouse || null
 			},
 			get_all_items: true,
 			source_doctype: "Material Request",
