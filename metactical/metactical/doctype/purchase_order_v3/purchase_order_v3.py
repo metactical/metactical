@@ -1283,6 +1283,7 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 	from metactical.custom_scripts.purchase_order.purchase_order import (
 		get_items_based_on_default_supplier,
 		get_material_requests_based_on_items,
+		open_mr_item_condition,
 	)
 
 	if isinstance(args, str):
@@ -1291,9 +1292,10 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 	supplier = args.get("supplier")
 	supplier_items = get_items_based_on_default_supplier(supplier)
 
+	warehouse = args.get("warehouse")
 	material_requests = [source_name]
 	if args.get("get_all_items"):
-		material_requests = get_material_requests_based_on_items(supplier_items)
+		material_requests = get_material_requests_based_on_items(supplier_items, warehouse)
 
 	def postprocess(source, target):
 		target.supplier = supplier
@@ -1330,7 +1332,7 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 					"postprocess": lambda source, target, source_parent: target.update(
 						{"qty": F(source.qty) - F(source.ordered_qty)}
 					),
-					"condition": lambda doc: F(doc.ordered_qty) < F(doc.qty),
+					"condition": open_mr_item_condition(warehouse),
 				},
 			},
 			target_doc,

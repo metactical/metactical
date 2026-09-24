@@ -260,7 +260,8 @@ frappe.ui.form.on('Purchase Order V3', {
                 method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.make_po3_based_on_supplier',
                 source_names: [frm.doc.supplier],
                 target_doc: frm.doc,
-                args: { supplier: frm.doc.supplier, get_all_items: true }
+                // blank Ship To Warehouse = requests for every warehouse
+                args: { supplier: frm.doc.supplier, get_all_items: true, warehouse: frm.doc.set_warehouse || null }
             },
             freeze: true,
             freeze_message: __('Fetching items from open Material Requests...'),
@@ -273,7 +274,9 @@ frappe.ui.form.on('Purchase Order V3', {
                 frappe.show_alert({
                     message: n
                         ? __('{0} item(s) fetched from open Material Requests.', [n])
-                        : __('No open Material Requests found for this supplier.'),
+                        : (frm.doc.set_warehouse
+                            ? __('No open Material Requests found for this supplier and {0}.', [frm.doc.set_warehouse])
+                            : __('No open Material Requests found for this supplier.')),
                     indicator: n ? 'green' : 'orange'
                 });
             }
