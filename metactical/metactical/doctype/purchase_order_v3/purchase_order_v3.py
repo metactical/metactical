@@ -6,6 +6,7 @@ import re
 
 import frappe
 from frappe.model.document import Document
+from frappe.contacts.doctype.address.address import render_address
 
 from metactical.procurement_v3.utils import (
 	F,
@@ -130,9 +131,11 @@ def po_ship_date(doc):
 def shared_series_naming(doc):
 	if not (doc.name and doc.name.startswith("PO3-")):
 		resolve_currency(doc)
+		resolve_addresses(doc)
 		npo = frappe.new_doc("Purchase Order")
 		npo.supplier = doc.supplier
 		npo.company = doc.company
+		set_native_addresses(npo, doc)
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
 		# PO3 has one date field, and it is a CANCEL date -- the point after which
 		# unfilled lines get dropped. It belongs in ais_cancel_date, which is what the
@@ -229,6 +232,7 @@ def validate(doc):
 	require_cancel_date(doc)
 
 	resolve_currency(doc)
+	resolve_addresses(doc)
 
 	# Changing the Ship To Warehouse has to take the lines with it. Filling only
 	# the blank ones left lines created under the old warehouse pointing at it,
@@ -309,6 +313,41 @@ def validate(doc):
 
 
 # ---------------------------------------------------------------------------
+# Shipping / billing address, defaulted from the Supplier.
+#
+# The Supplier carries the addresses its orders go out under
+# (nat_shipping_address / nat_billing_address). Native PO's form picks them up
+# through metactical's get_party_details override -- but that only runs in the
+# browser, so a PO3 and the twin it inserts server-side never saw them and fell
+# back to the company defaults.
+#
+# Like resolve_currency: fills only what is blank, so a buyer's own pick
+# survives, and it runs from before_insert too because the twin is built there,
+# ahead of validate.
+# ---------------------------------------------------------------------------
+def resolve_addresses(doc):
+	if doc.supplier and not (doc.shipping_address and doc.billing_address):
+		shipping, billing = frappe.db.get_value("Supplier", doc.supplier,
+			["nat_shipping_address", "nat_billing_address"]) or (None, None)
+		doc.shipping_address = doc.shipping_address or shipping
+		doc.billing_address = doc.billing_address or billing
+
+	doc.shipping_address_display = render_address(doc.shipping_address, check_permissions=False) if doc.shipping_address else None
+	doc.billing_address_display = render_address(doc.billing_address, check_permissions=False) if doc.billing_address else None
+
+
+# Blank on the PO3 leaves the native PO's own default (the company address)
+# alone rather than wiping it -- shipping_address is mandatory on Purchase Order.
+def set_native_addresses(npo, doc):
+	if doc.shipping_address:
+		npo.shipping_address = doc.shipping_address
+		npo.shipping_address_display = doc.shipping_address_display
+	if doc.billing_address:
+		npo.billing_address = doc.billing_address
+		npo.billing_address_display = doc.billing_address_display
+
+
+# ---------------------------------------------------------------------------
 # Currency, price list and the FX rate behind base_grand_total.
 #
 # Lifted out of validate so the twin can be built with the right numbers.
@@ -376,6 +415,7 @@ def auto_send_on_approve(doc):
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
+			set_native_addresses(npo, doc)
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.
@@ -505,6 +545,7 @@ def submitted_updates(doc):
 			npo.conversion_rate = F(doc.conversion_rate) or 1
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
+			set_native_addresses(npo, doc)
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.

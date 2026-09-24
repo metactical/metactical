@@ -223,6 +223,19 @@ function po3_reset_amended(frm) {
 }
 
 
+// Shows the picked address straight away; the server re-renders it on save.
+function po3_render_address(frm, field, display_field) {
+    if (!frm.doc[field]) {
+        frm.set_value(display_field, null);
+        return;
+    }
+    frappe.call({
+        method: 'frappe.contacts.doctype.address.address.get_address_display',
+        args: { address_dict: frm.doc[field] },
+        callback: function(r) { frm.set_value(display_field, r.message || null); }
+    });
+}
+
 frappe.ui.form.on('Purchase Order V3', {
     onload: po3_reset_amended,
 
@@ -286,11 +299,14 @@ frappe.ui.form.on('Purchase Order V3', {
         if (!frm.doc.supplier) return;
         frappe.db.get_value('Supplier', frm.doc.supplier,
             ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'po3_print_format',
-             'nat_sender_email_account'])
+             'nat_sender_email_account', 'nat_shipping_address', 'nat_billing_address'])
             .then(function(r) {
                 var v = r.message || {};
                 frm.set_value('buying_price_list', v.default_price_list || null);
                 if (v.default_currency) frm.set_value('currency', v.default_currency);
+                // a different supplier ships and bills under its own addresses
+                frm.set_value('shipping_address', v.nat_shipping_address || null);
+                frm.set_value('billing_address', v.nat_billing_address || null);
                 if (frm.is_new()) {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);
@@ -302,6 +318,12 @@ frappe.ui.form.on('Purchase Order V3', {
                     frappe.show_alert({ message: __('This supplier has no Default Price List - pick one manually.'), indicator: 'orange' });
                 }
             });
+    },
+    shipping_address: function(frm) {
+        po3_render_address(frm, 'shipping_address', 'shipping_address_display');
+    },
+    billing_address: function(frm) {
+        po3_render_address(frm, 'billing_address', 'billing_address_display');
     },
     buying_price_list: function(frm) {
         (frm.doc.items || []).forEach(function(d) {
