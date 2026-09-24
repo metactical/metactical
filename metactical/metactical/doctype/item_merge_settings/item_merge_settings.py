@@ -4,6 +4,12 @@
 import frappe
 from frappe.model.document import Document
 
+DEFAULT_TIMEOUT = 120
+
+
+class NotConfigured(Exception):
+	"""Metabase is off, or missing its URL, key or a database id - the caller reports it and stops."""
+
 
 class ItemMergeSettings(Document):
 	def validate(self):

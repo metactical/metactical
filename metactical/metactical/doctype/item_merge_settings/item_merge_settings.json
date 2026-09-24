@@ -10,7 +10,16 @@
   "merge_section",
   "use_old_item_price",
   "fields_to_copy",
-  "fields_to_overwrite"
+  "fields_to_overwrite",
+  "metabase_section",
+  "metabase_enabled",
+  "column_break_metabase",
+  "metabase_timeout",
+  "metabase_url",
+  "column_break_metabase_key",
+  "metabase_api_key",
+  "metabase_databases_help",
+  "metabase_databases"
  ],
  "fields": [
   {

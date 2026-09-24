@@ -166,8 +166,14 @@ doc_events = {
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
 	},
+	"Repost Item Valuation": {
+		"before_validate": "metactical.custom_scripts.repost_item_valuation.repost_item_valuation.clamp_repost_to_open_period"
+	},
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert"
+	},
+	"Warehouse": {
+		"validate": "metactical.custom_scripts.warehouse.warehouse.set_root_and_role"
 	}
 }
 
@@ -951,6 +957,9 @@ fixtures = [{
 			"Item-custom_column_break_iqyli",
 			"Item-custom_column_break_22avz",
 			"Item-custom_identity",
+			"Sales Order Item-barcode",
+			"Warehouse-warehouse_role",
+			"Warehouse-root_warehouse",
 			"Supplier-custom_tracking_url_template",
 			"Purchase Order-custom_po3_status",
 			"Supplier Claim V3-workflow_state",
@@ -967,6 +976,7 @@ fixtures = [{
 			"Supplier-custom_sender_address",
 			"Supplier-custom_sender_email",
 			"Sales Order Item-barcode"
+			"Supplier-po3_section"
 		]]]
 	},
 	{
@@ -1659,6 +1669,8 @@ jinja = {
 		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json",
 		"metactical.custom_scripts.utils.metactical_utils.get_refund_details_for_print",
 		"metactical.metactical.page.s3_uploader.s3_uploader.s3_product_payload",
+		"metactical.custom_scripts.utils.pps_order_config.get_order_warehouse_bin_config",
+		"metactical.custom_scripts.utils.pps_user_access.get_user_access_sync_payload",
 	]
 }
 
