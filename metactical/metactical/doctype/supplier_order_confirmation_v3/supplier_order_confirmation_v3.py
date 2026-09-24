@@ -6,7 +6,7 @@ import json
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.utils import F, mirror_po3_status, v3_recalc_totals
+from metactical.procurement_v3.utils import F, item_supplier_part_no, mirror_po3_status, v3_recalc_totals
 
 
 class SupplierOrderConfirmationV3(Document):
@@ -429,8 +429,7 @@ def item_identifiers(item_code, supplier=None):
 		"retail_sku_suffix": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
 		# the item's first barcode, the same one PO3 puts on the order line
 		"barcode": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode", order_by="idx asc"),
-		"supplier_part_no": frappe.db.get_value("Item Supplier",
-			{"parent": item_code, "supplier": supplier}, "supplier_part_no") if supplier else None,
+		"supplier_part_no": item_supplier_part_no(item_code, supplier),
 	}
 
 

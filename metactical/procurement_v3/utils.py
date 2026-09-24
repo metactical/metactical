@@ -21,6 +21,29 @@ def F(x):
 	return float(x or 0)
 
 
+# ---------------------------------------------------------------------------
+# The supplier SKU printed on an order line comes off the Item's Supplier Items
+# table. Prefer the order's own supplier; when that has no entry (supplier not
+# picked yet, or a sister account like "Carhartt - USA"), fall back to the
+# item's default supplier and then to any part number the item carries, so a
+# line never comes out blank while the Item itself has one.
+# ---------------------------------------------------------------------------
+def item_supplier_part_no(item_code, supplier=None):
+	rows = frappe.get_all("Item Supplier",
+		filters={"parent": item_code, "parenttype": "Item", "supplier_part_no": ("is", "set")},
+		fields=["supplier", "supplier_part_no"], order_by="idx asc")
+	if not rows:
+		return None
+	by_supplier = {r.supplier: r.supplier_part_no for r in rows}
+	if supplier and by_supplier.get(supplier):
+		return by_supplier[supplier]
+	for d in frappe.get_all("Item Default", filters={"parent": item_code, "parenttype": "Item"},
+			fields=["default_supplier"], order_by="idx asc"):
+		if d.default_supplier and by_supplier.get(d.default_supplier):
+			return by_supplier[d.default_supplier]
+	return rows[0].supplier_part_no
+
+
 def billable_qty(qty, short_qty):
 	"""How much of a line is still expected to cost us.
 
