@@ -3,6 +3,10 @@
 
 // Migrated from Client Script "Supplier Order Confirmation V3 Form" (Form view).
 
+// Line statuses where nothing ships now, so Confirmed Qty is 0. Mirrors
+// ZERO_QTY_STATUSES in the controller, which enforces the same on save.
+var SOC3_ZERO_QTY_STATUSES = ['Back-ordered', 'Supplier Stock Out', 'Discontinued', 'Cancelled by Supplier'];
+
 function soc3_maybe_autopull(frm) {
     if (frm._soc3_autopull) return;
     if (!frm.is_new() || !frm.doc.purchase_order_v3) return;
@@ -275,8 +279,14 @@ function soc3_import(frm) {
                         frappe.model.set_value(row.doctype, row.name, 'line_status', rec.line_status);
                     }
                 }
-                if (rec.confirmed_qty !== undefined) {
+                // a nothing-ships status wins over a pasted quantity, as on save
+                if (SOC3_ZERO_QTY_STATUSES.indexOf(row.line_status) !== -1
+                        || SOC3_ZERO_QTY_STATUSES.indexOf(rec.line_status) !== -1) {
+                    frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', 0);
+                } else if (rec.confirmed_qty !== undefined) {
                     frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', flt(rec.confirmed_qty));
+                } else if (rec.line_status === 'Confirmed') {
+                    frappe.model.set_value(row.doctype, row.name, 'confirmed_qty', flt(row.ordered_qty));
                 }
                 if (rec.backorder_eta) {
                     frappe.model.set_value(row.doctype, row.name, 'backorder_eta', rec.backorder_eta);
@@ -314,7 +324,18 @@ function soc3_import(frm) {
 frappe.ui.form.on('Supplier Order Confirmation V3 Item', {
     confirmed_qty: function(frm) { soc3_totals(frm); },
     confirmed_rate: function(frm) { soc3_totals(frm); },
-    line_status: function(frm) { soc3_totals(frm); },
+    line_status: function(frm, cdt, cdn) {
+        var row = locals[cdt][cdn];
+        // confirmed_qty's own handler recomputes the totals
+        if (SOC3_ZERO_QTY_STATUSES.indexOf(row.line_status) !== -1 && flt(row.confirmed_qty) !== 0) {
+            frappe.model.set_value(cdt, cdn, 'confirmed_qty', 0);
+        } else if (row.line_status === 'Confirmed' && flt(row.confirmed_qty) !== flt(row.ordered_qty)) {
+            // Confirmed always means the full outstanding qty
+            frappe.model.set_value(cdt, cdn, 'confirmed_qty', flt(row.ordered_qty));
+        } else {
+            soc3_totals(frm);
+        }
+    },
     items_remove: function(frm) { soc3_totals(frm); },
     item_code: function(frm, cdt, cdn) {
         var row = locals[cdt][cdn];

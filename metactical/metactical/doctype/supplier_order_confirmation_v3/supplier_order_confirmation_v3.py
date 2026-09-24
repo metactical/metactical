@@ -43,6 +43,11 @@ class SupplierOrderConfirmationV3(Document):
 # its own resolve_item and ident with different bodies, so these are NOT
 # interchangeable and must not be hoisted into procurement_v3.utils.
 # ---------------------------------------------------------------------------
+# Line statuses where nothing ships now: Confirmed Qty is always 0. Mirrored as
+# SOC3_ZERO_QTY_STATUSES in the form script.
+ZERO_QTY_STATUSES = ("Back-ordered", "Supplier Stock Out", "Discontinued", "Cancelled by Supplier")
+
+
 def validate(doc):
 	def resolve_item(val):
 		if frappe.db.exists("Item", val):
@@ -180,12 +185,19 @@ def validate(doc):
 		if not F(d.confirmed_rate):
 			d.confirmed_rate = r.rate
 
+		# nothing ships now on these, so there is no quantity to confirm -- set
+		# it rather than make the user zero it by hand (the form does the same)
+		if d.line_status in ZERO_QTY_STATUSES:
+			d.confirmed_qty = 0
+		# Confirmed with no quantity = the full outstanding qty. A different
+		# non-zero quantity is left alone for the check below to catch: it is more
+		# likely a partial with the wrong status than a typo worth overwriting.
+		elif d.line_status == "Confirmed" and not F(d.confirmed_qty):
+			d.confirmed_qty = d.ordered_qty
+
 		q = F(d.confirmed_qty)
 		o = F(d.ordered_qty)
 		s = d.line_status
-		if s in ("Supplier Stock Out", "Discontinued", "Cancelled by Supplier") and q != 0:
-			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): status '" + s
-				+ "' requires Confirmed Qty = 0, got " + str(q))
 		if s == "Confirmed" and q != o:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "")
 				+ "): 'Confirmed' means the full outstanding qty (" + str(o) + "), got " + str(q)
@@ -193,10 +205,6 @@ def validate(doc):
 		if s in ("Partial - Balance Cancelled", "Partial - Balance Back-ordered") and not (0 < q < o):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + s
 				+ "' requires 0 < Confirmed Qty < " + str(o))
-		if s == "Back-ordered" and q != 0:
-			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "")
-				+ "): 'Back-ordered' means nothing ships now, so Confirmed Qty must be 0 (the full "
-				+ str(o) + " follows later). Use 'Partial - Balance Back-ordered' if some of it ships now.")
 		if s == "Substituted" and not d.substitute_item_code:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): 'Substituted' requires the Substitute Item.")
 		if d.confirmed_rate and F(r.rate):
