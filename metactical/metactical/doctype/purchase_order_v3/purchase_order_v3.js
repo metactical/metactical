@@ -64,10 +64,14 @@ function po3_norm_header(h) {
     return String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// erpnextitemcode / qtytoorderd (sic) / suppliername are the Sales Report V8-V9
+// column names. "Default Supplier Name" is the supplier column of the sales
+// report buyers paste from, so it is looked for first.
 var PO3_PASTE_COLS = {
-    code: ['erpitemcode', 'itemcode', 'item', 'itemid', 'sku', 'retailsku'],
-    qty:  ['qtytoordered', 'qty', 'quantity', 'orderqty', 'suggestedorderqtyv2', 'suggestedorderqty'],
-    rate: ['dsuppliercost', 'suppliercost', 'unitcost', 'rate', 'cost', 'price']
+    code: ['erpitemcode', 'erpnextitemcode', 'itemcode', 'item', 'itemid', 'sku', 'retailsku'],
+    qty:  ['qtytoordered', 'qtytoorderd', 'qty', 'quantity', 'orderqty', 'suggestedorderqtyv2', 'suggestedorderqty'],
+    rate: ['dsuppliercost', 'suppliercost', 'unitcost', 'rate', 'cost', 'price'],
+    supplier: ['defaultsuppliername', 'suppliername', 'supplier']
 };
 
 // How far down the paste to hunt for the header row.
@@ -98,8 +102,9 @@ function po3_paste_items(frm) {
             { fieldtype: 'HTML', options:
                 '<p style="margin-bottom:8px"><b>Select the whole sheet and paste it here.</b> '
                 + 'Title and grouping rows above the header are ignored, and so is every '
-                + 'column except <code>Erp Item Code</code>, <code>QtyToOrdered</code> and '
-                + '<code>DSupplier Cost ($)</code>.<br>Only rows with a QtyToOrdered above 0 '
+                + 'column except <code>Erp Item Code</code>, <code>QtyToOrdered</code>, '
+                + '<code>DSupplier Cost ($)</code> and <code>Default Supplier Name</code> (which fills the '
+                + 'Supplier when it is empty).<br>Only rows with a QtyToOrdered above 0 '
                 + 'are brought in. Items are matched on item code, retail SKU, barcode or '
                 + 'supplier part number.</p>' },
             { fieldtype: 'Check', fieldname: 'replace', label: __('Replace the existing lines'),
@@ -135,7 +140,8 @@ function po3_paste_items(frm) {
                 rows.push({
                     code: code,
                     qty: cells[idx.qty],
-                    rate: idx.rate !== -1 ? cells[idx.rate] : 0
+                    rate: idx.rate !== -1 ? cells[idx.rate] : 0,
+                    supplier: idx.supplier !== -1 ? cells[idx.supplier] : ''
                 });
             });
             if (!rows.length) {
@@ -171,7 +177,26 @@ function po3_paste_items(frm) {
                     d.hide();
                     frm.refresh_field('items');
 
+                    // The order takes the report's supplier when it has none of its
+                    // own; set_value runs the supplier handler, so price list,
+                    // currency, emails and addresses follow as if it were picked.
+                    var sup_msg = '';
+                    var others = (res.report_suppliers || []).filter(function(s) { return s !== frm.doc.supplier; });
+                    if (res.supplier) {
+                        frm.set_value('supplier', res.supplier);
+                        sup_msg = __('Supplier set from the report: <b>{0}</b>.', [res.supplier]);
+                    } else if (!frm.doc.supplier && others.length > 1) {
+                        sup_msg = __('The report lists several suppliers ({0}) - pick the Supplier yourself.', [others.join(', ')]);
+                    } else if (frm.doc.supplier && others.length) {
+                        sup_msg = __('The report lists {0}, not this order\'s supplier {1} - the Supplier was left as it is.',
+                                     ['<b>' + others.join(', ') + '</b>', '<b>' + frm.doc.supplier + '</b>']);
+                    }
+                    if ((res.unknown_suppliers || []).length) {
+                        sup_msg += (sup_msg ? '<br>' : '') + __('Supplier not found: {0}', [res.unknown_suppliers.join(', ')]);
+                    }
+
                     var msg = __('Added {0} item(s).', [items.length]);
+                    if (sup_msg) msg = sup_msg + '<br><br>' + msg;
                     if (res.skipped_zero_qty) {
                         msg += '<br>' + __('{0} row(s) skipped for a quantity of 0.', [res.skipped_zero_qty]);
                     }

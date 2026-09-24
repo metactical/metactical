@@ -11,6 +11,7 @@ from frappe.contacts.doctype.address.address import render_address
 from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
+	item_supplier_part_no,
 	mirror_po3_status,
 	v3_may_close_native,
 	v3_open_bo,
@@ -355,16 +356,14 @@ def set_native_addresses(npo, doc):
 # from Material Requests, and none of those paths go through get_item_details
 # the way a native PO line does. Every PO3 line came out without either.
 #
-# Barcode is the item's first one, as on native PO. Supplier SKU is this
-# supplier's part number off the Item. Only blanks are filled, so a typed-in
+# Barcode is the item's first one, as on native PO. Supplier SKU is the Item's
+# part number (see item_supplier_part_no). Only blanks are filled, so a typed-in
 # value survives -- except a barcode that does not belong to the line's item,
 # which is what is left behind when the item on a line is changed.
 # ---------------------------------------------------------------------------
 def item_identifiers(item_code, supplier=None):
 	barcode = frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode", order_by="idx asc")
-	part_no = frappe.db.get_value("Item Supplier",
-		{"parent": item_code, "supplier": supplier}, "supplier_part_no") if supplier else None
-	return {"barcode": barcode, "supplier_part_no": part_no}
+	return {"barcode": barcode, "supplier_part_no": item_supplier_part_no(item_code, supplier)}
 
 
 @frappe.whitelist()
@@ -379,7 +378,7 @@ def fill_item_identifiers(doc):
 		if d.barcode and not frappe.db.exists("Item Barcode",
 				{"parent": d.item_code, "barcode": d.barcode}):
 			d.barcode = None
-		if d.barcode and (d.supplier_part_no or not doc.supplier):
+		if d.barcode and d.supplier_part_no:
 			continue
 		ids = item_identifiers(d.item_code, doc.supplier)
 		d.barcode = d.barcode or ids["barcode"]
@@ -1359,6 +1358,13 @@ def resolve_pasted_items(rows, supplier=None, price_list=None):
 	then this supplier's part number. Rows with no usable quantity are dropped --
 	a buying report typically lists the whole catalogue with most quantities at
 	zero, and only the ones actually being ordered belong on the order.
+
+	A row may carry the report's supplier (its "Supplier Name" column, which the
+	sales reports fill with the Supplier ID). When the order has no supplier yet
+	and every row being ordered names the same one, that is the order's supplier:
+	it is returned as `supplier` for the form to set, and it drives the part
+	number match and the price list fallback here. Several suppliers in one paste
+	are reported back, never guessed between.
 	"""
 	if isinstance(rows, str):
 		rows = json.loads(rows)
@@ -1401,6 +1407,31 @@ def resolve_pasted_items(rows, supplier=None, price_list=None):
 			hit = frappe.db.get_value("Item Supplier", {"supplier_part_no": val}, "parent")
 		return hit
 
+	def resolve_supplier(val, cache={}):
+		val = (val or "").strip()
+		if not val:
+			return None
+		if val not in cache:
+			cache[val] = val if frappe.db.exists("Supplier", val) \
+				else frappe.db.get_value("Supplier", {"supplier_name": val}, "name")
+		return cache[val]
+
+	# the report's suppliers, over the rows actually being ordered
+	report_suppliers, unknown_suppliers = [], []
+	for r in rows:
+		if not (r.get("code") or "").strip() or num(r.get("qty")) <= 0 or not (r.get("supplier") or "").strip():
+			continue
+		hit = resolve_supplier(r.get("supplier"))
+		bucket, val = (report_suppliers, hit) if hit else (unknown_suppliers, r.get("supplier").strip())
+		if val not in bucket:
+			bucket.append(val)
+
+	from_report = None
+	if not supplier and len(report_suppliers) == 1:
+		from_report = supplier = report_suppliers[0]
+		if not price_list:
+			price_list = frappe.db.get_value("Supplier", supplier, "default_price_list")
+
 	out, unknown, skipped = [], [], 0
 	for r in rows:
 		code = (r.get("code") or "").strip()
@@ -1423,7 +1454,8 @@ def resolve_pasted_items(rows, supplier=None, price_list=None):
 
 		detail = frappe.db.get_value("Item", item,
 			["item_name", "stock_uom", "ifw_retailskusuffix"], as_dict=True) or {}
-		ids = item_identifiers(item, supplier)
+		# the row's own supplier first: it is who the report says supplies it
+		ids = item_identifiers(item, resolve_supplier(r.get("supplier")) or supplier)
 		# a row pasted by barcode keeps the barcode it was pasted as
 		if frappe.db.exists("Item Barcode", {"parent": item, "barcode": code}):
 			ids["barcode"] = code
@@ -1438,4 +1470,6 @@ def resolve_pasted_items(rows, supplier=None, price_list=None):
 			"pasted_as": code,
 		})
 
-	return {"items": out, "unknown": unknown, "skipped_zero_qty": skipped}
+	return {"items": out, "unknown": unknown, "skipped_zero_qty": skipped,
+		"supplier": from_report, "report_suppliers": report_suppliers,
+		"unknown_suppliers": unknown_suppliers}
