@@ -233,6 +233,7 @@ def validate(doc):
 
 	resolve_currency(doc)
 	resolve_addresses(doc)
+	fill_item_identifiers(doc)
 
 	# Changing the Ship To Warehouse has to take the lines with it. Filling only
 	# the blank ones left lines created under the old warehouse pointing at it,
@@ -345,6 +346,44 @@ def set_native_addresses(npo, doc):
 	if doc.billing_address:
 		npo.billing_address = doc.billing_address
 		npo.billing_address_display = doc.billing_address_display
+
+
+# ---------------------------------------------------------------------------
+# Barcode and supplier SKU on each line.
+#
+# Nothing filled these on PO3: the lines are built by hand, pasted in, or mapped
+# from Material Requests, and none of those paths go through get_item_details
+# the way a native PO line does. Every PO3 line came out without either.
+#
+# Barcode is the item's first one, as on native PO. Supplier SKU is this
+# supplier's part number off the Item. Only blanks are filled, so a typed-in
+# value survives -- except a barcode that does not belong to the line's item,
+# which is what is left behind when the item on a line is changed.
+# ---------------------------------------------------------------------------
+def item_identifiers(item_code, supplier=None):
+	barcode = frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode", order_by="idx asc")
+	part_no = frappe.db.get_value("Item Supplier",
+		{"parent": item_code, "supplier": supplier}, "supplier_part_no") if supplier else None
+	return {"barcode": barcode, "supplier_part_no": part_no}
+
+
+@frappe.whitelist()
+def get_item_identifiers(item_code, supplier=None):
+	return item_identifiers(item_code, supplier)
+
+
+def fill_item_identifiers(doc):
+	for d in doc.get("items"):
+		if not d.item_code:
+			continue
+		if d.barcode and not frappe.db.exists("Item Barcode",
+				{"parent": d.item_code, "barcode": d.barcode}):
+			d.barcode = None
+		if d.barcode and (d.supplier_part_no or not doc.supplier):
+			continue
+		ids = item_identifiers(d.item_code, doc.supplier)
+		d.barcode = d.barcode or ids["barcode"]
+		d.supplier_part_no = d.supplier_part_no or ids["supplier_part_no"]
 
 
 # ---------------------------------------------------------------------------
@@ -1262,6 +1301,7 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 			d for d in target.get("items")
 			if d.get("item_code") in supplier_items and F(d.get("qty")) > 0
 		])
+		fill_item_identifiers(target)
 		today = frappe.utils.getdate(frappe.utils.nowdate())
 		for d in target.get("items"):
 			if d.required_by and frappe.utils.getdate(d.required_by) < today:
@@ -1381,13 +1421,16 @@ def resolve_pasted_items(rows, supplier=None, price_list=None):
 
 		detail = frappe.db.get_value("Item", item,
 			["item_name", "stock_uom", "ifw_retailskusuffix"], as_dict=True) or {}
+		ids = item_identifiers(item, supplier)
+		# a row pasted by barcode keeps the barcode it was pasted as
+		if frappe.db.exists("Item Barcode", {"parent": item, "barcode": code}):
+			ids["barcode"] = code
 		out.append({
 			"item_code": item,
 			"item_name": detail.get("item_name"),
 			"uom": detail.get("stock_uom"),
 			"retail_sku_suffix": detail.get("ifw_retailskusuffix"),
-			"supplier_part_no": frappe.db.get_value("Item Supplier",
-				{"parent": item, "supplier": supplier}, "supplier_part_no") if supplier else None,
+			**ids,
 			"qty": qty,
 			"rate": rate,
 			"pasted_as": code,
