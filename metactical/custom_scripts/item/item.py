@@ -459,6 +459,12 @@ class CustomItem(Item):
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
 
+        # Schedule the re-create watchdog now, at drop time, rather than waiting for the first
+        # site to confirm: if a site's product is already gone it has nothing to delete and never
+        # reports back, and if no site reports back nothing would otherwise re-create the item.
+        # deduplicate keeps this to a single watchdog even alongside the first-response one.
+        from metactical.custom_scripts.utils.item_rmq_api import schedule_recreate_watchdog
+        schedule_recreate_watchdog(self.item_code, frappe.session.user)
 
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
         self.reload()
