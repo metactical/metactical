@@ -26,6 +26,13 @@ class PostTransport(Transport):
 		return response.content
 
 class Purolator:
+	# Shipping label geometry, in PDF points (72pt = 1in). Matches the 4x6 page
+	# Canada Post returns, so both carriers print on the same stock.
+	LABEL_WIDTH_PT = 288.0
+	LABEL_HEIGHT_PT = 432.0
+	LABEL_SIZE_TOLERANCE_PT = 2.0
+	LABEL_PADDING_PT = 4.0
+
 	def __init__(self):
 		self.settings = self.get_settings()
 
@@ -403,7 +410,14 @@ class Purolator:
 			errors = self.render_error(validate_shipment.body.ResponseInformation.Errors)
 			frappe.throw(errors)
 		else:
-			create_shipment = client.service.CreateShipment(Shipment=request["Shipment"])
+			# PrinterType is a sibling of Shipment on CreateShipmentRequestContainer.
+			# Omitting it makes Purolator fall back to "Regular", which returns a wide
+			# Bill of Lading (label on the left, Conditions of Carriage on the right)
+			# instead of a 4x6 thermal label.
+			create_shipment = client.service.CreateShipment(
+				Shipment=request["Shipment"],
+				PrinterType=request["PrinterType"]
+			)
 			if create_shipment.body.ResponseInformation.Errors is None:
 				shipment.shipments = []
 				piece_row = 0
@@ -492,7 +506,7 @@ class Purolator:
 		files = []
 		for document in documents:
 			for detail in document.DocumentDetails.DocumentDetail:
-				binary_data = base64.b64decode(detail.Data)
+				binary_data = self.normalize_label(base64.b64decode(detail.Data))
 				files.append(self.write_file('Shipment', docname, binary_data, file_name=f"{pin}.pdf"))
 		return files
 	
@@ -646,6 +660,110 @@ class Purolator:
 					else:
 						frappe.log_error(message=f"Failed to download content from {url}", title="Purolator Manifet Error")
 		return shipments, po_number
+
+	def normalize_label(self, pdf_bytes):
+		"""Return the shipping label as a single 4x6 page, matching Canada Post.
+
+		Purolator's "Regular" printer type returns a wide Bill of Lading carrying the
+		4x6 label on the left and the Conditions of Carriage panel on the right. Crop
+		it down to just the label so it prints on the same stock as a Canada Post
+		label. A label that already measures 4x6 is returned untouched.
+		"""
+		doc = None
+		out = None
+		try:
+			doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+			if self.is_label_sized(doc):
+				return pdf_bytes
+
+			# Only fires while the carrier is still sending the wrong format, so it
+			# goes quiet once PrinterType takes effect.
+			frappe.log_error(
+				message="Purolator returned {0} page(s) sized {1}".format(
+					len(doc),
+					", ".join("%.1fx%.1fpt" % (p.rect.width, p.rect.height) for p in doc)
+				),
+				title="Purolator Label Geometry"
+			)
+
+			out = fitz.open()
+			for page in doc:
+				new_page = out.new_page(width=self.LABEL_WIDTH_PT, height=self.LABEL_HEIGHT_PT)
+				new_page.show_pdf_page(new_page.rect, doc, page.number, clip=self.find_label_rect(page))
+			return out.tobytes()
+		except Exception:
+			# A cosmetic trim must never lose a label the carrier has already billed.
+			frappe.log_error(message=frappe.get_traceback(), title="Purolator Label Normalize Error")
+			return pdf_bytes
+		finally:
+			if out is not None:
+				out.close()
+			if doc is not None:
+				doc.close()
+
+	def is_label_sized(self, doc):
+		if len(doc) != 1:
+			return False
+		rect = doc[0].rect
+		return (abs(rect.width - self.LABEL_WIDTH_PT) <= self.LABEL_SIZE_TOLERANCE_PT
+			and abs(rect.height - self.LABEL_HEIGHT_PT) <= self.LABEL_SIZE_TOLERANCE_PT)
+
+	def find_label_rect(self, page):
+		"""Locate the shipping label within a wider Bill of Lading page."""
+		bounds = page.rect
+
+		divider = None
+		for needle in ("CONDITIONS OF CARRIAGE", "Fold the Bill of Lading"):
+			hits = page.search_for(needle)
+			if hits:
+				divider = min(hit.x0 for hit in hits)
+				break
+
+		# Ignore a hit that lands too far left to be the panel edge.
+		if not divider or divider <= bounds.width * 0.2:
+			divider = bounds.width * 0.52
+
+		region = fitz.Rect(bounds.x0, bounds.y0, divider, bounds.y1)
+
+		# Tighten onto what is actually drawn so the crop excludes page margins.
+		content = fitz.Rect()
+		for block in page.get_text("blocks"):
+			content |= region & fitz.Rect(block[:4])
+		for drawing in page.get_drawings():
+			content |= region & drawing["rect"]
+
+		if not content.is_empty:
+			region = (content + (-self.LABEL_PADDING_PT, -self.LABEL_PADDING_PT,
+					self.LABEL_PADDING_PT, self.LABEL_PADDING_PT)) & bounds
+
+		return self.expand_to_label_ratio(region, bounds)
+
+	def expand_to_label_ratio(self, rect, bounds):
+		"""Grow the short side to a 4:6 ratio, so the crop is never stretched.
+
+		show_pdf_page() scales the clip to fill the target page, and a stretched
+		barcode may not scan.
+		"""
+		if not rect.width or not rect.height:
+			return bounds
+
+		target = self.LABEL_WIDTH_PT / self.LABEL_HEIGHT_PT
+		width, height = rect.width, rect.height
+		if width / height > target:
+			height = width / target
+		else:
+			width = height * target
+
+		mid_x, mid_y = (rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2
+		grown = fitz.Rect(mid_x - width / 2, mid_y - height / 2,
+				mid_x + width / 2, mid_y + height / 2)
+
+		# Slide back inside the page rather than clipping, which would skew the ratio.
+		dx = max(bounds.x0 - grown.x0, 0) + min(bounds.x1 - grown.x1, 0)
+		dy = max(bounds.y0 - grown.y0, 0) + min(bounds.y1 - grown.y1, 0)
+		grown = grown + (dx, dy, dx, dy)
+
+		return grown & bounds
 
 	def extract_manifest_no(self, content):
 		document = fitz.open(stream=content, filetype="pdf")
