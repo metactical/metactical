@@ -480,6 +480,37 @@ def _drop_legacy_products(job, log):
 	_step(job, step, "failed" if counts["failed"] else "attention" if counts["skipped"] else "done", message)
 
 
+# ---------- item changes jobs: item name, retail SKU, item code ----------
+
+def create_changes_job(template, changes):
+	"""Queue edits to a template's variants. Nothing is written until the worker runs it.
+
+	Renames are rename_doc without merge: every Link to the item (bins, ledger, prices, reposts)
+	follows it, and the CustomItem hook records an Item Merge History row for each one."""
+	family.load_template(template)
+	fam = {r.name: r for r in frappe.get_all("Item", filters={"variant_of": template},
+											 fields=["name", "item_name", "ifw_retailskusuffix"])}
+	rows, problems = rules.plan_changes(template, fam, changes)
+	if not rows and not problems:
+		raise UserError("Nothing has changed")
+	new_codes = [r["new_code"] for r in rows if r["new_code"]]
+	if new_codes and not problems:
+		taken = frappe.get_all("Item", filters={"name": ["in", new_codes]}, pluck="name")
+		problems += [f"{t} already exists as an item" for t in sorted(taken)]
+		running = frappe.get_all("Repost Item Valuation", filters={"status": "In Progress",
+								 "item_code": ["in", [r["item_code"] for r in rows if r["new_code"]]]}, pluck="item_code")
+		problems += [f"{c} has a stock repost running right now - try again when it finishes" for c in sorted(set(running))]
+	if problems:
+		raise UserError("Can't save: " + " · ".join(dict.fromkeys(problems)))
+	running = _active_job(template)
+	if running:
+		raise UserError(f"Job {running} is already queued or running for {template} - wait for it to finish")
+	job = frappe.get_doc({"doctype": DOCTYPE, "job_type": "Item Changes", "template": template, "status": "Queued",
+						  "total": len(rows), "processed": 0, "steps": "[]",
+						  "changes": [{**r, "status": "Queued"} for r in rows]}).insert()
+	family.add_activity(template, f"queued item changes job {job.name}: {len(rows)} variant(s)")
+	_enqueue(job)
+	return job.name
 
 
 def run_changes(job, log):
