@@ -30,11 +30,11 @@ frappe.ui.form.on("Zoho Books Settings", {
 		});
 	},
 
-	fetch_credit_cards(frm) {
+	fetch_bank_accounts(frm) {
 		frappe.call({
-			method: "metactical.metactical.doctype.zoho_books_settings.zoho_books_settings.fetch_credit_cards",
+			method: "metactical.metactical.doctype.zoho_books_settings.zoho_books_settings.fetch_bank_accounts",
 			freeze: true,
-			freeze_message: __("Fetching credit cards from Zoho Books..."),
+			freeze_message: __("Fetching bank accounts from Zoho Books..."),
 			callback: (r) => {
 				if (!r.exc) {
 					frappe.show_alert({ message: r.message, indicator: "green" });

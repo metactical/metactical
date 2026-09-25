@@ -25,8 +25,8 @@
   "refresh_token",
   "access_token",
   "access_token_expiry",
-  "credit_cards_section",
-  "fetch_credit_cards",
+  "bank_accounts_section",
+  "fetch_bank_accounts",
   "last_synced_on"
  ],
  "fields": [
@@ -151,16 +151,16 @@
    "read_only": 1
   },
   {
-   "description": "Syncs Zoho Books credit card accounts into ERPNext Bank Account records (matched by Integration ID).",
-   "fieldname": "credit_cards_section",
+   "description": "Syncs Zoho Books bank accounts into ERPNext Bank Account records (matched by Integration ID).",
+   "fieldname": "bank_accounts_section",
    "fieldtype": "Section Break",
-   "label": "Credit Cards"
+   "label": "Bank Accounts"
   },
   {
    "depends_on": "eval:!doc.__islocal",
-   "fieldname": "fetch_credit_cards",
+   "fieldname": "fetch_bank_accounts",
    "fieldtype": "Button",
-   "label": "Fetch Credit Cards"
+   "label": "Fetch Bank Accounts"
   },
   {
    "fieldname": "last_synced_on",
