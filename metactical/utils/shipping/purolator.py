@@ -267,7 +267,14 @@ class Purolator:
 			first_row = shipment.shipment_parcel[0]
 			data.append({'name': first_row.name, 'idx': first_row.idx, 'count': first_row.count, 'items': items})
 
-		return {"data": data, 'options': [{'key': k, 'val': v} for k, v in options.items()], "supports_multiple": False}
+		return {
+			"data": data,
+			'options': [{'key': k, 'val': v} for k, v in options.items()],
+			"supports_multiple": False,
+			# A single quote covers every piece (TotalPieces/PiecesInformation above),
+			# so the one row returned is the whole shipment's price, not one parcel's.
+			"rates_per_parcel": False,
+		}
 	
 	def create_shipment(self, docname, selected_service, shipment_amount):
 
