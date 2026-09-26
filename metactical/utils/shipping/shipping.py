@@ -16,8 +16,17 @@ def get_enabled_providers():
 		enabled_providers.append("Purolator")
 	return enabled_providers
 
+def validate_provider(provider):
+	# Every caller reaches a carrier API from here, so an unrecognised (or blank)
+	# provider must stop here rather than fall through to the signature default and
+	# hand one carrier's service code to another.
+	if provider not in ("Canada Post", "Purolator"):
+		frappe.throw(_("Unknown shipping provider: {0}").format(provider or _("(not set)")))
+
+
 @frappe.whitelist()
 def get_rate(name, provider='Canada Post', context=None):
+	validate_provider(provider)
 	if provider=="Canada Post":
 		cp = CanadaPost()
 		response = cp.get_rate(name, context)
@@ -30,6 +39,7 @@ def get_rate(name, provider='Canada Post', context=None):
 
 @frappe.whitelist()
 def create_shipping(name, provider='Canada Post', carrier_service=None, service_name={}, shipment_amount=0):
+	validate_provider(provider)
 	printing_disabled = frappe.db.get_single_value("Shipment Settings", "disable_automatic_print")
 	if provider=="Canada Post":
 		cp = CanadaPost()
@@ -62,6 +72,7 @@ def update_delivery_notes(docname):
 
 @frappe.whitelist()
 def avoid_shpment(name, provider='Canada Post', shipments_name=None):
+	validate_provider(provider)
 	if provider=="Canada Post":
 		cp = CanadaPost()
 		response = cp.avoid_shpment(name, shipments_name)
