@@ -173,6 +173,9 @@ def shared_series_naming(doc):
 			# as ordered off the NATIVE PO, not off the PO3
 			r.material_request = d.material_request
 			r.material_request_item = d.material_request_item
+			# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+			# see copy_line_identifiers
+			copy_line_identifiers(r, d)
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -371,6 +374,16 @@ def get_item_identifiers(item_code, supplier=None):
 	return item_identifiers(item_code, supplier)
 
 
+# The native twin's lines are built from item_code/qty/rate alone, leaving
+# ERPNext's get_item_details to fill the rest. It only fills barcode when the
+# item has exactly ONE barcode (erpnext update_barcode_value), so any item with
+# two or more came through with the PO3 line's barcode missing on the native PO
+# -- and on everything printed from it. Carry both identifiers across as-is.
+def copy_line_identifiers(r, d):
+	r.barcode = d.barcode
+	r.supplier_part_no = d.supplier_part_no
+
+
 def fill_item_identifiers(doc):
 	for d in doc.get("items"):
 		if not d.item_code:
@@ -476,6 +489,9 @@ def auto_send_on_approve(doc):
 				# as ordered off the NATIVE PO, not off the PO3
 				r.material_request = d.material_request
 				r.material_request_item = d.material_request_item
+				# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+				# see copy_line_identifiers
+				copy_line_identifiers(r, d)
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -606,6 +622,9 @@ def submitted_updates(doc):
 				# as ordered off the NATIVE PO, not off the PO3
 				r.material_request = d.material_request
 				r.material_request_item = d.material_request_item
+				# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+				# see copy_line_identifiers
+				copy_line_identifiers(r, d)
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False

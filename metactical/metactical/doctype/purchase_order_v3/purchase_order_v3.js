@@ -360,6 +360,17 @@ frappe.ui.form.on('Purchase Order V3', {
         });
     },
     refresh: function(frm) {
+        // Print the native twin with Purchase Order's own print formats, so every
+        // PO format (existing and future) works here without a PO3 copy. Only once
+        // submitted: until approval the twin's lines are not synced from the PO3,
+        // so a draft still prints from its own doctype.
+        if (frm.doc.docstatus === 1 && frm.doc.erp_purchase_order) {
+            frm.print_doc = function() {
+                frappe.set_route('print', 'Purchase Order', frm.doc.erp_purchase_order);
+            };
+        } else {
+            delete frm.print_doc;
+        }
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭱ Paste Items'), function() { po3_paste_items(frm); });
         }
