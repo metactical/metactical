@@ -169,18 +169,18 @@ class ZohoBooksSettings(Document):
 		return data
 
 	# ------------------------------------------------------------------
-	# First run: credit cards -> native ERPNext Bank Account records
+	# First run: bank accounts -> native ERPNext Bank Account records
 	# ------------------------------------------------------------------
-	def fetch_credit_cards(self):
-		"""Sync Zoho Books credit card accounts into ERPNext Bank Account records.
+	def fetch_bank_accounts(self):
+		"""Sync Zoho Books bank accounts into ERPNext Bank Account records.
 
 		Each Zoho account maps to a Bank Account, keyed by ``integration_id`` so
 		re-runs update existing records instead of creating duplicates.
 		"""
-		# The bankaccounts endpoint only filters by Status; account_type is a
-		# field on each record, so pull all accounts and filter here.
+		# The bankaccounts endpoint returns every banking account (bank cards,
+		# credit cards, etc.); pull them all with Status.All.
 		data = self.zoho_get("bankaccounts", params={"filter_by": "Status.All"})
-		accounts = [a for a in data.get("bankaccounts", []) if a.get("account_type") == "credit_card"]
+		accounts = data.get("bankaccounts", [])
 
 		created = updated = 0
 		for acc in accounts:
@@ -193,7 +193,7 @@ class ZohoBooksSettings(Document):
 		return {"total": len(accounts), "created": created, "updated": updated}
 
 	def _sync_bank_account(self, acc):
-		"""Create or update a Bank Account for one Zoho card. Returns True if created."""
+		"""Create or update a Bank Account for one Zoho account. Returns True if created."""
 		account_id = acc.get("account_id")
 		bank = _get_or_create_bank(acc.get("bank_name") or "Zoho Books")
 		book_balance = acc.get("balance") or 0
@@ -202,7 +202,7 @@ class ZohoBooksSettings(Document):
 		values = {
 			"account_name": acc.get("account_name") or account_id,
 			"bank": bank,
-			"account_type": _get_or_create_bank_account_type("Credit Card"),
+			"account_type": _get_or_create_bank_account_type(_account_type_label(acc.get("account_type"))),
 			"bank_account_no": acc.get("account_number"),
 			"integration_id": account_id,
 			"last_integration_date": nowdate(),
@@ -250,6 +250,13 @@ def _get_or_create_bank_account_type(account_type):
 	).insert(ignore_permissions=True).name
 
 
+def _account_type_label(account_type):
+	"""Turn a Zoho account_type (e.g. "credit_card") into a readable label."""
+	if not account_type:
+		return "Bank"
+	return account_type.replace("_", " ").title()
+
+
 # ----------------------------------------------------------------------
 # Whitelisted entry points (called from the client form)
 # ----------------------------------------------------------------------
@@ -260,7 +267,7 @@ def generate_tokens():
 
 
 @frappe.whitelist()
-def fetch_credit_cards():
+def fetch_bank_accounts():
 	doc = frappe.get_single("Zoho Books Settings")
-	result = doc.fetch_credit_cards()
-	return _("Synced {total} credit card account(s): {created} created, {updated} updated.").format(**result)
+	result = doc.fetch_bank_accounts()
+	return _("Synced {total} bank account(s): {created} created, {updated} updated.").format(**result)
