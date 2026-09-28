@@ -1,0 +1,220 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-09-17 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "scope_section",
+  "buying_price_list",
+  "selling_price_list",
+  "column_break_scope",
+  "brand",
+  "item_group",
+  "rule_section",
+  "markup",
+  "min_margin_pct",
+  "column_break_rule",
+  "rounding_rule",
+  "locked",
+  "disabled",
+  "evidence_section",
+  "derived_from_history",
+  "sample_size",
+  "low_confidence",
+  "column_break_evidence",
+  "spread_low",
+  "spread_high",
+  "derived_on",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "scope_section",
+   "fieldtype": "Section Break",
+   "label": "Applies To"
+  },
+  {
+   "fieldname": "buying_price_list",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Supplier Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "selling_price_list",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Selling Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Leave blank to cover every brand on this supplier list.",
+   "fieldname": "brand",
+   "fieldtype": "Link",
+   "label": "Brand",
+   "options": "Brand"
+  },
+  {
+   "description": "Leave blank to cover every item group. A row with both brand and item group set wins over one with only a brand.",
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "rule_section",
+   "fieldtype": "Section Break",
+   "label": "Rule"
+  },
+  {
+   "description": "Selling price = landed cost x this.",
+   "fieldname": "markup",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Markup",
+   "precision": "4",
+   "reqd": 1
+  },
+  {
+   "description": "Flag a suggestion falling under this. Never blocks. Ignored on the franchise and wholesale lists, which run thin by design.",
+   "fieldname": "min_margin_pct",
+   "fieldtype": "Percent",
+   "label": "Minimum Margin %"
+  },
+  {
+   "fieldname": "column_break_rule",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.99",
+   "fieldname": "rounding_rule",
+   "fieldtype": "Select",
+   "label": "Round To",
+   "options": "0.99\n0.95\nwhole\nnone"
+  },
+  {
+   "default": "0",
+   "description": "Rebuilding from history will not overwrite a locked row.",
+   "fieldname": "locked",
+   "fieldtype": "Check",
+   "label": "Pinned by a Person"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "evidence_section",
+   "fieldtype": "Section Break",
+   "label": "Evidence"
+  },
+  {
+   "default": "0",
+   "fieldname": "derived_from_history",
+   "fieldtype": "Check",
+   "label": "Derived From Price History",
+   "read_only": 1
+  },
+  {
+   "description": "How many items this median was taken from.",
+   "fieldname": "sample_size",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sample Size",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Fewer than 30 observations. Treat the markup as a hint, not a rule.",
+   "fieldname": "low_confidence",
+   "fieldtype": "Check",
+   "label": "Low Confidence",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_evidence",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "spread_low",
+   "fieldtype": "Float",
+   "label": "Spread Low",
+   "precision": "4",
+   "read_only": 1
+  },
+  {
+   "fieldname": "spread_high",
+   "fieldtype": "Float",
+   "label": "Spread High",
+   "precision": "4",
+   "read_only": 1
+  },
+  {
+   "fieldname": "derived_on",
+   "fieldtype": "Date",
+   "label": "Derived On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-17 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ICL Pricing",
+ "name": "Pricing Matrix",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
