@@ -26,8 +26,8 @@ add_to_apps_screen = [
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["metactical.bundle.js"]
+app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css", "metactical_price_grid.bundle.css"]
+app_include_js = ["metactical.bundle.js", "metactical_price_grid.bundle.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -66,7 +66,9 @@ doctype_js = {
 	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js",
 	"Email Campaign": "custom_scripts/email_campaign/email_campaign.js",
 	"BOM" : "custom_scripts/bom/bom.js",
-	"Operation": "custom_scripts/bom_operation/bom_operation.js"
+	"Operation": "custom_scripts/bom_operation/bom_operation.js",
+	# Adds the "Revise Prices" button that opens the ICL Pricing grid (merged from the icl_pricing app).
+	"Supplier Order Confirmation V3": "public/js/price_grid_supplier_order_confirmation_v3.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -105,6 +107,7 @@ home_page = "login"
 
 # before_install = "metactical.install.before_install"
 # after_install = "metactical.install.after_install"
+after_install = "metactical.pricing.icl_pricing_setup.after_install"
 
 # Desk Notifications
 # ------------------
