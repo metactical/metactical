@@ -37,6 +37,14 @@ def is_large(item_count):
 	return cint(item_count) > limits()["threshold"]
 
 
+def apply_threshold():
+	"""Apply runs in the background when it would write more than this many
+	prices/costs, so a big push to the price lists never blocks the request.
+	Tunable via ICL Pricing Settings; defaults to 50."""
+	s = frappe.get_cached_doc("ICL Pricing Settings")
+	return cint(s.get("apply_background_threshold")) or 50
+
+
 def is_busy(name):
 	return frappe.db.get_value("Price Revision", name, "job_status") in ACTIVE
 

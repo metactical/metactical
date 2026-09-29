@@ -115,7 +115,7 @@
 						</button>
 					</template>
 				</div>
-				<input v-model="search" class="form-control input-xs pg-search" :placeholder="t('Search item, name, SKU or brand')" @input="limit = PAGE" />
+				<input v-model="searchRaw" class="form-control input-xs pg-search" :placeholder="t('Search item, name, SKU or brand')" @input="onSearch" />
 				<label class="pg-check"><input v-model="showDetail" type="checkbox" /> {{ t("Show was / margin") }}</label>
 				<button v-if="editable" class="btn btn-xs btn-default" @click.stop="openMenu($event, bulkMenu())">{{ t("Bulk") }} ▾</button>
 				<button v-if="editable" class="btn btn-xs btn-default" @click="addPriceList">+ {{ t("Price List") }}</button>
@@ -200,6 +200,7 @@
 </template>
 
 <script>
+import { markRaw } from "vue";
 import Builder from "./Builder.vue";
 import GridRow from "./GridRow.vue";
 import { cellView, key, landedFor, parse, roundUp, SEP } from "./cells";
@@ -229,6 +230,7 @@ export default {
 			store: { edits: {}, removes: {}, costs: {}, company_currency: null },
 			filter: "all",
 			search: "",
+			searchRaw: "",
 			showDetail: true,
 			sort: { key: null, dir: 1 },
 			limit: PAGE,
@@ -268,35 +270,61 @@ export default {
 				{ key: "edited", label: __("Set by hand") },
 			];
 		},
-		// one pass over every cell; filters and counts both read it
-		flags() {
+		rowByCode() {
+			const m = new Map();
+			if (this.grid) for (const row of this.grid.rows) m.set(row.item_code, row);
+			return m;
+		},
+		// the items the user has an unsaved change on — the only rows whose flags
+		// can differ from the server baseline
+		touched() {
+			const s = new Set();
+			for (const k of Object.keys(this.store.edits)) s.add(k.split(SEP)[0]);
+			for (const k of Object.keys(this.store.removes)) s.add(k.split(SEP)[0]);
+			for (const k of Object.keys(this.store.costs)) s.add(k);
+			return s;
+		},
+		// per-row flags for the untouched server state; computed once per load, not
+		// per keystroke, because it doesn't read the edit store's values
+		baseFlags() {
 			const out = new Map();
 			if (!this.grid) return out;
-			for (const row of this.grid.rows) {
-				const f = {
-					cost: Math.abs(row.new_cost - row.old_cost) >= 0.005 || row.item_code in this.store.costs,
-					changed: false, review: false, hold: false, new: false, remove: false,
-					edited: row.item_code in this.store.costs,
-				};
-				for (const l of this.lists) {
-					const v = cellView(row, l, this.store);
-					if (!v) continue;
-					if (v.state === "up") f.changed = true;
-					if (v.state === "review" || v.state === "under") f.review = true;
-					if (v.state === "hold") f.hold = true;
-					if (v.state === "remove") f.remove = true;
-					if (v.isNew && v.state === "up") f.new = true;
-					if (v.cell.edited || v.changed) f.edited = true;
-				}
-				out.set(row.item_code, f);
+			const empty = { edits: {}, removes: {}, costs: {}, company_currency: this.doc.company_currency };
+			for (const row of this.grid.rows) out.set(row.item_code, this.rowFlags(row, empty));
+			return out;
+		},
+		// baseline with only the touched rows recomputed against live edits, so
+		// typing is O(touched rows), not O(all rows × lists)
+		flags() {
+			const touched = this.touched;
+			if (!touched.size) return this.baseFlags;
+			const out = new Map(this.baseFlags);
+			for (const code of touched) {
+				const row = this.rowByCode.get(code);
+				if (row) out.set(code, this.rowFlags(row, this.store));
+			}
+			return out;
+		},
+		baseCounts() {
+			const out = { all: 0, cost: 0, changed: 0, review: 0, hold: 0, new: 0, remove: 0, edited: 0 };
+			for (const f of this.baseFlags.values()) {
+				out.all += 1;
+				for (const k in f) if (f[k]) out[k] += 1;
 			}
 			return out;
 		},
 		counts() {
-			const out = { all: 0, cost: 0, changed: 0, review: 0, hold: 0, new: 0, remove: 0, edited: 0 };
-			for (const f of this.flags.values()) {
-				out.all += 1;
-				for (const k in f) if (f[k]) out[k] += 1;
+			const touched = this.touched;
+			if (!touched.size) return this.baseCounts;
+			const out = { ...this.baseCounts };
+			for (const code of touched) {
+				const base = this.baseFlags.get(code);
+				const live = this.flags.get(code);
+				if (!base || !live) continue;
+				for (const k in base) {
+					if (base[k]) out[k] -= 1;
+					if (live[k]) out[k] += 1;
+				}
 			}
 			return out;
 		},
@@ -364,10 +392,31 @@ export default {
 		window.removeEventListener("beforeunload", this._unload);
 		frappe.realtime.off("price_revision_job", this._onJob);
 		clearInterval(this._poll);
+		clearTimeout(this._searchTimer);
 	},
 	methods: {
 		t(text, args) {
 			return __(text, args);
+		},
+
+		// one pass over a row's cells against a given edit store
+		rowFlags(row, store) {
+			const f = {
+				cost: Math.abs(row.new_cost - row.old_cost) >= 0.005 || row.item_code in store.costs,
+				changed: false, review: false, hold: false, new: false, remove: false,
+				edited: row.item_code in store.costs,
+			};
+			for (const l of this.lists) {
+				const v = cellView(row, l, store);
+				if (!v) continue;
+				if (v.state === "up") f.changed = true;
+				if (v.state === "review" || v.state === "under") f.review = true;
+				if (v.state === "hold") f.hold = true;
+				if (v.state === "remove") f.remove = true;
+				if (v.isNew && v.state === "up") f.new = true;
+				if (v.cell.edited || v.changed) f.edited = true;
+			}
+			return f;
 		},
 
 		// ------------------------------------------------------------ loading
@@ -455,25 +504,38 @@ export default {
 		},
 
 		jobEnded(failed) {
+			// realtime and the 4s poll can both report the same finish; act once
+			if (this._ending) return;
+			this._ending = true;
 			clearInterval(this._poll);
 			this._poll = null;
 			const name = this.grid.doc.name;
-			this.call("get_grid", { name }).then((g) => {
-				this.take(g, failed);  // a failed save keeps your unsaved edits
-				if (failed) frappe.msgprint({ title: __("Background job stopped"), message: g.doc.job_message || "", indicator: "red" });
-				else frappe.show_alert({ message: __("{0} is up to date", [name]), indicator: "green" }, 5);
-			});
+			this.call("get_grid", { name })
+				.then((g) => {
+					this.take(g, failed);  // a failed save keeps your unsaved edits
+					if (failed) frappe.msgprint({ title: __("Background job stopped"), message: g.doc.job_message || "", indicator: "red" });
+					else frappe.show_alert({ message: __("{0} is up to date", [name]), indicator: "green" }, 5);
+				})
+				.finally(() => (this._ending = false));
 		},
 
 		take(grid, keepEdits) {
 			const old = this.store;
+			// Server rows never change here (only the edit store overlays them), so
+			// keep them out of Vue's reactivity: big revisions load and type faster.
+			grid.rows = markRaw(grid.rows);
 			this.grid = grid;
 			if (["Queued", "Running"].includes(grid.doc.job_status) && !this._poll) this.$nextTick(() => this.watchJob());
 			this.store = { edits: {}, removes: {}, costs: {}, company_currency: grid.doc.company_currency };
 			if (keepEdits) {
 				const present = new Set(grid.rows.map((r) => r.item_code));
+				const columns = new Set((grid.lists || []).map((l) => l.name));
+				// drop edits for items or price-list columns no longer on the grid
 				for (const part of ["edits", "removes"])
-					for (const [k, v] of Object.entries(old[part])) if (present.has(k.split(SEP)[0])) this.store[part][k] = v;
+					for (const [k, v] of Object.entries(old[part])) {
+						const [code, list] = k.split(SEP);
+						if (present.has(code) && columns.has(list)) this.store[part][k] = v;
+					}
 				for (const [k, v] of Object.entries(old.costs)) if (present.has(k)) this.store.costs[k] = v;
 			}
 			this.syncActions();
@@ -840,6 +902,13 @@ export default {
 
 		setFilter(f) {
 			this.filter = f;
+		},
+
+		// re-filtering thousands of rows on every keystroke is wasteful; settle first
+		onSearch() {
+			this.limit = PAGE;
+			clearTimeout(this._searchTimer);
+			this._searchTimer = setTimeout(() => (this.search = this.searchRaw), 200);
 		},
 
 		// ----------------------------------------------------------- keyboard
