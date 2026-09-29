@@ -160,18 +160,38 @@ def selectable_price_lists(name):
 
 @frappe.whitelist()
 def apply_grid(name):
-	"""Submit (if still a draft) and write the prices, in one step."""
+	"""Submit (if still a draft) and write the prices, in one step.
+
+	Applying more than the apply threshold (ICL Pricing Settings, default 50)
+	worth of price/cost writes runs in the background, so a large push to the
+	price lists never blocks the request; a big draft (past the item threshold)
+	does too, since submitting it recalculates every line.
+	"""
 	frappe.has_permission("Price Revision", "submit", name, throw=True)
 	jobs.ensure_idle(name)
-	if _is_large(name):
+	if _is_large(name):  # big draft: submitting it recalculates every line
 		jobs.start(name, "apply")
 		return {"queued": True}
 	doc = frappe.get_doc("Price Revision", name)
+	if _apply_work_size(doc) > jobs.apply_threshold():
+		jobs.start(name, "apply")
+		return {"queued": True}
 	if doc.docstatus == 0:
 		doc.submit()
 	result = apply_revision(name)
 	result["grid"] = _grid(frappe.get_doc("Price Revision", name))
 	return result
+
+
+def _apply_work_size(doc):
+	"""How many Item Price writes applying this revision would make: each cost
+	that actually changed, plus every price to update or remove."""
+	costs = sum(
+		1 for i in doc.items
+		if i.apply and abs(flt(i.new_cost) - flt(i.old_cost)) >= 0.005
+	)
+	changes = sum(1 for p in doc.prices if p.action in ("Update", "Delete"))
+	return costs + changes
 
 
 @frappe.whitelist()
@@ -444,12 +464,3 @@ def _grid(doc):
 		"lists": lists,
 		"rows": rows,
 	}
-
-
-@frappe.whitelist()
-def screen_version():
-	"""The grid bundle the server has now. A tab opened before an update
-	compares it with the one it loaded and offers a reload."""
-	from frappe.utils import get_assets_json
-
-	return get_assets_json().get("metactical_price_grid.bundle.js")
