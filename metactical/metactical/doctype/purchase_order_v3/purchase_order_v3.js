@@ -448,7 +448,7 @@ frappe.ui.form.on('Purchase Order V3', {
             }, __('Create'));
         };
         mk('Inbound Shipment', 'Inbound Shipment V3');
-        mk('Goods Receipt', 'Goods Receipt V3');
+        mk('Goods Receipt', 'Purchase Receipt V3');
         mk('Supplier Claim', 'Supplier Claim V3');
         if (frm.doc.erp_purchase_order) {
             frm.add_custom_button(__('Native PO'), function() {

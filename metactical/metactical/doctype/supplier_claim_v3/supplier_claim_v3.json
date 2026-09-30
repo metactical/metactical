@@ -9,7 +9,7 @@
  "field_order": [
   "sec_main",
   "purchase_order_v3",
-  "goods_receipt_v3",
+  "purchase_receipt_v3",
   "purchase_receipt",
   "supplier",
   "supplier_name",
@@ -37,10 +37,10 @@
    "options": "Purchase Order V3"
   },
   {
-   "fieldname": "goods_receipt_v3",
+   "fieldname": "purchase_receipt_v3",
    "fieldtype": "Link",
-   "label": "Goods Receipt V3",
-   "options": "Goods Receipt V3"
+   "label": "Purchase Receipt V3",
+   "options": "Purchase Receipt V3"
   },
   {
    "description": "Claims are raised after receiving \u2014 link the receipt the problem came in on.",

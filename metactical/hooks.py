@@ -964,7 +964,7 @@ fixtures = [{
 			"Purchase Order-custom_po3_status",
 			"Supplier Claim V3-workflow_state",
 			"Inbound Shipment V3-workflow_state",
-			"Goods Receipt V3-workflow_state",
+			"Purchase Receipt V3-workflow_state",
 			"Supplier Order Confirmation V3-workflow_state",
 			"Purchase Order V3-workflow_state",
 			"Purchase Order-custom_purchase_order_v3",
@@ -1639,7 +1639,7 @@ fixtures = [{
 	{
 		"dt": "Workflow",
 		"filters": [["name", "in", [
-			"Goods Receipt V3 Flow",
+			"Purchase Receipt V3 Flow",
 			"Inbound Shipment V3 Flow",
 			"Purchase Order V3 Flow",
 			"Supplier Claim V3 Flow",

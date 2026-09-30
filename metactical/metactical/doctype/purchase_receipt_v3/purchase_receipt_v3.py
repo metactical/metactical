@@ -14,7 +14,7 @@ from metactical.procurement_v3.utils import (
 )
 
 
-class GoodsReceiptV3(Document):
+class PurchaseReceiptV3(Document):
 	def validate(self):
 		validate(self)
 
@@ -27,7 +27,7 @@ class GoodsReceiptV3(Document):
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Validate And Classify"
-# (DocType Event / Before Save on Goods Receipt V3).
+# (DocType Event / Before Save on Purchase Receipt V3).
 #
 # Picks the shipment this count belongs to, lays out the expected lines, and
 # classifies every counted row against what was expected -- Match / Short /
@@ -85,10 +85,10 @@ def validate(doc):
 					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
 				onboard = onboard + float(si.qty or 0)
 			taken = 0.0
-			for prior in frappe.get_all("Goods Receipt V3",
+			for prior in frappe.get_all("Purchase Receipt V3",
 					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
 					fields=["name"], limit_page_length=0):
-				for gi in frappe.get_all("Goods Receipt V3 Item",
+				for gi in frappe.get_all("Purchase Receipt V3 Item",
 						filters={"parent": prior.name}, fields=["received_qty"],
 						limit_page_length=0):
 					taken = taken + float(gi.received_qty or 0)
@@ -119,12 +119,12 @@ def validate(doc):
 				shipped_map[si.po3_item] = shipped_map.get(si.po3_item, 0) + float(si.qty or 0)
 
 		# what earlier receipts already took off THIS shipment
-		for p in frappe.get_all("Goods Receipt V3",
+		for p in frappe.get_all("Purchase Receipt V3",
 				filters={"inbound_shipment_v3": doc.inbound_shipment_v3, "docstatus": 1},
 				fields=["name"], limit_page_length=0):
 			if p.name == doc.name:
 				continue
-			for gi in frappe.get_all("Goods Receipt V3 Item", filters={"parent": p.name},
+			for gi in frappe.get_all("Purchase Receipt V3 Item", filters={"parent": p.name},
 					fields=["po3_item", "received_qty"], limit_page_length=0):
 				if gi.po3_item:
 					recv_on_ship[gi.po3_item] = recv_on_ship.get(gi.po3_item, 0) + float(gi.received_qty or 0)
@@ -311,7 +311,7 @@ def validate(doc):
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Post To PO3"
-# (DocType Event / After Submit on Goods Receipt V3).
+# (DocType Event / After Submit on Purchase Receipt V3).
 #
 # Writes the counted quantities back onto the PO3 lines and re-derives each
 # line status, reconciles the confirmation's backorders and any open shipments,
@@ -388,7 +388,7 @@ def post_to_po3(doc):
 	if all_terminal:
 		hdr["receipt_status"] = "Closed Short" if any_short else "Received"
 		hdr["workflow_state"] = "Closed Short" if any_short else "Closed"
-		open_grs = frappe.get_all("Goods Receipt V3",
+		open_grs = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": po.name, "docstatus": 0,
 					"name": ("!=", doc.name)}, fields=["name"], limit_page_length=1)
 		if any_short and po.erp_purchase_order and not open_grs:
@@ -494,7 +494,7 @@ def post_to_po3(doc):
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Cancel Guard"
-# (DocType Event / Before Cancel on Goods Receipt V3).
+# (DocType Event / Before Cancel on Purchase Receipt V3).
 #
 # While the native Purchase Receipt is still submitted the stock it moved is
 # on hand, so that has to be cancelled first -- which rolls the quantities back
@@ -519,7 +519,7 @@ def cancel_guard(doc):
 # item code, retail SKU suffix, every Item Barcode, and this supplier's part
 # numbers, all upper-cased. Called once per receipt and cached client-side.
 #
-# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed to
+# No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed to
 # this dotted path.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
@@ -557,7 +557,7 @@ def v3_gr3_scan_map(po3=None):
 # each, so the form can lay the grid out before anything is saved. Counts are
 # always returned at zero -- the server re-derives them on save.
 #
-# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed here.
+# No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed here.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def v3_gr3_prefill_preview(po3=None, shipment=None):
@@ -578,10 +578,10 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
 				onboard = onboard + float(si.qty or 0)
 			taken = 0.0
-			for prior in frappe.get_all("Goods Receipt V3",
+			for prior in frappe.get_all("Purchase Receipt V3",
 					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
 					fields=["name"], limit_page_length=0):
-				for gi in frappe.get_all("Goods Receipt V3 Item",
+				for gi in frappe.get_all("Purchase Receipt V3 Item",
 						filters={"parent": prior.name}, fields=["received_qty"],
 						limit_page_length=0):
 					taken = taken + float(gi.received_qty or 0)
@@ -600,10 +600,10 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 				fields=["po3_item", "qty"], limit_page_length=0):
 			if si.po3_item:
 				shipped_map[si.po3_item] = shipped_map.get(si.po3_item, 0) + float(si.qty or 0)
-		for p in frappe.get_all("Goods Receipt V3",
+		for p in frappe.get_all("Purchase Receipt V3",
 				filters={"inbound_shipment_v3": ship, "docstatus": 1},
 				fields=["name"], limit_page_length=0):
-			for gi in frappe.get_all("Goods Receipt V3 Item", filters={"parent": p.name},
+			for gi in frappe.get_all("Purchase Receipt V3 Item", filters={"parent": p.name},
 					fields=["po3_item", "received_qty"], limit_page_length=0):
 				if gi.po3_item:
 					recv_on_ship[gi.po3_item] = recv_on_ship.get(gi.po3_item, 0) + float(gi.received_qty or 0)
@@ -633,11 +633,11 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 # Migrated from Server Script "V3 Retry GR3 Posting"
 # (API: v3_retry_gr3_posting).
 #
-# Recovery for a posted Goods Receipt V3 whose native Purchase Receipt never
+# Recovery for a posted Purchase Receipt V3 whose native Purchase Receipt never
 # made it: submits an existing draft PR, or builds and submits a new one.
 # Backs the "Retry ERP Posting" button.
 #
-# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed here.
+# No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed here.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def v3_retry_gr3_posting(gr3=None):
@@ -647,7 +647,7 @@ def v3_retry_gr3_posting(gr3=None):
 	name = gr3
 	if not name:
 		frappe.throw("pass gr3=<name>")
-	doc = frappe.get_doc("Goods Receipt V3", name)
+	doc = frappe.get_doc("Purchase Receipt V3", name)
 	if doc.docstatus != 1 or doc.workflow_state != "Posted":
 		frappe.throw(name + " is not Posted - nothing to retry.")
 
