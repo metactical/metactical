@@ -470,7 +470,7 @@ def post_to_po3(doc):
 				frappe.db.set_value(doc.doctype, doc.name, {"post_error": pr_err})
 				frappe.msgprint("<b>Stock NOT updated.</b> Purchase Receipt " + pr.name
 					+ " was created but could not be submitted:<br>" + pr_err
-					+ "<br><br>Fix the cause, then use <b>Retry ERP Posting</b> on this Goods Receipt.")
+					+ "<br><br>Fix the cause, then use <b>Retry ERP Posting</b> on this Purchase Receipt 3.")
 
 	# a receipt supersedes a manual reopen - normal closing rules apply again
 	frappe.db.set_value("Purchase Order V3", po.name, "manually_reopened", 0,
@@ -641,8 +641,8 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def v3_retry_gr3_posting(gr3=None):
-	# v3_retry_gr3_posting?gr3=GR3-YYYY-NNNNN
-	# Submits the draft PR a Goods Receipt already created, or creates one if the
+	# v3_retry_gr3_posting?gr3=PR3-YYYY-NNNNN
+	# Submits the draft PR a Purchase Receipt 3 already created, or creates one if the
 	# earlier attempt never got that far. Safe to call repeatedly.
 	name = gr3
 	if not name:
@@ -657,7 +657,7 @@ def v3_retry_gr3_posting(gr3=None):
 			frappe.db.set_value(doc.doctype, doc.name, {"post_error": None})
 			frappe.response["message"] = {"status": "already submitted", "pr": pr.name}
 		elif pr.docstatus == 2:
-			frappe.throw("Purchase Receipt " + pr.name + " was cancelled. Amend it in ERP, or cancel this Goods Receipt and re-receive.")
+			frappe.throw("Purchase Receipt " + pr.name + " was cancelled. Amend it in ERP, or cancel this Purchase Receipt 3 and re-receive.")
 		else:
 			try:
 				pr.submit()
