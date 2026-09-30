@@ -762,7 +762,7 @@ def submitted_updates(doc):
 				frappe.msgprint(gate["why"])
 			elif drafts:
 				frappe.msgprint("Native PO " + doc.erp_purchase_order
-					+ " left open - there is still a draft Goods Receipt against this order.")
+					+ " left open - there is still a draft Purchase Receipt 3 against this order.")
 		elif doc.workflow_state in ("Sent to Supplier", "Acknowledged",
 				"Partially Received", "Received") and native_now == "Closed":
 			try:
