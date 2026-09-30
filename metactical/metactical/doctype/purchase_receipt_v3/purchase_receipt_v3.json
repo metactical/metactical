@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "GR3-.YYYY.-.#####",
+ "autoname": "PR3-.YYYY.-.#####",
  "creation": "2026-08-12 13:04:20.975552",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -148,7 +148,7 @@
    "fieldname": "items",
    "fieldtype": "Table",
    "label": "Items",
-   "options": "Goods Receipt V3 Item",
+   "options": "Purchase Receipt V3 Item",
    "reqd": 1
   },
   {
@@ -219,7 +219,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Goods Receipt V3",
+   "options": "Purchase Receipt V3",
    "read_only": 1
   }
  ],
@@ -230,7 +230,7 @@
  "modified": "2026-08-23 22:44:43.651506",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "Goods Receipt V3",
+ "name": "Purchase Receipt V3",
  "naming_rule": "Expression (old style)",
  "owner": "akpoclaudeuser@goldenplazadistributors.com",
  "permissions": [

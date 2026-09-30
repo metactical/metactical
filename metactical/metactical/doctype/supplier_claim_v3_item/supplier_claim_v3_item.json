@@ -12,7 +12,7 @@
   "reason",
   "claim_type",
   "claim_amount",
-  "goods_receipt_v3",
+  "purchase_receipt_v3",
   "gr3_item",
   "sec_resolution",
   "supplier_response",
@@ -80,10 +80,10 @@
    "label": "Claim Amount"
   },
   {
-   "fieldname": "goods_receipt_v3",
+   "fieldname": "purchase_receipt_v3",
    "fieldtype": "Link",
    "label": "From Receipt",
-   "options": "Goods Receipt V3",
+   "options": "Purchase Receipt V3",
    "read_only": 1
   },
   {
