@@ -8,6 +8,8 @@ from frappe.utils import cint, flt, now_datetime, nowdate
 
 from metactical.icl_pricing.doctype.icl_pricing_settings.icl_pricing_settings import (
 	always_price_lists,
+	items_per_page,
+	max_items,
 )
 from metactical.pricing.costing import build_price_line, landed_cost
 from metactical.pricing.matrix import lookup_table as matrix_table
@@ -28,10 +30,38 @@ def current_prices(item_codes, price_lists):
 
 
 class PriceRevision(Document):
+	def autoname(self):
+		# a revision that belongs to a batch is named as a page of it
+		# (PRB-2026-00001-01 … -10); a standalone revision keeps its own series
+		if self.batch and self.page_no:
+			self.name = "{0}-{1:02d}".format(self.batch, cint(self.page_no))
+
 	def validate(self):
+		self._check_item_cap()
 		self.set_currencies()
 		self.recalculate()
 		self.roll_up_summary()
+
+	def _check_item_cap(self):
+		"""A revision holds a bounded number of items — ERPNext handles a huge
+		child table poorly, so a big selection is meant to be split across a
+		batch of revisions instead. Existing over-cap revisions are grandfathered:
+		only creating a new one over the cap, or adding still more to one already
+		over it, is refused."""
+		# a revision that is one page of a batch is capped at the page size;
+		# a standalone revision at the overall batch cap
+		cap = items_per_page() if self.batch else max_items()
+		n = len(self.items or [])
+		if n <= cap:
+			return
+		if self.is_new():
+			frappe.throw(_("A price revision can hold at most {0} items, but {1} were "
+			               "selected. Split the selection into smaller revisions.").format(cap, n))
+		before = cint(frappe.db.count("Price Revision Item", {"parent": self.name}))
+		if n > before:
+			frappe.throw(_("{0} already has {1} items, over the {2} limit — you can't add "
+			               "more. Remove some, or put them in another revision.").format(
+			               self.name, before, cap))
 
 	# The price rows are generated from the items and scoped lists, which are
 	# validated themselves; checking thousands of generated rows one at a time
@@ -99,21 +129,41 @@ class PriceRevision(Document):
 		if not scoped or not self.items:
 			return
 
+		ctx = self._pricing_context(scoped, [i.item_code for i in self.items])
+		decided = self._decided_prices()
+
+		rebuilt = []
+		for item in self.items:
+			rebuilt.extend(self._lines_for_item(item, scoped, ctx, decided))
+
+		self.set("prices", [])
+		for r in rebuilt:
+			self.append("prices", r)
+
+	def _pricing_context(self, scoped, codes):
+		"""Everything :meth:`_lines_for_item` needs, in a few queries. Scope it
+		to ``codes`` so a single-cell save loads one item's data, not the lot."""
 		include_all = {d.price_list for d in self.price_lists if d.get("include_all")}
 		include_all |= set(always_price_lists())
 		currency_of = dict(frappe.get_all(
 			"Price List", filters={"name": ("in", scoped)}, fields=["name", "currency"], as_list=True,
 		))
-		codes = [i.item_code for i in self.items]
 		current = current_prices(codes, scoped)
 		item_meta = {
 			r.name: r for r in frappe.get_all(
 				"Item", filters={"name": ("in", codes)}, fields=["name", "brand", "item_group"],
 			)
 		}
-		find_markup = matrix_table(self.buying_price_list)
+		return {
+			"include_all": include_all,
+			"currency_of": currency_of,
+			"current": current,
+			"item_meta": item_meta,
+			"find_markup": matrix_table(self.buying_price_list),
+		}
 
-		# decisions made in the grid, keyed on item + list
+	def _decided_prices(self):
+		"""The grid decisions (a typed price, a price to remove), keyed item+list."""
 		decided = {}
 		for p in self.prices or []:
 			if p.get("edited") or p.get("remove"):
@@ -121,78 +171,163 @@ class PriceRevision(Document):
 					"price": flt(p.new_price) if p.get("edited") else 0,
 					"remove": cint(p.get("remove")),
 				}
+		return decided
+
+	def _lines_for_item(self, item, scoped, ctx, decided):
+		"""Every scoped price line for one item, as row dicts, and the item's own
+		landed-cost / cost-change fields set along the way. The per-item unit both
+		a full recalculation and a single-cell save are built from."""
+		include_all = ctx["include_all"]
+		currency_of = ctx["currency_of"]
+		current = ctx["current"]
+		find_markup = ctx["find_markup"]
+
+		landed_old = landed_cost(item.old_cost, item.duty_pct, self.conversion_rate)
+		landed_new = landed_cost(item.new_cost, item.duty_pct, self.conversion_rate)
+		item.landed_old_cad = landed_old["company_ccy"]
+		item.landed_new_cad = landed_new["company_ccy"]
+		item.landed_old_usd = self._in_currency("USD", landed_old)
+		item.landed_new_usd = self._in_currency("USD", landed_new)
+		item.supplier_currency = self.supplier_currency
+		item.cost_change_pct = (
+			(flt(item.new_cost) - flt(item.old_cost)) / flt(item.old_cost) * 100.0
+			if flt(item.old_cost) else 0.0
+		)
+		moved = flt(item.new_cost) - flt(item.old_cost)
+		direction = "up" if moved >= 0.005 else "down" if moved <= -0.005 else "same"
+		meta = ctx["item_meta"].get(item.item_code) or {}
+
+		lines = []
+		for pl_name in scoped:
+			ccy = currency_of.get(pl_name)
+			if not ccy:
+				continue
+			key = (item.item_code, pl_name)
+			old_price = current.get(key, 0)
+			mine = decided.get(key) or {}
+
+			# A cost change revises the prices an item already has. It only
+			# prices an item new to a list when the list is always included,
+			# was added to this revision for every item, or someone typed one.
+			if not old_price and pl_name not in include_all and not mine.get("price"):
+				continue
+
+			old_in_ccy = self._in_currency(ccy, landed_old)
+			new_in_ccy = self._in_currency(ccy, landed_new)
+			if new_in_ccy is None:
+				lines.append(self._row(item, pl_name, ccy, {
+					"old_price": old_price, "new_price": old_price, "action": "Review",
+				}, note=_("{0} is in {1}; no exchange rate from {2} on file.").format(
+					pl_name, ccy, self.company_currency)))
+				continue
+			fx_note = None
+			if ccy not in (self.company_currency, self.supplier_currency):
+				fx_note = _("Landed converted {0} -> {1} at {2}.").format(
+					self.company_currency, ccy, flt(self._fx(ccy), 4))
+
+			mx = find_markup(pl_name, meta.get("brand"), meta.get("item_group")) or {}
+			line = build_price_line(
+				price_list=pl_name,
+				list_currency=ccy,
+				old_price=old_price,
+				old_landed=old_in_ccy,
+				new_landed=new_in_ccy,
+				markup=mx.get("markup"),
+				rounding=mx.get("rounding_rule") or self.rounding_rule or "0.99",
+				min_margin_pct=mx.get("min_margin_pct"),
+				cost_change=direction,
+				use_suggested=cint(self.use_suggested),
+			)
+			line["landed_in_list_ccy"] = new_in_ccy
+			line["markup_used"] = mx.get("markup")
+			line["markup_source"] = mx.get("matched_on")
+
+			if mine.get("price"):
+				take_typed_price(line, mine["price"], new_in_ccy, floor=mx.get("min_margin_pct"))
+			if mine.get("remove") and old_price:
+				mark_removed(line)
+
+			lines.append(self._row(item, pl_name, ccy, line, note=fx_note))
+		return lines
+
+	def save_item_edits(self, affected_items):
+		"""Persist an edit by rebuilding only the items it touched.
+
+		A full save rebuilds and rewrites every price line and re-checks every
+		link; when someone changes one cell (or one item's cost) only that
+		item's lines can move. This rebuilds just those, with the same maths a
+		full recalculation uses, writes the few rows that actually changed, and
+		refreshes the summary. Nothing else on the document is touched, so a
+		thousand-item revision saves a cell as quickly as a ten-item one.
+
+		Structural changes (a column added or dropped, Use Suggested toggled)
+		still go through the full save, since they move every line.
+		"""
+		affected_items = {c for c in affected_items if c}
+		scoped = [d.price_list for d in (self.price_lists or [])]
+		if not scoped or not affected_items:
+			return
+
+		ctx = self._pricing_context(
+			scoped, [i.item_code for i in self.items if i.item_code in affected_items]
+		)
+		decided = self._decided_prices()
+
+		# rows currently on the doc, split into the touched items and the rest
+		was, kept = {}, []
+		for p in self.prices or []:
+			if p.item_code in affected_items:
+				was[(p.item_code, p.price_list)] = p
+			else:
+				kept.append(p)
+
+		child = self.meta.get_field("prices").options
+		now, user = now_datetime(), frappe.session.user
+		next_idx = max([cint(p.idx) for p in (self.prices or [])] or [0])
 
 		rebuilt = []
 		for item in self.items:
-			landed_old = landed_cost(item.old_cost, item.duty_pct, self.conversion_rate)
-			landed_new = landed_cost(item.new_cost, item.duty_pct, self.conversion_rate)
-			item.landed_old_cad = landed_old["company_ccy"]
-			item.landed_new_cad = landed_new["company_ccy"]
-			item.landed_old_usd = self._in_currency("USD", landed_old)
-			item.landed_new_usd = self._in_currency("USD", landed_new)
-			item.supplier_currency = self.supplier_currency
-			item.cost_change_pct = (
-				(flt(item.new_cost) - flt(item.old_cost)) / flt(item.old_cost) * 100.0
-				if flt(item.old_cost) else 0.0
-			)
-			moved = flt(item.new_cost) - flt(item.old_cost)
-			direction = "up" if moved >= 0.005 else "down" if moved <= -0.005 else "same"
-			meta = item_meta.get(item.item_code) or {}
+			if item.item_code not in affected_items:
+				continue
+			for r in self._lines_for_item(item, scoped, ctx, decided):
+				row = was.pop((r["item_code"], r["price_list"]), None)
+				if row is None or row.get("__islocal") or not row.name:
+					next_idx += 1
+					row = self._new_price_row(child, r, next_idx, now, user)
+					row.db_insert()
+				else:
+					for k, v in r.items():
+						row.set(k, v)
+					row.modified, row.modified_by = now, user
+					row.db_update()
+				rebuilt.append(row)
 
-			for pl_name in scoped:
-				ccy = currency_of.get(pl_name)
-				if not ccy:
-					continue
-				key = (item.item_code, pl_name)
-				old_price = current.get(key, 0)
-				mine = decided.get(key) or {}
+		# a line a touched item no longer has (its cost fell off an include-all
+		# list, a typed price on a new cell was cleared before its first save…)
+		gone = [row.name for row in was.values() if row.name and not row.get("__islocal")]
+		if gone:
+			frappe.db.delete(child, {"name": ("in", gone)})
 
-				# A cost change revises the prices an item already has. It only
-				# prices an item new to a list when the list is always included,
-				# was added to this revision for every item, or someone typed one.
-				if not old_price and pl_name not in include_all and not mine.get("price"):
-					continue
+		self.set("prices", kept + rebuilt)
+		self.roll_up_summary()
+		frappe.db.set_value("Price Revision", self.name, {
+			"total_items": self.total_items,
+			"total_price_changes": self.total_price_changes,
+			"lines_needing_review": self.lines_needing_review,
+			"avg_cost_change_pct": self.avg_cost_change_pct,
+			"avg_margin_before": self.avg_margin_before,
+			"avg_margin_after": self.avg_margin_after,
+		}, update_modified=True)
 
-				old_in_ccy = self._in_currency(ccy, landed_old)
-				new_in_ccy = self._in_currency(ccy, landed_new)
-				if new_in_ccy is None:
-					rebuilt.append(self._row(item, pl_name, ccy, {
-						"old_price": old_price, "new_price": old_price, "action": "Review",
-					}, note=_("{0} is in {1}; no exchange rate from {2} on file.").format(
-						pl_name, ccy, self.company_currency)))
-					continue
-				fx_note = None
-				if ccy not in (self.company_currency, self.supplier_currency):
-					fx_note = _("Landed converted {0} -> {1} at {2}.").format(
-						self.company_currency, ccy, flt(self._fx(ccy), 4))
-
-				mx = find_markup(pl_name, meta.get("brand"), meta.get("item_group")) or {}
-				line = build_price_line(
-					price_list=pl_name,
-					list_currency=ccy,
-					old_price=old_price,
-					old_landed=old_in_ccy,
-					new_landed=new_in_ccy,
-					markup=mx.get("markup"),
-					rounding=mx.get("rounding_rule") or self.rounding_rule or "0.99",
-					min_margin_pct=mx.get("min_margin_pct"),
-					cost_change=direction,
-					use_suggested=cint(self.use_suggested),
-				)
-				line["landed_in_list_ccy"] = new_in_ccy
-				line["markup_used"] = mx.get("markup")
-				line["markup_source"] = mx.get("matched_on")
-
-				if mine.get("price"):
-					take_typed_price(line, mine["price"], new_in_ccy, floor=mx.get("min_margin_pct"))
-				if mine.get("remove") and old_price:
-					mark_removed(line)
-
-				rebuilt.append(self._row(item, pl_name, ccy, line, note=fx_note))
-
-		self.set("prices", [])
-		for r in rebuilt:
-			self.append("prices", r)
+	def _new_price_row(self, child, values, idx, now, user):
+		row = frappe.new_doc(child)
+		row.update(values)
+		row.parent, row.parenttype, row.parentfield = self.name, self.doctype, "prices"
+		row.docstatus, row.idx = self.docstatus, idx
+		row.name = frappe.generate_hash(length=10)
+		row.creation = row.modified = now
+		row.owner = row.modified_by = user
+		return row
 
 	def _in_currency(self, currency, landed):
 		"""A landed-cost pair expressed in ``currency``, or None with no rate."""
