@@ -2,9 +2,8 @@
  "actions": [],
  "allow_rename": 0,
  "autoname": "naming_series:",
- "creation": "2026-09-17 10:00:00.000000",
+ "creation": "2026-09-30 12:00:00.000000",
  "doctype": "DocType",
- "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
   "source_section",
@@ -19,8 +18,6 @@
   "whole_order",
   "use_suggested",
   "status",
-  "batch",
-  "page_no",
   "basis_section",
   "company",
   "company_currency",
@@ -30,12 +27,12 @@
   "rate_source",
   "rounding_rule",
   "effective_from",
+  "paging_section",
+  "items_per_page",
+  "page_count",
+  "column_break_paging",
   "scope_section",
   "price_lists",
-  "items_section",
-  "items",
-  "prices_section",
-  "prices",
   "summary_section",
   "total_items",
   "total_price_changes",
@@ -44,14 +41,6 @@
   "avg_margin_before",
   "avg_margin_after",
   "lines_needing_review",
-  "applied_section",
-  "applied_on",
-  "applied_by",
-  "column_break_applied",
-  "reverted_on",
-  "reverted_by",
-  "notes",
-  "amended_from",
   "section_job",
   "job_status",
   "job_operation",
@@ -66,11 +55,11 @@
    "label": "Source"
   },
   {
-   "default": "PREV-.YYYY.-",
+   "default": "PRB-.YYYY.-",
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Series",
-   "options": "PREV-.YYYY.-",
+   "options": "PRB-.YYYY.-",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -91,7 +80,7 @@
    "read_only": 1
   },
   {
-   "description": "The cost list this revision writes to.",
+   "description": "The cost list every revision in this batch writes to.",
    "fieldname": "buying_price_list",
    "fieldtype": "Link",
    "label": "Supplier Price List",
@@ -103,7 +92,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Supplier Confirmation",
+   "default": "Manual",
    "fieldname": "source",
    "fieldtype": "Select",
    "label": "Raised From",
@@ -124,18 +113,16 @@
    "label": "Supplier Order Confirmation"
   },
   {
+   "default": "0",
    "fieldname": "whole_order",
    "fieldtype": "Check",
-   "label": "Whole Order",
-   "default": "0",
-   "description": "Include every line of the order, not just the lines whose cost changed."
+   "label": "Whole Order"
   },
   {
+   "default": "1",
    "fieldname": "use_suggested",
    "fieldtype": "Check",
-   "label": "Use Suggested Price",
-   "default": "1",
-   "description": "On: lines whose cost changed take the suggested price, up or down. Off: current prices are kept and suggestions are only shown."
+   "label": "Use Suggested Price"
   },
   {
    "default": "Draft",
@@ -144,24 +131,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nPending Review\nApplied\nReverted\nCancelled",
+   "options": "Draft\nPending Review\nApplied\nPartially Applied\nReverted\nCancelled",
    "read_only": 1
-  },
-  {
-   "fieldname": "batch",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "label": "Batch",
-   "options": "Price Revision Batch",
-   "read_only": 1,
-   "description": "The collective this revision is one page of. Set when a large selection is split across several revisions."
-  },
-  {
-   "fieldname": "page_no",
-   "fieldtype": "Int",
-   "label": "Page",
-   "read_only": 1,
-   "description": "This revision's page number within its batch."
   },
   {
    "fieldname": "basis_section",
@@ -195,7 +166,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Stamped from the Purchase Order — the rate the goods were actually bought at. Kept so a margin can be reproduced months later.",
    "fieldname": "conversion_rate",
    "fieldtype": "Float",
    "label": "Conversion Rate",
@@ -221,6 +191,28 @@
    "label": "Effective From"
   },
   {
+   "fieldname": "paging_section",
+   "fieldtype": "Section Break",
+   "label": "Pages"
+  },
+  {
+   "description": "Items per revision (page) in this batch, fixed when the batch was created.",
+   "fieldname": "items_per_page",
+   "fieldtype": "Int",
+   "label": "Items Per Page",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page_count",
+   "fieldtype": "Int",
+   "label": "Pages",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_paging",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "scope_section",
    "fieldtype": "Section Break",
    "label": "Price Lists In Scope"
@@ -230,28 +222,6 @@
    "fieldtype": "Table MultiSelect",
    "label": "Selling Price Lists",
    "options": "Price Revision Price List"
-  },
-  {
-   "fieldname": "items_section",
-   "fieldtype": "Section Break",
-   "label": "Cost Changes"
-  },
-  {
-   "fieldname": "items",
-   "fieldtype": "Table",
-   "label": "Items",
-   "options": "Price Revision Item"
-  },
-  {
-   "fieldname": "prices_section",
-   "fieldtype": "Section Break",
-   "label": "Price Changes"
-  },
-  {
-   "fieldname": "prices",
-   "fieldtype": "Table",
-   "label": "Prices",
-   "options": "Price Revision Price"
   },
   {
    "collapsible": 1,
@@ -300,56 +270,6 @@
    "read_only": 1
   },
   {
-   "collapsible": 1,
-   "fieldname": "applied_section",
-   "fieldtype": "Section Break",
-   "label": "Application"
-  },
-  {
-   "fieldname": "applied_on",
-   "fieldtype": "Datetime",
-   "label": "Applied On",
-   "read_only": 1
-  },
-  {
-   "fieldname": "applied_by",
-   "fieldtype": "Link",
-   "label": "Applied By",
-   "options": "User",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_applied",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "reverted_on",
-   "fieldtype": "Datetime",
-   "label": "Reverted On",
-   "read_only": 1
-  },
-  {
-   "fieldname": "reverted_by",
-   "fieldtype": "Link",
-   "label": "Reverted By",
-   "options": "User",
-   "read_only": 1
-  },
-  {
-   "fieldname": "notes",
-   "fieldtype": "Small Text",
-   "label": "Notes"
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Price Revision",
-   "print_hide": 1,
-   "read_only": 1
-  },
-  {
    "fieldname": "section_job",
    "fieldtype": "Section Break",
    "label": "Background Job",
@@ -390,17 +310,21 @@
   }
  ],
  "index_web_pages_for_search": 1,
- "is_submittable": 1,
- "links": [],
- "modified": "2026-09-19 09:00:00.000000",
+ "is_submittable": 0,
+ "links": [
+  {
+   "group": "Pages",
+   "link_doctype": "Price Revision",
+   "link_fieldname": "batch"
+  }
+ ],
+ "modified": "2026-09-30 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "ICL Pricing",
- "name": "Price Revision",
+ "name": "Price Revision Batch",
  "owner": "Administrator",
  "permissions": [
   {
-   "amend": 1,
-   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -410,12 +334,9 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
-   "submit": 1,
    "write": 1
   },
   {
-   "amend": 1,
-   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -425,7 +346,6 @@
    "report": 1,
    "role": "Purchase Manager",
    "share": 1,
-   "submit": 1,
    "write": 1
   },
   {
