@@ -127,7 +127,6 @@ function gr3_apply_scan(frm, item_code, label, qty_override) {
         row.received_qty = 0;
         row.accepted_qty = 0;
         row.rejected_qty = 0;
-        row.disposition = 'Accept';
         added = true;
     }
     var was = flt(row.received_qty);
@@ -265,6 +264,13 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 + (frm.doc.purchase_order_v3 || 'the order')
                 + '. This cannot be undone without cancelling that receipt.<br>'
                 + bits.join(' &middot; '), 'orange');
+        }
+
+        // the draft native twin, kept in step with the count (see sync_native_pr)
+        if (frm.doc.docstatus === 0 && frm.doc.erp_purchase_receipt) {
+            frm.add_custom_button(__('Draft Purchase Receipt'), function () {
+                frappe.set_route('Form', 'Purchase Receipt', frm.doc.erp_purchase_receipt);
+            }, __('View'));
         }
 
         if (frm.doc.docstatus === 1) {
