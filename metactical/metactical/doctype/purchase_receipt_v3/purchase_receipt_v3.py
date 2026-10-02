@@ -41,8 +41,7 @@ class PurchaseReceiptV3(Document):
 # Picks the shipment this count belongs to, lays out the expected lines, and
 # classifies every counted row against what was expected -- Match / Short /
 # Over / Wrong Variant / Wrong Item / Damaged / Unordered -- enforcing a
-# Reject Reason on any line that comes in under what was expected once
-# counting is done.
+# Reject Reason on every Short line once counting is done.
 #
 # resolve_item and ident stay nested here ON PURPOSE. Supplier Order
 # Confirmation V3 has functions of the same names with DIFFERENT bodies, so
@@ -271,12 +270,15 @@ def validate(doc):
 			d.variance_qty = 0
 		if vt != "Match":
 			var_count += 1
-		# less usable stock than expected - counted short, or some of it
-		# rejected - has to say why before the receipt can move on
-		if strict and acc < F(d.expected_qty) and not d.reject_reason:
-			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): accepted "
-				+ str(acc) + " of " + str(F(d.expected_qty)) + " expected - set a Reject Reason "
+		# a short line has to say why before the receipt can move on
+		if strict and vt == "Short" and not d.reject_reason:
+			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): counted "
+				+ str(rec) + " of " + str(F(d.expected_qty)) + " expected - set a Reject Reason "
 				+ "before this receipt can move on.")
+		# "Other" is only a reason once it is written down
+		if d.reject_reason == "Other" and not (d.remarks or "").strip():
+			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): Reject "
+				+ "Reason is Other - write the reason in Remarks.")
 
 	doc.has_variance = 1 if var_count else 0
 	doc.variance_count = var_count
