@@ -20,8 +20,8 @@ class SupplierClaimV3(Document):
 # a Purchase Receipt V3 (rejections, wrong items, unbilled overages), maps each
 # one to a claim reason and claim type, and totals the claim value.
 #
-# claim_reason / claim_type_for / claimable stay nested, matching the original
-# script's scoping.
+# claim_reason / claimable stay nested, matching the original script's scoping.
+# Every line starts as a Credit claim; the buyer changes the Claim Type per line.
 # ---------------------------------------------------------------------------
 def validate(doc):
 	# A receipt line is claimable when the supplier owes us something for it:
@@ -45,21 +45,9 @@ def validate(doc):
 			return "Overage Billed"
 		return "Other"
 
-	def claim_type_for(disposition):
-		if disposition == "Return to Supplier":
-			return "Refund"
-		if disposition in ("Keep - Claim Credit", "Keep - Free of Charge", "Write Off", "Quarantine"):
-			return "Credit"
-		if disposition == "Accept as Substitution":
-			return "None"
-		return "Credit"
-
-	def claimable(rejected, disposition, var_type, var_qty, overage_billed):
+	def claimable(rejected, var_type, var_qty, overage_billed):
 		if rejected > 0:
 			return rejected
-		if disposition in ("Return to Supplier", "Keep - Claim Credit",
-				"Keep - Free of Charge", "Write Off"):
-			return abs(var_qty) if var_qty else 0
 		if var_type in ("Short", "Wrong Item", "Wrong Variant", "Unordered"):
 			return abs(var_qty)
 		if var_type == "Over" and overage_billed:
@@ -106,9 +94,9 @@ def validate(doc):
 			for d in frappe.get_all("Purchase Receipt V3 Item", filters={"parent": g.name},
 					fields=["name", "po3_item", "expected_item_code", "received_item_code",
 							"rejected_qty", "reject_reason", "variance_type", "variance_qty",
-							"disposition", "overage_billed", "photo", "remarks"],
+							"overage_billed", "photo", "remarks"],
 					order_by="idx", limit_page_length=0):
-				qty = claimable(F(d.rejected_qty), d.disposition, d.variance_type,
+				qty = claimable(F(d.rejected_qty), d.variance_type,
 					F(d.variance_qty), d.overage_billed)
 				qty = qty - claimed.get(d.name, 0)
 				if qty <= 0:
@@ -124,7 +112,7 @@ def validate(doc):
 				row.item_name = frappe.db.get_value("Item", ic, "item_name") if ic else None
 				row.qty = qty
 				row.reason = claim_reason(d.reject_reason, d.variance_type)
-				row.claim_type = claim_type_for(d.disposition)
+				row.claim_type = "Credit"
 				row.claim_amount = qty * rates.get(d.po3_item, 0)
 				row.supplier_response = "Pending"
 				row.goods_outcome = "Pending"
@@ -137,8 +125,8 @@ def validate(doc):
 		if not doc.items:
 			frappe.throw("Nothing on " + (doc.purchase_receipt_v3 or doc.purchase_order_v3)
 				+ " is claimable. A line becomes claimable when the receipt rejects "
-				+ "some of it, or flags it Short / Wrong Item / Wrong Variant, or its "
-				+ "disposition is Return to Supplier or Keep - Claim Credit. "
+				+ "some of it, or flags it Short / Wrong Item / Wrong Variant / Unordered, "
+				+ "or an overage the supplier billed. "
 				+ "If it has already been claimed, look at the existing claim instead.")
 
 		# when the claim came from one receipt only, carry its links across

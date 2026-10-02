@@ -22,7 +22,6 @@
   "cb_split",
   "variance_type",
   "variance_qty",
-  "disposition",
   "overage_billed",
   "photo",
   "remarks"
@@ -115,7 +114,9 @@
    "fieldname": "reject_reason",
    "fieldtype": "Select",
    "label": "Reject Reason",
-   "options": "\nDamaged\nDefective\nExpired\nWrong Labelling\nOther"
+   "options": "\nShort Shipped\nDamaged\nDefective\nExpired\nWrong Labelling\nOther",
+   "description": "Required when the line comes in under what was expected - counted short, or part of it rejected.",
+   "mandatory_depends_on": "eval:!in_list(['Draft', 'Counting'], parent.workflow_state) && flt(doc.accepted_qty) < flt(doc.expected_qty)"
   },
   {
    "fieldname": "cb_split",
@@ -139,12 +140,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "disposition",
-   "fieldtype": "Select",
-   "label": "Disposition",
-   "options": "\nAccept\nKeep - Free of Charge\nKeep - Claim Credit\nAccept as Substitution\nQuarantine\nReturn to Supplier\nClose Short\nWrite Off"
-  },
-  {
    "default": "0",
    "description": "Supplier invoiced the extra qty. Decides free-of-charge vs claim.",
    "fieldname": "overage_billed",
@@ -166,7 +161,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:43.845201",
+ "modified": "2026-10-02 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3 Item",

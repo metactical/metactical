@@ -53,6 +53,14 @@ ZERO_QTY_STATUSES = ("Back-ordered", "Supplier Stock Out", "Discontinued", "Canc
 # what holds for pasted rows and the bulk-status API.
 ETA_REQUIRED_STATUSES = ("Back-ordered", "Supplier Stock Out")
 
+# The supplier is sending MORE than the order asked for:
+#   Qty Increased  - more of a line that is on the order; Confirmed Qty is above
+#                    the outstanding qty and the PO3 line grows to match
+#   New Item Added - an item that is not on the order at all; the row has no PO3
+#                    line until submit, when one is added to the order for it
+QTY_INCREASED = "Qty Increased"
+NEW_ITEM = "New Item Added"
+
 
 def validate(doc):
 	def resolve_item(val):
@@ -149,6 +157,9 @@ def validate(doc):
 			if not code:
 				frappe.throw("Row " + str(d.idx) + ": no item matches '" + str(d.item_code) + "'.")
 			d.item_code = code
+			# not on the order, so there is no PO line to match - submit adds one
+			if d.line_status == NEW_ITEM:
+				continue
 			match = None
 			for r in po.items:
 				if r.item_code == code and r.name not in used and outstanding(r, claimed):
@@ -156,7 +167,8 @@ def validate(doc):
 					break
 			if not match:
 				frappe.throw("Row " + str(d.idx) + ": " + code + " is not outstanding on " + po.name
-					+ " (already received, closed, or on another confirmation).")
+					+ " (already received, closed, or on another confirmation). If the supplier is "
+					+ "sending it as an extra item, set the line to '" + NEW_ITEM + "'.")
 			d.po3_item = match
 			used[match] = 1
 			if not d.line_status:
@@ -168,6 +180,9 @@ def validate(doc):
 	doc.revision_no = len(others) + 1
 
 	for d in doc.items:
+		if d.line_status == NEW_ITEM:
+			validate_new_item(doc, po, d)
+			continue
 		if d.po3_item not in rows:
 			frappe.throw("Row " + str(d.idx) + ": PO3 Line does not belong to " + po.name)
 		r = rows[d.po3_item]
@@ -207,10 +222,14 @@ def validate(doc):
 		if s == "Confirmed" and q != o:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "")
 				+ "): 'Confirmed' means the full outstanding qty (" + str(o) + "), got " + str(q)
-				+ ". Use a 'Partial - ...' status for less.")
+				+ ". Use a 'Partial - ...' status for less, or '" + QTY_INCREASED + "' for more.")
 		if s in ("Partial - Balance Cancelled", "Partial - Balance Back-ordered") and not (0 < q < o):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + s
 				+ "' requires 0 < Confirmed Qty < " + str(o))
+		if s == QTY_INCREASED and not q > o:
+			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + s
+				+ "' means the supplier is sending more than the outstanding qty (" + str(o)
+				+ ") - Confirmed Qty must be above it, got " + str(q) + ".")
 		if s == "Substituted" and not d.substitute_item_code:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): 'Substituted' requires the Substitute Item.")
 		if d.confirmed_rate and F(r.rate):
@@ -264,6 +283,35 @@ def validate(doc):
 
 
 # ---------------------------------------------------------------------------
+# A line the supplier added that was never on the order.
+#
+# Nothing to measure it against, so Ordered Qty is 0 and the confirmation alone
+# says how many are coming and at what price. A row that was pulled off the
+# order cannot become one: more of an ordered item is Qty Increased.
+# ---------------------------------------------------------------------------
+def validate_new_item(doc, po, d):
+	label = "Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + NEW_ITEM + "'"
+	if d.po3_item:
+		frappe.throw(label + " is for items that are not on " + po.name
+			+ ". This line is on the order - use '" + QTY_INCREASED + "' for extra quantity.")
+	d.ordered_qty = 0
+	ii = item_identifiers(d.item_code, doc.supplier)
+	d.item_name = ii["item_name"]
+	d.retail_sku_suffix = ii["retail_sku_suffix"]
+	d.barcode = ii["barcode"]
+	d.supplier_part_no = ii["supplier_part_no"]
+	d.rate_variance_pct = 0
+	if F(d.confirmed_qty) <= 0:
+		frappe.throw(label + " needs the Confirmed Qty the supplier is sending.")
+	if not F(d.confirmed_rate) and po.buying_price_list:
+		d.confirmed_rate = F(frappe.db.get_value("Item Price",
+			{"item_code": d.item_code, "price_list": po.buying_price_list, "buying": 1},
+			"price_list_rate", order_by="valid_from desc"))
+	if not F(d.confirmed_rate):
+		frappe.throw(label + " needs a Confirmed Rate - there is no order price to fall back on.")
+
+
+# ---------------------------------------------------------------------------
 # Header totals, printed under the Lines grid.
 #
 # Deliberately derived and never typed: the grid is what the supplier said, and
@@ -302,9 +350,16 @@ def set_totals(doc):
 def mirror_to_po3(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	discontinued_items = []
+	# what the native twin has to take on as well: {po3_item: extra qty}, and
+	# the PO3 lines that were added for new items
+	native_increase = {}
+	native_new = []
 
 	for d in doc.items:
 		s = d.line_status
+		if s == NEW_ITEM:
+			native_new.append(add_po3_line(po, d))
+			continue
 		prev = frappe.db.get_value("Purchase Order V3 Item", d.po3_item,
 			["line_status", "confirmed_qty"], as_dict=True)
 		total = F(d.confirmed_qty)
@@ -344,7 +399,16 @@ def mirror_to_po3(doc):
 			upd["short_qty"] = F(d.ordered_qty)
 		elif s == "Substituted":
 			upd["line_status"] = "Substituted"
+		elif s == QTY_INCREASED:
+			# the order grows by whatever the supplier is sending over the balance
+			extra = F(d.confirmed_qty) - F(d.ordered_qty)
+			upd["line_status"] = "Confirmed"
+			upd["qty"] = F(frappe.db.get_value("Purchase Order V3 Item", d.po3_item, "qty")) + extra
+			native_increase[d.po3_item] = extra
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
+
+	if native_increase or native_new:
+		grow_native_po(po.name, native_increase, native_new)
 
 	if discontinued_items:
 		frappe.msgprint("Marked <b>Discontinued</b> on the Item record: "
@@ -378,6 +442,98 @@ def mirror_to_po3(doc):
 	v3_recalc_totals(po.name)
 
 	mirror_po3_status(po.name)
+
+
+# ---------------------------------------------------------------------------
+# Puts a New Item Added line onto the submitted PO3, already Confirmed, and
+# points the confirmation row at it -- from here on shipments, receipts and
+# claims treat it like any other line on the order.
+# ---------------------------------------------------------------------------
+def add_po3_line(po, d):
+	r = po.append("items", {
+		"item_code": d.item_code,
+		"item_name": d.item_name,
+		"retail_sku_suffix": d.retail_sku_suffix,
+		"supplier_part_no": d.supplier_part_no,
+		"barcode": d.barcode,
+		"variant_of": frappe.db.get_value("Item", d.item_code, "variant_of"),
+		"uom": frappe.db.get_value("Item", d.item_code, "stock_uom"),
+		"qty": F(d.confirmed_qty),
+		"rate": F(d.confirmed_rate),
+		"amount": F(d.confirmed_qty) * F(d.confirmed_rate),
+		"warehouse": po.set_warehouse,
+		"required_by": po.required_by,
+		"line_status": "Confirmed",
+		"confirmed_qty": F(d.confirmed_qty),
+	})
+	r.docstatus = 1
+	r.db_insert()
+	frappe.db.set_value(d.doctype, d.name, "po3_item", r.name)
+	d.po3_item = r.name
+	return r.name
+
+
+# ---------------------------------------------------------------------------
+# Carries Qty Increased / New Item Added onto the native Purchase Order, through
+# ERPNext's own "Update Items" so its per-received / billing figures stay right.
+# The native PR can only receive what its PO line holds, so without this the
+# extra goods would have nowhere to land.
+#
+# A twin still in draft is skipped: approval rebuilds it from the PO3 lines.
+# A failure is reported rather than raised -- the supplier has confirmed, and
+# the native PO can still be fixed by hand with Update Items.
+# ---------------------------------------------------------------------------
+def grow_native_po(po3_name, increase, new_lines):
+	from erpnext.controllers.accounts_controller import update_child_qty_rate
+
+	erp_po = frappe.db.get_value("Purchase Order V3", po3_name, "erp_purchase_order")
+	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
+		return
+	npo = frappe.get_doc("Purchase Order", erp_po)
+
+	erp_of = {}
+	for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": po3_name},
+			fields=["name", "erp_po_item"], limit_page_length=0):
+		erp_of[r.name] = r.erp_po_item
+	add_to = {}
+	for po3_item, extra in increase.items():
+		if erp_of.get(po3_item):
+			add_to[erp_of[po3_item]] = extra
+
+	trans = []
+	for r in npo.items:
+		trans.append({"docname": r.name, "item_code": r.item_code, "idx": r.idx,
+			"qty": F(r.qty) + add_to.get(r.name, 0), "rate": F(r.rate), "uom": r.uom,
+			"conversion_factor": r.conversion_factor, "schedule_date": str(r.schedule_date)})
+	new_rows = []
+	for po3_item in new_lines:
+		r = frappe.db.get_value("Purchase Order V3 Item", po3_item,
+			["name", "item_code", "qty", "rate", "uom"], as_dict=True)
+		new_rows.append(r)
+		trans.append({"item_code": r.item_code, "idx": len(trans) + 1, "qty": F(r.qty),
+			"rate": F(r.rate), "uom": r.uom, "conversion_factor": 1,
+			"schedule_date": str(npo.schedule_date)})
+
+	before = set(r.name for r in npo.items)
+	try:
+		update_child_qty_rate("Purchase Order", json.dumps(trans), erp_po)
+	except Exception as e:
+		frappe.msgprint("<b>Native PO " + erp_po + " was NOT updated</b> with the extra "
+			+ "quantity / new items:<br>" + str(e)[:300] + "<br><br>Use <b>Update Items</b> on "
+			+ erp_po + " to add them, or the receipt cannot post against them.")
+		return
+
+	# link each new PO3 line to the native row made for it, so the receipt can
+	# post against it
+	added = [r for r in frappe.get_all("Purchase Order Item", filters={"parent": erp_po},
+		fields=["name", "item_code"], order_by="idx", limit_page_length=0) if r.name not in before]
+	for r in new_rows:
+		for i, n in enumerate(added):
+			if n.item_code == r.item_code:
+				frappe.db.set_value("Purchase Order V3 Item", r.name, "erp_po_item", n.name)
+				added.pop(i)
+				break
+	frappe.msgprint("Native PO " + erp_po + " updated with the extra quantity / new items.")
 
 
 # ---------------------------------------------------------------------------
