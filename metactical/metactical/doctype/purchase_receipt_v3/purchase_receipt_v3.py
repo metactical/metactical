@@ -6,6 +6,7 @@ from frappe.model.document import Document
 
 from metactical.procurement_v3.utils import (
 	F,
+	item_supplier_part_no,
 	mirror_po3_status,
 	v3_may_close_native,
 	v3_open_bo,
@@ -67,7 +68,9 @@ def validate(doc):
 		return {
 			"rs": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
 			"bc": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
-			"sp": frappe.db.get_value("Item Supplier", {"parent": item_code, "supplier": supplier}, "supplier_part_no")}
+			# the same fallbacks PO3 and SOC3 use, so the receipt shows the
+			# supplier SKU the order line does
+			"sp": item_supplier_part_no(item_code, supplier)}
 
 
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
@@ -518,6 +521,9 @@ def fill_native_pr(pr, doc, po, final):
 		row.rejected_qty = F(d.rejected_qty)
 		row.warehouse = doc.warehouse
 		row.rejected_warehouse = doc.rejected_warehouse
+		# ours, not ERPNext's: it only looks at this exact supplier
+		if d.supplier_part_no:
+			row.supplier_part_no = d.supplier_part_no
 		if d.po3_item and d.received_item_code == d.expected_item_code:
 			r = rows.get(d.po3_item)
 			if r:
@@ -583,8 +589,10 @@ def sync_native_pr(doc):
 		doc.post_error = "Draft Purchase Receipt not updated: " + msg
 		frappe.db.set_value(doc.doctype, doc.name, "post_error", doc.post_error,
 			update_modified=False)
-		frappe.msgprint("The draft native Purchase Receipt could not be updated:<br>" + msg,
-			indicator="orange", alert=True)
+		frappe.msgprint("This count was saved, but the draft Purchase Receipt "
+			+ (doc.erp_purchase_receipt or "") + " was <b>not</b> updated to match:<br><br>" + msg
+			+ "<br><br>Fix the cause and save again.",
+			title="Purchase Receipt not updated", indicator="orange")
 		return
 	doc.erp_purchase_receipt = pr.name
 	doc.post_error = None

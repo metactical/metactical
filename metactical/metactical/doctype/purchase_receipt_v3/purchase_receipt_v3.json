@@ -104,7 +104,8 @@
    "fieldname": "rejected_warehouse",
    "fieldtype": "Link",
    "label": "Rejected Goods Warehouse",
-   "options": "Warehouse"
+   "options": "Warehouse",
+   "mandatory_depends_on": "eval:(doc.items || []).some(function (d) { return flt(d.rejected_qty) > 0; })"
   },
   {
    "fieldname": "counted_by",
@@ -227,7 +228,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:43.651506",
+ "modified": "2026-10-02 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3",
