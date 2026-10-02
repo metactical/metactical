@@ -115,8 +115,8 @@
    "fieldtype": "Select",
    "label": "Reject Reason",
    "options": "\nShort Shipped\nDamaged\nDefective\nExpired\nWrong Labelling\nOther",
-   "description": "Required when the line comes in under what was expected - counted short, or part of it rejected.",
-   "mandatory_depends_on": "eval:!in_list(['Draft', 'Counting'], parent.workflow_state) && flt(doc.accepted_qty) < flt(doc.expected_qty)"
+   "description": "Required when the line is Short. Other needs the reason written in Remarks.",
+   "mandatory_depends_on": "eval:!in_list(['Draft', 'Counting'], parent.workflow_state) && doc.variance_type == 'Short'"
   },
   {
    "fieldname": "cb_split",
@@ -154,14 +154,15 @@
   {
    "fieldname": "remarks",
    "fieldtype": "Small Text",
-   "label": "Remarks"
+   "label": "Remarks",
+   "mandatory_depends_on": "eval:doc.reject_reason == 'Other'"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-02 12:00:00.000000",
+ "modified": "2026-10-02 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3 Item",
