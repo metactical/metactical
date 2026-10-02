@@ -402,8 +402,13 @@ def mirror_to_po3(doc):
 		elif s == QTY_INCREASED:
 			# the order grows by whatever the supplier is sending over the balance
 			extra = F(d.confirmed_qty) - F(d.ordered_qty)
+			line = frappe.db.get_value("Purchase Order V3 Item", d.po3_item,
+				["qty", "remarks"], as_dict=True)
 			upd["line_status"] = "Confirmed"
-			upd["qty"] = F(frappe.db.get_value("Purchase Order V3 Item", d.po3_item, "qty")) + extra
+			upd["qty"] = F(line.qty) + extra
+			upd["remarks"] = add_remark(line.remarks, "Qty increased from "
+				+ fmt_qty(line.qty) + " to " + fmt_qty(upd["qty"])
+				+ " by Supplier Order Confirmation V3 " + doc.name + ".")
 			native_increase[d.po3_item] = extra
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
 
@@ -465,12 +470,24 @@ def add_po3_line(po, d):
 		"required_by": po.required_by,
 		"line_status": "Confirmed",
 		"confirmed_qty": F(d.confirmed_qty),
+		"remarks": "New item added by Supplier Order Confirmation V3 " + d.parent + ".",
 	})
 	r.docstatus = 1
 	r.db_insert()
 	frappe.db.set_value(d.doctype, d.name, "po3_item", r.name)
 	d.po3_item = r.name
 	return r.name
+
+
+# The PO3 line's remarks keep every change a confirmation made to it, so a
+# second increase is appended rather than overwriting the first.
+def add_remark(existing, note):
+	return (existing + "\n" + note) if existing else note
+
+
+def fmt_qty(q):
+	q = F(q)
+	return str(int(q)) if q == int(q) else str(q)
 
 
 # ---------------------------------------------------------------------------
