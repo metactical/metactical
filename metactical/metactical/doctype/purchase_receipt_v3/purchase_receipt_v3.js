@@ -224,7 +224,31 @@ frappe.ui.form.on('Purchase Receipt V3', {
         gr3_fetch_lines(frm);
     },
     refresh: function(frm) {
+        // Print the native twin with Purchase Receipt's own print formats, as
+        // PO3 does with its native PO, so every PR format works here without a
+        // PR3 copy. Unlike PO3 this holds in draft too: sync_native_pr rewrites
+        // the twin on every save, so it always matches the last saved count.
+        if (frm.doc.erp_purchase_receipt) {
+            frm.print_doc = function() {
+                if (frm.is_dirty()) {
+                    frappe.toast({
+                        message: __('Unsaved changes are not on the Purchase Receipt yet - save first to print them.'),
+                        indicator: 'yellow'
+                    });
+                }
+                frappe.set_route('print', 'Purchase Receipt', frm.doc.erp_purchase_receipt);
+            };
+        } else {
+            delete frm.print_doc;
+        }
         gr3_bind_scan_enter(frm);
+        // a draft whose native twin refused the last save - say so where it
+        // cannot be missed, until a save brings the two back in step
+        if (frm.doc.docstatus === 0 && frm.doc.post_error) {
+            frm.dashboard.set_headline('<span style="color:var(--red-600)"><b>'
+                + __('Draft Purchase Receipt {0} is out of date.', [frm.doc.erp_purchase_receipt || ''])
+                + '</b> ' + frappe.utils.escape_html(frm.doc.post_error) + '</span>');
+        }
         frm.set_query('inbound_shipment_v3', function () {
             var f = { workflow_state: ['in', ['In Transit', 'Received']] };
             if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
