@@ -79,7 +79,7 @@
   {
    "allow_on_submit": 1,
    "columns": 1,
-   "description": "Total received against this PO line so far, updated by every Goods Receipt.",
+   "description": "Total received against this PO line so far, updated by every Purchase Receipt 3.",
    "fieldname": "received_qty",
    "fieldtype": "Float",
    "in_list_view": 1,

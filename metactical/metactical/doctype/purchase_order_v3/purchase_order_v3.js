@@ -64,10 +64,14 @@ function po3_norm_header(h) {
     return String(h == null ? '' : h).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// erpnextitemcode / qtytoorderd (sic) / suppliername are the Sales Report V8-V9
+// column names. "Default Supplier Name" is the supplier column of the sales
+// report buyers paste from, so it is looked for first.
 var PO3_PASTE_COLS = {
-    code: ['erpitemcode', 'itemcode', 'item', 'itemid', 'sku', 'retailsku'],
-    qty:  ['qtytoordered', 'qty', 'quantity', 'orderqty', 'suggestedorderqtyv2', 'suggestedorderqty'],
-    rate: ['dsuppliercost', 'suppliercost', 'unitcost', 'rate', 'cost', 'price']
+    code: ['erpitemcode', 'erpnextitemcode', 'itemcode', 'item', 'itemid', 'sku', 'retailsku'],
+    qty:  ['qtytoordered', 'qtytoorderd', 'qty', 'quantity', 'orderqty', 'suggestedorderqtyv2', 'suggestedorderqty'],
+    rate: ['dsuppliercost', 'suppliercost', 'unitcost', 'rate', 'cost', 'price'],
+    supplier: ['defaultsuppliername', 'suppliername', 'supplier']
 };
 
 // How far down the paste to hunt for the header row.
@@ -98,8 +102,9 @@ function po3_paste_items(frm) {
             { fieldtype: 'HTML', options:
                 '<p style="margin-bottom:8px"><b>Select the whole sheet and paste it here.</b> '
                 + 'Title and grouping rows above the header are ignored, and so is every '
-                + 'column except <code>Erp Item Code</code>, <code>QtyToOrdered</code> and '
-                + '<code>DSupplier Cost ($)</code>.<br>Only rows with a QtyToOrdered above 0 '
+                + 'column except <code>Erp Item Code</code>, <code>QtyToOrdered</code>, '
+                + '<code>DSupplier Cost ($)</code> and <code>Default Supplier Name</code> (which fills the '
+                + 'Supplier when it is empty).<br>Only rows with a QtyToOrdered above 0 '
                 + 'are brought in. Items are matched on item code, retail SKU, barcode or '
                 + 'supplier part number.</p>' },
             { fieldtype: 'Check', fieldname: 'replace', label: __('Replace the existing lines'),
@@ -135,7 +140,8 @@ function po3_paste_items(frm) {
                 rows.push({
                     code: code,
                     qty: cells[idx.qty],
-                    rate: idx.rate !== -1 ? cells[idx.rate] : 0
+                    rate: idx.rate !== -1 ? cells[idx.rate] : 0,
+                    supplier: idx.supplier !== -1 ? cells[idx.supplier] : ''
                 });
             });
             if (!rows.length) {
@@ -163,6 +169,7 @@ function po3_paste_items(frm) {
                         row.uom = it.uom;
                         row.retail_sku_suffix = it.retail_sku_suffix;
                         if (it.supplier_part_no) row.supplier_part_no = it.supplier_part_no;
+                        if (it.barcode) row.barcode = it.barcode;
                         row.qty = it.qty;
                         if (it.rate) row.rate = it.rate;
                         row.amount = flt(it.qty) * flt(it.rate);
@@ -170,7 +177,26 @@ function po3_paste_items(frm) {
                     d.hide();
                     frm.refresh_field('items');
 
+                    // The order takes the report's supplier when it has none of its
+                    // own; set_value runs the supplier handler, so price list,
+                    // currency, emails and addresses follow as if it were picked.
+                    var sup_msg = '';
+                    var others = (res.report_suppliers || []).filter(function(s) { return s !== frm.doc.supplier; });
+                    if (res.supplier) {
+                        frm.set_value('supplier', res.supplier);
+                        sup_msg = __('Supplier set from the report: <b>{0}</b>.', [res.supplier]);
+                    } else if (!frm.doc.supplier && others.length > 1) {
+                        sup_msg = __('The report lists several suppliers ({0}) - pick the Supplier yourself.', [others.join(', ')]);
+                    } else if (frm.doc.supplier && others.length) {
+                        sup_msg = __('The report lists {0}, not this order\'s supplier {1} - the Supplier was left as it is.',
+                                     ['<b>' + others.join(', ') + '</b>', '<b>' + frm.doc.supplier + '</b>']);
+                    }
+                    if ((res.unknown_suppliers || []).length) {
+                        sup_msg += (sup_msg ? '<br>' : '') + __('Supplier not found: {0}', [res.unknown_suppliers.join(', ')]);
+                    }
+
                     var msg = __('Added {0} item(s).', [items.length]);
+                    if (sup_msg) msg = sup_msg + '<br><br>' + msg;
                     if (res.skipped_zero_qty) {
                         msg += '<br>' + __('{0} row(s) skipped for a quantity of 0.', [res.skipped_zero_qty]);
                     }
@@ -191,7 +217,54 @@ function po3_paste_items(frm) {
     d.show();
 }
 
+// Amend hands back a copy of the cancelled order that deliberately keeps the
+// no_copy fields (create_new.js: `!from_amend && df.no_copy`), so the draft
+// opens showing that order's workflow state, its native PO and every line's
+// confirmed / received progress. The server clears all of it on insert; clear
+// it here as well so the buyer works on an order that already reads like a new
+// one, instead of one still claiming lines were confirmed against a PO that no
+// longer exists.
+//
+// Driven off the same no_copy flags the server uses, so the two cannot drift.
+var PO3_AMEND_KEEP = ['amended_from', 'material_request', 'material_request_item'];
+var PO3_NUMERIC = ['Int', 'Float', 'Currency', 'Percent', 'Check'];
+
+function po3_reset_amended(frm) {
+    if (!frm.is_new() || !frm.doc.amended_from) return;
+
+    var blank = function(doc) {
+        var fields = frappe.meta.docfield_list[doc.doctype]
+            || (frappe.get_meta(doc.doctype) || {}).fields || [];
+        fields.forEach(function(df) {
+            if (!cint(df.no_copy) || PO3_AMEND_KEEP.indexOf(df.fieldname) !== -1) return;
+            doc[df.fieldname] = PO3_NUMERIC.indexOf(df.fieldtype) !== -1
+                ? (flt(df.default) || 0)
+                : (df.default || null);
+        });
+    };
+
+    blank(frm.doc);
+    (frm.doc.items || []).forEach(blank);
+    frm.doc.workflow_state = null;
+}
+
+
+// Shows the picked address straight away; the server re-renders it on save.
+function po3_render_address(frm, field, display_field) {
+    if (!frm.doc[field]) {
+        frm.set_value(display_field, null);
+        return;
+    }
+    frappe.call({
+        method: 'frappe.contacts.doctype.address.address.get_address_display',
+        args: { address_dict: frm.doc[field] },
+        callback: function(r) { frm.set_value(display_field, r.message || null); }
+    });
+}
+
 frappe.ui.form.on('Purchase Order V3', {
+    onload: po3_reset_amended,
+
     // Mirrors metactical's own override of this button on native Purchase
     // Order, not stock ERPNext's. get_all_items makes the server pull every
     // open Material Request for the supplier at once, so there is no document
@@ -212,7 +285,8 @@ frappe.ui.form.on('Purchase Order V3', {
                 method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.make_po3_based_on_supplier',
                 source_names: [frm.doc.supplier],
                 target_doc: frm.doc,
-                args: { supplier: frm.doc.supplier, get_all_items: true }
+                // blank Ship To Warehouse = requests for every warehouse
+                args: { supplier: frm.doc.supplier, get_all_items: true, warehouse: frm.doc.set_warehouse || null }
             },
             freeze: true,
             freeze_message: __('Fetching items from open Material Requests...'),
@@ -225,7 +299,9 @@ frappe.ui.form.on('Purchase Order V3', {
                 frappe.show_alert({
                     message: n
                         ? __('{0} item(s) fetched from open Material Requests.', [n])
-                        : __('No open Material Requests found for this supplier.'),
+                        : (frm.doc.set_warehouse
+                            ? __('No open Material Requests found for this supplier and {0}.', [frm.doc.set_warehouse])
+                            : __('No open Material Requests found for this supplier.')),
                     indicator: n ? 'green' : 'orange'
                 });
             }
@@ -233,15 +309,33 @@ frappe.ui.form.on('Purchase Order V3', {
     },
 
     currency: po3_fx,
+
+    // A new destination has to take the lines with it.
+    set_warehouse: function(frm) {
+        if (frm.doc.docstatus !== 0) return;
+
+        // Take the lines with it. A line left on the old warehouse is stock
+        // received somewhere nobody chose, and ERPNext blanks the native PO's
+        // Set Target Warehouse outright when its lines disagree. Same thing
+        // ERPNext does on this field (autofill_warehouse).
+        (frm.doc.items || []).forEach(function(row) {
+            if (row.warehouse !== frm.doc.set_warehouse) {
+                frappe.model.set_value(row.doctype, row.name, 'warehouse', frm.doc.set_warehouse);
+            }
+        });
+    },
     supplier: function(frm) {
         if (!frm.doc.supplier) return;
         frappe.db.get_value('Supplier', frm.doc.supplier,
             ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'po3_print_format',
-             'nat_sender_email_account'])
+             'nat_sender_email_account', 'nat_shipping_address', 'nat_billing_address'])
             .then(function(r) {
                 var v = r.message || {};
                 frm.set_value('buying_price_list', v.default_price_list || null);
                 if (v.default_currency) frm.set_value('currency', v.default_currency);
+                // a different supplier ships and bills under its own addresses
+                frm.set_value('shipping_address', v.nat_shipping_address || null);
+                frm.set_value('billing_address', v.nat_billing_address || null);
                 if (frm.is_new()) {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);
@@ -254,12 +348,29 @@ frappe.ui.form.on('Purchase Order V3', {
                 }
             });
     },
+    shipping_address: function(frm) {
+        po3_render_address(frm, 'shipping_address', 'shipping_address_display');
+    },
+    billing_address: function(frm) {
+        po3_render_address(frm, 'billing_address', 'billing_address_display');
+    },
     buying_price_list: function(frm) {
         (frm.doc.items || []).forEach(function(d) {
             if (!d.rate) po3_pull_rate(frm, d.doctype, d.name);
         });
     },
     refresh: function(frm) {
+        // Print the native twin with Purchase Order's own print formats, so every
+        // PO format (existing and future) works here without a PO3 copy. Only once
+        // submitted: until approval the twin's lines are not synced from the PO3,
+        // so a draft still prints from its own doctype.
+        if (frm.doc.docstatus === 1 && frm.doc.erp_purchase_order) {
+            frm.print_doc = function() {
+                frappe.set_route('print', 'Purchase Order', frm.doc.erp_purchase_order);
+            };
+        } else {
+            delete frm.print_doc;
+        }
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭱ Paste Items'), function() { po3_paste_items(frm); });
         }
@@ -337,7 +448,7 @@ frappe.ui.form.on('Purchase Order V3', {
             }, __('Create'));
         };
         mk('Inbound Shipment', 'Inbound Shipment V3');
-        mk('Goods Receipt', 'Goods Receipt V3');
+        mk('Purchase Receipt 3', 'Purchase Receipt V3');
         mk('Supplier Claim', 'Supplier Claim V3');
         if (frm.doc.erp_purchase_order) {
             frm.add_custom_button(__('Native PO'), function() {
@@ -347,8 +458,27 @@ frappe.ui.form.on('Purchase Order V3', {
     }
 });
 
+// A new item on the line means a new barcode and supplier SKU -- replace, not
+// keep, whatever the previous item left there.
+function po3_pull_identifiers(frm, cdt, cdn) {
+    var row = locals[cdt][cdn];
+    if (!row.item_code) return;
+    frappe.call({
+        method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.get_item_identifiers',
+        args: { item_code: row.item_code, supplier: frm.doc.supplier },
+        callback: function(r) {
+            var v = r.message || {};
+            frappe.model.set_value(cdt, cdn, 'barcode', v.barcode || null);
+            frappe.model.set_value(cdt, cdn, 'supplier_part_no', v.supplier_part_no || null);
+        }
+    });
+}
+
 frappe.ui.form.on('Purchase Order V3 Item', {
-    item_code: po3_pull_rate,
+    item_code: function(frm, cdt, cdn) {
+        po3_pull_rate(frm, cdt, cdn);
+        po3_pull_identifiers(frm, cdt, cdn);
+    },
     qty: po3_amount,
     rate: po3_amount
 });
