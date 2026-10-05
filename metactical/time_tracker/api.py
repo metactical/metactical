@@ -286,12 +286,28 @@ def _assert_no_overlap(user, new_from, new_to, exclude=None):
 		frappe.throw(_("Those times overlap another entry ({0}).").format(clash[0][0]))
 
 
+def _approver_emails(settings):
+	"""The settings address plus everyone who holds the Time Approval role."""
+	emails = set()
+	if settings.approver:
+		emails.add(settings.approver)
+	emails.update(
+		frappe.get_all(
+			"Has Role",
+			filters={"role": APPROVER_ROLE, "parenttype": "User"},
+			pluck="parent",
+		)
+	)
+	enabled = set(frappe.get_all("User", filters={"name": ["in", list(emails) or [""]], "enabled": 1}, pluck="name"))
+	return sorted(e for e in emails if e in enabled or e == settings.approver)
+
+
 def _notify_approver(ctx, subject, body):
-	approver = ctx.settings.approver
-	if not approver:
+	recipients = _approver_emails(ctx.settings)
+	if not recipients:
 		return
 	try:
-		frappe.sendmail(recipients=[approver], subject=subject, message=body, now=False)
+		frappe.sendmail(recipients=recipients, subject=subject, message=body, now=False)
 	except Exception:
 		_fail("Time change request email failed")
 
@@ -386,11 +402,11 @@ def request_correction(log, from_time, to_time, reason):
 		}
 	).insert(ignore_permissions=True)
 
-	approver = ctx.settings.approver
-	if approver:
+	recipients = _approver_emails(ctx.settings)
+	if recipients:
 		try:
 			frappe.sendmail(
-				recipients=[approver],
+				recipients=recipients,
 				subject=_("Time change request from {0}").format(ctx.employee.employee_name),
 				message=_(
 					"{0} asked to change {1}: {2} - {3} becomes {4} - {5}.<br>Reason: {6}<br>"
@@ -411,12 +427,17 @@ def request_correction(log, from_time, to_time, reason):
 	return {"name": req.name, "status": req.status}
 
 
+APPROVER_ROLE = "Time Approval"
+
+
 def can_review(user=None):
+	"""Anyone with the Time Approval role sees and decides every request. HR Manager, System Manager and
+	the address in Time Tracker Settings keep working as before."""
 	user = user or frappe.session.user
 	if user == "Administrator":
 		return True
 	roles = set(frappe.get_roles(user))
-	if roles & {"System Manager", "HR Manager"}:
+	if roles & {APPROVER_ROLE, "System Manager", "HR Manager"}:
 		return True
 	return bool(core.get_settings().approver) and core.get_settings().approver.lower() == user.lower()
 
@@ -507,4 +528,115 @@ def apply_correction(req):
 
 @frappe.whitelist()
 def get_my_permissions():
-	return {"can_review": can_review()}
+	allowed = can_review()
+	return {
+		"can_review": allowed,
+		"pending_count": frappe.db.count("Checkin Request Modification", {"status": "Pending"}) if allowed else 0,
+	}
+
+
+@frappe.whitelist()
+def get_requests(tab="Pending"):
+	"""The approvals screen: every request (no team filtering) with the context to decide on it."""
+	assert_can_review()
+	decided = tab == "Decided"
+	filters = {"status": ["in", ["Approved", "Declined"]]} if decided else {"status": "Pending"}
+	rows = frappe.get_all(
+		"Checkin Request Modification",
+		filters=filters,
+		fields=[
+			"name", "user", "request_type", "status", "reason", "log", "date", "creation", "reviewed_by",
+			"reviewed_on", "review_comment", "requested_from", "requested_to", "current_checkin",
+			"current_checkout", "requested_checkin_military", "requested_checkout_military",
+		],
+		order_by="reviewed_on desc, modified desc" if decided else "creation asc",
+		limit=200,
+	)
+
+	users = [r.user for r in rows]
+	employees = {
+		r.user_id: r
+		for r in frappe.get_all(
+			"Employee", filters={"user_id": ["in", users or [""]]}, fields=["user_id", "name", "employee_name"]
+		)
+	}
+	today = now_datetime().date()
+	shift_of = {}
+	if employees:
+		for emp, shift_type in frappe.db.sql(
+			"""select employee, shift_type from `tabShift Assignment`
+			where docstatus=1 and status='Active' and start_date <= %(d)s and (end_date is null or end_date >= %(d)s)
+				and employee in %(emps)s order by start_date asc""",
+			{"d": today, "emps": [e.name for e in employees.values()]},
+		):
+			shift_of[emp] = shift_type  # latest start_date wins (ordered ascending)
+	reviewer_names = {
+		u.name: u.full_name
+		for u in frappe.get_all(
+			"User", filters={"name": ["in", [r.reviewed_by for r in rows if r.reviewed_by] or [""]]},
+			fields=["name", "full_name"],
+		)
+	}
+
+	out = []
+	for r in rows:
+		emp = employees.get(r.user)
+		log = frappe.db.get_value("Clockin Log", r.log, ["date", "from_time", "to_time", "total_hours"], as_dict=True) if r.log else None
+		day = getdate(log.date) if log else _iso_or_none(r.date)
+		new_from = get_datetime(r.requested_from) if r.requested_from else None
+		new_to = get_datetime(r.requested_to) if r.requested_to else None
+		if (new_from is None or new_to is None) and day:  # request made by the older page: only HH:MM were kept
+			new_from = new_from or get_datetime(f"{day} {r.requested_checkin_military}")
+			new_to = new_to or get_datetime(f"{day} {r.requested_checkout_military}")
+		requested_hours = core.hours_between(new_from, new_to) if new_from and new_to else None
+		current_hours = float(log.total_hours or 0) if log else None
+		same_day = (
+			[
+				{
+					"from_time": str(l.from_time),
+					"to_time": str(l.to_time) if l.to_time else None,
+					"hours": round(core.log_hours(l, now_datetime()), 4),
+					"is_this_entry": l.name == r.log,
+				}
+				for l in core.logs_for_day(r.user, day)
+			]
+			if day
+			else []
+		)
+		out.append(
+			{
+				"name": r.name,
+				"user": r.user,
+				"employee_name": emp.employee_name if emp else r.user,
+				"shift": shift_of.get(emp.name) if emp else None,
+				"request_type": r.request_type or "Change",
+				"status": r.status,
+				"reason": r.reason,
+				"date": str(day) if day else None,
+				"requested_at": str(r.creation),
+				"current_from": str(log.from_time) if log else None,
+				"current_to": str(log.to_time) if log and log.to_time else None,
+				"current_hours": round(current_hours, 4) if current_hours is not None else None,
+				"requested_from": str(new_from) if new_from else None,
+				"requested_to": str(new_to) if new_to else None,
+				"requested_hours": round(requested_hours, 4) if requested_hours is not None else None,
+				"delta_hours": round(requested_hours - (current_hours or 0), 4) if requested_hours is not None else None,
+				"same_day": same_day,
+				"reviewed_by_name": reviewer_names.get(r.reviewed_by) or r.reviewed_by,
+				"reviewed_on": str(r.reviewed_on) if r.reviewed_on else None,
+				"review_comment": r.review_comment,
+			}
+		)
+
+	return {
+		"rows": out,
+		"pending_count": frappe.db.count("Checkin Request Modification", {"status": "Pending"}),
+		"decided_count": frappe.db.count("Checkin Request Modification", {"status": ["in", ["Approved", "Declined"]]}),
+	}
+
+
+def _iso_or_none(value):
+	try:
+		return getdate(value) if value else None
+	except Exception:
+		return None

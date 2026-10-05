@@ -1,5 +1,16 @@
 <template>
   <div class="tc-root">
+    <!-- People with the Time Approval role get a second screen on the same login -->
+    <div v-if="canReview" class="tc-tabs tc-tabs-main" role="tablist">
+      <button class="tc-tab" :class="{ active: tab === 'time' }" role="tab" @click="tab = 'time'">My time</button>
+      <button class="tc-tab" :class="{ active: tab === 'approvals' }" role="tab" @click="tab = 'approvals'">
+        Approvals <span v-if="pendingCount" class="tc-count">{{ pendingCount }}</span>
+      </button>
+    </div>
+
+    <ApprovalsScreen v-if="tab === 'approvals'" @changed="pendingCount = $event" />
+
+    <template v-else>
     <!-- Cannot clock: say exactly why -->
     <div v-if="state && state.status === 'blocked'" class="tc-card tc-blocked">
       <div class="tc-blocked-title">You can't clock in yet</div>
@@ -59,25 +70,6 @@
         <div v-if="logoutIn !== null" class="tc-logout">
           Logging out in {{ logoutIn }}s
           <button class="btn btn-default btn-xs" @click="cancelLogout">Stay logged in</button>
-        </div>
-      </div>
-
-      <!-- Approvals (only for the approver) -->
-      <div v-if="canReview && pending.length" class="tc-card">
-        <div class="tc-card-title">Waiting for your approval <span class="tc-count">{{ pending.length }}</span></div>
-        <div v-for="r in pending" :key="r.name" class="tc-req">
-          <div class="tc-req-main">
-            <b>{{ r.employee_name || r.user }}</b> · {{ fmtDate(r.date) }}
-            <div class="tc-muted">
-              <template v-if="r.request_type === 'Add'"><span class="tc-pill tc-pill-wait">missed time</span> add <b>{{ fmtTime(r.requested_from) }} – {{ fmtTime(r.requested_to) }}</b> ({{ r.requested_total_hours }} h)</template>
-              <template v-else>{{ r.current_checkin }} – {{ r.current_checkout }} → <b>{{ fmtTime(r.requested_from) || r.requested_checkin }} – {{ fmtTime(r.requested_to) || r.requested_checkout }}</b> ({{ r.requested_total_hours }} h)</template>
-            </div>
-            <div v-if="r.reason" class="tc-reason">“{{ r.reason }}”</div>
-          </div>
-          <div class="tc-req-actions">
-            <button class="btn btn-primary btn-xs" :disabled="busy" @click="review(r, 'Approved')">Approve</button>
-            <button class="btn btn-default btn-xs" :disabled="busy" @click="review(r, 'Declined')">Decline</button>
-          </div>
         </div>
       </div>
 
@@ -148,6 +140,7 @@
       </div>
       </div>
     </template>
+    </template>
 
     <!-- Correction dialog -->
     <div v-if="correction" class="tc-modal-back" @click.self="correction = null">
@@ -176,37 +169,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from "vue"
-
-const API = "metactical.time_tracker.api"
-
-// Server rejections carry a human message in _server_messages; surface it instead of a stack trace.
-// (frappe.call's error callback gets no response object here, so this talks to the endpoint directly.)
-const serverMessage = (body, status) => {
-  try {
-    const msgs = JSON.parse(body._server_messages).map((m) => JSON.parse(m).message)
-    const text = msgs.join(" ").replace(/<[^>]+>/g, "").trim()
-    if (text) return text
-  } catch (_) { /* fall through */ }
-  if (status === 403) return "You don't have permission to do that."
-  if (status === 401 || status === 410) return "Your session expired. Please log in again."
-  return "Something went wrong. Please try again."
-}
-
-const callBackend = async (method, args = {}) => {
-  const res = await fetch(`/api/method/${API}.${method}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Frappe-CSRF-Token": frappe.csrf_token || window.csrf_token,
-    },
-    body: JSON.stringify(args),
-  })
-  let body = {}
-  try { body = await res.json() } catch (_) { /* non-JSON error page */ }
-  if (!res.ok) throw new Error(serverMessage(body, res.status))
-  return body.message
-}
+import ApprovalsScreen from "./ApprovalsScreen.vue"
+import { callBackend, errorText } from "./api"
+import { parse, pad2, dateParts, asDate, fmtDate, fmtWeekday, fmtTime, fmtDuration } from "./format"
 
 const state = ref(null)
 const loadError = ref("")
@@ -218,7 +183,8 @@ const openDay = ref(null)
 const dayDetail = ref(null)
 const correction = ref(null)
 const canReview = ref(false)
-const pending = ref([])
+const pendingCount = ref(0)
+const tab = ref("time") // "time" | "approvals"
 const logoutIn = ref(null)
 const smallTouch = ref(false) // phones and small tablets: clock in/out is not offered there
 
@@ -229,16 +195,6 @@ const tick = ref(Date.now())
 let timer = null
 let logoutTimer = null
 
-// "2026-10-05 12:30:12.123456" is server-local wall time. Parse it as-is, never through UTC.
-const parse = (s) => {
-  if (!s) return null
-  const m = String(s).match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
-  return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) : null
-}
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-const pad2 = (n) => String(n).padStart(2, "0")
-// 01 - Jan - 2026
-const dateParts = (d) => `${pad2(d.getDate())} - ${MONTHS[d.getMonth()]} - ${d.getFullYear()}`
 const nowMs = computed(() => serverMs.value + (tick.value - fetchedAt.value))
 const nowDate = computed(() => new Date(nowMs.value))
 
@@ -252,23 +208,11 @@ const elapsedHours = computed(() => {
   return from ? Math.max(0, (nowMs.value - from.getTime()) / 3600000) : 0
 })
 
-const fmtTime = (s) => {
-  const d = parse(s)
-  return d ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""
-}
-const asDate = (s) => parse(String(s).length === 10 ? s + " 00:00" : s)
-const fmtDate = (s) => { const d = asDate(s); return d ? dateParts(d) : "" }
-const fmtWeekday = (s) => { const d = asDate(s); return d ? d.toLocaleDateString("en", { weekday: "short" }) : "" }
 // A full bar is one scheduled shift. Longer days just stay full: overtime is deliberately not marked.
 const barWidth = (hours) => {
   const shift = (cycle.value && cycle.value.shift_hours) || 8
   return Math.min(100, Math.max(0, (hours / shift) * 100))
 }
-const fmtDuration = (h) => {
-  const mins = Math.round((h || 0) * 60)
-  return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`
-}
-
 const applyState = (s) => {
   serverMs.value = (parse(s.server_now) || new Date()).getTime()
   fetchedAt.value = Date.now()
@@ -281,13 +225,14 @@ const setNotice = (text, kind = "ok") => {
   setTimeout(() => { if (notice.value && notice.value.text === text) notice.value = null }, 6000)
 }
 
-const errorText = (e) => (e && e.message) || "Something went wrong. Please try again."
-
 async function refresh() {
   try {
     applyState(await callBackend("get_state"))
-    if (state.value.status !== "blocked") {
-      await Promise.all([loadCycle(offset.value), loadReviewer()])
+    await loadReviewer() // approvers need this even when they cannot clock themselves
+    if (state.value.status === "blocked") {
+      if (canReview.value) tab.value = "approvals" // e.g. an approver who is not an employee
+    } else {
+      await loadCycle(offset.value)
     }
   } catch (e) {
     loadError.value = errorText(e)
@@ -372,22 +317,7 @@ async function submitCorrection() {
 async function loadReviewer() {
   const p = await callBackend("get_my_permissions")
   canReview.value = !!p.can_review
-  pending.value = canReview.value ? await callBackend("get_pending_requests") : []
-}
-
-async function review(r, decision) {
-  const comment = decision === "Declined" ? window.prompt("Reason for declining (optional)") : null
-  if (decision === "Declined" && comment === null) return
-  busy.value = true
-  try {
-    await callBackend("review_request", { name: r.name, decision, comment })
-    pending.value = pending.value.filter((x) => x.name !== r.name)
-    setNotice(`Request ${decision.toLowerCase()}.`)
-  } catch (e) {
-    setNotice(errorText(e), "error")
-  } finally {
-    busy.value = false
-  }
+  pendingCount.value = p.pending_count || 0
 }
 
 // Shared-device safety: after a clock action, return to the login screen unless told to stay.

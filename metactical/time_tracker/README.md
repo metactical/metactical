@@ -28,6 +28,12 @@ www page is untouched and still works; switch staff over once this is accepted.
 - Checkin Request Modification added: `reason`, `requested_from/to` (exact datetimes), `reviewed_by/on`, `review_comment`.
   Legacy 12h/military string fields are still filled so the old approve/decline pages keep working.
 
+## Approvals
+
+Role **Time Approval** (created by `patches/create_time_approval_role.py`): sees and decides every request.
+`api.can_review` also allows HR Manager, System Manager and the Time Tracker Settings approver address.
+`api.get_requests(tab)` feeds `ApprovalsScreen.vue`; shared helpers live in `components/time_clock/api.js` and `format.js`.
+
 ## Gotchas found
 
 - ERPNext's `validate_employee_role` **removes the Employee role from any user not linked to an Employee record**.

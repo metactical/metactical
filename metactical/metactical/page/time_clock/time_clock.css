@@ -91,6 +91,51 @@
 	#time_clock_ui .tc-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* tabs (main: My time / Approvals; and Pending / Decided) */
+#time_clock_ui .tc-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); }
+#time_clock_ui .tc-tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 14px; margin-bottom: -1px; font-weight: 600; color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+#time_clock_ui .tc-tab.active { color: var(--text-color); border-bottom-color: var(--green-500, #30a66d); }
+#time_clock_ui .tc-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* approvals screen */
+#time_clock_ui .ap-root { display: flex; flex-direction: column; gap: 16px; }
+#time_clock_ui .ap-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+#time_clock_ui .ap-bar .tc-tabs { border-bottom: 0; }
+#time_clock_ui .ap-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+#time_clock_ui .ap-filters select { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius, 6px); background: var(--control-bg); color: var(--text-color); }
+#time_clock_ui .ap-n { color: var(--text-muted); font-weight: 400; }
+#time_clock_ui .ap-empty { text-align: center; color: var(--text-muted); padding: 40px 20px; }
+#time_clock_ui .ap-grid { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+#time_clock_ui .ap-list { padding: 6px; display: flex; flex-direction: column; max-height: 70vh; overflow: auto; }
+#time_clock_ui .ap-item { display: flex; flex-direction: column; gap: 3px; text-align: left; background: none; border: 0; border-radius: var(--border-radius, 6px); padding: 10px 12px; color: inherit; cursor: pointer; }
+#time_clock_ui .ap-item:hover { background: var(--control-bg); }
+#time_clock_ui .ap-item.active { background: var(--control-bg); box-shadow: inset 3px 0 0 var(--green-500, #30a66d); }
+#time_clock_ui .ap-item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#time_clock_ui .ap-item-name { font-weight: 600; }
+#time_clock_ui .ap-item-sub { color: var(--text-muted); font-size: 12px; }
+#time_clock_ui .ap-delta { font-variant-numeric: tabular-nums; font-weight: 600; }
+#time_clock_ui .ap-detail { display: flex; flex-direction: column; gap: 16px; padding: 20px 24px; }
+#time_clock_ui .ap-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+#time_clock_ui .ap-title { font-size: 20px; font-weight: 700; }
+#time_clock_ui .ap-compare { display: flex; align-items: stretch; gap: 12px; }
+#time_clock_ui .ap-side { flex: 1; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg, 10px); }
+#time_clock_ui .ap-side-new { border-color: var(--green-500, #30a66d); }
+#time_clock_ui .ap-arrow { align-self: center; color: var(--text-muted); font-size: 20px; }
+#time_clock_ui .ap-label { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+#time_clock_ui .ap-times { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#time_clock_ui .ap-reason { font-style: italic; }
+#time_clock_ui .ap-when { font-size: 12px; }
+#time_clock_ui .ap-note { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+#time_clock_ui .ap-note textarea { font-weight: 400; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius, 6px); background: var(--control-bg); color: var(--text-color); }
+#time_clock_ui .ap-actions { display: flex; justify-content: flex-end; gap: 10px; }
+#time_clock_ui .ap-actions .btn { min-width: 120px; }
+#time_clock_ui .ap-decided { padding: 12px 14px; background: var(--control-bg); border-radius: var(--border-radius, 6px); }
+
+@media (max-width: 900px) {
+	#time_clock_ui .ap-grid { grid-template-columns: minmax(0, 1fr); }
+	#time_clock_ui .ap-list { max-height: 260px; }
+}
+
 /* /trackerv2 login */
 #time_clock_ui .tc-login { max-width: 420px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
 #time_clock_ui .tc-login label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }

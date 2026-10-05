@@ -65,11 +65,12 @@ class TestClockFlow(FrappeTestCase):
 			frappe.get_doc(
 				{"doctype": "Shift Type", "name": "TC Day", "start_time": "09:00:00", "end_time": "17:00:00"}
 			).insert(ignore_permissions=True)
-		sa = frappe.get_doc(
-			{"doctype": "Shift Assignment", "employee": cls.employee, "shift_type": "TC Day",
-			 "company": cls.company, "start_date": "2026-01-01", "status": "Active"}
-		).insert(ignore_permissions=True)
-		sa.submit()
+		if not frappe.db.exists("Shift Assignment", {"employee": cls.employee, "docstatus": 1, "status": "Active"}):
+			sa = frappe.get_doc(
+				{"doctype": "Shift Assignment", "employee": cls.employee, "shift_type": "TC Day",
+				 "company": cls.company, "start_date": "2026-01-01", "status": "Active"}
+			).insert(ignore_permissions=True)
+			sa.submit()
 		s = frappe.get_doc("Time Tracker Settings")
 		cls._saved_settings = s.as_dict(convert_dates_to_str=True)  # put back in tearDownClass
 		s.checkin_approver = APPROVER
@@ -168,8 +169,9 @@ class TestClockFlow(FrappeTestCase):
 
 	def test_user_without_employee_is_told_why(self):
 		frappe.set_user("Administrator")
-		frappe.get_doc({"doctype": "User", "email": "tc.nobody@example.com", "first_name": "Nobody",
-						"send_welcome_email": 0, "roles": [{"role": "Employee"}]}).insert(ignore_permissions=True)
+		if not frappe.db.exists("User", "tc.nobody@example.com"):
+			frappe.get_doc({"doctype": "User", "email": "tc.nobody@example.com", "first_name": "Nobody",
+							"send_welcome_email": 0, "roles": [{"role": "Employee"}]}).insert(ignore_permissions=True)
 		frappe.set_user("tc.nobody@example.com")
 		s = api.get_state()
 		self.assertEqual(s["status"], "blocked")
@@ -287,3 +289,70 @@ class TestClockFlow(FrappeTestCase):
 		self.assertEqual(float(get("max_shift_hours")), 12.0)
 		frappe.db.set_single_value("Time Tracker Settings", "max_shift_hours", 16)
 		frappe.clear_cache()
+
+	# ---- Time Approval role ------------------------------------------------------------------
+
+	def _approver_user(self):
+		from metactical.patches.create_time_approval_role import execute
+
+		frappe.set_user("Administrator")
+		execute()
+		email = "tc.timeapproval@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc({"doctype": "User", "email": email, "first_name": "Role Holder", "send_welcome_email": 0}).insert(
+				ignore_permissions=True
+			)
+		frappe.get_doc("User", email).add_roles("Time Approval")
+		return email
+
+	def test_time_approval_role_exists_and_is_idempotent(self):
+		from metactical.patches.create_time_approval_role import execute
+
+		execute()
+		execute()
+		self.assertEqual(frappe.db.count("Role", {"name": "Time Approval"}), 1)
+
+	def test_role_holder_sees_every_request_and_can_decide(self):
+		log = self._closed_log()
+		base_pending = frappe.db.count("Checkin Request Modification", {"status": "Pending"})
+		base_decided = frappe.db.count("Checkin Request Modification", {"status": ["in", ["Approved", "Declined"]]})
+		with self._now(at(18)):
+			change = api.request_correction(log, "2026-10-07 08:50:00", "2026-10-07 17:20:00", "Stayed late")["name"]
+			add = api.request_missed_punch("2026-10-05", "2026-10-05 09:00:00", "2026-10-05 17:00:00", "Forgot to clock in")["name"]
+
+		approver = self._approver_user()  # not the settings address, not HR Manager: only the role
+		frappe.set_user(approver)
+		self.assertTrue(api.get_my_permissions()["can_review"])
+		with self._now(at(18)):
+			data = api.get_requests("Pending")
+		self.assertEqual(data["pending_count"], base_pending + 2)
+		rows = {r["name"]: r for r in data["rows"]}
+		self.assertLessEqual({change, add}, set(rows))  # the screen shows everyone's requests, not just these
+
+		c = rows[change]
+		self.assertEqual(c["request_type"], "Change")
+		self.assertEqual(c["employee_name"], "Worker")
+		self.assertAlmostEqual(c["current_hours"], 8.0, places=3)
+		self.assertAlmostEqual(c["requested_hours"], 8.5 + 1 / 6 - 1 / 6, places=2)  # 08:50-17:20 = 8h30
+		self.assertAlmostEqual(c["delta_hours"], 0.5, places=2)
+		self.assertEqual(len(c["same_day"]), 1)
+		self.assertTrue(c["same_day"][0]["is_this_entry"])
+		a = rows[add]
+		self.assertEqual((a["request_type"], a["current_hours"], a["same_day"]), ("Add", None, []))
+		self.assertAlmostEqual(a["requested_hours"], 8.0, places=3)
+
+		with self._now(at(18)):
+			api.review_request(add, "Approved", "ok")
+			api.review_request(change, "Declined", "Please attach a note")
+		with self._now(at(18)):
+			done = api.get_requests("Decided")
+		self.assertEqual((done["pending_count"], done["decided_count"]), (base_pending, base_decided + 2))
+		by_name = {r["name"]: r for r in done["rows"]}
+		self.assertEqual(by_name[change]["status"], "Declined")
+		self.assertEqual(by_name[change]["review_comment"], "Please attach a note")
+		self.assertEqual(by_name[change]["reviewed_by_name"], "Role Holder")
+
+	def test_plain_employee_cannot_open_the_approvals_screen(self):
+		self.assertFalse(api.get_my_permissions()["can_review"])
+		with self.assertRaises(frappe.PermissionError):
+			api.get_requests("Pending")
