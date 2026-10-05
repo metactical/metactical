@@ -58,29 +58,24 @@ class ItemSupplierImportTool(Document):
 		return file_content
 	
 	def check_headers(self, file_content):
-		expected_headers = ["Item Supplier Table Name", "Supplier Part Number", "UPC/EAN", "Quantity To Update", "Item Code", "Wholesale Price", "Retail Price"]
-
-		for header in file_content[0]:
-			if header not in expected_headers:
-				frappe.throw(f"Header '{header}' should not be in this Excel File.")
+		get_column_map(file_content)
 
 	def edit_item_supplier(self, data):
+		columns = get_column_map(data)
+		rows = data[1:]
 		limit = 500
 		start = 0
-		while start < len(data):
+		while start < len(rows):
 			end = start + limit
-			self._edit_item_supplier(data[start:end])
+			self._edit_item_supplier(rows[start:end], columns)
 			start = end
 
-	def _edit_item_supplier(self, data):
+	def _edit_item_supplier(self, data, columns):
 		for row in data:
-			if row[0] == "Item Supplier Table Name":
-				continue
-
-			name = row[0]
-			supplier_part_no = row[1]
-			updated_qty = row[3]
-			item_code = row[4]
+			name = get_cell(row, columns, "Item Supplier Table Name")
+			supplier_part_no = get_cell(row, columns, "Supplier Part Number")
+			updated_qty = get_cell(row, columns, "Quantity To Update")
+			item_code = get_cell(row, columns, "Item Code")
 
 			try:
 				updated_qty = str(updated_qty).replace('+', '').strip()
@@ -162,29 +157,54 @@ def import_item_supplier():
 	}
 
 
+REQUIRED_HEADERS = ["Item Supplier Table Name", "Supplier Part Number", "Quantity To Update", "Item Code"]
+
+
+def get_column_map(data):
+	"""Map header names to column indexes. Unknown columns are ignored."""
+	if not data:
+		frappe.throw("The Excel File is empty.")
+
+	columns = {}
+	for idx, header in enumerate(data[0]):
+		header = str(header).strip() if header is not None else ""
+		if header and header not in columns:
+			columns[header] = idx
+
+	missing = [h for h in REQUIRED_HEADERS if h not in columns]
+	if missing:
+		frappe.throw(f"Missing required header(s) in this Excel File: {', '.join(missing)}")
+
+	return columns
+
+
+def get_cell(row, columns, header):
+	idx = columns[header]
+	return row[idx] if idx < len(row) else None
+
+
 def validate_item_supplier(data):
+	columns = get_column_map(data)
+	rows = data[1:]
 	limit = 500
 	start = 0
 	all_missing = []
 
-	while start < len(data):
+	while start < len(rows):
 		end = start + limit
-		batch_missing = _validate_item_supplier(data[start:end])
+		batch_missing = _validate_item_supplier(rows[start:end], columns)
 		all_missing.extend(batch_missing)
 		start = end
 
 	return all_missing
 
 
-def _validate_item_supplier(data):
+def _validate_item_supplier(data, columns):
 	missing_list = []
-	
-	for row in data:
-		if row[0] == "Item Supplier Table Name":
-			continue
 
-		name = row[0]
-		item_code = row[4]
+	for row in data:
+		name = get_cell(row, columns, "Item Supplier Table Name")
+		item_code = get_cell(row, columns, "Item Code")
 
 		# default values for missing
 		item_not_found = None
