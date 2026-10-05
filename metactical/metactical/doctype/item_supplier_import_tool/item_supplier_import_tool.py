@@ -96,7 +96,7 @@ class ItemSupplierImportTool(Document):
 						if supplier.name == name:
 							if not (supplier.ifw_supplier_qoh == updated_qty or (supplier.ifw_supplier_qoh > 49 and updated_qty == 50)):
 								supplier.ifw_supplier_qoh = updated_qty
-								supplier.ifw_sqohtimestamp = frappe.utils.now_datetime()
+								supplier.ifw_sqohtimestamp = format_sqoh_date(frappe.utils.getdate())
 								item.save()
 								frappe.db.commit()
 							supplier_exists = True
@@ -161,6 +161,11 @@ def import_item_supplier():
 		"docname": item_supplier_import_tool.name,
 		"missing_items": missing_items_list
 	}
+
+
+def format_sqoh_date(date):
+	"""Format as e.g. 1-Jan-0001 (day without leading zero, 4-digit year)."""
+	return f"{date.day}-{date.strftime('%b')}-{date.year:04d}"
 
 
 REQUIRED_HEADERS = ["Item Supplier Table Name", "Supplier Part Number", "Quantity To Update", "Item Code"]
