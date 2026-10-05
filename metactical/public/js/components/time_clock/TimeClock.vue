@@ -38,7 +38,12 @@
           </template>
         </div>
 
+        <div v-if="smallTouch" class="tc-mobile-note">
+          Clocking in and out isn't available on phones. Please use a workstation or kiosk.
+          You can still check your hours below.
+        </div>
         <button
+          v-else
           class="tc-action"
           :class="state.status === 'in' ? 'tc-action-out' : 'tc-action-in'"
           :disabled="busy || (state.status === 'out' && !state.can_clock_in)"
@@ -62,8 +67,11 @@
         <div class="tc-card-title">Waiting for your approval <span class="tc-count">{{ pending.length }}</span></div>
         <div v-for="r in pending" :key="r.name" class="tc-req">
           <div class="tc-req-main">
-            <b>{{ r.user }}</b> · {{ fmtDate(r.date) }}
-            <div class="tc-muted">{{ r.current_checkin }} – {{ r.current_checkout }} → <b>{{ fmtTime(r.requested_from) || r.requested_checkin }} – {{ fmtTime(r.requested_to) || r.requested_checkout }}</b> ({{ r.requested_total_hours }} h)</div>
+            <b>{{ r.employee_name || r.user }}</b> · {{ fmtDate(r.date) }}
+            <div class="tc-muted">
+              <template v-if="r.request_type === 'Add'"><span class="tc-pill tc-pill-wait">missed time</span> add <b>{{ fmtTime(r.requested_from) }} – {{ fmtTime(r.requested_to) }}</b> ({{ r.requested_total_hours }} h)</template>
+              <template v-else>{{ r.current_checkin }} – {{ r.current_checkout }} → <b>{{ fmtTime(r.requested_from) || r.requested_checkin }} – {{ fmtTime(r.requested_to) || r.requested_checkout }}</b> ({{ r.requested_total_hours }} h)</template>
+            </div>
             <div v-if="r.reason" class="tc-reason">“{{ r.reason }}”</div>
           </div>
           <div class="tc-req-actions">
@@ -109,14 +117,22 @@
             class="tc-day"
             :class="{ 'is-today': d.is_today, 'is-open': openDay === d.date }"
           >
-            <button class="tc-day-row" :disabled="!d.log_count" @click="toggleDay(d)">
+            <div class="tc-day-row">
+            <button class="tc-day-main" :disabled="!d.log_count" @click="toggleDay(d)">
               <span class="tc-day-wd">{{ fmtWeekday(d.date) }}</span>
               <span class="tc-day-name">{{ fmtDate(d.date) }}</span>
               <span class="tc-bar" :title="d.short ? 'Shorter than the ' + fmtDuration(cycle.shift_hours) + ' shift' : ''"><span class="tc-bar-fill" :class="{ 'is-short': d.short }" :style="{ width: barWidth(d.hours) + '%' }"></span></span>
               <span class="tc-day-hours">{{ d.hours ? fmtDuration(d.hours) : '—' }}</span>
               <span v-if="d.short" class="tc-pill tc-pill-short">short day</span>
-              <span v-if="d.pending_requests" class="tc-pill tc-pill-wait">change pending</span>
+              <span v-if="d.pending_requests" class="tc-pill tc-pill-wait">request pending</span>
+              <span
+                v-if="d.add_request && d.add_request.status === 'Declined'"
+                class="tc-pill tc-pill-declined"
+                :title="d.add_request.review_comment || ''"
+              >declined</span>
             </button>
+            <button v-if="d.can_add && !d.pending_requests" class="tc-link tc-add" @click="openMissed(d)">Add time</button>
+            </div>
             <div v-if="openDay === d.date && dayDetail" class="tc-day-detail">
               <div v-for="l in dayDetail.logs" :key="l.name" class="tc-entry">
                 <span>{{ fmtTime(l.from_time) }} → {{ l.open ? 'now' : fmtTime(l.to_time) }}</span>
@@ -136,16 +152,17 @@
     <!-- Correction dialog -->
     <div v-if="correction" class="tc-modal-back" @click.self="correction = null">
       <div class="tc-modal" role="dialog" aria-modal="true">
-        <div class="tc-card-title">Request a time change</div>
-        <p class="tc-muted">{{ fmtDate(correction.log.date) }}: currently {{ fmtTime(correction.log.from_time) }} → {{ fmtTime(correction.log.to_time) }}</p>
+        <div class="tc-card-title">{{ correction.mode === 'add' ? 'Add missed time' : 'Request a time change' }}</div>
+        <p v-if="correction.mode === 'add'" class="tc-muted">{{ fmtDate(correction.date) }}: no time was recorded this day.</p>
+        <p v-else class="tc-muted">{{ fmtDate(correction.log.date) }}: currently {{ fmtTime(correction.log.from_time) }} → {{ fmtTime(correction.log.to_time) }}</p>
         <label>Clock in
           <input type="datetime-local" v-model="correction.from" />
         </label>
         <label>Clock out
           <input type="datetime-local" v-model="correction.to" />
         </label>
-        <label>Why does it need to change?
-          <textarea v-model="correction.reason" rows="3" placeholder="e.g. Forgot to clock out, left at 5:00 PM"></textarea>
+        <label>{{ correction.mode === 'add' ? 'Why was it missed?' : 'Why does it need to change?' }}
+          <textarea v-model="correction.reason" rows="3" :placeholder="correction.mode === 'add' ? 'e.g. Forgot to clock in, worked my normal shift' : 'e.g. Forgot to clock out, left at 5:00 PM'"></textarea>
         </label>
         <div v-if="correction.error" class="tc-warn">{{ correction.error }}</div>
         <div class="tc-modal-actions">
@@ -203,6 +220,7 @@ const correction = ref(null)
 const canReview = ref(false)
 const pending = ref([])
 const logoutIn = ref(null)
+const smallTouch = ref(false) // phones and small tablets: clock in/out is not offered there
 
 // The page shows the SERVER's time: remember how far the browser clock is from it.
 const serverMs = ref(Date.now())
@@ -307,9 +325,26 @@ async function toggleDay(d) {
   dayDetail.value = await callBackend("get_day", { date: d.date })
 }
 
+// Default a missed day to the employee's shift times (an overnight shift ends on the next day).
+function openMissed(d) {
+  const sh = state.value.shift
+  const hhmm = (s) => String(s).slice(11, 16)
+  const overnight = String(sh.end).slice(0, 10) !== String(sh.start).slice(0, 10)
+  const next = new Date(asDate(d.date).getTime() + 86400000)
+  const nextIso = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`
+  correction.value = {
+    mode: "add",
+    date: d.date,
+    from: `${d.date}T${hhmm(sh.start)}`,
+    to: `${overnight ? nextIso : d.date}T${hhmm(sh.end)}`,
+    reason: "",
+    error: "",
+  }
+}
+
 function openCorrection(log) {
   const toInput = (s) => { const d = parse(s); return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "" }
-  correction.value = { log, from: toInput(log.from_time), to: toInput(log.to_time), reason: "", error: "" }
+  correction.value = { mode: "change", log, from: toInput(log.from_time), to: toInput(log.to_time), reason: "", error: "" }
 }
 
 async function submitCorrection() {
@@ -318,7 +353,11 @@ async function submitCorrection() {
   if (!c.from || !c.to) { c.error = "Enter both times."; return }
   busy.value = true
   try {
-    await callBackend("request_correction", { log: c.log.name, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason })
+    if (c.mode === "add") {
+      await callBackend("request_missed_punch", { date: c.date, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason })
+    } else {
+      await callBackend("request_correction", { log: c.log.name, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason })
+    }
     correction.value = null
     setNotice("Sent for approval.")
     await loadCycle(offset.value)
@@ -372,11 +411,21 @@ function cancelLogout() {
   logoutIn.value = null
 }
 
+let touchQuery = null
+const onTouchChange = (e) => { smallTouch.value = e.matches }
+
 onMounted(() => {
+  touchQuery = window.matchMedia("(pointer: coarse) and (max-width: 820px)")
+  smallTouch.value = touchQuery.matches
+  touchQuery.addEventListener("change", onTouchChange)
   timer = setInterval(() => { tick.value = Date.now() }, 1000)
   refresh()
 })
-onBeforeUnmount(() => { clearInterval(timer); cancelLogout() })
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  cancelLogout()
+  if (touchQuery) touchQuery.removeEventListener("change", onTouchChange)
+})
 
 defineExpose({ refresh })
 </script>

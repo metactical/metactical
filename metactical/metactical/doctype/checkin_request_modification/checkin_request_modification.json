@@ -13,6 +13,7 @@
   "current_checkout",
   "current_total_hours",
   "column_break_5",
+  "request_type",
   "status",
   "log",
   "requested_checkin",
@@ -76,8 +77,7 @@
    "fieldname": "log",
    "fieldtype": "Link",
    "label": "Log",
-   "options": "Clockin Log",
-   "reqd": 1
+   "options": "Clockin Log"
   },
   {
    "fieldname": "requested_checkin",
@@ -145,11 +145,19 @@
    "fieldname": "review_comment",
    "fieldtype": "Small Text",
    "label": "Review Comment"
+  },
+  {
+   "default": "Change",
+   "fieldname": "request_type",
+   "fieldtype": "Select",
+   "label": "Request Type",
+   "options": "Change\nAdd",
+   "in_list_view": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-05 12:00:00.000000",
+ "modified": "2026-10-05 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Checkin Request Modification",

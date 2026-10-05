@@ -11,6 +11,9 @@ from frappe.utils import add_days, flt, get_datetime, getdate, now_datetime
 
 SETTINGS = "Time Tracker Settings"
 
+# A day is only "short" when it misses the shift by more than this.
+SHORT_DAY_TOLERANCE_HOURS = 0.25
+
 
 class Blocked(Exception):
 	"""The user can see the tracker but cannot clock yet. Carries a stable code for the UI."""
@@ -32,6 +35,7 @@ def get_settings():
 		early_minutes=int(s.get("early_clockin_minutes") if s.get("early_clockin_minutes") is not None else 15),
 		enforce_window=int(s.get("enforce_shift_window") if s.get("enforce_shift_window") is not None else 1),
 		max_shift_hours=flt(s.get("max_shift_hours")) or 16.0,
+		backdate_days=int(s.get("backdate_limit_days") if s.get("backdate_limit_days") is not None else 14),
 		pay_cycles=[(getdate(r.from_date), getdate(r.to_date)) for r in (s.pay_cycles or [])],
 	)
 

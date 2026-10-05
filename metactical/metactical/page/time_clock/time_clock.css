@@ -59,8 +59,12 @@
 
 #time_clock_ui .tc-cycle-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 #time_clock_ui .tc-day { border-top: 1px solid var(--border-color); }
-#time_clock_ui .tc-day-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: 0; padding: 8px 0; text-align: left; color: inherit; cursor: pointer; }
-#time_clock_ui .tc-day-row:disabled { cursor: default; opacity: .7; }
+#time_clock_ui .tc-day-row { display: flex; align-items: center; gap: 12px; }
+#time_clock_ui .tc-day-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; background: none; border: 0; padding: 8px 0; text-align: left; color: inherit; cursor: pointer; }
+#time_clock_ui .tc-day-main:disabled { cursor: default; opacity: .7; }
+#time_clock_ui .tc-add { white-space: nowrap; opacity: 0; transition: opacity .12s; }
+#time_clock_ui .tc-day:hover .tc-add, #time_clock_ui .tc-add:focus-visible { opacity: 1; }
+#time_clock_ui .tc-mobile-note { max-width: 420px; margin: 0 auto; padding: 14px 16px; border-radius: var(--border-radius-lg, 10px); background: var(--control-bg); color: var(--text-muted); }
 #time_clock_ui .tc-day.is-today .tc-day-name { font-weight: 700; }
 #time_clock_ui .tc-day-wd { width: 34px; flex: none; color: var(--text-muted); }
 #time_clock_ui .tc-day-name { width: 112px; flex: none; font-variant-numeric: tabular-nums; }

@@ -71,6 +71,7 @@ class TestClockFlow(FrappeTestCase):
 		).insert(ignore_permissions=True)
 		sa.submit()
 		s = frappe.get_doc("Time Tracker Settings")
+		cls._saved_settings = s.as_dict(convert_dates_to_str=True)  # put back in tearDownClass
 		s.checkin_approver = APPROVER
 		s.start_date = "2026-10-01"
 		s.set("pay_cycles", [{"from_date": "2026-10-01", "to_date": "2026-10-14"}])
@@ -79,6 +80,21 @@ class TestClockFlow(FrappeTestCase):
 		s.max_shift_hours = 16
 		s.save(ignore_permissions=True)
 		frappe.clear_cache()
+
+	@classmethod
+	def tearDownClass(cls):
+		"""The tests rewrite Time Tracker Settings; leave the site's own settings as they were."""
+		frappe.set_user("Administrator")
+		saved = getattr(cls, "_saved_settings", None)
+		if saved:
+			s = frappe.get_doc("Time Tracker Settings")
+			for f in ("checkin_approver", "start_date", "logout_delay", "early_clockin_minutes",
+					  "enforce_shift_window", "max_shift_hours", "backdate_limit_days"):
+				s.set(f, saved.get(f))
+			s.set("pay_cycles", [{"from_date": r["from_date"], "to_date": r["to_date"]} for r in saved.get("pay_cycles", [])])
+			s.save(ignore_permissions=True)
+			frappe.db.commit()
+		super().tearDownClass()
 
 	@classmethod
 	def _make_company(cls):
@@ -172,14 +188,16 @@ class TestClockFlow(FrappeTestCase):
 
 	def test_correction_needs_a_reason_and_valid_times(self):
 		log = self._closed_log()
-		with self.assertRaises(frappe.ValidationError):
-			api.request_correction(log, "2026-10-07 09:00:00", "2026-10-07 17:00:00", "")
-		with self.assertRaises(frappe.ValidationError):
-			api.request_correction(log, "2026-10-07 17:00:00", "2026-10-07 09:00:00", "swapped")
+		with self._now(at(18)):
+			with self.assertRaises(frappe.ValidationError):
+				api.request_correction(log, "2026-10-07 09:00:00", "2026-10-07 17:00:00", "")
+			with self.assertRaises(frappe.ValidationError):
+				api.request_correction(log, "2026-10-07 17:00:00", "2026-10-07 09:00:00", "swapped")
 
 	def test_only_the_approver_can_approve_and_never_their_own(self):
 		log = self._closed_log()
-		req = api.request_correction(log, "2026-10-07 08:55:00", "2026-10-07 17:30:00", "Stayed late")["name"]
+		with self._now(at(18)):
+			req = api.request_correction(log, "2026-10-07 08:55:00", "2026-10-07 17:30:00", "Stayed late")["name"]
 		with self.assertRaises(frappe.PermissionError):  # the requester is not the approver
 			api.review_request(req, "Approved")
 		frappe.set_user(APPROVER)
@@ -212,3 +230,60 @@ class TestClockFlow(FrappeTestCase):
 	def clock_on(self, day, h1, h2):
 		self.clock("clock_in", at(h1, day=day))
 		self.clock("clock_out", at(h2, day=day))
+
+	# ---- missed days -------------------------------------------------------------------------
+
+	def _now(self, when):
+		return patch("metactical.time_tracker.core.now_datetime", return_value=when)
+
+	def test_missed_day_can_be_requested_and_approved(self):
+		day = dt.date(2026, 10, 5)  # Monday, nothing clocked
+		with self._now(at(12)):
+			req = api.request_missed_punch(str(day), "2026-10-05 09:00:00", "2026-10-05 17:00:00", "Forgot to clock in")
+			cycle = api.get_cycle()
+		d = {x["date"]: x for x in cycle["days"]}["2026-10-05"]
+		self.assertEqual(d["pending_requests"], 1)
+		self.assertFalse(frappe.db.exists("Clockin Log", {"user": USER, "date": day}))  # nothing counted yet
+		frappe.set_user(APPROVER)
+		with self._now(at(12)):
+			api.review_request(req["name"], "Approved")
+		row = frappe.db.get_value("Clockin Log", {"user": USER, "date": day}, ["total_hours", "has_clocked_out"], as_dict=True)
+		self.assertEqual((row.total_hours, row.has_clocked_out), (8.0, 1))
+		self.assertTrue(frappe.db.exists("Employee Checkin", {"employee": self.employee, "log_type": "OUT"}))
+
+	def test_missed_day_rules(self):
+		with self._now(at(12)):
+			args = ("2026-10-05", "2026-10-05 09:00:00", "2026-10-05 17:00:00", "Forgot")
+			with self.assertRaises(frappe.ValidationError):  # no reason
+				api.request_missed_punch("2026-10-05", args[1], args[2], "")
+			with self.assertRaises(frappe.ValidationError):  # future day
+				api.request_missed_punch("2026-10-09", "2026-10-09 09:00:00", "2026-10-09 17:00:00", "x y z")
+			with self.assertRaises(frappe.ValidationError):  # too far back
+				api.request_missed_punch("2026-09-01", "2026-09-01 09:00:00", "2026-09-01 17:00:00", "too old")
+			with self.assertRaises(frappe.ValidationError):  # clock in not on the chosen day
+				api.request_missed_punch("2026-10-05", "2026-10-04 09:00:00", "2026-10-05 17:00:00", "wrong day")
+			api.request_missed_punch(*args)
+			with self.assertRaises(frappe.ValidationError):  # one waiting request per day
+				api.request_missed_punch(*args)
+
+	def test_missed_time_cannot_overlap_existing_entry(self):
+		self.clock_on(DAY, 9, 12)  # Wednesday 9-12
+		with self._now(at(18)):
+			with self.assertRaises(frappe.ValidationError):
+				api.request_missed_punch(str(DAY), "2026-10-07 11:00:00", "2026-10-07 15:00:00", "overlaps")
+
+	def test_settings_defaults_patch_fills_only_unset_fields(self):
+		from metactical.patches.time_tracker_settings_defaults import execute
+
+		frappe.set_user("Administrator")
+		frappe.db.sql(
+			"delete from `tabSingles` where doctype='Time Tracker Settings' and field in "
+			"('early_clockin_minutes','enforce_shift_window','backdate_limit_days')"
+		)
+		frappe.db.set_single_value("Time Tracker Settings", "max_shift_hours", 12)  # already chosen: must survive
+		execute()
+		get = lambda f: frappe.db.get_single_value("Time Tracker Settings", f)
+		self.assertEqual((int(get("early_clockin_minutes")), int(get("enforce_shift_window")), int(get("backdate_limit_days"))), (15, 1, 14))
+		self.assertEqual(float(get("max_shift_hours")), 12.0)
+		frappe.db.set_single_value("Time Tracker Settings", "max_shift_hours", 16)
+		frappe.clear_cache()

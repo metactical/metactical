@@ -179,18 +179,34 @@ def get_cycle(offset=0):
 	s_start, s_end = core.shift_occurrence(ctx.shift, today)
 	shift_hours = core.hours_between(s_start, s_end)
 	still_open = {str(core.getdate(l.date)) for l in core.open_logs(ctx.user)}
+	adds = {}  # missed-time requests for days with no entry: latest per date
+	# `date` on this doctype is a text field, so filter the (few) rows in Python rather than in SQL.
+	for r in frappe.get_all(
+		"Checkin Request Modification",
+		filters={"user": ctx.user, "request_type": "Add"},
+		fields=["date", "status", "review_comment"],
+		order_by="creation asc",
+	):
+		if str(start) <= str(r.date) <= str(end):
+			adds[str(r.date)] = {"status": r.status, "review_comment": r.review_comment}
+	for k, v in adds.items():
+		if v["status"] == "Pending":
+			pending[k] = pending.get(k, 0) + 1
 	days = [
 		{
 			"date": str(d),
 			"hours": round(v[0], 4),
 			"log_count": v[1],
+			"add_request": adds.get(str(d)),
+			"can_add": bool(d <= today and (today - d).days <= ctx.settings.backdate_days and v[1] == 0),
 			"pending_requests": pending.get(str(d), 0),
 			"is_today": d == today,
-			# Short = worked something, finished, and less than the scheduled shift. Days with no
+			# Short = worked something, finished, and clearly less than the scheduled shift
+			# (a few minutes of clock-in/out jitter is not a short day). Days with no
 			# entries are not flagged (we do not know which days were scheduled), and a day still
 			# in progress is never short.
 			"short": bool(
-				shift_hours > 0 and 0 < v[0] < shift_hours and d != today and str(d) not in still_open
+				shift_hours > 0 and 0 < v[0] < shift_hours - core.SHORT_DAY_TOLERANCE_HOURS and d != today and str(d) not in still_open
 			),
 		}
 		for d, v in totals.items()
@@ -246,6 +262,94 @@ def _fmt12(d):
 	return get_datetime(d).strftime("%I:%M %p").lstrip("0")
 
 
+def _check_span(ctx, new_from, new_to, reason):
+	reason = (reason or "").strip()
+	if len(reason) < 3:
+		frappe.throw(_("Please say why the time needs to change."))
+	hours = core.hours_between(new_from, new_to)
+	if hours <= 0:
+		frappe.throw(_("Clock out must be after clock in."))
+	if hours > ctx.settings.max_shift_hours:
+		frappe.throw(_("That is longer than {0} hours.").format(ctx.settings.max_shift_hours))
+	if new_to > ctx.now:
+		frappe.throw(_("Clock out can not be in the future."))
+	return reason, hours
+
+
+def _assert_no_overlap(user, new_from, new_to, exclude=None):
+	clash = frappe.db.sql(
+		"""select name from `tabClockin Log`
+		where user=%s and name!=%s and from_time < %s and coalesce(to_time, now()) > %s limit 1""",
+		(user, exclude or "", new_to, new_from),
+	)
+	if clash:
+		frappe.throw(_("Those times overlap another entry ({0}).").format(clash[0][0]))
+
+
+def _notify_approver(ctx, subject, body):
+	approver = ctx.settings.approver
+	if not approver:
+		return
+	try:
+		frappe.sendmail(recipients=[approver], subject=subject, message=body, now=False)
+	except Exception:
+		_fail("Time change request email failed")
+
+
+@frappe.whitelist(methods=["POST"])
+def request_missed_punch(date, from_time, to_time, reason):
+	"""Employee asks to add an entry for a day they never clocked in at all."""
+	ctx = core.context()
+	day = getdate(date)
+	today = ctx.now.date()
+	if day > today:
+		frappe.throw(_("You can not add time for a future day."))
+	if (today - day).days > ctx.settings.backdate_days:
+		frappe.throw(
+			_("You can only add time up to {0} days back. Ask HR for older days.").format(ctx.settings.backdate_days)
+		)
+
+	new_from, new_to = get_datetime(from_time), get_datetime(to_time)
+	if new_from.date() != day:
+		frappe.throw(_("Clock in must be on {0}.").format(day))
+	reason, hours = _check_span(ctx, new_from, new_to, reason)
+	_assert_no_overlap(ctx.user, new_from, new_to)
+	if frappe.db.exists(
+		"Checkin Request Modification",
+		{"user": ctx.user, "request_type": "Add", "date": str(day), "status": "Pending"},
+	):
+		frappe.throw(_("You already have a request waiting for {0}.").format(day))
+
+	req = frappe.get_doc(
+		{
+			"doctype": "Checkin Request Modification",
+			"request_type": "Add",
+			"user": ctx.user,
+			"date": str(day),
+			"status": "Pending",
+			"reason": reason,
+			"requested_from": new_from,
+			"requested_to": new_to,
+			"current_checkin": "-",
+			"current_checkout": "-",
+			"current_total_hours": "0",
+			"requested_checkin": _fmt12(new_from),
+			"requested_checkout": _fmt12(new_to),
+			"requested_total_hours": str(round(hours, 2)),
+			"requested_checkin_military": new_from.strftime("%H:%M:%S"),
+			"requested_checkout_military": new_to.strftime("%H:%M:%S"),
+		}
+	).insert(ignore_permissions=True)
+	_notify_approver(
+		ctx,
+		_("Missed time request from {0}").format(ctx.employee.employee_name),
+		_("{0} asked to add time on {1}: {2} - {3}.<br>Reason: {4}<br>Review it on the Time Clock page.").format(
+			ctx.employee.employee_name, day, _fmt12(new_from), _fmt12(new_to), frappe.utils.escape_html(reason)
+		),
+	)
+	return {"name": req.name, "status": req.status}
+
+
 @frappe.whitelist(methods=["POST"])
 def request_correction(log, from_time, to_time, reason):
 	"""Employee asks for different in/out times on one of their own logs."""
@@ -255,16 +359,8 @@ def request_correction(log, from_time, to_time, reason):
 		frappe.throw(_("You can only correct your own time."), frappe.PermissionError)
 	if not doc.has_clocked_out:
 		frappe.throw(_("Clock out first, then request a correction."))
-	reason = (reason or "").strip()
-	if len(reason) < 3:
-		frappe.throw(_("Please say why the time needs to change."))
-
 	new_from, new_to = get_datetime(from_time), get_datetime(to_time)
-	hours = core.hours_between(new_from, new_to)
-	if hours <= 0:
-		frappe.throw(_("Clock out must be after clock in."))
-	if hours > ctx.settings.max_shift_hours:
-		frappe.throw(_("That is longer than {0} hours.").format(ctx.settings.max_shift_hours))
+	reason, hours = _check_span(ctx, new_from, new_to, reason)
 	if frappe.db.exists("Checkin Request Modification", {"log": log, "status": "Pending"}):
 		frappe.throw(_("This entry already has a request waiting for approval."))
 
@@ -333,15 +429,22 @@ def assert_can_review():
 @frappe.whitelist()
 def get_pending_requests():
 	assert_can_review()
-	return frappe.get_all(
+	rows = frappe.get_all(
 		"Checkin Request Modification",
 		filters={"status": "Pending"},
 		fields=[
-			"name", "user", "date", "log", "reason", "requested_from", "requested_to",
+			"name", "user", "date", "log", "request_type", "reason", "requested_from", "requested_to",
 			"current_checkin", "current_checkout", "current_total_hours", "requested_total_hours",
 		],
 		order_by="creation asc",
 	)
+	names = dict(
+		frappe.get_all("Employee", filters={"user_id": ["in", [r.user for r in rows] or [""]]},
+					   fields=["user_id", "employee_name"], as_list=True)
+	)
+	for r in rows:
+		r["employee_name"] = names.get(r.user) or r.user
+	return rows
 
 
 @frappe.whitelist(methods=["POST"])
@@ -356,7 +459,7 @@ def review_request(name, decision, comment=None):
 		frappe.throw(_("You cannot approve your own request."), frappe.PermissionError)
 
 	if decision == "Approved":
-		apply_correction(req)
+		apply_request(req)
 
 	req.status = decision
 	req.reviewed_by = frappe.session.user
@@ -366,19 +469,36 @@ def review_request(name, decision, comment=None):
 	return {"name": req.name, "status": req.status}
 
 
+def apply_request(req):
+	if req.get("request_type") == "Add":
+		apply_missed_punch(req)
+	else:
+		apply_correction(req)
+
+
+def apply_missed_punch(req):
+	"""Create the closed entry the employee asked for, refusing overlaps that appeared since."""
+	new_from, new_to = get_datetime(req.requested_from), get_datetime(req.requested_to)
+	_assert_no_overlap(req.user, new_from, new_to)
+	frappe.get_doc(
+		{
+			"doctype": "Clockin Log",
+			"user": req.user,
+			"date": new_from.date(),
+			"from_time": new_from,
+			"to_time": new_to,
+			"has_clocked_out": 1,
+		}
+	).insert(ignore_permissions=True)
+
+
 def apply_correction(req):
 	"""Write the approved times onto the log, refusing anything that would overlap another entry."""
 	if not req.requested_from or not req.requested_to:
 		frappe.throw(_("This is an older request without exact times. Edit the Clockin Log directly."))
 	log = frappe.get_doc("Clockin Log", req.log)
 	new_from, new_to = get_datetime(req.requested_from), get_datetime(req.requested_to)
-	clash = frappe.db.sql(
-		"""select name from `tabClockin Log`
-		where user=%s and name!=%s and from_time < %s and coalesce(to_time, now()) > %s limit 1""",
-		(log.user, log.name, new_to, new_from),
-	)
-	if clash:
-		frappe.throw(_("The new times overlap another entry ({0}).").format(clash[0][0]))
+	_assert_no_overlap(log.user, new_from, new_to, exclude=log.name)
 	log.from_time = new_from
 	log.to_time = new_to
 	log.date = new_from.date()

@@ -38,6 +38,11 @@ www page is untouched and still works; switch staff over once this is accepted.
 - `frappe.call`'s `error` callback receives no response object here; `callBackend` uses `fetch` instead.
 - HRMS refuses two Employee Checkins with the same timestamp.
 
+- Frappe does not apply a new field's default to an existing Single doc; saving the form then stores 0.
+  `patches/time_tracker_settings_defaults.py` sets the defaults once on migrate.
+- Frappe's `between` filter on the text `date` field of Checkin Request Modification builds invalid SQL; filter in Python.
+- Time Tracker Settings validate auto-generates pay cycles from `start_date` (saving it creates ~26 cycles).
+
 ## Tests
 
 `bench --site <site> run-tests --skip-test-records --module metactical.time_tracker.tests.test_time_tracker`
@@ -45,5 +50,4 @@ www page is untouched and still works; switch staff over once this is accepted.
 
 ## Not built yet
 
-Manager "who's in now" board, payroll/exceptions report + CSV export, missed-punch requests (a log with no
-existing row), break tracking, PIN/badge login for shared tablets, switching `/tracker` over.
+Manager "who's in now" board, payroll/exceptions report + CSV export, break tracking, PIN/badge login for shared tablets, switching `/tracker` over.

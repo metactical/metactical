@@ -15,7 +15,8 @@
   "clock_rules_section",
   "early_clockin_minutes",
   "enforce_shift_window",
-  "max_shift_hours"
+  "max_shift_hours",
+  "backdate_limit_days"
  ],
  "fields": [
   {
@@ -84,12 +85,19 @@
    "label": "Longest Plausible Shift (hours)",
    "description": "Open entries longer than this are flagged, and corrections beyond it are refused.",
    "non_negative": 1
+  },
+  {
+   "default": "14",
+   "fieldname": "backdate_limit_days",
+   "fieldtype": "Int",
+   "label": "Days Back Employees Can Add Missed Time",
+   "non_negative": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-05 12:00:00.000000",
+ "modified": "2026-10-05 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Time Tracker Settings",
