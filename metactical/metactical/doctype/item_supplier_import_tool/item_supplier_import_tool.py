@@ -145,12 +145,18 @@ def import_item_supplier():
 	file_doc.dn = item_supplier_import_tool.name
 	file_doc.save()
 
+	# Commit before queueing so the background job can load the document
+	frappe.db.commit()
+
+	# Updating each Item is too slow to finish within the request timeout,
+	# so submit in the background
 	item_supplier_import_tool.reload()
-	item_supplier_import_tool.submit()
+	queue_action(item_supplier_import_tool, "submit", timeout=2000, enqueue_after_commit=True)
 	frappe.db.commit()
 
 	return {
 		"status": "success",
+		"queue_status": "Queued",
 		"file_url": file_doc.file_url,
 		"docname": item_supplier_import_tool.name,
 		"missing_items": missing_items_list
@@ -202,28 +208,33 @@ def validate_item_supplier(data):
 def _validate_item_supplier(data, columns):
 	missing_list = []
 
-	for row in data:
-		name = get_cell(row, columns, "Item Supplier Table Name")
-		item_code = get_cell(row, columns, "Item Code")
+	rows = [
+		(get_cell(row, columns, "Item Supplier Table Name"), get_cell(row, columns, "Item Code"))
+		for row in data
+	]
+	names = list({r[0] for r in rows if r[0]})
+	item_codes = list({r[1] for r in rows if r[1]})
 
+	# Look up the whole batch in two queries instead of loading every Item
+	existing_items = set(frappe.get_all(
+		"Item", filters={"name": ["in", item_codes]}, pluck="name"
+	)) if item_codes else set()
+	existing_suppliers = {
+		(d.name, d.parent) for d in frappe.get_all(
+			"Item Supplier",
+			filters={"name": ["in", names], "parenttype": "Item", "parentfield": "supplier_items"},
+			fields=["name", "parent"],
+		)
+	} if names else set()
+
+	for name, item_code in rows:
 		# default values for missing
 		item_not_found = None
 		supplier_not_found = None
 
-		if not frappe.db.exists("Item", {"name": item_code}):
+		if item_code not in existing_items:
 			item_not_found = item_code
-
-		try:
-			if item_not_found is None:
-				item = frappe.get_doc("Item", item_code)
-				supplier_exists = False
-				for supplier in item.supplier_items:
-					if supplier.name == name:
-						supplier_exists = True
-						break
-				if not supplier_exists:
-					supplier_not_found = name
-		except Exception as e:
+		elif (name, item_code) not in existing_suppliers:
 			supplier_not_found = name
 
 		# Only append if any is missing
