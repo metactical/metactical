@@ -11,7 +11,11 @@
   "logout_delay",
   "start_date",
   "pay_cycles",
-  "clockinout_delay"
+  "clockinout_delay",
+  "clock_rules_section",
+  "early_clockin_minutes",
+  "enforce_shift_window",
+  "max_shift_hours"
  ],
  "fields": [
   {
@@ -54,12 +58,38 @@
    "fieldtype": "Int",
    "label": "Logout Delay",
    "non_negative": 1
+  },
+  {
+   "fieldname": "clock_rules_section",
+   "fieldtype": "Section Break",
+   "label": "Clock Rules"
+  },
+  {
+   "default": "15",
+   "fieldname": "early_clockin_minutes",
+   "fieldtype": "Int",
+   "label": "Allow Clock In This Many Minutes Before Shift",
+   "non_negative": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enforce_shift_window",
+   "fieldtype": "Check",
+   "label": "Only Allow Clock In During Shift"
+  },
+  {
+   "default": "16",
+   "fieldname": "max_shift_hours",
+   "fieldtype": "Float",
+   "label": "Longest Plausible Shift (hours)",
+   "description": "Open entries longer than this are flagged, and corrections beyond it are refused.",
+   "non_negative": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-02-21 03:09:40.256730",
+ "modified": "2026-10-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Time Tracker Settings",

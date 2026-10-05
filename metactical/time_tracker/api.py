@@ -1,0 +1,390 @@
+"""Whitelisted endpoints for the Time Clock page. Snake_case, same shapes everywhere.
+
+Every clock action returns the full new state, so the screen never has to guess what happened.
+"""
+
+import frappe
+from frappe import _
+from frappe.utils import add_days, get_datetime, getdate, now_datetime
+
+from metactical.time_tracker import core
+from metactical.time_tracker.core import Blocked
+
+
+def _fail(title):
+	frappe.log_error(title, frappe.get_traceback())
+
+
+def _blocked_state(b, user):
+	return {
+		"server_now": str(now_datetime()),
+		"status": "blocked",
+		"blockers": [{"code": b.code, "message": b.message}],
+		"user": user,
+	}
+
+
+# ---- state --------------------------------------------------------------------------------
+
+
+def build_state(ctx, notice=None):
+	now, user = ctx.now, ctx.user
+	logs = core.logs_for_day(user, now.date())
+	opened = core.open_logs(user)
+	current = opened[0] if opened else None
+
+	state_key, shift_start, shift_end = core.shift_window(ctx.shift, now, ctx.settings.early_minutes)
+	can_in, reason = True, None
+	if current:
+		can_in, reason = False, _("Already clocked in")
+	elif ctx.settings.enforce_window and state_key != "open":
+		can_in = False
+		reason = _("Your shift starts at {0}").format(shift_start.strftime("%I:%M %p").lstrip("0"))
+		if state_key == "after":
+			reason = _("Your shift is over. Next shift starts {0}").format(
+				shift_start.strftime("%a %I:%M %p").replace(" 0", " ")
+			)
+
+	today_hours = sum(core.log_hours(l, now) for l in logs)
+	# A shift that crossed midnight keeps its open log on yesterday's date; count it in today's total too.
+	if current and getdate(current.date) != now.date():
+		today_hours += core.log_hours(current, now)
+		logs = logs + [current]
+
+	cycle = None
+	try:
+		start, end = core.get_cycle(now.date(), ctx.settings)
+		totals = core.day_totals(user, start, end, now)
+		cycle = {
+			"from_date": str(start),
+			"to_date": str(end),
+			"total_hours": round(sum(v[0] for v in totals.values()), 4),
+		}
+	except Blocked as b:
+		cycle = {"error": b.message}
+
+	return {
+		"server_now": str(now),
+		"status": "in" if current else "out",
+		"user": user,
+		"employee": {"name": ctx.employee.name, "employee_name": ctx.employee.employee_name},
+		"shift": {
+			"name": ctx.shift.name,
+			"start": str(shift_start),
+			"end": str(shift_end),
+			"window_state": state_key,
+		},
+		"open_log": core.serialize_log(current, now) if current else None,
+		"can_clock_in": can_in,
+		"can_clock_in_reason": reason,
+		"can_clock_out": bool(current),
+		"today": {
+			"date": str(now.date()),
+			"total_hours": round(today_hours, 4),
+			"logs": [core.serialize_log(l, now) for l in logs],
+		},
+		"cycle": cycle,
+		"max_shift_hours": ctx.settings.max_shift_hours,
+		"auto_logout_seconds": ctx.settings.logout_delay,
+		"blockers": [],
+		"notice": notice,
+	}
+
+
+@frappe.whitelist()
+def get_state():
+	try:
+		return build_state(core.context())
+	except Blocked as b:
+		return _blocked_state(b, frappe.session.user)
+
+
+# ---- clock --------------------------------------------------------------------------------
+
+
+@frappe.whitelist(methods=["POST"])
+def clock_in():
+	ctx = core.context()
+	core.lock_employee(ctx.employee.name)
+
+	if core.open_logs(ctx.user):
+		return build_state(ctx, notice=_("You were already clocked in."))
+
+	state_key, shift_start, _end = core.shift_window(ctx.shift, ctx.now, ctx.settings.early_minutes)
+	if ctx.settings.enforce_window and state_key != "open":
+		frappe.throw(
+			_("Clock in opens {0} minutes before your shift ({1}).").format(
+				ctx.settings.early_minutes, shift_start.strftime("%I:%M %p").lstrip("0")
+			),
+			title=_("Too early"),
+		)
+
+	frappe.get_doc(
+		{
+			"doctype": "Clockin Log",
+			"user": ctx.user,
+			"date": ctx.now.date(),
+			"from_time": ctx.now,
+			"total_hours": 0.0,
+		}
+	).insert(ignore_permissions=True)
+	return build_state(ctx, notice=_("Clocked in."))
+
+
+@frappe.whitelist(methods=["POST"])
+def clock_out():
+	ctx = core.context()
+	core.lock_employee(ctx.employee.name)
+
+	opened = core.open_logs(ctx.user)
+	if not opened:
+		return build_state(ctx, notice=_("You were not clocked in."))
+
+	# More than one open log should be impossible; if history left some, close them all at the same moment.
+	for row in opened:
+		log = frappe.get_doc("Clockin Log", row.name)
+		log.to_time = ctx.now
+		log.has_clocked_out = 1
+		log.save(ignore_permissions=True)
+	return build_state(ctx, notice=_("Clocked out."))
+
+
+# ---- history ------------------------------------------------------------------------------
+
+
+@frappe.whitelist()
+def get_cycle(offset=0):
+	"""A pay cycle with per-day hours. offset 0 = the current cycle, 1 = the one before, and so on."""
+	ctx = core.context()
+	offset = int(offset)
+	cycles = sorted(ctx.settings.pay_cycles, key=lambda c: c[0], reverse=True)
+	today = ctx.now.date()
+	current_idx = next((i for i, (s, e) in enumerate(cycles) if s <= today <= e), 0)
+	idx = current_idx + offset
+	if not cycles or idx < 0 or idx >= len(cycles):
+		return {"error": _("No pay cycle available."), "has_prev": False, "has_next": False}
+
+	start, end = cycles[idx]
+	totals = core.day_totals(ctx.user, start, end, ctx.now)
+	pending = {
+		str(r.date): r.n
+		for r in frappe.db.sql(
+			"""select l.date as date, count(*) as n from `tabCheckin Request Modification` r
+			join `tabClockin Log` l on l.name = r.log
+			where r.user=%s and r.status='Pending' and l.date between %s and %s group by l.date""",
+			(ctx.user, start, end),
+			as_dict=True,
+		)
+	}
+	s_start, s_end = core.shift_occurrence(ctx.shift, today)
+	shift_hours = core.hours_between(s_start, s_end)
+	still_open = {str(core.getdate(l.date)) for l in core.open_logs(ctx.user)}
+	days = [
+		{
+			"date": str(d),
+			"hours": round(v[0], 4),
+			"log_count": v[1],
+			"pending_requests": pending.get(str(d), 0),
+			"is_today": d == today,
+			# Short = worked something, finished, and less than the scheduled shift. Days with no
+			# entries are not flagged (we do not know which days were scheduled), and a day still
+			# in progress is never short.
+			"short": bool(
+				shift_hours > 0 and 0 < v[0] < shift_hours and d != today and str(d) not in still_open
+			),
+		}
+		for d, v in totals.items()
+	]
+	return {
+		"from_date": str(start),
+		"to_date": str(end),
+		"shift_hours": round(shift_hours, 4),
+		"total_hours": round(sum(d["hours"] for d in days), 4),
+		"days": days,
+		"has_prev": idx + 1 < len(cycles),
+		"has_next": idx > 0,
+	}
+
+
+@frappe.whitelist()
+def get_day(date):
+	ctx = core.context()
+	logs = core.logs_for_day(ctx.user, date)
+	requests = {
+		r.log: r
+		for r in frappe.get_all(
+			"Checkin Request Modification",
+			filters={"user": ctx.user, "log": ["in", [l.name for l in logs] or [""]]},
+			fields=["name", "log", "status", "requested_from", "requested_to", "reason", "review_comment", "modified"],
+			order_by="modified asc",
+		)
+	}
+	out = []
+	for l in logs:
+		item = core.serialize_log(l, ctx.now)
+		r = requests.get(l.name)
+		item["request"] = (
+			{
+				"name": r.name,
+				"status": r.status,
+				"requested_from": str(r.requested_from) if r.requested_from else None,
+				"requested_to": str(r.requested_to) if r.requested_to else None,
+				"reason": r.reason,
+				"review_comment": r.review_comment,
+			}
+			if r
+			else None
+		)
+		out.append(item)
+	return {"date": str(getdate(date)), "logs": out, "total_hours": round(sum(i["hours"] for i in out), 4)}
+
+
+# ---- corrections --------------------------------------------------------------------------
+
+
+def _fmt12(d):
+	return get_datetime(d).strftime("%I:%M %p").lstrip("0")
+
+
+@frappe.whitelist(methods=["POST"])
+def request_correction(log, from_time, to_time, reason):
+	"""Employee asks for different in/out times on one of their own logs."""
+	ctx = core.context()
+	doc = frappe.get_doc("Clockin Log", log)
+	if doc.user != ctx.user:
+		frappe.throw(_("You can only correct your own time."), frappe.PermissionError)
+	if not doc.has_clocked_out:
+		frappe.throw(_("Clock out first, then request a correction."))
+	reason = (reason or "").strip()
+	if len(reason) < 3:
+		frappe.throw(_("Please say why the time needs to change."))
+
+	new_from, new_to = get_datetime(from_time), get_datetime(to_time)
+	hours = core.hours_between(new_from, new_to)
+	if hours <= 0:
+		frappe.throw(_("Clock out must be after clock in."))
+	if hours > ctx.settings.max_shift_hours:
+		frappe.throw(_("That is longer than {0} hours.").format(ctx.settings.max_shift_hours))
+	if frappe.db.exists("Checkin Request Modification", {"log": log, "status": "Pending"}):
+		frappe.throw(_("This entry already has a request waiting for approval."))
+
+	req = frappe.get_doc(
+		{
+			"doctype": "Checkin Request Modification",
+			"user": ctx.user,
+			"date": str(doc.date),
+			"log": log,
+			"status": "Pending",
+			"reason": reason,
+			"requested_from": new_from,
+			"requested_to": new_to,
+			# legacy fields the old approval page and emails still read
+			"current_checkin": _fmt12(doc.from_time),
+			"current_checkout": _fmt12(doc.to_time),
+			"current_total_hours": str(round(doc.total_hours or 0, 2)),
+			"requested_checkin": _fmt12(new_from),
+			"requested_checkout": _fmt12(new_to),
+			"requested_total_hours": str(round(hours, 2)),
+			"requested_checkin_military": new_from.strftime("%H:%M:%S"),
+			"requested_checkout_military": new_to.strftime("%H:%M:%S"),
+		}
+	).insert(ignore_permissions=True)
+
+	approver = ctx.settings.approver
+	if approver:
+		try:
+			frappe.sendmail(
+				recipients=[approver],
+				subject=_("Time change request from {0}").format(ctx.employee.employee_name),
+				message=_(
+					"{0} asked to change {1}: {2} - {3} becomes {4} - {5}.<br>Reason: {6}<br>"
+					"Review it on the Time Clock page."
+				).format(
+					ctx.employee.employee_name,
+					doc.date,
+					_fmt12(doc.from_time),
+					_fmt12(doc.to_time),
+					_fmt12(new_from),
+					_fmt12(new_to),
+					frappe.utils.escape_html(reason),
+				),
+				now=False,
+			)
+		except Exception:
+			_fail("Time change request email failed")
+	return {"name": req.name, "status": req.status}
+
+
+def can_review(user=None):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	roles = set(frappe.get_roles(user))
+	if roles & {"System Manager", "HR Manager"}:
+		return True
+	return bool(core.get_settings().approver) and core.get_settings().approver.lower() == user.lower()
+
+
+def assert_can_review():
+	if not can_review():
+		frappe.throw(_("Only the time approver can review requests."), frappe.PermissionError)
+
+
+@frappe.whitelist()
+def get_pending_requests():
+	assert_can_review()
+	return frappe.get_all(
+		"Checkin Request Modification",
+		filters={"status": "Pending"},
+		fields=[
+			"name", "user", "date", "log", "reason", "requested_from", "requested_to",
+			"current_checkin", "current_checkout", "current_total_hours", "requested_total_hours",
+		],
+		order_by="creation asc",
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def review_request(name, decision, comment=None):
+	assert_can_review()
+	if decision not in ("Approved", "Declined"):
+		frappe.throw(_("Decision must be Approved or Declined."))
+	req = frappe.get_doc("Checkin Request Modification", name)
+	if req.status != "Pending":
+		frappe.throw(_("This request was already {0}.").format(req.status.lower()))
+	if req.user == frappe.session.user and frappe.session.user not in ("Administrator",):
+		frappe.throw(_("You cannot approve your own request."), frappe.PermissionError)
+
+	if decision == "Approved":
+		apply_correction(req)
+
+	req.status = decision
+	req.reviewed_by = frappe.session.user
+	req.reviewed_on = now_datetime()
+	req.review_comment = (comment or "").strip() or None
+	req.save(ignore_permissions=True)
+	return {"name": req.name, "status": req.status}
+
+
+def apply_correction(req):
+	"""Write the approved times onto the log, refusing anything that would overlap another entry."""
+	if not req.requested_from or not req.requested_to:
+		frappe.throw(_("This is an older request without exact times. Edit the Clockin Log directly."))
+	log = frappe.get_doc("Clockin Log", req.log)
+	new_from, new_to = get_datetime(req.requested_from), get_datetime(req.requested_to)
+	clash = frappe.db.sql(
+		"""select name from `tabClockin Log`
+		where user=%s and name!=%s and from_time < %s and coalesce(to_time, now()) > %s limit 1""",
+		(log.user, log.name, new_to, new_from),
+	)
+	if clash:
+		frappe.throw(_("The new times overlap another entry ({0}).").format(clash[0][0]))
+	log.from_time = new_from
+	log.to_time = new_to
+	log.date = new_from.date()
+	log.save(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def get_my_permissions():
+	return {"can_review": can_review()}

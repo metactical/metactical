@@ -20,7 +20,14 @@
   "requested_total_hours",
   "section_break_12",
   "requested_checkin_military",
-  "requested_checkout_military"
+  "requested_checkout_military",
+  "reason",
+  "requested_from",
+  "requested_to",
+  "review_section",
+  "reviewed_by",
+  "reviewed_on",
+  "review_comment"
  ],
  "fields": [
   {
@@ -41,14 +48,12 @@
   {
    "fieldname": "current_checkin",
    "fieldtype": "Data",
-   "label": "Current CheckIn",
-   "reqd": 1
+   "label": "Current CheckIn"
   },
   {
    "fieldname": "current_checkout",
    "fieldtype": "Data",
-   "label": "Current CheckOut",
-   "reqd": 1
+   "label": "Current CheckOut"
   },
   {
    "fieldname": "current_total_hours",
@@ -77,14 +82,12 @@
   {
    "fieldname": "requested_checkin",
    "fieldtype": "Data",
-   "label": "Requested CheckIn",
-   "reqd": 1
+   "label": "Requested CheckIn"
   },
   {
    "fieldname": "requested_checkout",
    "fieldtype": "Data",
-   "label": "Requested CheckOut",
-   "reqd": 1
+   "label": "Requested CheckOut"
   },
   {
    "fieldname": "requested_total_hours",
@@ -104,11 +107,49 @@
    "fieldname": "requested_checkout_military",
    "fieldtype": "Time",
    "label": "Requested Checkout Military"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason"
+  },
+  {
+   "fieldname": "requested_from",
+   "fieldtype": "Datetime",
+   "label": "Requested From"
+  },
+  {
+   "fieldname": "requested_to",
+   "fieldtype": "Datetime",
+   "label": "Requested To"
+  },
+  {
+   "fieldname": "review_section",
+   "fieldtype": "Section Break",
+   "label": "Review"
+  },
+  {
+   "fieldname": "reviewed_by",
+   "fieldtype": "Link",
+   "label": "Reviewed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reviewed_on",
+   "fieldtype": "Datetime",
+   "label": "Reviewed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "review_comment",
+   "fieldtype": "Small Text",
+   "label": "Review Comment"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-05-19 09:26:25.885416",
+ "modified": "2026-10-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Checkin Request Modification",
@@ -124,6 +165,16 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
    "write": 1
   }
  ],

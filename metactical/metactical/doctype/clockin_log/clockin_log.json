@@ -51,7 +51,7 @@
    "in_standard_filter": 1,
    "label": "Total Hours",
    "non_negative": 1,
-   "precision": "1"
+   "precision": "4"
   },
   {
    "default": "0",
@@ -76,7 +76,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-05-10 17:19:16.452849",
+ "modified": "2026-10-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Clockin Log",
@@ -96,15 +96,19 @@
   },
   {
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "Employee",
-   "share": 1,
+   "role": "HR Manager",
    "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Employee",
+   "if_owner": 1
   }
  ],
  "sort_field": "modified",
