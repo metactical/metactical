@@ -404,7 +404,72 @@ def process_manual_order(form_data):
 		frappe.response["InvoiceId"] = None
 		frappe.response["Total"] = 0.0
 
-	
+
+
+@frappe.whitelist()
+def convert_manual_to_regular_order(*args, **kwargs):
+	form_data = dict(frappe.form_dict)
+	order_id = form_data.get("InvoiceId")
+
+	log = create_log(form_data, "Manual Order - Convert to Regular")
+
+	if not order_id:
+		frappe.response["Status"] = "500"
+		frappe.response["Message"] = ["InvoiceId is required"]
+		frappe.response["InvoiceId"] = None
+		frappe.response["Total"] = 0.0
+		frappe.db.set_value('POS API Log', log, 'error', "InvoiceId is required")
+		frappe.db.commit()
+		return
+
+	try:
+		sales_order = frappe.get_doc('Sales Order', order_id)
+
+		payment_entries = frappe.db.get_all(
+			"Payment Entry Reference",
+			filters={"reference_doctype": "Sales Order", "reference_name": order_id, "docstatus": 1},
+			pluck="parent"
+		)
+		if payment_entries:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = ["Cannot convert Sales Order {0}: it has submitted Payment Entries ({1}). Please cancel the payments first.".format(
+				order_id, ", ".join(payment_entries))]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error',
+				"Payment Entries found: {0}".format(", ".join(payment_entries)), update_modified=False)
+			frappe.db.commit()
+			return
+
+		if sales_order.docstatus == 1:
+			sales_order.cancel()
+			frappe.db.commit()
+		elif sales_order.docstatus == 0:
+			frappe.delete_doc('Sales Order', order_id, ignore_permissions=True, force=True)
+			frappe.db.commit()
+		else:
+			frappe.response["Status"] = "500"
+			frappe.response["Message"] = ["Sales Order {0} is already cancelled".format(order_id)]
+			frappe.response["InvoiceId"] = None
+			frappe.response["Total"] = 0.0
+			frappe.db.set_value('POS API Log', log, 'error', "Sales Order {0} is already cancelled".format(order_id))
+			frappe.db.commit()
+			return
+
+	except Exception as e:
+		frappe.log_error(title='Convert Manual Order - Cancel Error', message=frappe.get_traceback())
+		frappe.db.set_value('POS API Log', log, 'error', str(e), update_modified=False)
+		frappe.clear_last_message()
+		frappe.response["Status"] = "500"
+		frappe.response["Message"] = [str(e)]
+		frappe.response["InvoiceId"] = None
+		frappe.response["Total"] = 0.0
+		return
+
+	# Treat as a new order by clearing InvoiceId so process_order creates a fresh Sales Order
+	form_data["InvoiceId"] = None
+	process_order(form_data)
+
 
 def validate_users(form_data):
 	# Check if SalesPerson exists
@@ -1371,7 +1436,9 @@ def create_return(*args, **kwargs):
         
 def create_return_invoice(form_data, invoiceId):
     try:
+        frappe.set_user("Administrator")
         sales_return = make_sales_return(invoiceId)
+        frappe.set_user(form_data["SalesPerson"])
         pos_profile = frappe.db.get_value("POS Profile", form_data["POSProfile"] + ' Operators', ["name", "write_off_limit", "ifw_return_warehouse"], as_dict=True)
         formatted_items = get_items(form_data)
         items = sales_return.items.copy()
@@ -1469,14 +1536,17 @@ def create_return_invoice(form_data, invoiceId):
         sales_return.selling_price_list = form_data['PriceList']
         sales_return.currency = frappe.db.get_value("Price List", form_data['PriceList'], 'currency')
         
+        frappe.set_user(form_data["SalesPerson"])
+        sales_return.flags.ignore_permissions = True
         sales_return.save()
+        sales_return.flags.ignore_permissions = True
         sales_return.submit()
         return sales_return, total_restock_fee
     except Exception as e:
         frappe.db.rollback()
         frappe.clear_last_message()
         frappe.set_user("Administrator")
-        
+
         frappe.log_error(title='Create Sales Return Error', message=frappe.get_traceback())
         raise e
     
