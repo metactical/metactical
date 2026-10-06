@@ -9,7 +9,7 @@ DEFAULTS = {
 	"backdate_limit_days": 14,
 	"standard_day_hours": 8,
 	"reminder_minutes_after_shift_end": 15,
-	"auto_close_hours_after_shift_end": 4,
+	"auto_close_hours_after_shift_end": 2,
 }
 
 

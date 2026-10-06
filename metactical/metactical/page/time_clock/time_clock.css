@@ -164,6 +164,9 @@
 #time_clock_ui .ap-att-label input { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: var(--border-radius, 6px); background: var(--control-bg); color: var(--text-color); }
 #time_clock_ui .tc-worknote { font-size: 12px; margin: -6px 0 10px; }
 
+/* build number */
+#time_clock_ui .tc-build { text-align: center; color: var(--text-muted); font-size: 11px; margin-top: 8px; }
+
 /* /trackerv2 login */
 #time_clock_ui .tc-login { max-width: 420px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
 #time_clock_ui .tc-login label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }

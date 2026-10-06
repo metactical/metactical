@@ -12,11 +12,11 @@
  "modified": "2026-10-06 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "Time Clock Hours",
+ "name": "Time Tracker V2 Report",
  "owner": "Administrator",
  "prepared_report": 0,
  "ref_doctype": "Clockin Log",
- "report_name": "Time Clock Hours",
+ "report_name": "Time Tracker V2 Report",
  "report_type": "Script Report",
  "roles": [
   {

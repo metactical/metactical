@@ -152,6 +152,8 @@
     </template>
     </template>
 
+    <div v-if="build" class="tc-build">Time Clock · build {{ build }}</div>
+
     <!-- Correction dialog -->
     <div v-if="correction" class="tc-modal-back" @click.self="correction = null">
       <div class="tc-modal" role="dialog" aria-modal="true">
@@ -200,6 +202,7 @@ const dayDetail = ref(null)
 const correction = ref(null)
 const canReview = ref(false)
 const pendingCount = ref(0)
+const build = ref("")
 const tab = ref("time") // "time" | "approvals"
 const logoutIn = ref(null)
 const smallTouch = ref(false) // phones and small tablets: clock in/out is not offered there
@@ -338,6 +341,7 @@ async function submitCorrection() {
 
 async function loadReviewer() {
   const p = await callBackend("get_my_permissions")
+  build.value = p.build || ""
   zoneState.serverTz = p.server_tz || "UTC"
   zoneState.mode = p.display_zone || "server"
   canReview.value = !!p.can_review

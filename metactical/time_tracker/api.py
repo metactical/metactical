@@ -10,6 +10,7 @@ from frappe.utils import add_days, get_datetime, getdate, now_datetime
 from frappe.rate_limiter import rate_limit
 
 from metactical.time_tracker import core, reminders
+from metactical.time_tracker.build import BUILD
 from metactical.time_tracker.core import Blocked
 
 
@@ -604,6 +605,7 @@ def _scoped(status_filter):
 def get_my_permissions():
 	allowed = can_review()
 	return {
+		"build": BUILD,
 		"server_tz": core.server_tz_name(),
 		"display_zone": core.get_display_zone(),
 		"can_review": allowed,

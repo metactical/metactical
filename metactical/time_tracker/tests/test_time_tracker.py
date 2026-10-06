@@ -80,7 +80,7 @@ class TestClockFlow(FrappeTestCase):
 		s.enforce_shift_window = 1
 		s.max_shift_hours = 16
 		s.reminder_minutes_after_shift_end = 15
-		s.auto_close_hours_after_shift_end = 4
+		s.auto_close_hours_after_shift_end = 2
 		s.save(ignore_permissions=True)
 		frappe.clear_cache()
 
@@ -615,7 +615,7 @@ class TestClockFlow(FrappeTestCase):
 				reminders.run(user=USER)
 			self.assertEqual(len(sent), 1)  # never twice
 			with self._now(at(21, 10)):
-				reminders.run(user=USER)  # more than 4 hours past the end
+				reminders.run(user=USER)  # more than 2 hours past the end
 		row = frappe.db.get_value("Clockin Log", {"user": USER}, ["has_clocked_out", "auto_closed", "closed_via", "to_time", "total_hours"], as_dict=True)
 		self.assertEqual((row.has_clocked_out, row.auto_closed, row.closed_via), (1, 1, "auto"))
 		self.assertEqual(row.to_time, at(17, 0))  # at the scheduled end, not when the job ran
@@ -648,7 +648,7 @@ class TestClockFlow(FrappeTestCase):
 		with patch.object(reminders, "send", return_value=["email"]):
 			with self._now(at(17, 20)):
 				reminders.run(user=USER)
-			self.assertEqual(due(), at(21, 0))  # next: the auto-close, 4 hours past the end
+			self.assertEqual(due(), at(19, 0))  # next: the auto-close, 2 hours past the end
 			with self._now(at(21, 5)):
 				reminders.run(user=USER)
 		self.assertIsNone(due())  # closed: nothing left to follow up
@@ -669,7 +669,7 @@ class TestClockFlow(FrappeTestCase):
 			self.assertEqual(frappe.db.count("Clockin Log", {"user": USER, "has_clocked_out": 0}), 1)
 		finally:
 			frappe.db.set_single_value("Time Tracker Settings", "reminder_minutes_after_shift_end", 15)
-			frappe.db.set_single_value("Time Tracker Settings", "auto_close_hours_after_shift_end", 4)
+			frappe.db.set_single_value("Time Tracker Settings", "auto_close_hours_after_shift_end", 2)
 			frappe.clear_cache(doctype="Time Tracker Settings")
 
 	def test_the_link_clocks_out_now_exactly_once_and_only_that_entry(self):
@@ -717,6 +717,58 @@ class TestClockFlow(FrappeTestCase):
 			self.assertIn(log.name, [r["name"] for r in api.get_attention()["auto_closed"]])
 			api.close_entry(log.name)  # "looks right"
 			self.assertNotIn(log.name, [r["name"] for r in api.get_attention()["auto_closed"]])
+
+	# ---- Rocket.Chat, and the build number ---------------------------------------------------
+
+	def _forgotten(self):
+		self.clock("clock_in", at(9, 0))
+		return frappe.db.get_value("Clockin Log", {"user": USER}, "name")
+
+	def test_auto_close_posts_name_link_scheduled_and_closed_time_to_rocketchat(self):
+		from metactical.time_tracker import reminders
+
+		name = self._forgotten()
+		posts = []
+		fake_post = lambda url, json=None, timeout=None: posts.append((url, json)) or SimpleNamespace(raise_for_status=lambda: None)
+		with patch.object(reminders, "send", return_value=["email"]), patch.object(
+			reminders, "_rocketchat_settings", return_value=("http://rc.test/hooks/abc", "Payroll-Time-Adjustments")
+		), patch.object(reminders.requests, "post", side_effect=fake_post):
+			with self._now(at(19, 5)):  # 2 hours + 5 minutes past the 17:00 end
+				reminders.run(user=USER)
+		self.assertEqual(len(posts), 1)
+		url, body = posts[0]
+		self.assertEqual((url, body["channel"]), ("http://rc.test/hooks/abc", "#Payroll-Time-Adjustments"))
+		for needle in ("Worker", f"/app/clockin-log/{name}", "Scheduled time", "05:00 PM", "Auto-closed time", "07:05 PM"):
+			self.assertIn(needle, body["text"])
+		self.assertEqual(frappe.db.get_value("Clockin Log", name, "to_time"), at(17, 0))
+
+	def test_without_a_webhook_nothing_is_posted(self):
+		from metactical.time_tracker import reminders
+
+		self._forgotten()
+		with patch.object(reminders, "send", return_value=["email"]), patch.object(
+			reminders, "_rocketchat_settings", return_value=(None, "Payroll-Time-Adjustments")
+		), patch.object(reminders.requests, "post", side_effect=AssertionError("must not post")):
+			with self._now(at(19, 5)):
+				reminders.run(user=USER)
+		self.assertEqual(frappe.db.count("Clockin Log", {"user": USER, "has_clocked_out": 0}), 0)  # still closed
+
+	def test_a_failing_rocketchat_never_blocks_the_close(self):
+		from metactical.time_tracker import reminders
+
+		name = self._forgotten()
+		with patch.object(reminders, "send", return_value=["email"]), patch.object(
+			reminders, "_rocketchat_settings", return_value=("http://rc.test/hooks/abc", "Payroll-Time-Adjustments")
+		), patch.object(reminders.requests, "post", side_effect=ConnectionError("down")):
+			with self._now(at(19, 5)):
+				reminders.run(user=USER)
+		self.assertEqual(frappe.db.get_value("Clockin Log", name, ["has_clocked_out", "auto_closed"], as_dict=True), {"has_clocked_out": 1, "auto_closed": 1})
+
+	def test_the_build_number_is_reported(self):
+		from metactical.time_tracker.build import BUILD
+
+		self.assertEqual(api.get_my_permissions()["build"], BUILD)
+		self.assertIsInstance(BUILD, int)
 
 
 class TestLocations(FrappeTestCase):

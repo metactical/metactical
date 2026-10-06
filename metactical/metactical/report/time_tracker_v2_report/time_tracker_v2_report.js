@@ -1,4 +1,4 @@
-frappe.query_reports["Time Clock Hours"] = {
+frappe.query_reports["Time Tracker V2 Report"] = {
 	filters: [
 		{ fieldname: "from_date", label: __("From (work day)"), fieldtype: "Date", reqd: 1, default: frappe.datetime.add_days(frappe.datetime.get_today(), -14) },
 		{ fieldname: "to_date", label: __("To (work day)"), fieldtype: "Date", reqd: 1, default: frappe.datetime.get_today() },

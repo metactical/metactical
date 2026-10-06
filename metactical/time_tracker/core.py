@@ -117,7 +117,7 @@ def get_settings():
 		backdate_days=int(s.get("backdate_limit_days") if s.get("backdate_limit_days") is not None else 14),
 		standard_day_hours=flt(s.get("standard_day_hours")) or 8.0,
 		reminder_minutes=int(s.get("reminder_minutes_after_shift_end") if s.get("reminder_minutes_after_shift_end") is not None else 15),
-		auto_close_hours=int(s.get("auto_close_hours_after_shift_end") if s.get("auto_close_hours_after_shift_end") is not None else 4),
+		auto_close_hours=int(s.get("auto_close_hours_after_shift_end") if s.get("auto_close_hours_after_shift_end") is not None else 2),
 		pay_cycles=[(getdate(r.from_date), getdate(r.to_date)) for r in (s.pay_cycles or [])],
 	)
 

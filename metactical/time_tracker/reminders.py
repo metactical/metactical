@@ -4,7 +4,7 @@ When an entry is created its follow-up time is worked out once (`schedule_follow
 one indexed lookup for open entries whose follow-up is due, and returns at once if there are none:
 
 1. `reminder_minutes_after_shift_end` after the scheduled end (default 15): send a reminder with a link.
-2. `auto_close_hours_after_shift_end` after the scheduled end (default 4): close the entry AT THE SCHEDULED END,
+2. `auto_close_hours_after_shift_end` after the scheduled end (default 2): close the entry AT THE SCHEDULED END,
    flag it Auto Closed, and tell the employee. An approver can confirm or change the time.
 
 The link carries a signed, expiring token. It needs no login and can only do one thing: close that one open
@@ -19,6 +19,7 @@ import hmac
 import time
 
 import frappe
+import requests
 from frappe import _
 from frappe.utils import get_datetime
 
@@ -231,3 +232,41 @@ def auto_close(log_name, scheduled_end):
 	doc.followup_due_on = None
 	doc.save(ignore_permissions=True)
 	send_auto_closed(doc, closed_at)
+	post_to_payroll_channel(doc, scheduled_end, core.now_datetime())
+
+
+# ---- Rocket.Chat: tell payroll about every automatic close ----------------------------------------------------
+
+
+def _rocketchat_settings():
+	"""(webhook url or None, channel name). The webhook is a secret, so it is a Password field."""
+	doc = frappe.get_cached_doc(core.SETTINGS)
+	url = (doc.get_password("rocketchat_webhook_url", raise_exception=False) or "").strip()
+	channel = (doc.get("rocketchat_channel") or "Payroll-Time-Adjustments").strip().lstrip("#")
+	return (url or None), channel
+
+
+def _stamp(value):
+	"""A server-time moment with its zone, e.g. Tue 06 Oct 2026 05:00 PM EDT."""
+	return core._zone().localize(get_datetime(value), is_dst=False).strftime("%a %d %b %Y %I:%M %p %Z")
+
+
+def post_to_payroll_channel(doc, scheduled_end, auto_closed_at):
+	"""Post Name, ERP link, Scheduled time and Auto-closed time. A failure is logged and never stops the close."""
+	url, channel = _rocketchat_settings()
+	if not url:
+		return False
+	name = frappe.db.get_value("Employee", {"user_id": doc.user}, "employee_name") or doc.user
+	text = (
+		"*Auto-closed time entry*\n"
+		f"• Name: {name}\n"
+		f"• ERP link: {frappe.utils.get_url()}/app/clockin-log/{doc.name}\n"
+		f"• Scheduled time: {_stamp(scheduled_end)} (the shift end the entry was closed at)\n"
+		f"• Auto-closed time: {_stamp(auto_closed_at)} (when the system closed it)"
+	)
+	try:
+		requests.post(url, json={"channel": "#" + channel, "text": text}, timeout=10).raise_for_status()
+		return True
+	except Exception:
+		frappe.log_error("Time clock: Rocket.Chat post failed", frappe.get_traceback())
+		return False

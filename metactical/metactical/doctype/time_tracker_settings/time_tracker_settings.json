@@ -19,7 +19,10 @@
   "standard_day_hours",
   "backdate_limit_days",
   "reminder_minutes_after_shift_end",
-  "auto_close_hours_after_shift_end"
+  "auto_close_hours_after_shift_end",
+  "rocketchat_section",
+  "rocketchat_webhook_url",
+  "rocketchat_channel"
  ],
  "fields": [
   {
@@ -113,18 +116,35 @@
    "description": "Email/SMS the employee a one-tap link. 0 switches reminders off."
   },
   {
-   "default": "4",
+   "default": "2",
    "fieldname": "auto_close_hours_after_shift_end",
    "fieldtype": "Int",
    "label": "Auto-Close Forgotten Entries After (hours past shift end)",
    "non_negative": 1,
    "description": "Closes the entry at the scheduled end and flags it for an approver. 0 switches auto-close off."
+  },
+  {
+   "fieldname": "rocketchat_section",
+   "fieldtype": "Section Break",
+   "label": "Rocket.Chat"
+  },
+  {
+   "fieldname": "rocketchat_webhook_url",
+   "fieldtype": "Password",
+   "label": "Rocket.Chat Incoming Webhook URL",
+   "description": "Auto-closed entries are posted to the channel below through this webhook. Leave empty to post nothing."
+  },
+  {
+   "default": "Payroll-Time-Adjustments",
+   "fieldname": "rocketchat_channel",
+   "fieldtype": "Data",
+   "label": "Rocket.Chat Channel"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-06 18:00:00.000000",
+ "modified": "2026-10-06 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Time Tracker Settings",

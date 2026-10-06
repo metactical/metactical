@@ -37,7 +37,7 @@ Role **Time Approval** (created by `patches/create_time_approval_role.py`): sees
 ## Work zone, reminders, approvals by cycle
 
 - `core.work_day(moment, tz)` / `core.employee_for_user().work_tz`: `Clockin Log.date` is the WORK day; shifts stay in server time
-  (`core.shift_times_for_workday`). Report: `metactical/report/time_clock_hours`.
+  (`core.shift_times_for_workday`). Report: `metactical/report/time_tracker_v2_report` ("Time Tracker V2 Report").
 - `reminders.py`: `schedule_followup` (once, on creation) + `run` (every 10 min, idle = one indexed lookup) + signed link token.
   Guest endpoints `get_clockout_link` / `confirm_clockout`; page `www/trackerv2/clockout.html`.
 - `api.get_requests(cycle_offset)`: one cycle, all statuses; offset > 1 needs System Manager. `get_attention`, `close_entry`.
@@ -80,3 +80,7 @@ The Work Time Zone per employee (work day / shift window in the employee's zone)
 ## Not built yet
 
 Manager "who's in now" board, payroll/exceptions report + CSV export, break tracking, PIN/badge login for shared tablets, switching `/tracker` over.
+
+## Builds
+
+`build.py` holds the build number; every update adds a `CHANGELOG.md` entry and a `tt-build-<N>` tag. See the changelog for rollback.
