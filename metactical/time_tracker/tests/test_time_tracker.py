@@ -135,7 +135,7 @@ class TestClockFlow(FrappeTestCase):
 	def test_full_day_uses_server_time_and_adds_up(self):
 		s = self.clock("clock_in", at(9, 2))
 		self.assertEqual(s["status"], "in")
-		self.assertEqual(s["open_log"]["from_time"][:16], "2026-10-07 09:02")
+		self.assertEqual(s["open_log"]["from_time"][:16], "2026-10-07T09:02")  # ISO, with the server offset after it
 		s = self.clock("clock_out", at(17, 0))
 		self.assertEqual(s["status"], "out")
 		self.assertAlmostEqual(s["today"]["total_hours"], 7 + 58 / 60, places=3)
@@ -356,3 +356,49 @@ class TestClockFlow(FrappeTestCase):
 		self.assertFalse(api.get_my_permissions()["can_review"])
 		with self.assertRaises(frappe.PermissionError):
 			api.get_requests("Pending")
+
+	# ---- time zones (display only: stored times stay in server time) -------------------------
+
+	def test_every_instant_sent_to_the_browser_carries_its_offset(self):
+		import re
+
+		has_offset = re.compile(r"[+-]\d{2}:\d{2}$")
+		self.clock("clock_in", at(9, 0))
+		s = self.state(at(10, 0))
+		for value in (s["server_now"], s["shift"]["start"], s["shift"]["end"], s["open_log"]["from_time"]):
+			self.assertRegex(value, has_offset)
+		self.assertRegex(s["today"]["logs"][0]["from_time"], has_offset)
+
+	def test_times_typed_in_another_zone_are_stored_in_server_time(self):
+		server = core.server_tz_name()
+		# 13:00 UTC on 7 Oct is 09:00 in an Eastern server, whatever zone this site really uses
+		expected = core.to_server_naive("2026-10-07 13:00:00", "UTC")
+		if server in ("America/Toronto", "America/New_York"):
+			self.assertEqual(expected, dt.datetime(2026, 10, 7, 9, 0))
+		self.assertEqual(core.to_server_naive("2026-10-07 09:00:00", server), dt.datetime(2026, 10, 7, 9, 0))
+		self.assertEqual(core.to_server_naive("2026-10-07 09:00:00"), dt.datetime(2026, 10, 7, 9, 0))
+		with self.assertRaises(frappe.ValidationError):
+			core.to_server_naive("2026-10-07 09:00:00", "Mars/Olympus")
+
+	def test_request_made_in_utc_lands_at_the_right_server_time(self):
+		log = self._closed_log()  # 09:00-17:00 server time
+		out_utc = core.with_offset(at(17, 30))  # what the browser would get back for 17:30 server time
+		frm = dt.datetime.fromisoformat(core.with_offset(at(8, 50))).astimezone(dt.timezone.utc)
+		to = dt.datetime.fromisoformat(out_utc).astimezone(dt.timezone.utc)
+		with self._now(at(18)):
+			req = api.request_correction(
+				log, frm.strftime("%Y-%m-%d %H:%M:%S"), to.strftime("%Y-%m-%d %H:%M:%S"), "Entered in UTC", timezone="UTC"
+			)
+		row = frappe.db.get_value("Checkin Request Modification", req["name"], ["requested_from", "requested_to"], as_dict=True)
+		self.assertEqual((row.requested_from, row.requested_to), (at(8, 50), at(17, 30)))
+
+	def test_display_zone_is_remembered_per_user(self):
+		self.assertEqual(api.get_my_permissions()["display_zone"], "server")
+		api.set_display_zone("America/Vancouver")
+		self.assertEqual(api.get_my_permissions()["display_zone"], "America/Vancouver")
+		api.set_display_zone("browser")
+		self.assertEqual(api.get_my_permissions()["display_zone"], "browser")
+		with self.assertRaises(frappe.ValidationError):
+			api.set_display_zone("Pacific/Auckland")  # not on the list
+		api.set_display_zone("server")
+		self.assertEqual(api.get_my_permissions()["server_tz"], core.server_tz_name())

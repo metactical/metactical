@@ -1,11 +1,14 @@
 <template>
   <div class="tc-root">
     <!-- People with the Time Approval role get a second screen on the same login -->
+    <div class="tc-topbar">
     <div v-if="canReview" class="tc-tabs tc-tabs-main" role="tablist">
       <button class="tc-tab" :class="{ active: tab === 'time' }" role="tab" @click="tab = 'time'">My time</button>
       <button class="tc-tab" :class="{ active: tab === 'approvals' }" role="tab" @click="tab = 'approvals'">
         Approvals <span v-if="pendingCount" class="tc-count">{{ pendingCount }}</span>
       </button>
+    </div>
+    <ZoneSelect />
     </div>
 
     <ApprovalsScreen v-if="tab === 'approvals'" @changed="pendingCount = $event" />
@@ -36,7 +39,11 @@
           <span class="tc-muted">· {{ state.shift.name }} {{ fmtTime(state.shift.start) }}–{{ fmtTime(state.shift.end) }}</span>
         </div>
         <div class="tc-clock">{{ clockText }}</div>
-        <div class="tc-date">{{ weekdayText }} · {{ dateText }}</div>
+        <div class="tc-date">{{ weekdayText }} · {{ dateText }} · {{ zoneText }}</div>
+        <div v-if="clockSkewMin" class="tc-skew">
+          This computer's clock is {{ clockSkewMin }} min {{ clockSkewMs > 0 ? 'behind' : 'ahead' }}. The time shown and
+          recorded comes from the server, so your punch is correct. Please tell IT to fix this PC.
+        </div>
 
         <div class="tc-status">
           <template v-if="state.status === 'in'">
@@ -148,6 +155,7 @@
         <div class="tc-card-title">{{ correction.mode === 'add' ? 'Add missed time' : 'Request a time change' }}</div>
         <p v-if="correction.mode === 'add'" class="tc-muted">{{ fmtDate(correction.date) }}: no time was recorded this day.</p>
         <p v-else class="tc-muted">{{ fmtDate(correction.log.date) }}: currently {{ fmtTime(correction.log.from_time) }} → {{ fmtTime(correction.log.to_time) }}</p>
+        <p class="tc-muted tc-zone-note">Times below are in {{ zoneLabelFor(correction.tz) }}. They are saved as server time.</p>
         <label>Clock in
           <input type="datetime-local" v-model="correction.from" />
         </label>
@@ -171,7 +179,12 @@
 import { ref, computed, onMounted, onBeforeUnmount } from "vue"
 import ApprovalsScreen from "./ApprovalsScreen.vue"
 import { callBackend, errorText } from "./api"
-import { parse, pad2, dateParts, asDate, fmtDate, fmtWeekday, fmtTime, fmtDuration } from "./format"
+import ZoneSelect from "./ZoneSelect.vue"
+import { zoneState, activeTz } from "./zone"
+import {
+  parse, pad2, asDate, fmtDate, fmtWeekday, fmtTime, fmtDuration,
+  fmtClock, fmtDateMs, fmtWeekdayLong, zoneLabelFor, wallInZone, wallStrToMs,
+} from "./format"
 
 const state = ref(null)
 const loadError = ref("")
@@ -198,11 +211,15 @@ let logoutTimer = null
 const nowMs = computed(() => serverMs.value + (tick.value - fetchedAt.value))
 const nowDate = computed(() => new Date(nowMs.value))
 
-const clockText = computed(() =>
-  nowDate.value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" })
-)
-const dateText = computed(() => dateParts(nowDate.value))
-const weekdayText = computed(() => nowDate.value.toLocaleDateString("en", { weekday: "long" }))
+// Shown in the zone the user chose (server time by default); what is stored is always server time.
+const clockText = computed(() => fmtClock(nowMs.value))
+const dateText = computed(() => fmtDateMs(nowMs.value))
+const weekdayText = computed(() => fmtWeekdayLong(nowMs.value))
+const zoneText = computed(() => zoneLabelFor(activeTz.value, nowMs.value))
+
+// How far this PC's clock is from the server's (positive = PC behind). Only worth a warning past 2 minutes.
+const clockSkewMs = ref(0)
+const clockSkewMin = computed(() => (Math.abs(clockSkewMs.value) > 120000 ? Math.round(Math.abs(clockSkewMs.value) / 60000) : 0))
 const elapsedHours = computed(() => {
   const from = state.value && state.value.open_log && parse(state.value.open_log.from_time)
   return from ? Math.max(0, (nowMs.value - from.getTime()) / 3600000) : 0
@@ -227,8 +244,12 @@ const setNotice = (text, kind = "ok") => {
 
 async function refresh() {
   try {
-    applyState(await callBackend("get_state"))
-    await loadReviewer() // approvers need this even when they cannot clock themselves
+    await loadReviewer() // also tells us the server zone and the user's saved display zone: needed before showing times
+    const t0 = Date.now()
+    const s = await callBackend("get_state")
+    const t1 = Date.now()
+    applyState(s)
+    clockSkewMs.value = (parse(s.server_now) || new Date()).getTime() - (t0 + t1) / 2
     if (state.value.status === "blocked") {
       if (canReview.value) tab.value = "approvals" // e.g. an approver who is not an employee
     } else {
@@ -272,24 +293,32 @@ async function toggleDay(d) {
 
 // Default a missed day to the employee's shift times (an overnight shift ends on the next day).
 function openMissed(d) {
+  // Shift hours are server time: put them on the missed (server) day, then show them in the chosen zone.
   const sh = state.value.shift
-  const hhmm = (s) => String(s).slice(11, 16)
-  const overnight = String(sh.end).slice(0, 10) !== String(sh.start).slice(0, 10)
+  const stz = zoneState.serverTz
+  const startWall = wallInZone(parse(sh.start).getTime(), stz)
+  const endWall = wallInZone(parse(sh.end).getTime(), stz)
+  const overnight = endWall.slice(0, 10) !== startWall.slice(0, 10)
   const next = new Date(asDate(d.date).getTime() + 86400000)
   const nextIso = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`
+  const fromMs = wallStrToMs(`${d.date}T${startWall.slice(11)}`, stz)
+  const toMs = wallStrToMs(`${overnight ? nextIso : d.date}T${endWall.slice(11)}`, stz)
+  const tz = activeTz.value
   correction.value = {
     mode: "add",
     date: d.date,
-    from: `${d.date}T${hhmm(sh.start)}`,
-    to: `${overnight ? nextIso : d.date}T${hhmm(sh.end)}`,
+    tz,
+    from: wallInZone(fromMs, tz),
+    to: wallInZone(toMs, tz),
     reason: "",
     error: "",
   }
 }
 
 function openCorrection(log) {
-  const toInput = (s) => { const d = parse(s); return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "" }
-  correction.value = { mode: "change", log, from: toInput(log.from_time), to: toInput(log.to_time), reason: "", error: "" }
+  const tz = activeTz.value
+  const toInput = (s) => { const d = parse(s); return d ? wallInZone(d.getTime(), tz) : "" }
+  correction.value = { mode: "change", log, tz, from: toInput(log.from_time), to: toInput(log.to_time), reason: "", error: "" }
 }
 
 async function submitCorrection() {
@@ -299,9 +328,9 @@ async function submitCorrection() {
   busy.value = true
   try {
     if (c.mode === "add") {
-      await callBackend("request_missed_punch", { date: c.date, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason })
+      await callBackend("request_missed_punch", { date: c.date, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason, timezone: c.tz })
     } else {
-      await callBackend("request_correction", { log: c.log.name, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason })
+      await callBackend("request_correction", { log: c.log.name, from_time: toServer(c.from), to_time: toServer(c.to), reason: c.reason, timezone: c.tz })
     }
     correction.value = null
     setNotice("Sent for approval.")
@@ -316,6 +345,8 @@ async function submitCorrection() {
 
 async function loadReviewer() {
   const p = await callBackend("get_my_permissions")
+  zoneState.serverTz = p.server_tz || "UTC"
+  zoneState.mode = p.display_zone || "server"
   canReview.value = !!p.can_review
   pendingCount.value = p.pending_count || 0
 }

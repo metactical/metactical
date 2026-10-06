@@ -136,6 +136,13 @@
 	#time_clock_ui .ap-list { max-height: 260px; }
 }
 
+/* display time zone picker + clock warning */
+#time_clock_ui .tc-topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+#time_clock_ui .tc-zone { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); }
+#time_clock_ui .tc-zone select { padding: 6px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius, 6px); background: var(--control-bg); color: var(--text-color); max-width: 320px; }
+#time_clock_ui .tc-zone-note { font-size: 12px; margin: 0; }
+#time_clock_ui .tc-skew { margin: 0 auto 14px; max-width: 420px; padding: 10px 12px; border-radius: var(--border-radius, 6px); background: var(--yellow-100, #fff5d6); color: var(--yellow-700, #8a6100); font-size: 13px; }
+
 /* /trackerv2 login */
 #time_clock_ui .tc-login { max-width: 420px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
 #time_clock_ui .tc-login label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }

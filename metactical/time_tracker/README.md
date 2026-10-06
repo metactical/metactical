@@ -34,6 +34,13 @@ Role **Time Approval** (created by `patches/create_time_approval_role.py`): sees
 `api.can_review` also allows HR Manager, System Manager and the Time Tracker Settings approver address.
 `api.get_requests(tab)` feeds `ApprovalsScreen.vue`; shared helpers live in `components/time_clock/api.js` and `format.js`.
 
+## Time zones
+
+Storage and rules are in site (server) time. API instants carry a UTC offset (`core.with_offset`); times typed by a
+user in another zone are converted with `core.to_server_naive(value, tz)`. The display zone is a per-user preference
+(`set_display_zone`). Front end: `zone.js` (state), `format.js` (zone-aware formatting), `ZoneSelect.vue`.
+The Work Time Zone per employee (work day / shift window in the employee's zone) is Phase 2.
+
 ## Gotchas found
 
 - ERPNext's `validate_employee_role` **removes the Employee role from any user not linked to an Employee record**.

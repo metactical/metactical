@@ -6,6 +6,7 @@ Everything here uses server time. The browser never sends a timestamp.
 import datetime as dt
 
 import frappe
+import pytz
 from frappe import _
 from frappe.utils import add_days, flt, get_datetime, getdate, now_datetime
 
@@ -22,6 +23,60 @@ class Blocked(Exception):
 		super().__init__(message)
 		self.code = code
 		self.message = message
+
+
+# ---- time zones ---------------------------------------------------------------------------
+#
+# Everything is stored and calculated in the SITE time zone ("server time"). The screens may display it in
+# another zone, so every instant sent to the browser carries its UTC offset.
+
+
+def server_tz_name():
+	return frappe.utils.get_system_timezone() or "UTC"
+
+
+def _zone(name=None):
+	try:
+		return pytz.timezone(name or server_tz_name())
+	except pytz.UnknownTimeZoneError:
+		frappe.throw(_("Unknown time zone: {0}").format(name))
+
+
+def with_offset(value):
+	"""Server-time value -> ISO string with its UTC offset, e.g. 2026-10-05T16:18:00-04:00 (None stays None)."""
+	if value in (None, ""):
+		return None
+	d = get_datetime(value).replace(microsecond=0)
+	if d.tzinfo is None:
+		d = _zone().localize(d, is_dst=False)
+	return d.isoformat()
+
+
+def to_server_naive(value, tz_name=None):
+	"""A time the user typed in `tz_name` (None = server time) -> naive datetime in server time."""
+	d = get_datetime(value)
+	if d.tzinfo is not None:
+		return d.astimezone(_zone()).replace(tzinfo=None)
+	if not tz_name or tz_name == server_tz_name():
+		return d
+	return _zone(tz_name).localize(d, is_dst=False).astimezone(_zone()).replace(tzinfo=None)
+
+
+# Zones a user can pick for DISPLAY, besides "server" and "browser" (this computer's zone).
+DISPLAY_ZONES = (
+	"America/Vancouver",  # Pacific
+	"America/Edmonton",  # Mountain
+	"America/Winnipeg",  # Central
+	"America/Toronto",  # Eastern
+	"America/Halifax",  # Atlantic
+	"UTC",
+)
+ZONE_DEFAULT_KEY = "time_clock_display_zone"
+
+
+def get_display_zone(user=None):
+	v = frappe.defaults.get_user_default(ZONE_DEFAULT_KEY, user=user or frappe.session.user)
+	return v if v in ("server", "browser") or v in DISPLAY_ZONES else "server"
 
 
 # ---- settings -----------------------------------------------------------------------------
@@ -180,8 +235,8 @@ def serialize_log(log, now):
 	return {
 		"name": log.name,
 		"date": str(log.date),
-		"from_time": str(log.from_time),
-		"to_time": str(log.to_time) if log.to_time else None,
+		"from_time": with_offset(log.from_time),
+		"to_time": with_offset(log.to_time) if log.to_time else None,
 		"hours": round(log_hours(log, now), 4),
 		"open": not log.has_clocked_out,
 	}

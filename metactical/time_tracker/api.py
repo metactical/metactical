@@ -17,7 +17,7 @@ def _fail(title):
 
 def _blocked_state(b, user):
 	return {
-		"server_now": str(now_datetime()),
+		"server_now": core.with_offset(now_datetime()),
 		"status": "blocked",
 		"blockers": [{"code": b.code, "message": b.message}],
 		"user": user,
@@ -39,10 +39,10 @@ def build_state(ctx, notice=None):
 		can_in, reason = False, _("Already clocked in")
 	elif ctx.settings.enforce_window and state_key != "open":
 		can_in = False
-		reason = _("Your shift starts at {0}").format(shift_start.strftime("%I:%M %p").lstrip("0"))
+		reason = _("Your shift starts at {0} (server time)").format(shift_start.strftime("%I:%M %p").lstrip("0"))
 		if state_key == "after":
 			reason = _("Your shift is over. Next shift starts {0}").format(
-				shift_start.strftime("%a %I:%M %p").replace(" 0", " ")
+				shift_start.strftime("%a %I:%M %p").replace(" 0", " ") + " (server time)"
 			)
 
 	today_hours = sum(core.log_hours(l, now) for l in logs)
@@ -64,14 +64,14 @@ def build_state(ctx, notice=None):
 		cycle = {"error": b.message}
 
 	return {
-		"server_now": str(now),
+		"server_now": core.with_offset(now),
 		"status": "in" if current else "out",
 		"user": user,
 		"employee": {"name": ctx.employee.name, "employee_name": ctx.employee.employee_name},
 		"shift": {
 			"name": ctx.shift.name,
-			"start": str(shift_start),
-			"end": str(shift_end),
+			"start": core.with_offset(shift_start),
+			"end": core.with_offset(shift_end),
 			"window_state": state_key,
 		},
 		"open_log": core.serialize_log(current, now) if current else None,
@@ -113,7 +113,7 @@ def clock_in():
 	state_key, shift_start, _end = core.shift_window(ctx.shift, ctx.now, ctx.settings.early_minutes)
 	if ctx.settings.enforce_window and state_key != "open":
 		frappe.throw(
-			_("Clock in opens {0} minutes before your shift ({1}).").format(
+			_("Clock in opens {0} minutes before your shift ({1} server time).").format(
 				ctx.settings.early_minutes, shift_start.strftime("%I:%M %p").lstrip("0")
 			),
 			title=_("Too early"),
@@ -243,8 +243,8 @@ def get_day(date):
 			{
 				"name": r.name,
 				"status": r.status,
-				"requested_from": str(r.requested_from) if r.requested_from else None,
-				"requested_to": str(r.requested_to) if r.requested_to else None,
+				"requested_from": core.with_offset(r.requested_from),
+				"requested_to": core.with_offset(r.requested_to),
 				"reason": r.reason,
 				"review_comment": r.review_comment,
 			}
@@ -313,7 +313,7 @@ def _notify_approver(ctx, subject, body):
 
 
 @frappe.whitelist(methods=["POST"])
-def request_missed_punch(date, from_time, to_time, reason):
+def request_missed_punch(date, from_time, to_time, reason, timezone=None):
 	"""Employee asks to add an entry for a day they never clocked in at all."""
 	ctx = core.context()
 	day = getdate(date)
@@ -325,7 +325,7 @@ def request_missed_punch(date, from_time, to_time, reason):
 			_("You can only add time up to {0} days back. Ask HR for older days.").format(ctx.settings.backdate_days)
 		)
 
-	new_from, new_to = get_datetime(from_time), get_datetime(to_time)
+	new_from, new_to = core.to_server_naive(from_time, timezone), core.to_server_naive(to_time, timezone)
 	if new_from.date() != day:
 		frappe.throw(_("Clock in must be on {0}.").format(day))
 	reason, hours = _check_span(ctx, new_from, new_to, reason)
@@ -367,7 +367,7 @@ def request_missed_punch(date, from_time, to_time, reason):
 
 
 @frappe.whitelist(methods=["POST"])
-def request_correction(log, from_time, to_time, reason):
+def request_correction(log, from_time, to_time, reason, timezone=None):
 	"""Employee asks for different in/out times on one of their own logs."""
 	ctx = core.context()
 	doc = frappe.get_doc("Clockin Log", log)
@@ -375,7 +375,7 @@ def request_correction(log, from_time, to_time, reason):
 		frappe.throw(_("You can only correct your own time."), frappe.PermissionError)
 	if not doc.has_clocked_out:
 		frappe.throw(_("Clock out first, then request a correction."))
-	new_from, new_to = get_datetime(from_time), get_datetime(to_time)
+	new_from, new_to = core.to_server_naive(from_time, timezone), core.to_server_naive(to_time, timezone)
 	reason, hours = _check_span(ctx, new_from, new_to, reason)
 	if frappe.db.exists("Checkin Request Modification", {"log": log, "status": "Pending"}):
 		frappe.throw(_("This entry already has a request waiting for approval."))
@@ -526,10 +526,21 @@ def apply_correction(req):
 	log.save(ignore_permissions=True)
 
 
+@frappe.whitelist(methods=["POST"])
+def set_display_zone(zone):
+	"""Remember, per user, which time zone the screens show times in. Stored times never change."""
+	if zone not in ("server", "browser") and zone not in core.DISPLAY_ZONES:
+		frappe.throw(_("That time zone is not available."))
+	frappe.defaults.set_user_default(core.ZONE_DEFAULT_KEY, zone, user=frappe.session.user)
+	return {"display_zone": zone}
+
+
 @frappe.whitelist()
 def get_my_permissions():
 	allowed = can_review()
 	return {
+		"server_tz": core.server_tz_name(),
+		"display_zone": core.get_display_zone(),
 		"can_review": allowed,
 		"pending_count": frappe.db.count("Checkin Request Modification", {"status": "Pending"}) if allowed else 0,
 	}
@@ -593,8 +604,8 @@ def get_requests(tab="Pending"):
 		same_day = (
 			[
 				{
-					"from_time": str(l.from_time),
-					"to_time": str(l.to_time) if l.to_time else None,
+					"from_time": core.with_offset(l.from_time),
+					"to_time": core.with_offset(l.to_time),
 					"hours": round(core.log_hours(l, now_datetime()), 4),
 					"is_this_entry": l.name == r.log,
 				}
@@ -613,17 +624,17 @@ def get_requests(tab="Pending"):
 				"status": r.status,
 				"reason": r.reason,
 				"date": str(day) if day else None,
-				"requested_at": str(r.creation),
-				"current_from": str(log.from_time) if log else None,
-				"current_to": str(log.to_time) if log and log.to_time else None,
+				"requested_at": core.with_offset(r.creation),
+				"current_from": core.with_offset(log.from_time) if log else None,
+				"current_to": core.with_offset(log.to_time) if log and log.to_time else None,
 				"current_hours": round(current_hours, 4) if current_hours is not None else None,
-				"requested_from": str(new_from) if new_from else None,
-				"requested_to": str(new_to) if new_to else None,
+				"requested_from": core.with_offset(new_from),
+				"requested_to": core.with_offset(new_to),
 				"requested_hours": round(requested_hours, 4) if requested_hours is not None else None,
 				"delta_hours": round(requested_hours - (current_hours or 0), 4) if requested_hours is not None else None,
 				"same_day": same_day,
 				"reviewed_by_name": reviewer_names.get(r.reviewed_by) or r.reviewed_by,
-				"reviewed_on": str(r.reviewed_on) if r.reviewed_on else None,
+				"reviewed_on": core.with_offset(r.reviewed_on),
 				"review_comment": r.review_comment,
 			}
 		)
