@@ -13,6 +13,11 @@
   "total_hours",
   "has_clocked_out",
   "auto_closed",
+  "reminder_sent_on",
+  "followup_due_on",
+  "auto_close_reviewed",
+  "closed_via",
+  "closed_by",
   "in_employee_checkin_record",
   "out_employee_checkin_record"
  ],
@@ -81,11 +86,47 @@
    "label": "Auto Closed",
    "read_only": 1,
    "description": "Closed by the system at zero hours because it was never clocked out and the pay period was already paid."
+  },
+  {
+   "fieldname": "reminder_sent_on",
+   "fieldtype": "Datetime",
+   "label": "Reminder Sent On",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_close_reviewed",
+   "fieldtype": "Check",
+   "label": "Auto Close Reviewed",
+   "read_only": 1,
+   "description": "An approver has confirmed or corrected the time the system closed this entry at."
+  },
+  {
+   "fieldname": "closed_via",
+   "fieldtype": "Data",
+   "label": "Closed Via",
+   "read_only": 1,
+   "description": "auto, link or approver. Empty when the employee clocked out on the Time Clock."
+  },
+  {
+   "fieldname": "closed_by",
+   "fieldtype": "Link",
+   "label": "Closed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "followup_due_on",
+   "fieldtype": "Datetime",
+   "label": "Follow-up Due On",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "When the reminder or auto-close for this open entry is next due. Empty once nothing is pending."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-06 12:00:00.000000",
+ "modified": "2026-10-06 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Clockin Log",

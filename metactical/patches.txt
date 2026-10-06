@@ -36,3 +36,4 @@ metactical.patches.time_tracker_shift_expected_hours
 metactical.patches.create_standard_shift_types
 metactical.patches.normalize_employee_regions
 metactical.patches.close_stale_open_entries
+metactical.patches.schedule_followups_for_open_entries

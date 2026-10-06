@@ -74,11 +74,13 @@ class TestClockFlow(FrappeTestCase):
 		s = frappe.get_doc("Time Tracker Settings")
 		cls._saved_settings = s.as_dict(convert_dates_to_str=True)  # put back in tearDownClass
 		s.checkin_approver = APPROVER
-		s.start_date = "2026-09-17"
-		s.set("pay_cycles", [{"from_date": "2026-09-17", "to_date": "2026-09-30"}, {"from_date": "2026-10-01", "to_date": "2026-10-14"}])
+		s.start_date = "2026-09-03"
+		s.set("pay_cycles", [{"from_date": "2026-09-03", "to_date": "2026-09-16"}, {"from_date": "2026-09-17", "to_date": "2026-09-30"}, {"from_date": "2026-10-01", "to_date": "2026-10-14"}])
 		s.early_clockin_minutes = 15
 		s.enforce_shift_window = 1
 		s.max_shift_hours = 16
+		s.reminder_minutes_after_shift_end = 15
+		s.auto_close_hours_after_shift_end = 4
 		s.save(ignore_permissions=True)
 		frappe.clear_cache()
 
@@ -90,7 +92,8 @@ class TestClockFlow(FrappeTestCase):
 		if saved:
 			s = frappe.get_doc("Time Tracker Settings")
 			for f in ("checkin_approver", "start_date", "logout_delay", "early_clockin_minutes",
-					  "enforce_shift_window", "max_shift_hours", "backdate_limit_days", "standard_day_hours"):
+					  "enforce_shift_window", "max_shift_hours", "backdate_limit_days", "standard_day_hours",
+					  "reminder_minutes_after_shift_end", "auto_close_hours_after_shift_end"):
 				s.set(f, saved.get(f))
 			s.set("pay_cycles", [{"from_date": r["from_date"], "to_date": r["to_date"]} for r in saved.get("pay_cycles", [])])
 			s.save(ignore_permissions=True)
@@ -306,67 +309,12 @@ class TestClockFlow(FrappeTestCase):
 		frappe.get_doc("User", email).add_roles("Time Approval")
 		return email
 
-	def _scoped_counts(self):
-		"""(pending, decided) as the approvals screen counts them: current and previous pay cycle only."""
-		approver = self._approver_user()
-		frappe.set_user(approver)
-		with self._now(at(18)):
-			data = api.get_requests("Pending")
-		frappe.set_user(USER)
-		return data["pending_count"], data["decided_count"]
-
 	def test_time_approval_role_exists_and_is_idempotent(self):
 		from metactical.patches.create_time_approval_role import execute
 
 		execute()
 		execute()
 		self.assertEqual(frappe.db.count("Role", {"name": "Time Approval"}), 1)
-
-	def test_role_holder_sees_every_request_and_can_decide(self):
-		log = self._closed_log()
-		base_pending, base_decided = self._scoped_counts()
-		with self._now(at(18)):
-			change = api.request_correction(log, "2026-10-07 08:50:00", "2026-10-07 17:20:00", "Stayed late")["name"]
-			add = api.request_missed_punch("2026-10-05", "2026-10-05 09:00:00", "2026-10-05 17:00:00", "Forgot to clock in")["name"]
-
-		approver = self._approver_user()  # not the settings address, not HR Manager: only the role
-		frappe.set_user(approver)
-		self.assertTrue(api.get_my_permissions()["can_review"])
-		with self._now(at(18)):
-			data = api.get_requests("Pending")
-		self.assertEqual(data["pending_count"], base_pending + 2)
-		rows = {r["name"]: r for r in data["rows"]}
-		self.assertLessEqual({change, add}, set(rows))  # the screen shows everyone's requests, not just these
-
-		c = rows[change]
-		self.assertEqual(c["request_type"], "Change")
-		self.assertEqual(c["employee_name"], "Worker")
-		self.assertAlmostEqual(c["current_hours"], 8.0, places=3)
-		self.assertAlmostEqual(c["requested_hours"], 8.5 + 1 / 6 - 1 / 6, places=2)  # 08:50-17:20 = 8h30
-		self.assertAlmostEqual(c["delta_hours"], 0.5, places=2)
-		self.assertEqual(len(c["same_day"]), 1)
-		self.assertTrue(c["same_day"][0]["is_this_entry"])
-		a = rows[add]
-		self.assertEqual((a["request_type"], a["current_hours"], a["same_day"]), ("Add", None, []))
-		self.assertAlmostEqual(a["requested_hours"], 8.0, places=3)
-
-		with self._now(at(18)):
-			api.review_request(add, "Approved", "ok")
-			api.review_request(change, "Declined", "Please attach a note")
-		with self._now(at(18)):
-			done = api.get_requests("Decided")
-		self.assertEqual((done["pending_count"], done["decided_count"]), (base_pending, base_decided + 2))
-		by_name = {r["name"]: r for r in done["rows"]}
-		self.assertEqual(by_name[change]["status"], "Declined")
-		self.assertEqual(by_name[change]["review_comment"], "Please attach a note")
-		self.assertEqual(by_name[change]["reviewed_by_name"], "Role Holder")
-
-	def test_plain_employee_cannot_open_the_approvals_screen(self):
-		self.assertFalse(api.get_my_permissions()["can_review"])
-		with self.assertRaises(frappe.PermissionError):
-			api.get_requests("Pending")
-
-	# ---- time zones (display only: stored times stay in server time) -------------------------
 
 	def test_every_instant_sent_to_the_browser_carries_its_offset(self):
 		import re
@@ -446,41 +394,6 @@ class TestClockFlow(FrappeTestCase):
 		frappe.set_user(USER)
 		return name
 
-	def test_hr_manager_alone_cannot_approve(self):
-		frappe.set_user("Administrator")
-		email = "tc.hrmanager@example.com"
-		if not frappe.db.exists("User", email):
-			frappe.get_doc({"doctype": "User", "email": email, "first_name": "Hr Only", "send_welcome_email": 0}).insert(
-				ignore_permissions=True
-			)
-		frappe.get_doc("User", email).add_roles("HR Manager")
-		frappe.set_user(email)
-		self.assertFalse(api.get_my_permissions()["can_review"])
-		for call in (lambda: api.get_requests("Pending"), api.expire_old_requests):
-			with self.assertRaises(frappe.PermissionError):
-				call()
-
-	def test_approvals_show_only_current_and_previous_cycle_and_old_ones_can_be_expired(self):
-		current = self._legacy_request(dt.date(2026, 10, 5))
-		previous = self._legacy_request(dt.date(2026, 9, 25))
-		paid = self._legacy_request(dt.date(2026, 9, 3))  # before the previous cycle: already paid out
-		frappe.set_user(self._approver_user())
-		with self._now(at(18)):
-			data = api.get_requests("Pending")
-			rows = {r["name"]: r for r in data["rows"]}
-			self.assertEqual((rows[current]["cycle"], rows[previous]["cycle"]), ("current", "previous"))
-			self.assertNotIn(paid, rows)
-			self.assertGreaterEqual(data["hidden_older_pending"], 1)
-			self.assertEqual(api.get_my_permissions()["pending_count"], data["pending_count"])
-			self.assertEqual(data["cycles"]["previous"]["from"], "2026-09-17")
-			result = api.expire_old_requests()
-		self.assertGreaterEqual(result["expired"], 1)
-		row = frappe.db.get_value("Checkin Request Modification", paid, ["status", "review_comment"], as_dict=True)
-		self.assertEqual(row.status, "Declined")
-		self.assertIn("Expired", row.review_comment)
-		self.assertEqual(frappe.db.get_value("Checkin Request Modification", current, "status"), "Pending")
-		self.assertEqual(frappe.db.get_value("Checkin Request Modification", previous, "status"), "Pending")
-
 	def test_a_paid_out_period_cannot_be_changed_or_approved(self):
 		frappe.set_user("Administrator")
 		old = frappe.get_doc(
@@ -533,6 +446,277 @@ class TestClockFlow(FrappeTestCase):
 		execute()
 		self.assertFalse(frappe.db.get_value("Employee", self.employee, "ais_state"))
 		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Employee", "reference_name": self.employee, "content": ["like", "%Zorgonia%"]}))
+
+	# ---- approvals by pay cycle -------------------------------------------------------------------
+
+	def test_role_holder_sees_every_request_in_the_cycle_and_can_decide(self):
+		log = self._closed_log()
+		with self._now(at(18)):
+			change = api.request_correction(log, "2026-10-07 08:50:00", "2026-10-07 17:20:00", "Stayed late")["name"]
+			add = api.request_missed_punch("2026-10-05", "2026-10-05 09:00:00", "2026-10-05 17:00:00", "Forgot to clock in")["name"]
+
+		approver = self._approver_user()  # not the settings address, not an administrator: only the role
+		frappe.set_user(approver)
+		self.assertTrue(api.get_my_permissions()["can_review"])
+		with self._now(at(18)):
+			data = api.get_requests(0)
+		rows = {r["name"]: r for r in data["rows"]}
+		self.assertLessEqual({change, add}, set(rows))
+		self.assertEqual(data["cycle"]["label"], "current")
+		c = rows[change]
+		self.assertEqual((c["request_type"], c["employee_name"]), ("Change", "Worker"))
+		self.assertAlmostEqual(c["current_hours"], 8.0, places=3)
+		self.assertAlmostEqual(c["delta_hours"], 0.5, places=2)
+		self.assertTrue(c["same_day"][0]["is_this_entry"])
+		a = rows[add]
+		self.assertEqual((a["request_type"], a["current_hours"], a["same_day"]), ("Add", None, []))
+
+		with self._now(at(18)):
+			api.review_request(add, "Approved", "ok")
+			api.review_request(change, "Declined", "Please attach a note")
+			data = api.get_requests(0)
+		by_name = {r["name"]: r for r in data["rows"]}
+		self.assertEqual((by_name[add]["status"], by_name[change]["status"]), ("Approved", "Declined"))
+		self.assertEqual(by_name[change]["review_comment"], "Please attach a note")
+		self.assertEqual(by_name[change]["reviewed_by_name"], "Role Holder")
+		self.assertGreaterEqual(data["counts"]["Approved"], 1)
+		self.assertEqual(data["counts"]["All"], sum(data["counts"][k] for k in ("Pending", "Approved", "Declined")))
+
+	def test_plain_employee_cannot_open_the_approvals_screen(self):
+		self.assertFalse(api.get_my_permissions()["can_review"])
+		for call in (lambda: api.get_requests(0), api.get_attention, api.expire_old_requests):
+			with self.assertRaises(frappe.PermissionError):
+				call()
+
+	def test_hr_manager_alone_cannot_approve(self):
+		frappe.set_user("Administrator")
+		email = "tc.hrmanager@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc({"doctype": "User", "email": email, "first_name": "Hr Only", "send_welcome_email": 0}).insert(
+				ignore_permissions=True
+			)
+		frappe.get_doc("User", email).add_roles("HR Manager")
+		frappe.set_user(email)
+		self.assertFalse(api.get_my_permissions()["can_review"])
+		for call in (lambda: api.get_requests(0), api.expire_old_requests):
+			with self.assertRaises(frappe.PermissionError):
+				call()
+
+	def test_go_back_one_cycle_and_only_an_administrator_can_go_further(self):
+		current = self._legacy_request(dt.date(2026, 10, 5))
+		previous = self._legacy_request(dt.date(2026, 9, 25))
+		paid = self._legacy_request(dt.date(2026, 9, 8))  # two cycles back: already paid out
+
+		frappe.set_user(self._approver_user())  # Time Approval only
+		with self._now(at(18)):
+			cur = api.get_requests(0)
+			prev = api.get_requests(1)
+			self.assertEqual((cur["cycle"]["label"], cur["has_newer"], cur["has_older"]), ("current", False, True))
+			self.assertEqual((prev["cycle"]["label"], prev["has_newer"], prev["has_older"]), ("previous", True, False))  # no further
+			self.assertIn(current, {r["name"] for r in cur["rows"]})
+			self.assertIn(previous, {r["name"] for r in prev["rows"]})
+			self.assertNotIn(paid, {r["name"] for r in cur["rows"] + prev["rows"]})
+			with self.assertRaises(frappe.PermissionError):
+				api.get_requests(2)
+			self.assertGreaterEqual(cur["hidden_older_pending"], 1)
+			self.assertEqual(api.get_my_permissions()["pending_count"], cur["pending_count"])
+
+		frappe.set_user("Administrator")
+		with self._now(at(18)):
+			old = api.get_requests(2)
+		self.assertEqual((old["cycle"]["label"], old["has_older"], old["has_newer"]), ("older", False, True))  # nothing earlier exists
+		self.assertIn(paid, {r["name"] for r in old["rows"]})
+		self.assertTrue(old["can_browse_history"])
+
+	def test_old_pending_requests_can_be_expired_in_one_go(self):
+		current = self._legacy_request(dt.date(2026, 10, 5))
+		paid = self._legacy_request(dt.date(2026, 9, 3))
+		frappe.set_user(self._approver_user())
+		with self._now(at(18)):
+			result = api.expire_old_requests()
+		self.assertGreaterEqual(result["expired"], 1)
+		row = frappe.db.get_value("Checkin Request Modification", paid, ["status", "review_comment"], as_dict=True)
+		self.assertEqual(row.status, "Declined")
+		self.assertIn("Expired", row.review_comment)
+		self.assertEqual(frappe.db.get_value("Checkin Request Modification", current, "status"), "Pending")
+
+	# ---- Phase 2: the work day follows the employee's work zone ------------------------------
+
+	def test_work_day_follows_the_work_zone(self):
+		import pytz
+
+		server = core.server_tz_name()
+		start = at(1, 0)  # 01:00 server time
+		pacific = pytz.timezone(server).localize(start).astimezone(pytz.timezone("America/Vancouver")).date()
+		self.assertEqual(core.work_day(start, "America/Vancouver"), pacific)
+		self.assertEqual(core.work_day(start, server), start.date())
+		self.assertEqual(core.work_day(start, None), start.date())
+
+	def test_employee_region_sets_the_work_zone(self):
+		try:
+			for region, tz in (("CA-ON", "America/Toronto"), ("CA-AB", "America/Edmonton"), ("US-TX", "America/Vancouver"),
+							   ("OTHER", "America/Vancouver"), ("", core.server_tz_name())):
+				frappe.db.set_value("Employee", self.employee, "ais_state", region)
+				with self._now(at(10)):
+					state = api.get_state()
+				self.assertEqual(state["work"]["tz"], tz, region)
+		finally:
+			frappe.db.set_value("Employee", self.employee, "ais_state", "")
+
+	def test_a_missed_day_lands_on_the_work_day_not_the_server_day(self):
+		frappe.db.set_value("Employee", self.employee, "ais_state", "OTHER")  # Pacific work days
+		try:
+			server_start, server_end = at(1, 0), at(9, 0)  # the early hours on the server clock
+			work_day = core.work_day(server_start, "America/Vancouver")
+			with self._now(at(12)):
+				req = api.request_missed_punch(str(work_day), str(server_start), str(server_end), "Worked the early shift")
+			frappe.set_user(self._approver_user())
+			with self._now(at(12)):
+				api.review_request(req["name"], "Approved")
+			self.assertEqual(frappe.db.get_value("Clockin Log", {"user": USER, "from_time": server_start}, "date"), work_day)
+		finally:
+			frappe.db.set_value("Employee", self.employee, "ais_state", "")
+
+	def test_missed_day_defaults_put_the_shift_on_that_work_day(self):
+		frappe.db.set_value("Employee", self.employee, "ais_state", "OTHER")
+		try:
+			with self._now(at(12)):
+				d = api.get_missed_defaults(str(DAY))
+			start = dt.datetime.fromisoformat(d["from_time"]).replace(tzinfo=None)
+			self.assertEqual(core.work_day(start, "America/Vancouver"), DAY)
+		finally:
+			frappe.db.set_value("Employee", self.employee, "ais_state", "")
+
+	# ---- forgot to clock out ---------------------------------------------------------------
+
+	def test_reminder_link_tokens_are_signed_and_expire(self):
+		from metactical.time_tracker import reminders
+
+		token = reminders.make_token("LOG-1")
+		self.assertEqual(reminders.read_token(token), "LOG-1")
+		for bad in (token[:-3] + "abc", "garbage", "", reminders.make_token("LOG-1", valid_hours=-1)):
+			with self.assertRaises(reminders.InvalidLink):
+				reminders.read_token(bad)
+
+	def test_forgotten_clock_out_is_reminded_once_then_closed_at_the_shift_end(self):
+		from metactical.time_tracker import reminders
+
+		self.clock("clock_in", at(9, 0))
+		sent = []
+		fake = lambda user, subject, html, sms: sent.append(subject) or ["email"]
+		with patch.object(reminders, "send", side_effect=fake):
+			with self._now(at(17, 5)):
+				reminders.run(user=USER)  # only 5 minutes past the end: too early
+			self.assertEqual(sent, [])
+			with self._now(at(17, 20)):
+				reminders.run(user=USER)
+			self.assertEqual(len(sent), 1)
+			with self._now(at(17, 40)):
+				reminders.run(user=USER)
+			self.assertEqual(len(sent), 1)  # never twice
+			with self._now(at(21, 10)):
+				reminders.run(user=USER)  # more than 4 hours past the end
+		row = frappe.db.get_value("Clockin Log", {"user": USER}, ["has_clocked_out", "auto_closed", "closed_via", "to_time", "total_hours"], as_dict=True)
+		self.assertEqual((row.has_clocked_out, row.auto_closed, row.closed_via), (1, 1, "auto"))
+		self.assertEqual(row.to_time, at(17, 0))  # at the scheduled end, not when the job ran
+		self.assertAlmostEqual(row.total_hours, 8.0, places=3)
+		self.assertEqual(len(sent), 2)  # the reminder, then the "we closed it" notice
+		self.assertTrue(frappe.db.exists("Employee Checkin", {"employee": self.employee, "log_type": "OUT"}))
+
+	def test_an_idle_run_does_no_work(self):
+		from metactical.time_tracker import reminders
+
+		def idle_run(when):
+			# the job must not look up shifts or employees, let alone send anything, when nothing is due
+			with patch.object(core, "expected_end_for", side_effect=AssertionError("must not run")), patch.object(
+				reminders, "send", side_effect=AssertionError("must not send")
+			):
+				with self._now(when):
+					reminders.run(user=USER)
+
+		idle_run(at(23, 0))  # nobody is clocked in
+		self.clock("clock_in", at(9, 0))
+		idle_run(at(12, 0))  # open, but nothing is due until 17:15
+
+	def test_the_follow_up_time_is_set_once_and_moves_on(self):
+		from metactical.time_tracker import reminders
+
+		self.clock("clock_in", at(9, 0))
+		name = frappe.db.get_value("Clockin Log", {"user": USER}, "name")
+		due = lambda: frappe.db.get_value("Clockin Log", name, "followup_due_on")
+		self.assertEqual(due(), at(17, 15))  # scheduled end 17:00 + 15 minutes
+		with patch.object(reminders, "send", return_value=["email"]):
+			with self._now(at(17, 20)):
+				reminders.run(user=USER)
+			self.assertEqual(due(), at(21, 0))  # next: the auto-close, 4 hours past the end
+			with self._now(at(21, 5)):
+				reminders.run(user=USER)
+		self.assertIsNone(due())  # closed: nothing left to follow up
+
+
+	def test_reminders_and_auto_close_can_be_switched_off(self):
+		from metactical.time_tracker import reminders
+
+		self.clock("clock_in", at(9, 0))
+		frappe.set_user("Administrator")
+		frappe.db.set_single_value("Time Tracker Settings", "reminder_minutes_after_shift_end", 0)
+		frappe.db.set_single_value("Time Tracker Settings", "auto_close_hours_after_shift_end", 0)
+		frappe.clear_cache(doctype="Time Tracker Settings")
+		try:
+			with patch.object(reminders, "send", side_effect=AssertionError("must not send")):
+				with self._now(at(23, 0)):
+					reminders.run(user=USER)
+			self.assertEqual(frappe.db.count("Clockin Log", {"user": USER, "has_clocked_out": 0}), 1)
+		finally:
+			frappe.db.set_single_value("Time Tracker Settings", "reminder_minutes_after_shift_end", 15)
+			frappe.db.set_single_value("Time Tracker Settings", "auto_close_hours_after_shift_end", 4)
+			frappe.clear_cache(doctype="Time Tracker Settings")
+
+	def test_the_link_clocks_out_now_exactly_once_and_only_that_entry(self):
+		from metactical.time_tracker import reminders
+
+		self.clock("clock_in", at(9, 0))
+		name = frappe.db.get_value("Clockin Log", {"user": USER, "has_clocked_out": 0}, "name")
+		token = reminders.make_token(name)
+		frappe.set_user("Guest")
+		self.assertTrue(api.get_clockout_link(token)["open"])
+		with self._now(at(17, 30)):
+			done = api.confirm_clockout(token)
+		self.assertFalse(done["open"])
+		to_time = frappe.db.get_value("Clockin Log", name, "to_time")
+		self.assertEqual(to_time, at(17, 30))  # the moment of the click
+		self.assertEqual(frappe.db.get_value("Clockin Log", name, "closed_via"), "link")
+		with self._now(at(18, 30)):
+			api.confirm_clockout(token)  # pressing again changes nothing
+		self.assertEqual(frappe.db.get_value("Clockin Log", name, "to_time"), to_time)
+		with self.assertRaises(reminders.InvalidLink):
+			api.confirm_clockout("not-a-token")
+
+	def test_the_approver_sees_forgotten_entries_and_can_close_or_confirm_them(self):
+		from metactical.time_tracker import reminders
+
+		self.clock("clock_in", at(9, 0))  # never clocked out
+		frappe.set_user(self._approver_user())
+		with self._now(at(16, 0)):
+			self.assertEqual([r for r in api.get_attention()["open"] if r["employee_name"] == "Worker"], [])  # still inside the shift
+		with self._now(at(19, 0)):
+			mine = [r for r in api.get_attention()["open"] if r["employee_name"] == "Worker"]
+			self.assertEqual(len(mine), 1)
+			with self.assertRaises(frappe.ValidationError):
+				api.close_entry(mine[0]["name"], "2026-10-07 08:00:00")  # before they clocked in
+			api.close_entry(mine[0]["name"], "2026-10-07 17:10:00")
+		row = frappe.db.get_value("Clockin Log", mine[0]["name"], ["to_time", "closed_via", "closed_by"], as_dict=True)
+		self.assertEqual((row.to_time, row.closed_via), (at(17, 10), "approver"))
+
+		# something the system closed: the approver confirms it
+		frappe.set_user("Administrator")
+		log = frappe.get_doc({"doctype": "Clockin Log", "user": USER, "date": DAY, "from_time": at(18, 0), "to_time": at(19, 0),
+							  "has_clocked_out": 1, "auto_closed": 1, "closed_via": "auto"}).insert(ignore_permissions=True)
+		frappe.set_user(self._approver_user())
+		with self._now(at(20, 0)):
+			self.assertIn(log.name, [r["name"] for r in api.get_attention()["auto_closed"]])
+			api.close_entry(log.name)  # "looks right"
+			self.assertNotIn(log.name, [r["name"] for r in api.get_attention()["auto_closed"]])
 
 
 class TestLocations(FrappeTestCase):

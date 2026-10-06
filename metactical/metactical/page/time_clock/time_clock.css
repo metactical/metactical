@@ -148,6 +148,22 @@
 #time_clock_ui .ap-old { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--yellow-100, #fff5d6); border-color: var(--yellow-300, #f0d27a); }
 #time_clock_ui .ap-cycle { text-transform: capitalize; }
 
+/* approvals redesign: cycle bar, status chips, forgotten clock-outs */
+#time_clock_ui .ap-cyclebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius-lg, 10px); background: var(--card-bg, var(--fg-color)); }
+#time_clock_ui .ap-cycle-title { display: flex; flex-direction: column; align-items: center; text-align: center; }
+#time_clock_ui .ap-admin { font-size: 11px; }
+#time_clock_ui .ap-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+#time_clock_ui .ap-chip { background: var(--control-bg); border: 1px solid transparent; border-radius: 999px; padding: 4px 12px; color: var(--text-color); cursor: pointer; }
+#time_clock_ui .ap-chip.active { border-color: var(--green-500, #30a66d); font-weight: 600; }
+#time_clock_ui .ap-chip-n { color: var(--text-muted); margin-left: 4px; }
+#time_clock_ui .tc-count-warn { background: var(--orange-500, #f08a24); }
+#time_clock_ui .ap-att { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--border-color); }
+#time_clock_ui .ap-att-main { flex: 1; min-width: 240px; }
+#time_clock_ui .ap-att-act { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+#time_clock_ui .ap-att-label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-muted); }
+#time_clock_ui .ap-att-label input { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: var(--border-radius, 6px); background: var(--control-bg); color: var(--text-color); }
+#time_clock_ui .tc-worknote { font-size: 12px; margin: -6px 0 10px; }
+
 /* /trackerv2 login */
 #time_clock_ui .tc-login { max-width: 420px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
 #time_clock_ui .tc-login label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }

@@ -228,6 +228,8 @@ scheduler_events = {
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		], "*/1 * * * *": [
 			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
+		], "*/10 * * * *": [
+			"metactical.time_tracker.reminders.run"
 		]
 	}
 }

@@ -34,6 +34,14 @@ Role **Time Approval** (created by `patches/create_time_approval_role.py`): sees
 `api.can_review` also allows HR Manager, System Manager and the Time Tracker Settings approver address.
 `api.get_requests(tab)` feeds `ApprovalsScreen.vue`; shared helpers live in `components/time_clock/api.js` and `format.js`.
 
+## Work zone, reminders, approvals by cycle
+
+- `core.work_day(moment, tz)` / `core.employee_for_user().work_tz`: `Clockin Log.date` is the WORK day; shifts stay in server time
+  (`core.shift_times_for_workday`). Report: `metactical/report/time_clock_hours`.
+- `reminders.py`: `schedule_followup` (once, on creation) + `run` (every 10 min, idle = one indexed lookup) + signed link token.
+  Guest endpoints `get_clockout_link` / `confirm_clockout`; page `www/trackerv2/clockout.html`.
+- `api.get_requests(cycle_offset)`: one cycle, all statuses; offset > 1 needs System Manager. `get_attention`, `close_entry`.
+
 ## Pay cycles, expected hours, regions
 
 - `core.scope_cycles()` = current and previous cycle; approvals, change requests and approval are limited to them.

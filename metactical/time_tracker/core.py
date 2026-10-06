@@ -10,6 +10,8 @@ import pytz
 from frappe import _
 from frappe.utils import add_days, flt, get_datetime, getdate, now_datetime
 
+from metactical.time_tracker import locations
+
 SETTINGS = "Time Tracker Settings"
 
 # A day is only "short" when it misses the shift by more than this.
@@ -79,6 +81,28 @@ def get_display_zone(user=None):
 	return v if v in ("server", "browser") or v in DISPLAY_ZONES else "server"
 
 
+def work_day(value, tz_name):
+	"""The calendar day a server-time moment falls on in `tz_name` (the employee's work zone)."""
+	d = get_datetime(value)
+	if not tz_name or tz_name == server_tz_name():
+		return d.date()
+	return _zone().localize(d, is_dst=False).astimezone(_zone(tz_name)).date()
+
+
+def shift_times_for_workday(shift, workday, tz_name):
+	"""(start, end) in server time of the shift that belongs to work day `workday` in `tz_name`.
+
+	Shifts are written in server time. For someone whose work zone is far from it, the shift that is their
+	Tuesday may begin on the server's Monday, so look a day either side.
+	"""
+	workday = getdate(workday)
+	for offset in (0, -1, 1):
+		start, end = shift_occurrence(shift, add_days(workday, offset))
+		if work_day(start, tz_name) == workday:
+			return start, end
+	return shift_occurrence(shift, workday)
+
+
 # ---- settings -----------------------------------------------------------------------------
 
 
@@ -92,6 +116,8 @@ def get_settings():
 		max_shift_hours=flt(s.get("max_shift_hours")) or 16.0,
 		backdate_days=int(s.get("backdate_limit_days") if s.get("backdate_limit_days") is not None else 14),
 		standard_day_hours=flt(s.get("standard_day_hours")) or 8.0,
+		reminder_minutes=int(s.get("reminder_minutes_after_shift_end") if s.get("reminder_minutes_after_shift_end") is not None else 15),
+		auto_close_hours=int(s.get("auto_close_hours_after_shift_end") if s.get("auto_close_hours_after_shift_end") is not None else 4),
 		pay_cycles=[(getdate(r.from_date), getdate(r.to_date)) for r in (s.pay_cycles or [])],
 	)
 
@@ -148,13 +174,26 @@ def shift_window(shift, now, early_minutes):
 # ---- who / which shift ---------------------------------------------------------------------
 
 
+def employee_for_user(user):
+	"""The active Employee row for a user (with its work time zone), or None."""
+	fields = ["name", "employee_name", "default_shift", "company"]
+	has_region = frappe.get_meta("Employee").has_field("ais_state")
+	if has_region:
+		fields.append("ais_state")
+	row = frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, fields, as_dict=True)
+	if row:
+		row["ais_state"] = row.get("ais_state") if has_region else None
+		row["work_tz"] = locations.work_time_zone(row["ais_state"], default=server_tz_name())
+	return row
+
+
+def work_zone_of_user(user):
+	row = employee_for_user(user)
+	return row.work_tz if row else server_tz_name()
+
+
 def get_employee(user):
-	row = frappe.db.get_value(
-		"Employee",
-		{"user_id": user, "status": "Active"},
-		["name", "employee_name", "default_shift", "company"],
-		as_dict=True,
-	)
+	row = employee_for_user(user)
 	if not row:
 		raise Blocked(
 			"no_employee",
@@ -204,6 +243,30 @@ def expected_hours(shift, settings=None):
 	if 0 < length <= MAX_SCHEDULED_SHIFT_HOURS:
 		return length
 	return settings.standard_day_hours
+
+
+def expected_end(shift, from_time, settings=None):
+	"""When an entry that started at `from_time` is expected to end: the scheduled end of the shift it belongs
+	to, else `expected hours` after it started."""
+	settings = settings or get_settings()
+	f = get_datetime(from_time)
+	for offset in (0, -1, 1):
+		start, end = shift_occurrence(shift, add_days(f.date(), offset))
+		if start - dt.timedelta(hours=2) <= f <= end:
+			return end
+	return f + dt.timedelta(hours=expected_hours(shift, settings))
+
+
+def expected_end_for(user, from_time, settings=None):
+	"""expected_end() for a user's entry, or None when they have no employee/shift to measure against."""
+	row = employee_for_user(user)
+	if not row:
+		return None
+	try:
+		shift = get_shift(row, getdate(from_time))
+	except Blocked:
+		return None
+	return expected_end(shift, from_time, settings)
 
 
 def get_cycle(on_date, settings=None):
@@ -258,7 +321,11 @@ def context(user=None):
 	employee = get_employee(user)
 	now = now_datetime()
 	shift = get_shift(employee, now.date())
-	return frappe._dict(user=user, employee=employee, shift=shift, settings=settings, now=now)
+	work_tz = employee.work_tz
+	return frappe._dict(
+		user=user, employee=employee, shift=shift, settings=settings, now=now,
+		work_tz=work_tz, work_today=work_day(now, work_tz),
+	)
 
 
 # ---- logs ---------------------------------------------------------------------------------

@@ -7,7 +7,9 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, get_datetime, getdate, now_datetime
 
-from metactical.time_tracker import core
+from frappe.rate_limiter import rate_limit
+
+from metactical.time_tracker import core, reminders
 from metactical.time_tracker.core import Blocked
 
 
@@ -29,7 +31,7 @@ def _blocked_state(b, user):
 
 def build_state(ctx, notice=None):
 	now, user = ctx.now, ctx.user
-	logs = core.logs_for_day(user, now.date())
+	logs = core.logs_for_day(user, ctx.work_today)
 	opened = core.open_logs(user)
 	current = opened[0] if opened else None
 
@@ -47,13 +49,13 @@ def build_state(ctx, notice=None):
 
 	today_hours = sum(core.log_hours(l, now) for l in logs)
 	# A shift that crossed midnight keeps its open log on yesterday's date; count it in today's total too.
-	if current and getdate(current.date) != now.date():
+	if current and getdate(current.date) != ctx.work_today:
 		today_hours += core.log_hours(current, now)
 		logs = logs + [current]
 
 	cycle = None
 	try:
-		start, end = core.get_cycle(now.date(), ctx.settings)
+		start, end = core.get_cycle(ctx.work_today, ctx.settings)
 		totals = core.day_totals(user, start, end, now)
 		cycle = {
 			"from_date": str(start),
@@ -75,12 +77,18 @@ def build_state(ctx, notice=None):
 			"window_state": state_key,
 			"expected_hours": round(core.expected_hours(ctx.shift, ctx.settings), 4),
 		},
+		"work": {
+			"tz": ctx.work_tz,
+			"today": str(ctx.work_today),
+			"region": ctx.employee.get("ais_state"),
+			"differs_from_server": ctx.work_tz != core.server_tz_name(),
+		},
 		"open_log": core.serialize_log(current, now) if current else None,
 		"can_clock_in": can_in,
 		"can_clock_in_reason": reason,
 		"can_clock_out": bool(current),
 		"today": {
-			"date": str(now.date()),
+			"date": str(ctx.work_today),
 			"total_hours": round(today_hours, 4),
 			"logs": [core.serialize_log(l, now) for l in logs],
 		},
@@ -124,7 +132,7 @@ def clock_in():
 		{
 			"doctype": "Clockin Log",
 			"user": ctx.user,
-			"date": ctx.now.date(),
+			"date": ctx.work_today,
 			"from_time": ctx.now,
 			"total_hours": 0.0,
 		}
@@ -159,7 +167,7 @@ def get_cycle(offset=0):
 	ctx = core.context()
 	offset = int(offset)
 	cycles = sorted(ctx.settings.pay_cycles, key=lambda c: c[0], reverse=True)
-	today = ctx.now.date()
+	today = ctx.work_today
 	current_idx = next((i for i, (s, e) in enumerate(cycles) if s <= today <= e), 0)
 	idx = current_idx + offset
 	if not cycles or idx < 0 or idx >= len(cycles):
@@ -264,7 +272,7 @@ def _fmt12(d):
 
 def _assert_period_open(ctx, day):
 	"""Only the current and the previous pay cycle can still be changed; older ones are paid out."""
-	scope = core.scope_cycles(ctx.now.date(), ctx.settings)
+	scope = core.scope_cycles(ctx.work_today, ctx.settings)
 	if scope and getdate(day) < scope["previous_from"]:
 		frappe.throw(_("That pay period is already closed. Please ask HR."))
 
@@ -324,7 +332,7 @@ def request_missed_punch(date, from_time, to_time, reason, timezone=None):
 	"""Employee asks to add an entry for a day they never clocked in at all."""
 	ctx = core.context()
 	day = getdate(date)
-	today = ctx.now.date()
+	today = ctx.work_today
 	if day > today:
 		frappe.throw(_("You can not add time for a future day."))
 	_assert_period_open(ctx, day)
@@ -334,7 +342,7 @@ def request_missed_punch(date, from_time, to_time, reason, timezone=None):
 		)
 
 	new_from, new_to = core.to_server_naive(from_time, timezone), core.to_server_naive(to_time, timezone)
-	if new_from.date() != day:
+	if core.work_day(new_from, ctx.work_tz) != day:
 		frappe.throw(_("Clock in must be on {0}.").format(day))
 	reason, hours = _check_span(ctx, new_from, new_to, reason)
 	_assert_no_overlap(ctx.user, new_from, new_to)
@@ -529,7 +537,7 @@ def apply_missed_punch(req):
 		{
 			"doctype": "Clockin Log",
 			"user": req.user,
-			"date": new_from.date(),
+			"date": core.work_day(new_from, core.work_zone_of_user(req.user)),
 			"from_time": new_from,
 			"to_time": new_to,
 			"has_clocked_out": 1,
@@ -546,7 +554,7 @@ def apply_correction(req):
 	_assert_no_overlap(log.user, new_from, new_to, exclude=log.name)
 	log.from_time = new_from
 	log.to_time = new_to
-	log.date = new_from.date()
+	log.date = core.work_day(new_from, core.work_zone_of_user(log.user))
 	log.save(ignore_permissions=True)
 
 
@@ -561,6 +569,12 @@ def set_display_zone(zone):
 
 REQ = "Checkin Request Modification"
 EXPIRED_NOTE = "Expired: older than the previous pay period. Please send a new request if this still needs changing."
+
+
+def can_browse_history(user=None):
+	"""Only a System Manager can look further back than the previous pay cycle."""
+	user = user or frappe.session.user
+	return user == "Administrator" or "System Manager" in frappe.get_roles(user)
 
 
 def _entry_dates(rows):
@@ -593,20 +607,41 @@ def get_my_permissions():
 		"server_tz": core.server_tz_name(),
 		"display_zone": core.get_display_zone(),
 		"can_review": allowed,
+		"can_browse_history": allowed and can_browse_history(),
 		"pending_count": len(_scoped("Pending")[1]) if allowed else 0,
 	}
 
 
+def _cycles_ascending():
+	return sorted(core.get_settings().pay_cycles, key=lambda c: c[0])
+
+
 @frappe.whitelist()
-def get_requests(tab="Pending"):
-	"""The approvals screen. Everyone with the role sees every request, but only those about the current or
-	previous pay cycle: older periods are already paid out."""
+def get_requests(cycle_offset=0):
+	"""The approvals screen: every request about ONE pay cycle, whatever its status.
+
+	cycle_offset 0 is the current cycle, 1 the previous one. Anyone with the role can go back one cycle (older
+	periods are already paid out); a System Manager can go back as far as the history goes.
+	"""
 	assert_can_review()
-	decided = tab == "Decided"
-	scope, pending = _scoped("Pending")
-	_, done = _scoped(["in", ["Approved", "Declined"]])
-	chosen = done if decided else pending
-	day_of = {r.name: d for r, d in chosen}
+	offset = max(0, int(cycle_offset or 0))
+	if offset > 1 and not can_browse_history():
+		frappe.throw(_("Only an administrator can look further back than the previous pay cycle."), frappe.PermissionError)
+	cycles = _cycles_ascending()
+	today = core.today()
+	current = next((i for i, (a, b) in enumerate(cycles) if a <= today <= b), None)
+	if current is None:
+		frappe.throw(_("No pay cycle covers today. Add one in Time Tracker Settings."))
+	idx = current - offset
+	if idx < 0:
+		frappe.throw(_("There is no earlier pay cycle."))
+	start, end = cycles[idx]
+	scope = core.scope_cycles(today)
+
+	# a request is always made after the day it is about, so `creation >= start` only narrows the search
+	candidates = frappe.get_all(REQ, filters={"creation": [">=", start]}, fields=["name", "log", "date"], limit=10000)
+	days = _entry_dates(candidates)
+	day_of = {r.name: days[r.name] for r in candidates if days[r.name] and start <= days[r.name] <= end}
 
 	rows = frappe.get_all(
 		REQ,
@@ -616,8 +651,9 @@ def get_requests(tab="Pending"):
 			"reviewed_on", "review_comment", "requested_from", "requested_to",
 			"requested_checkin_military", "requested_checkout_military",
 		],
-		order_by="reviewed_on desc, modified desc" if decided else "creation asc",
 	)
+	# waiting first (oldest first), then decided (latest first)
+	rows.sort(key=lambda r: (r.status != "Pending", r.creation if r.status == "Pending" else -get_datetime(r.reviewed_on or r.creation).timestamp()))
 
 	users = [r.user for r in rows]
 	employees = {
@@ -626,7 +662,6 @@ def get_requests(tab="Pending"):
 			"Employee", filters={"user_id": ["in", users or [""]]}, fields=["user_id", "name", "employee_name"]
 		)
 	}
-	today = core.today()
 	shift_of = {}
 	if employees:
 		for emp, shift_type in frappe.db.sql(
@@ -656,19 +691,15 @@ def get_requests(tab="Pending"):
 			new_to = new_to or get_datetime(f"{day} {r.requested_checkout_military}")
 		requested_hours = core.hours_between(new_from, new_to) if new_from and new_to else None
 		current_hours = float(log.total_hours or 0) if log else None
-		same_day = (
-			[
-				{
-					"from_time": core.with_offset(l.from_time),
-					"to_time": core.with_offset(l.to_time),
-					"hours": round(core.log_hours(l, now_datetime()), 4),
-					"is_this_entry": l.name == r.log,
-				}
-				for l in core.logs_for_day(r.user, day)
-			]
-			if day
-			else []
-		)
+		same_day = [
+			{
+				"from_time": core.with_offset(l.from_time),
+				"to_time": core.with_offset(l.to_time),
+				"hours": round(core.log_hours(l, core.now_datetime()), 4),
+				"is_this_entry": l.name == r.log,
+			}
+			for l in core.logs_for_day(r.user, day)
+		]
 		out.append(
 			{
 				"name": r.name,
@@ -678,8 +709,7 @@ def get_requests(tab="Pending"):
 				"request_type": r.request_type or "Change",
 				"status": r.status,
 				"reason": r.reason,
-				"date": str(day) if day else None,
-				"cycle": core.cycle_label(day, scope),
+				"date": str(day),
 				"requested_at": core.with_offset(r.creation),
 				"current_from": core.with_offset(log.from_time) if log else None,
 				"current_to": core.with_offset(log.to_time) if log and log.to_time else None,
@@ -695,20 +725,22 @@ def get_requests(tab="Pending"):
 			}
 		)
 
-	def span(a, b):
-		return {"from": str(a), "to": str(b)} if a and b else None
-
+	counts = {s: sum(1 for r in out if r["status"] == s) for s in ("Pending", "Approved", "Declined")}
+	counts["All"] = len(out)
+	pending_in_scope = len(_scoped("Pending")[1])
+	may_go_back = idx > 0 and (offset < 1 or can_browse_history())
 	return {
 		"rows": out,
-		"pending_count": len(pending),
-		"decided_count": len(done),
-		"hidden_older_pending": max(0, frappe.db.count(REQ, {"status": "Pending"}) - len(pending)),
-		"cycles": {
-			"current": span(scope and scope["current_from"], scope and scope["current_to"]),
-			"previous": span(scope and scope["previous_from"], scope and scope["previous_to"]),
-		}
-		if scope
-		else None,
+		"counts": counts,
+		"cycle": {
+			"from": str(start), "to": str(end), "offset": offset,
+			"label": "current" if offset == 0 else "previous" if offset == 1 else "older",
+		},
+		"has_older": may_go_back,
+		"has_newer": offset > 0,
+		"pending_count": pending_in_scope,
+		"hidden_older_pending": max(0, frappe.db.count(REQ, {"status": "Pending"}) - pending_in_scope) if scope else 0,
+		"can_browse_history": can_browse_history(),
 	}
 
 
@@ -729,6 +761,149 @@ def expire_old_requests():
 			{"status": "Declined", "reviewed_by": frappe.session.user, "reviewed_on": now, "review_comment": EXPIRED_NOTE},
 		)
 	return {"expired": len(expired)}
+
+
+# ---- forgotten clock-outs: the approver's list, and closing an entry --------------------------------
+
+
+@frappe.whitelist()
+def get_attention():
+	"""Entries an approver may need to act on: still open past the scheduled end, and ones the system closed."""
+	assert_can_review()
+	settings = core.get_settings()
+	now = core.now_datetime()
+	scope = core.scope_cycles(core.today(), settings)
+	floor = scope["previous_from"] if scope else None
+	date_filter = {"date": [">=", floor]} if floor else {}
+
+	open_logs = frappe.get_all(
+		"Clockin Log", filters={"has_clocked_out": 0, **date_filter},
+		fields=["name", "user", "date", "from_time", "reminder_sent_on"], order_by="from_time asc",
+	)
+	auto = frappe.get_all(
+		"Clockin Log", filters={"auto_closed": 1, "auto_close_reviewed": 0, **date_filter},
+		fields=["name", "user", "date", "from_time", "to_time", "total_hours", "closed_via"], order_by="from_time desc",
+	)
+	people = {
+		e.user_id: e.employee_name
+		for e in frappe.get_all(
+			"Employee", filters={"user_id": ["in", [r.user for r in open_logs + auto] or [""]]}, fields=["user_id", "employee_name"]
+		)
+	}
+
+	still_open = []
+	for r in open_logs:
+		end = core.expected_end_for(r.user, r.from_time, settings)
+		if end is not None and now < end:
+			continue  # still inside their shift
+		still_open.append(
+			{
+				"name": r.name,
+				"employee_name": people.get(r.user) or r.user,
+				"date": str(r.date),
+				"from_time": core.with_offset(r.from_time),
+				"expected_end": core.with_offset(end) if end else None,
+				"open_hours": round(core.hours_between(r.from_time, now), 4),
+				"reminder_sent_on": core.with_offset(r.reminder_sent_on),
+			}
+		)
+	return {
+		"open": still_open,
+		"auto_closed": [
+			{
+				"name": r.name,
+				"employee_name": people.get(r.user) or r.user,
+				"date": str(r.date),
+				"from_time": core.with_offset(r.from_time),
+				"to_time": core.with_offset(r.to_time),
+				"hours": round(r.total_hours or 0, 4),
+			}
+			for r in auto
+		],
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def close_entry(log, to_time=None, timezone=None):
+	"""An approver closes an open entry at the time the employee actually left, or confirms/corrects the time the
+	system closed it at (leave `to_time` empty to just confirm)."""
+	assert_can_review()
+	doc = frappe.get_doc("Clockin Log", log)
+	settings = core.get_settings()
+	scope = core.scope_cycles(core.today(), settings)
+	if scope and getdate(doc.date) < scope["previous_from"]:
+		frappe.throw(_("That pay period is already closed."))
+
+	if not to_time:
+		if not (doc.auto_closed and doc.has_clocked_out):
+			frappe.throw(_("Choose the time they left."))
+	else:
+		t = core.to_server_naive(to_time, timezone)
+		if t <= get_datetime(doc.from_time):
+			frappe.throw(_("They cannot have left before they clocked in."))
+		if t > core.now_datetime():
+			frappe.throw(_("That time is in the future."))
+		if core.hours_between(doc.from_time, t) > settings.max_shift_hours:
+			frappe.throw(_("That is longer than {0} hours.").format(settings.max_shift_hours))
+		doc.to_time = t
+		doc.has_clocked_out = 1
+		if not doc.closed_via:
+			doc.closed_via = "approver"
+	doc.closed_by = frappe.session.user
+	if doc.auto_closed:
+		doc.auto_close_reviewed = 1
+	doc.save(ignore_permissions=True)
+	return {"name": doc.name}
+
+
+# ---- the reminder link (no login: the signed token is the key) ----------------------------------
+
+
+def _link_info(doc):
+	first = (frappe.db.get_value("Employee", {"user_id": doc.user}, "employee_name") or "").split(" ")[0]
+	return {
+		"first_name": first,
+		"since": core.with_offset(doc.from_time),
+		"open": not doc.has_clocked_out,
+		"closed_at": core.with_offset(doc.to_time) if doc.has_clocked_out else None,
+		"auto_closed": bool(doc.auto_closed),
+		"server_tz": core.server_tz_name(),
+	}
+
+
+@frappe.whitelist(allow_guest=True)
+@rate_limit(limit=60, seconds=300)
+def get_clockout_link(token):
+	return _link_info(frappe.get_doc("Clockin Log", reminders.read_token(token)))
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=20, seconds=300)
+def confirm_clockout(token):
+	"""Clock the person out NOW (never at an earlier time they might claim). Safe to press twice."""
+	name = reminders.read_token(token)
+	doc = frappe.get_doc("Clockin Log", name)
+	emp = frappe.db.get_value("Employee", {"user_id": doc.user}, "name")
+	if emp:
+		core.lock_employee(emp)
+		doc.reload()
+	if not doc.has_clocked_out:
+		doc.to_time = core.now_datetime()
+		doc.has_clocked_out = 1
+		doc.closed_via = "link"
+		doc.save(ignore_permissions=True)
+	return _link_info(doc)
+
+
+# ---- missing days: where the shift falls for the employee's work day --------------------------------
+
+
+@frappe.whitelist()
+def get_missed_defaults(date):
+	"""Server-time clock in/out for the shift that belongs to work day `date` (shifts are written in server time)."""
+	ctx = core.context()
+	start, end = core.shift_times_for_workday(ctx.shift, date, ctx.work_tz)
+	return {"from_time": core.with_offset(start), "to_time": core.with_offset(end)}
 
 
 def _iso_or_none(value):

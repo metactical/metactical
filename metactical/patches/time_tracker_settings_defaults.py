@@ -8,6 +8,8 @@ DEFAULTS = {
 	"max_shift_hours": 16,
 	"backdate_limit_days": 14,
 	"standard_day_hours": 8,
+	"reminder_minutes_after_shift_end": 15,
+	"auto_close_hours_after_shift_end": 4,
 }
 
 

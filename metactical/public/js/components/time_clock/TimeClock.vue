@@ -40,6 +40,9 @@
         </div>
         <div class="tc-clock">{{ clockText }}</div>
         <div class="tc-date">{{ weekdayText }} · {{ dateText }} · {{ zoneText }}</div>
+        <div v-if="state.work && state.work.differs_from_server" class="tc-muted tc-worknote">
+          Your work days follow {{ state.work.tz.replace(/_/g, ' ') }}, so a shift is listed on the day it falls there.
+        </div>
         <div v-if="clockSkewMin" class="tc-skew">
           This computer's clock is {{ clockSkewMin }} min {{ clockSkewMs > 0 ? 'behind' : 'ahead' }}. The time shown and
           recorded comes from the server, so your punch is correct. Please tell IT to fix this PC.
@@ -291,28 +294,18 @@ async function toggleDay(d) {
   dayDetail.value = await callBackend("get_day", { date: d.date })
 }
 
-// Default a missed day to the employee's shift times (an overnight shift ends on the next day).
-function openMissed(d) {
-  // Shift hours are server time: put them on the missed (server) day, then show them in the chosen zone.
-  const sh = state.value.shift
-  const stz = zoneState.serverTz
-  const startWall = wallInZone(parse(sh.start).getTime(), stz)
-  const endWall = wallInZone(parse(sh.end).getTime(), stz)
-  const overnight = endWall.slice(0, 10) !== startWall.slice(0, 10)
-  const next = new Date(asDate(d.date).getTime() + 86400000)
-  const nextIso = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-${pad2(next.getDate())}`
-  const fromMs = wallStrToMs(`${d.date}T${startWall.slice(11)}`, stz)
-  const toMs = wallStrToMs(`${overnight ? nextIso : d.date}T${endWall.slice(11)}`, stz)
+// Default a missed day to the employee's shift. The server knows which server-time shift belongs to that
+// WORK day (shifts are written in server time, work days follow the employee's work zone).
+async function openMissed(d) {
   const tz = activeTz.value
-  correction.value = {
-    mode: "add",
-    date: d.date,
-    tz,
-    from: wallInZone(fromMs, tz),
-    to: wallInZone(toMs, tz),
-    reason: "",
-    error: "",
-  }
+  let from = ""
+  let to = ""
+  try {
+    const r = await callBackend("get_missed_defaults", { date: d.date })
+    from = wallInZone(parse(r.from_time).getTime(), tz)
+    to = wallInZone(parse(r.to_time).getTime(), tz)
+  } catch (_) { /* the dialog still opens, with empty times */ }
+  correction.value = { mode: "add", date: d.date, tz, from, to, reason: "", error: "" }
 }
 
 function openCorrection(log) {

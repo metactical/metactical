@@ -28,9 +28,12 @@ class ClockinLog(Document):
 
 	def after_insert(self):
 		insert_in_employee_checkin(self)
+		from metactical.time_tracker.reminders import schedule_followup
+
+		schedule_followup(self)
 
 	def before_save(self):
-		if self.has_clocked_out and not self.auto_closed:
+		if self.has_clocked_out:
 			self.insert_out_employee_checkin()
 
 	def on_update(self):
