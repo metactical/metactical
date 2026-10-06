@@ -34,6 +34,14 @@ Role **Time Approval** (created by `patches/create_time_approval_role.py`): sees
 `api.can_review` also allows HR Manager, System Manager and the Time Tracker Settings approver address.
 `api.get_requests(tab)` feeds `ApprovalsScreen.vue`; shared helpers live in `components/time_clock/api.js` and `format.js`.
 
+## Pay cycles, expected hours, regions
+
+- `core.scope_cycles()` = current and previous cycle; approvals, change requests and approval are limited to them.
+- `core.expected_hours(shift)` = Shift Type `tt_expected_hours`, else the shift length (<= 14h), else Standard Day Hours.
+- `locations.py` = ISO 3166-2 codes for `Employee.ais_state` and the work time zone rule (Phase 2 will use it).
+- Patches added: `time_tracker_shift_expected_hours`, `create_standard_shift_types`, `normalize_employee_regions`,
+  `close_stale_open_entries`, `create_time_approval_role`, `time_tracker_settings_defaults`.
+
 ## Time zones
 
 Storage and rules are in site (server) time. API instants carry a UTC offset (`core.with_offset`); times typed by a

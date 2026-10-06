@@ -120,7 +120,7 @@
             <button class="tc-day-main" :disabled="!d.log_count" @click="toggleDay(d)">
               <span class="tc-day-wd">{{ fmtWeekday(d.date) }}</span>
               <span class="tc-day-name">{{ fmtDate(d.date) }}</span>
-              <span class="tc-bar" :title="d.short ? 'Shorter than the ' + fmtDuration(cycle.shift_hours) + ' shift' : ''"><span class="tc-bar-fill" :class="{ 'is-short': d.short }" :style="{ width: barWidth(d.hours) + '%' }"></span></span>
+              <span class="tc-bar" :title="d.short ? 'Shorter than the expected ' + fmtDuration(cycle.expected_hours) + ' day' : ''"><span class="tc-bar-fill" :class="{ 'is-short': d.short }" :style="{ width: barWidth(d.hours) + '%' }"></span></span>
               <span class="tc-day-hours">{{ d.hours ? fmtDuration(d.hours) : '—' }}</span>
               <span v-if="d.short" class="tc-pill tc-pill-short">short day</span>
               <span v-if="d.pending_requests" class="tc-pill tc-pill-wait">request pending</span>
@@ -227,7 +227,7 @@ const elapsedHours = computed(() => {
 
 // A full bar is one scheduled shift. Longer days just stay full: overtime is deliberately not marked.
 const barWidth = (hours) => {
-  const shift = (cycle.value && cycle.value.shift_hours) || 8
+  const shift = (cycle.value && cycle.value.expected_hours) || 8
   return Math.min(100, Math.max(0, (hours / shift) * 100))
 }
 const applyState = (s) => {

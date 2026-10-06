@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from metactical.time_tracker import locations
 from frappe.model.document import Document
 from email.utils import formataddr
 
@@ -71,7 +72,8 @@ class EmployeeSignUp(Document):
 			'user_id': self.company_email,
 			'create_user_permission': 1,
 			'permanent_address': address,
-			'ais_state': self.state,
+			# the Employee field is an ISO 3166-2 drop-down (CA-BC, US-TX, OTHER); never pass free text to it
+			'ais_state': locations.normalize_region(self.state) or (locations.OTHER if self.country not in ('Canada', 'United States') else ''),
 			'branch': self.branch,
 			'bio': self.comments, 
 			"bank_document": self.bank_document,

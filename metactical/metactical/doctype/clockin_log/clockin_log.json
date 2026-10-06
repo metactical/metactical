@@ -12,6 +12,7 @@
   "to_time",
   "total_hours",
   "has_clocked_out",
+  "auto_closed",
   "in_employee_checkin_record",
   "out_employee_checkin_record"
  ],
@@ -72,11 +73,19 @@
    "fieldtype": "Link",
    "label": "Out Employee Checkin Record",
    "options": "Employee Checkin"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_closed",
+   "fieldtype": "Check",
+   "label": "Auto Closed",
+   "read_only": 1,
+   "description": "Closed by the system at zero hours because it was never clocked out and the pay period was already paid."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-05 12:00:00.000000",
+ "modified": "2026-10-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Clockin Log",
@@ -95,20 +104,15 @@
    "write": 1
   },
   {
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "HR Manager",
-   "write": 1
-  },
-  {
    "read": 1,
    "report": 1,
    "role": "Employee",
    "if_owner": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Time Approval"
   }
  ],
  "sort_field": "modified",

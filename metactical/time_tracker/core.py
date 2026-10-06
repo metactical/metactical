@@ -91,6 +91,7 @@ def get_settings():
 		enforce_window=int(s.get("enforce_shift_window") if s.get("enforce_shift_window") is not None else 1),
 		max_shift_hours=flt(s.get("max_shift_hours")) or 16.0,
 		backdate_days=int(s.get("backdate_limit_days") if s.get("backdate_limit_days") is not None else 14),
+		standard_day_hours=flt(s.get("standard_day_hours")) or 8.0,
 		pay_cycles=[(getdate(r.from_date), getdate(r.to_date)) for r in (s.pay_cycles or [])],
 	)
 
@@ -177,7 +178,32 @@ def get_shift(employee, on_date):
 			"no_shift",
 			_("{0} has no active Shift Assignment. Ask HR to assign a shift.").format(employee.employee_name),
 		)
-	return frappe.db.get_value("Shift Type", shift_name, ["name", "start_time", "end_time"], as_dict=True)
+	fields = ["name", "start_time", "end_time"]
+	if frappe.get_meta("Shift Type").has_field("tt_expected_hours"):
+		fields.append("tt_expected_hours")
+	return frappe.db.get_value("Shift Type", shift_name, fields, as_dict=True)
+
+
+# A shift longer than this is an availability window (Flex Shift 00:01-23:59, Store Shift 06:00-22:00), not a
+# working day. Some people do work 12-14 hours, so anything up to 14 hours counts as a real schedule.
+MAX_SCHEDULED_SHIFT_HOURS = 14
+
+
+def expected_hours(shift, settings=None):
+	"""Paid hours a normal day is expected to be on this schedule.
+
+	Order: the shift's own Expected Hours; else the shift's length when it is a real schedule (up to 14
+	hours); else the Standard Day Hours setting (8 by default).
+	"""
+	settings = settings or get_settings()
+	own = flt(shift.get("tt_expected_hours")) if hasattr(shift, "get") else flt(getattr(shift, "tt_expected_hours", 0))
+	if own > 0:
+		return own
+	start, end = shift_occurrence(shift, dt.date(2000, 1, 3))
+	length = hours_between(start, end)
+	if 0 < length <= MAX_SCHEDULED_SHIFT_HOURS:
+		return length
+	return settings.standard_day_hours
 
 
 def get_cycle(on_date, settings=None):
@@ -187,6 +213,40 @@ def get_cycle(on_date, settings=None):
 		if start <= d <= end:
 			return start, end
 	raise Blocked("no_cycle", _("No pay cycle covers {0}. Ask HR to add one in Time Tracker Settings.").format(d))
+
+
+def today():
+	return now_datetime().date()
+
+
+def scope_cycles(on_date, settings=None):
+	"""The current and the previous pay cycle: the only periods that can still be changed or approved.
+	Older ones are paid out. None when no cycle covers `on_date`."""
+	settings = settings or get_settings()
+	d = getdate(on_date)
+	cycles = sorted(settings.pay_cycles, key=lambda c: c[0])
+	for i, (start, end) in enumerate(cycles):
+		if start <= d <= end:
+			prev = cycles[i - 1] if i > 0 else None
+			return {
+				"current_from": start,
+				"current_to": end,
+				"previous_from": prev[0] if prev else start,
+				"previous_to": prev[1] if prev else None,
+			}
+	return None
+
+
+def cycle_label(day, scope):
+	"""'current', 'previous' or None for a day, given scope_cycles()."""
+	if not scope or not day:
+		return None
+	day = getdate(day)
+	if scope["current_from"] <= day <= scope["current_to"]:
+		return "current"
+	if scope["previous_to"] and scope["previous_from"] <= day <= scope["previous_to"]:
+		return "previous"
+	return None
 
 
 def context(user=None):

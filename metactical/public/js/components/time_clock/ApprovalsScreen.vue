@@ -14,6 +14,11 @@
           <option value="">All employees</option>
           <option v-for="e in employees" :key="e.user" :value="e.user">{{ e.name }}</option>
         </select>
+        <select v-model="f.cycle" aria-label="Pay cycle">
+          <option value="">Both pay cycles</option>
+          <option value="current">Current pay cycle</option>
+          <option value="previous">Previous pay cycle</option>
+        </select>
         <select v-model="f.type" aria-label="Request type">
           <option value="">All types</option>
           <option value="Change">Time changes</option>
@@ -24,6 +29,19 @@
           <option v-for="s in shifts" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
+    </div>
+
+    <div v-if="cycles" class="ap-scope">
+      Showing the current and previous pay cycle:
+      {{ fmtDate(cycles.previous ? cycles.previous.from : cycles.current.from) }} – {{ fmtDate(cycles.current.to) }}.
+      Older periods are already paid out.
+    </div>
+    <div v-if="hiddenOlder" class="tc-card ap-old">
+      <div>
+        <b>{{ hiddenOlder }}</b> older request{{ hiddenOlder === 1 ? ' is' : 's are' }} hidden because that pay period is already paid out.
+        They can no longer be approved.
+      </div>
+      <button class="btn btn-default btn-sm" :disabled="busy" @click="expireOld">Decline them as expired</button>
     </div>
 
     <div v-if="loading" class="tc-card tc-muted">Loading…</div>
@@ -54,7 +72,7 @@
             <span v-else class="ap-delta">{{ fmtDelta(r.delta_hours) }}</span>
           </span>
           <span class="ap-item-sub">
-            {{ fmtDate(r.date) }} ·
+            {{ fmtDate(r.date) }} · <span class="ap-cycle">{{ r.cycle }}</span> ·
             <span class="tc-pill" :class="r.request_type === 'Add' ? 'tc-pill-wait' : 'tc-pill-out'">{{ r.request_type === 'Add' ? 'missed time' : 'time change' }}</span>
           </span>
         </button>
@@ -143,7 +161,9 @@ const actionError = ref("")
 const comment = ref("")
 const notice = ref(null)
 const selectedName = ref("")
-const f = ref({ employee: "", type: "", shift: "" })
+const f = ref({ employee: "", type: "", shift: "", cycle: "" })
+const cycles = ref(null)
+const hiddenOlder = ref(0)
 
 // Everyone with the Time Approval role sees every request, so the filters are built from what came back.
 const employees = computed(() => {
@@ -157,6 +177,7 @@ const shown = computed(() =>
   rows.value.filter(
     (r) =>
       (!f.value.employee || r.user === f.value.employee) &&
+      (!f.value.cycle || r.cycle === f.value.cycle) &&
       (!f.value.type || r.request_type === f.value.type) &&
       (!f.value.shift || r.shift === f.value.shift)
   )
@@ -170,6 +191,8 @@ async function load(which) {
     const data = await callBackend("get_requests", { tab: which })
     rows.value = data.rows
     counts.value = { pending: data.pending_count, decided: data.decided_count }
+    cycles.value = data.cycles
+    hiddenOlder.value = data.hidden_older_pending || 0
     selectedName.value = data.rows.length ? data.rows[0].name : ""
     comment.value = ""
     actionError.value = ""
@@ -211,6 +234,21 @@ async function decide(decision) {
     setNotice(`${decision}: ${r.employee_name}, ${fmtDate(r.date)}.`)
   } catch (e) {
     actionError.value = errorText(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+// Pending requests about a period that is already paid out cannot be approved any more: close them with a note.
+async function expireOld() {
+  if (!window.confirm(`Decline ${hiddenOlder.value} older request(s) as expired? The employees will be told to send a new request if it still needs changing.`)) return
+  busy.value = true
+  try {
+    const r = await callBackend("expire_old_requests")
+    setNotice(`Declined ${r.expired} old request(s) as expired.`)
+    await load(tab.value)
+  } catch (e) {
+    setNotice(errorText(e), "error")
   } finally {
     busy.value = false
   }

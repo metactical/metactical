@@ -16,6 +16,7 @@
   "early_clockin_minutes",
   "enforce_shift_window",
   "max_shift_hours",
+  "standard_day_hours",
   "backdate_limit_days"
  ],
  "fields": [
@@ -92,12 +93,20 @@
    "fieldtype": "Int",
    "label": "Days Back Employees Can Add Missed Time",
    "non_negative": 1
+  },
+  {
+   "default": "8",
+   "fieldname": "standard_day_hours",
+   "fieldtype": "Float",
+   "label": "Standard Day Hours",
+   "non_negative": 1,
+   "description": "Expected hours on a normal day when a shift is too wide to say (over 14 hours, e.g. Flex Shift) and has no Expected Hours."
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-05 15:00:00.000000",
+ "modified": "2026-10-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Time Tracker Settings",

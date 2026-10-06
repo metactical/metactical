@@ -7,6 +7,7 @@ DEFAULTS = {
 	"enforce_shift_window": 1,
 	"max_shift_hours": 16,
 	"backdate_limit_days": 14,
+	"standard_day_hours": 8,
 }
 
 

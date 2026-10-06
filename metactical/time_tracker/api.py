@@ -73,6 +73,7 @@ def build_state(ctx, notice=None):
 			"start": core.with_offset(shift_start),
 			"end": core.with_offset(shift_end),
 			"window_state": state_key,
+			"expected_hours": round(core.expected_hours(ctx.shift, ctx.settings), 4),
 		},
 		"open_log": core.serialize_log(current, now) if current else None,
 		"can_clock_in": can_in,
@@ -176,8 +177,7 @@ def get_cycle(offset=0):
 			as_dict=True,
 		)
 	}
-	s_start, s_end = core.shift_occurrence(ctx.shift, today)
-	shift_hours = core.hours_between(s_start, s_end)
+	shift_hours = core.expected_hours(ctx.shift, ctx.settings)
 	still_open = {str(core.getdate(l.date)) for l in core.open_logs(ctx.user)}
 	adds = {}  # missed-time requests for days with no entry: latest per date
 	# `date` on this doctype is a text field, so filter the (few) rows in Python rather than in SQL.
@@ -214,7 +214,7 @@ def get_cycle(offset=0):
 	return {
 		"from_date": str(start),
 		"to_date": str(end),
-		"shift_hours": round(shift_hours, 4),
+		"expected_hours": round(shift_hours, 4),
 		"total_hours": round(sum(d["hours"] for d in days), 4),
 		"days": days,
 		"has_prev": idx + 1 < len(cycles),
@@ -260,6 +260,13 @@ def get_day(date):
 
 def _fmt12(d):
 	return get_datetime(d).strftime("%I:%M %p").lstrip("0")
+
+
+def _assert_period_open(ctx, day):
+	"""Only the current and the previous pay cycle can still be changed; older ones are paid out."""
+	scope = core.scope_cycles(ctx.now.date(), ctx.settings)
+	if scope and getdate(day) < scope["previous_from"]:
+		frappe.throw(_("That pay period is already closed. Please ask HR."))
 
 
 def _check_span(ctx, new_from, new_to, reason):
@@ -320,6 +327,7 @@ def request_missed_punch(date, from_time, to_time, reason, timezone=None):
 	today = ctx.now.date()
 	if day > today:
 		frappe.throw(_("You can not add time for a future day."))
+	_assert_period_open(ctx, day)
 	if (today - day).days > ctx.settings.backdate_days:
 		frappe.throw(
 			_("You can only add time up to {0} days back. Ask HR for older days.").format(ctx.settings.backdate_days)
@@ -375,6 +383,7 @@ def request_correction(log, from_time, to_time, reason, timezone=None):
 		frappe.throw(_("You can only correct your own time."), frappe.PermissionError)
 	if not doc.has_clocked_out:
 		frappe.throw(_("Clock out first, then request a correction."))
+	_assert_period_open(ctx, doc.date)
 	new_from, new_to = core.to_server_naive(from_time, timezone), core.to_server_naive(to_time, timezone)
 	reason, hours = _check_span(ctx, new_from, new_to, reason)
 	if frappe.db.exists("Checkin Request Modification", {"log": log, "status": "Pending"}):
@@ -431,13 +440,13 @@ APPROVER_ROLE = "Time Approval"
 
 
 def can_review(user=None):
-	"""Anyone with the Time Approval role sees and decides every request. HR Manager, System Manager and
-	the address in Time Tracker Settings keep working as before."""
+	"""Anyone with the Time Approval role sees and decides every request. System Manager and the address in
+	Time Tracker Settings also can. HR Manager does not: too many people hold it."""
 	user = user or frappe.session.user
 	if user == "Administrator":
 		return True
 	roles = set(frappe.get_roles(user))
-	if roles & {APPROVER_ROLE, "System Manager", "HR Manager"}:
+	if roles & {APPROVER_ROLE, "System Manager"}:
 		return True
 	return bool(core.get_settings().approver) and core.get_settings().approver.lower() == user.lower()
 
@@ -490,7 +499,22 @@ def review_request(name, decision, comment=None):
 	return {"name": req.name, "status": req.status}
 
 
+def _request_day(req):
+	if req.get("log"):
+		d = frappe.db.get_value("Clockin Log", req.log, "date")
+		return getdate(d) if d else None
+	return _iso_or_none(req.get("date"))
+
+
+def _assert_request_period_open(req):
+	scope = core.scope_cycles(core.today())
+	day = _request_day(req)
+	if scope and (day is None or day < scope["previous_from"]):
+		frappe.throw(_("That pay period is already closed, so this request can only be declined."))
+
+
 def apply_request(req):
+	_assert_request_period_open(req)
 	if req.get("request_type") == "Add":
 		apply_missed_punch(req)
 	else:
@@ -535,6 +559,33 @@ def set_display_zone(zone):
 	return {"display_zone": zone}
 
 
+REQ = "Checkin Request Modification"
+EXPIRED_NOTE = "Expired: older than the previous pay period. Please send a new request if this still needs changing."
+
+
+def _entry_dates(rows):
+	"""request name -> the day the request is about (None when it cannot be told)."""
+	log_names = [r.log for r in rows if r.log]
+	log_day = {
+		l.name: getdate(l.date)
+		for l in frappe.get_all("Clockin Log", filters={"name": ["in", log_names or [""]]}, fields=["name", "date"])
+	}
+	return {r.name: (log_day.get(r.log) if r.log else _iso_or_none(r.date)) for r in rows}
+
+
+def _scoped(status_filter):
+	"""(scope, [(row, day)]): requests about the current or previous pay cycle only."""
+	scope = core.scope_cycles(core.today())
+	filters = {"status": status_filter}
+	if scope:
+		# a request is always made after the day it is about, so this only narrows the search
+		filters["creation"] = [">=", scope["previous_from"]]
+	rows = frappe.get_all(REQ, filters=filters, fields=["name", "log", "date"], limit=5000)
+	days = _entry_dates(rows)
+	keep = [(r, days[r.name]) for r in rows if scope is None or (days[r.name] and scope["previous_from"] <= days[r.name] <= scope["current_to"])]
+	return scope, keep
+
+
 @frappe.whitelist()
 def get_my_permissions():
 	allowed = can_review()
@@ -542,26 +593,30 @@ def get_my_permissions():
 		"server_tz": core.server_tz_name(),
 		"display_zone": core.get_display_zone(),
 		"can_review": allowed,
-		"pending_count": frappe.db.count("Checkin Request Modification", {"status": "Pending"}) if allowed else 0,
+		"pending_count": len(_scoped("Pending")[1]) if allowed else 0,
 	}
 
 
 @frappe.whitelist()
 def get_requests(tab="Pending"):
-	"""The approvals screen: every request (no team filtering) with the context to decide on it."""
+	"""The approvals screen. Everyone with the role sees every request, but only those about the current or
+	previous pay cycle: older periods are already paid out."""
 	assert_can_review()
 	decided = tab == "Decided"
-	filters = {"status": ["in", ["Approved", "Declined"]]} if decided else {"status": "Pending"}
+	scope, pending = _scoped("Pending")
+	_, done = _scoped(["in", ["Approved", "Declined"]])
+	chosen = done if decided else pending
+	day_of = {r.name: d for r, d in chosen}
+
 	rows = frappe.get_all(
-		"Checkin Request Modification",
-		filters=filters,
+		REQ,
+		filters={"name": ["in", list(day_of) or [""]]},
 		fields=[
 			"name", "user", "request_type", "status", "reason", "log", "date", "creation", "reviewed_by",
-			"reviewed_on", "review_comment", "requested_from", "requested_to", "current_checkin",
-			"current_checkout", "requested_checkin_military", "requested_checkout_military",
+			"reviewed_on", "review_comment", "requested_from", "requested_to",
+			"requested_checkin_military", "requested_checkout_military",
 		],
 		order_by="reviewed_on desc, modified desc" if decided else "creation asc",
-		limit=200,
 	)
 
 	users = [r.user for r in rows]
@@ -571,7 +626,7 @@ def get_requests(tab="Pending"):
 			"Employee", filters={"user_id": ["in", users or [""]]}, fields=["user_id", "name", "employee_name"]
 		)
 	}
-	today = now_datetime().date()
+	today = core.today()
 	shift_of = {}
 	if employees:
 		for emp, shift_type in frappe.db.sql(
@@ -592,8 +647,8 @@ def get_requests(tab="Pending"):
 	out = []
 	for r in rows:
 		emp = employees.get(r.user)
+		day = day_of.get(r.name)
 		log = frappe.db.get_value("Clockin Log", r.log, ["date", "from_time", "to_time", "total_hours"], as_dict=True) if r.log else None
-		day = getdate(log.date) if log else _iso_or_none(r.date)
 		new_from = get_datetime(r.requested_from) if r.requested_from else None
 		new_to = get_datetime(r.requested_to) if r.requested_to else None
 		if (new_from is None or new_to is None) and day:  # request made by the older page: only HH:MM were kept
@@ -624,6 +679,7 @@ def get_requests(tab="Pending"):
 				"status": r.status,
 				"reason": r.reason,
 				"date": str(day) if day else None,
+				"cycle": core.cycle_label(day, scope),
 				"requested_at": core.with_offset(r.creation),
 				"current_from": core.with_offset(log.from_time) if log else None,
 				"current_to": core.with_offset(log.to_time) if log and log.to_time else None,
@@ -639,11 +695,40 @@ def get_requests(tab="Pending"):
 			}
 		)
 
+	def span(a, b):
+		return {"from": str(a), "to": str(b)} if a and b else None
+
 	return {
 		"rows": out,
-		"pending_count": frappe.db.count("Checkin Request Modification", {"status": "Pending"}),
-		"decided_count": frappe.db.count("Checkin Request Modification", {"status": ["in", ["Approved", "Declined"]]}),
+		"pending_count": len(pending),
+		"decided_count": len(done),
+		"hidden_older_pending": max(0, frappe.db.count(REQ, {"status": "Pending"}) - len(pending)),
+		"cycles": {
+			"current": span(scope and scope["current_from"], scope and scope["current_to"]),
+			"previous": span(scope and scope["previous_from"], scope and scope["previous_to"]),
+		}
+		if scope
+		else None,
 	}
+
+
+@frappe.whitelist(methods=["POST"])
+def expire_old_requests():
+	"""Decline, as expired, every pending request about a period older than the previous pay cycle."""
+	assert_can_review()
+	scope = core.scope_cycles(core.today())
+	if not scope:
+		frappe.throw(_("No pay cycle covers today, so nothing can be treated as old."))
+	pending = frappe.get_all(REQ, filters={"status": "Pending"}, fields=["name", "log", "date"], limit=10000)
+	days = _entry_dates(pending)
+	expired = [r.name for r in pending if days[r.name] is None or days[r.name] < scope["previous_from"]]
+	now = now_datetime()
+	for name in expired:
+		frappe.db.set_value(
+			REQ, name,
+			{"status": "Declined", "reviewed_by": frappe.session.user, "reviewed_on": now, "review_comment": EXPIRED_NOTE},
+		)
+	return {"expired": len(expired)}
 
 
 def _iso_or_none(value):

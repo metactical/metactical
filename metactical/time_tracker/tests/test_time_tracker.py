@@ -74,8 +74,8 @@ class TestClockFlow(FrappeTestCase):
 		s = frappe.get_doc("Time Tracker Settings")
 		cls._saved_settings = s.as_dict(convert_dates_to_str=True)  # put back in tearDownClass
 		s.checkin_approver = APPROVER
-		s.start_date = "2026-10-01"
-		s.set("pay_cycles", [{"from_date": "2026-10-01", "to_date": "2026-10-14"}])
+		s.start_date = "2026-09-17"
+		s.set("pay_cycles", [{"from_date": "2026-09-17", "to_date": "2026-09-30"}, {"from_date": "2026-10-01", "to_date": "2026-10-14"}])
 		s.early_clockin_minutes = 15
 		s.enforce_shift_window = 1
 		s.max_shift_hours = 16
@@ -90,7 +90,7 @@ class TestClockFlow(FrappeTestCase):
 		if saved:
 			s = frappe.get_doc("Time Tracker Settings")
 			for f in ("checkin_approver", "start_date", "logout_delay", "early_clockin_minutes",
-					  "enforce_shift_window", "max_shift_hours", "backdate_limit_days"):
+					  "enforce_shift_window", "max_shift_hours", "backdate_limit_days", "standard_day_hours"):
 				s.set(f, saved.get(f))
 			s.set("pay_cycles", [{"from_date": r["from_date"], "to_date": r["to_date"]} for r in saved.get("pay_cycles", [])])
 			s.save(ignore_permissions=True)
@@ -222,7 +222,7 @@ class TestClockFlow(FrappeTestCase):
 			self.clock_on(day, h1, h2)
 		with patch("metactical.time_tracker.core.now_datetime", return_value=at(12)):
 			cycle = api.get_cycle()
-		self.assertEqual(cycle["shift_hours"], 8.0)
+		self.assertEqual(cycle["expected_hours"], 8.0)
 		by_date = {d["date"]: d for d in cycle["days"]}
 		self.assertTrue(by_date["2026-10-05"]["short"])
 		self.assertFalse(by_date["2026-10-06"]["short"])
@@ -280,13 +280,14 @@ class TestClockFlow(FrappeTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.sql(
 			"delete from `tabSingles` where doctype='Time Tracker Settings' and field in "
-			"('early_clockin_minutes','enforce_shift_window','backdate_limit_days')"
+			"('early_clockin_minutes','enforce_shift_window','backdate_limit_days','standard_day_hours')"
 		)
 		frappe.db.set_single_value("Time Tracker Settings", "max_shift_hours", 12)  # already chosen: must survive
 		execute()
 		get = lambda f: frappe.db.get_single_value("Time Tracker Settings", f)
 		self.assertEqual((int(get("early_clockin_minutes")), int(get("enforce_shift_window")), int(get("backdate_limit_days"))), (15, 1, 14))
 		self.assertEqual(float(get("max_shift_hours")), 12.0)
+		self.assertEqual(float(get("standard_day_hours")), 8.0)
 		frappe.db.set_single_value("Time Tracker Settings", "max_shift_hours", 16)
 		frappe.clear_cache()
 
@@ -305,6 +306,15 @@ class TestClockFlow(FrappeTestCase):
 		frappe.get_doc("User", email).add_roles("Time Approval")
 		return email
 
+	def _scoped_counts(self):
+		"""(pending, decided) as the approvals screen counts them: current and previous pay cycle only."""
+		approver = self._approver_user()
+		frappe.set_user(approver)
+		with self._now(at(18)):
+			data = api.get_requests("Pending")
+		frappe.set_user(USER)
+		return data["pending_count"], data["decided_count"]
+
 	def test_time_approval_role_exists_and_is_idempotent(self):
 		from metactical.patches.create_time_approval_role import execute
 
@@ -314,8 +324,7 @@ class TestClockFlow(FrappeTestCase):
 
 	def test_role_holder_sees_every_request_and_can_decide(self):
 		log = self._closed_log()
-		base_pending = frappe.db.count("Checkin Request Modification", {"status": "Pending"})
-		base_decided = frappe.db.count("Checkin Request Modification", {"status": ["in", ["Approved", "Declined"]]})
+		base_pending, base_decided = self._scoped_counts()
 		with self._now(at(18)):
 			change = api.request_correction(log, "2026-10-07 08:50:00", "2026-10-07 17:20:00", "Stayed late")["name"]
 			add = api.request_missed_punch("2026-10-05", "2026-10-05 09:00:00", "2026-10-05 17:00:00", "Forgot to clock in")["name"]
@@ -402,3 +411,158 @@ class TestClockFlow(FrappeTestCase):
 			api.set_display_zone("Pacific/Auckland")  # not on the list
 		api.set_display_zone("server")
 		self.assertEqual(api.get_my_permissions()["server_tz"], core.server_tz_name())
+
+	# ---- schedules, roles, pay-cycle scope, patches ------------------------------------------
+
+	def test_expected_hours_follow_the_schedule(self):
+		D = frappe._dict
+		settings = core.get_settings()
+		self.assertEqual(core.expected_hours(D(start_time="09:00:00", end_time="17:00:00"), settings), 8)
+		# the window may include lunch: Expected Hours says what is paid inside it
+		self.assertEqual(core.expected_hours(D(start_time="10:00:00", end_time="19:00:00", tt_expected_hours=8), settings), 8)
+		self.assertEqual(core.expected_hours(D(start_time="08:00:00", end_time="22:00:00"), settings), 14)  # a real 14h schedule
+		# availability windows are not working days: deverp's Flex Shift and Store Shift
+		self.assertEqual(core.expected_hours(D(start_time="00:01:00", end_time="23:59:59"), settings), settings.standard_day_hours)
+		self.assertEqual(core.expected_hours(D(start_time="06:00:00", end_time="22:00:00"), settings), settings.standard_day_hours)
+
+	def test_standard_shift_types_patch_is_idempotent(self):
+		from metactical.patches.create_standard_shift_types import STANDARD, execute
+
+		frappe.set_user("Administrator")
+		execute()
+		execute()
+		for name, _start, _end, hours in STANDARD:
+			self.assertEqual(float(frappe.db.get_value("Shift Type", name, "tt_expected_hours")), hours)
+
+	def _legacy_request(self, day, status="Pending"):
+		"""A request as the older page left them: made now, about an entry on `day`."""
+		frappe.set_user("Administrator")
+		name = frappe.get_doc(
+			{"doctype": "Checkin Request Modification", "request_type": "Add", "user": USER, "date": str(day),
+			 "status": status, "reason": "old", "requested_from": dt.datetime.combine(day, dt.time(9)),
+			 "requested_to": dt.datetime.combine(day, dt.time(17)), "current_checkin": "-", "current_checkout": "-",
+			 "requested_checkin": "9:00 AM", "requested_checkout": "5:00 PM"}
+		).insert(ignore_permissions=True).name
+		frappe.set_user(USER)
+		return name
+
+	def test_hr_manager_alone_cannot_approve(self):
+		frappe.set_user("Administrator")
+		email = "tc.hrmanager@example.com"
+		if not frappe.db.exists("User", email):
+			frappe.get_doc({"doctype": "User", "email": email, "first_name": "Hr Only", "send_welcome_email": 0}).insert(
+				ignore_permissions=True
+			)
+		frappe.get_doc("User", email).add_roles("HR Manager")
+		frappe.set_user(email)
+		self.assertFalse(api.get_my_permissions()["can_review"])
+		for call in (lambda: api.get_requests("Pending"), api.expire_old_requests):
+			with self.assertRaises(frappe.PermissionError):
+				call()
+
+	def test_approvals_show_only_current_and_previous_cycle_and_old_ones_can_be_expired(self):
+		current = self._legacy_request(dt.date(2026, 10, 5))
+		previous = self._legacy_request(dt.date(2026, 9, 25))
+		paid = self._legacy_request(dt.date(2026, 9, 3))  # before the previous cycle: already paid out
+		frappe.set_user(self._approver_user())
+		with self._now(at(18)):
+			data = api.get_requests("Pending")
+			rows = {r["name"]: r for r in data["rows"]}
+			self.assertEqual((rows[current]["cycle"], rows[previous]["cycle"]), ("current", "previous"))
+			self.assertNotIn(paid, rows)
+			self.assertGreaterEqual(data["hidden_older_pending"], 1)
+			self.assertEqual(api.get_my_permissions()["pending_count"], data["pending_count"])
+			self.assertEqual(data["cycles"]["previous"]["from"], "2026-09-17")
+			result = api.expire_old_requests()
+		self.assertGreaterEqual(result["expired"], 1)
+		row = frappe.db.get_value("Checkin Request Modification", paid, ["status", "review_comment"], as_dict=True)
+		self.assertEqual(row.status, "Declined")
+		self.assertIn("Expired", row.review_comment)
+		self.assertEqual(frappe.db.get_value("Checkin Request Modification", current, "status"), "Pending")
+		self.assertEqual(frappe.db.get_value("Checkin Request Modification", previous, "status"), "Pending")
+
+	def test_a_paid_out_period_cannot_be_changed_or_approved(self):
+		frappe.set_user("Administrator")
+		old = frappe.get_doc(
+			{"doctype": "Clockin Log", "user": USER, "date": dt.date(2026, 9, 3), "from_time": dt.datetime(2026, 9, 3, 9),
+			 "to_time": dt.datetime(2026, 9, 3, 17), "has_clocked_out": 1}
+		).insert(ignore_permissions=True)
+		frappe.set_user(USER)
+		with self._now(at(18)):
+			with self.assertRaises(frappe.ValidationError):
+				api.request_correction(old.name, "2026-09-03 09:00:00", "2026-09-03 17:30:00", "too late for this")
+			with self.assertRaises(frappe.ValidationError):
+				api.request_missed_punch("2026-09-04", "2026-09-04 09:00:00", "2026-09-04 17:00:00", "too late for this")
+		# a request made before the period closed cannot be approved afterwards
+		stale = self._legacy_request(dt.date(2026, 9, 3))
+		frappe.set_user(self._approver_user())
+		with self._now(at(18)):
+			with self.assertRaises(frappe.ValidationError):
+				api.review_request(stale, "Approved")
+			api.review_request(stale, "Declined", "closed")  # declining is still fine
+
+	def test_patch_closes_only_entries_older_than_the_previous_cycle(self):
+		from metactical.patches.close_stale_open_entries import execute
+
+		frappe.set_user("Administrator")
+		ancient = frappe.get_doc(
+			{"doctype": "Clockin Log", "user": USER, "date": dt.date(2024, 2, 4), "from_time": dt.datetime(2024, 2, 4, 9)}
+		).insert(ignore_permissions=True)
+		with self._now(at(10)):
+			execute()
+		row = frappe.db.get_value("Clockin Log", ancient.name, ["has_clocked_out", "auto_closed", "total_hours", "from_time", "to_time"], as_dict=True)
+		self.assertEqual((row.has_clocked_out, row.auto_closed, row.total_hours), (1, 1, 0))
+		self.assertEqual(row.from_time, row.to_time)
+		self.assertFalse(frappe.db.exists("Employee Checkin", {"employee": self.employee, "log_type": "OUT"}))  # no invented punch
+
+		frappe.set_user(USER)
+		self.clock("clock_in", at(9, 0))  # open today: must be left alone
+		frappe.set_user("Administrator")
+		with self._now(at(10)):
+			execute()
+		self.assertEqual(frappe.db.count("Clockin Log", {"user": USER, "has_clocked_out": 0}), 1)
+
+	def test_region_patch_converts_text_and_clears_what_it_cannot_match(self):
+		from metactical.patches.normalize_employee_regions import execute
+
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Employee", self.employee, "ais_state", "British Columbia")
+		execute()
+		self.assertEqual(frappe.db.get_value("Employee", self.employee, "ais_state"), "CA-BC")
+		frappe.db.set_value("Employee", self.employee, "ais_state", "Zorgonia")
+		execute()
+		self.assertFalse(frappe.db.get_value("Employee", self.employee, "ais_state"))
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Employee", "reference_name": self.employee, "content": ["like", "%Zorgonia%"]}))
+
+
+class TestLocations(FrappeTestCase):
+	def test_free_text_becomes_iso_codes(self):
+		from metactical.time_tracker import locations as L
+
+		cases = {"BC": "CA-BC", "British Columbia": "CA-BC", "B.C.": "CA-BC", "bc ": "CA-BC", "Ontario": "CA-ON",
+				 "ON": "CA-ON", "Quebec": "CA-QC", "Texas": "US-TX", "tx": "US-TX", "CA-AB": "CA-AB", "us-wa": "US-WA",
+				 "California": "US-CA", "Other": "OTHER"}
+		for text, code in cases.items():
+			self.assertEqual(L.normalize_region(text), code, text)
+		for text in ("Zorgonia", "", None, "Manila"):
+			self.assertIsNone(L.normalize_region(text))
+
+	def test_every_option_is_valid_and_canada_has_a_zone(self):
+		from metactical.time_tracker import locations as L
+
+		self.assertEqual(len(L.CODES), 13 + 51 + 1)  # provinces and territories, 50 states + DC, OTHER
+		self.assertEqual(len(set(L.CODES)), len(L.CODES))
+		for code in L.CODES:
+			self.assertEqual(L.normalize_region(code), code)
+		self.assertEqual(set(L.CANADA_ZONE), {c for c in L.CODES if c.startswith("CA-")})
+
+	def test_time_zone_rule_canada_by_province_everyone_else_pacific(self):
+		from metactical.time_tracker import locations as L
+
+		self.assertEqual(L.work_time_zone("CA-ON"), "America/Toronto")
+		self.assertEqual(L.work_time_zone("CA-AB"), "America/Edmonton")
+		self.assertEqual(L.work_time_zone("CA-SK"), "America/Regina")
+		self.assertEqual(L.work_time_zone("US-TX"), "America/Vancouver")  # outside Canada: Pacific
+		self.assertEqual(L.work_time_zone("OTHER"), "America/Vancouver")
+		self.assertEqual(L.work_time_zone(None, default="SERVER"), "SERVER")  # unknown: the server zone
+		self.assertEqual((L.country_of("CA-BC"), L.country_of("US-TX"), L.country_of("OTHER")), ("CA", "US", None))
