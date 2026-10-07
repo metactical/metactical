@@ -37,5 +37,7 @@ def get_default_services():
 				"Tracked Packet – International": "INT.TP"
 			}
 			default_shipping_service = settings.default_shipping_service
-			default_carrier_service = cp_services[settings.default_cp_service]
+			# .strip() because one code in the map above carries a stray tab, which
+			# stops the default from ever matching a rate returned by Canada Post.
+			default_carrier_service = cp_services[settings.default_cp_service].strip()
 	return {"default_shipping_service": default_shipping_service, "default_carrier_service": default_carrier_service}

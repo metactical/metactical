@@ -14,6 +14,13 @@ import re
 import time
 
 
+# Canada Post service codes are all scoped by destination: DOM.* (domestic),
+# USA.* and INT.*. Anything else belongs to another carrier and must never be
+# sent to the shipment endpoint - Canada Post answers with a bare 8900 "system
+# error" that says nothing about the real problem.
+SERVICE_CODE_PATTERN = re.compile(r'^(DOM|USA|INT)\.')
+
+
 class CanadaPost():
 	def __init__(self) -> None:
 		self.settings = frappe.get_cached_doc('Canada Post', 'Canada Post')
@@ -152,7 +159,23 @@ class CanadaPost():
 					'count': parcel.count,
 					'items': items,
 				})
-		return {'data': res, 'options': [{'key': k, 'val': v} for k, v in options.items()]}
+		return {
+			'data': res,
+			'options': [{'key': k, 'val': v} for k, v in options.items()],
+			# One row per parcel, each priced on its own: the shipment total is the sum.
+			'rates_per_parcel': True,
+		}
+
+	def validate_service_code(self, parcel, code):
+		if not code:
+			frappe.throw(_("No Canada Post service selected for parcel {0}.").format(parcel.idx))
+
+		if not SERVICE_CODE_PATTERN.match(code):
+			frappe.throw(_(
+				"{0} is not a Canada Post service code (parcel {1}). "
+				"The selected rate belongs to another carrier - please reopen Get Rate "
+				"and pick a single carrier for the whole shipment."
+			).format(bold(code), parcel.idx))
 
 	def create_shipping(self, name, carrier_service, service_name, shipment_amount):
 		if carrier_service is None:
@@ -193,6 +216,8 @@ class CanadaPost():
 			context.parcel = parcel
 			context.parcel.carrier_service = carrier_service.get(parcel.name)
 			context.parcel.service_name = service_name.get(parcel.name)
+			if (parcel.idx - exists.get(parcel.name, 0)) > 0:
+				self.validate_service_code(parcel, context.parcel.carrier_service)
 			context.parcel.weight = round(float(context.parcel.weight), 2)
 			context.parcel.height = round(float(context.parcel.height), 2)
 			context.parcel.length = round(float(context.parcel.length), 2)

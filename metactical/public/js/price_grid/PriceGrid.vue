@@ -85,6 +85,31 @@
 				</button>
 			</div>
 
+			<div v-if="doc.batch" class="pg-pager">
+				<a class="pg-pager__name" :href="'/app/price-revision-batch/' + encodeURIComponent(doc.batch.name)" target="_blank">{{ doc.batch.name }}</a>
+				<span class="pg-muted">{{ doc.batch.total_items }} {{ t("items") }} · {{ doc.batch.total_price_changes }} {{ t("changes") }}</span>
+				<span class="pg-spacer"></span>
+				<button class="btn btn-xs btn-default" :disabled="doc.batch.page_no <= 1" @click="goPage(doc.batch.page_no - 1)" :title="t('Previous page')">◀</button>
+				<select class="form-control input-xs pg-pager__select" :value="doc.batch.page_no" @change="goPage($event.target.value)" :title="t('Jump to a page')">
+					<option v-for="p in doc.batch.pages" :key="p.page_no" :value="p.page_no">
+						{{ t("Page") }} {{ p.page_no }} / {{ doc.batch.page_count }} — {{ p.total_items }} {{ t("items") }}{{ p.status && p.status !== "Draft" ? " · " + p.status : "" }}
+					</option>
+				</select>
+				<button class="btn btn-xs btn-default" :disabled="doc.batch.page_no >= doc.batch.page_count" @click="goPage(doc.batch.page_no + 1)" :title="t('Next page')">▶</button>
+				<template v-if="searchHits.length">
+					<span class="pg-muted">{{ t("Matches on") }}</span>
+					<button
+						v-for="h in searchHits"
+						:key="h.page_no"
+						class="btn btn-xs"
+						:class="h.page_no === doc.batch.page_no ? 'btn-primary' : 'btn-default'"
+						@click="goPage(h.page_no)"
+					>
+						{{ h.page_no }} <span class="pg-count">{{ h.matches }}</span>
+					</button>
+				</template>
+			</div>
+
 			<div class="pg-toolbar">
 				<div v-if="doc.confirmation" class="btn-group" :title="t('Which lines of the order are on this revision')">
 					<button class="btn btn-xs" :class="!doc.whole_order ? 'btn-primary' : 'btn-default'" :disabled="!editable" @click="wholeOrder(false)">
@@ -115,7 +140,7 @@
 						</button>
 					</template>
 				</div>
-				<input v-model="search" class="form-control input-xs pg-search" :placeholder="t('Search item, name, SKU or brand')" @input="limit = PAGE" />
+				<input v-model="searchRaw" class="form-control input-xs pg-search" :placeholder="t('Search item, name, SKU or brand')" @input="onSearch" />
 				<label class="pg-check"><input v-model="showDetail" type="checkbox" /> {{ t("Show was / margin") }}</label>
 				<button v-if="editable" class="btn btn-xs btn-default" @click.stop="openMenu($event, bulkMenu())">{{ t("Bulk") }} ▾</button>
 				<button v-if="editable" class="btn btn-xs btn-default" @click="addPriceList">+ {{ t("Price List") }}</button>
@@ -132,7 +157,9 @@
 				</span>
 			</div>
 
-			<div ref="scroll" class="pg-scroll" @paste="onPaste">
+			<div class="pg-tablewrap">
+			<div v-if="paging" class="pg-loading-overlay"><span class="pg-spinner"></span> {{ t("Loading…") }}</div>
+			<div ref="scroll" class="pg-scroll" :class="{ 'pg-scroll--frozen': paging }" @paste="onPaste">
 				<table class="pg-table">
 					<thead>
 						<tr>
@@ -185,6 +212,7 @@
 					<span class="pg-muted">{{ t("{0} of {1} items shown", [shown.length, rows.length]) }}</span>
 				</div>
 			</div>
+			</div>
 			<div class="pg-foot pg-muted">
 				{{ t("Arrow keys and Enter move between cells. Esc undoes a cell. Paste a block from Excel into any cell. × removes a price, + adds one. Hover a cell for how its price was worked out.") }}
 			</div>
@@ -200,6 +228,7 @@
 </template>
 
 <script>
+import { markRaw } from "vue";
 import Builder from "./Builder.vue";
 import GridRow from "./GridRow.vue";
 import { cellView, key, landedFor, parse, roundUp, SEP } from "./cells";
@@ -229,6 +258,9 @@ export default {
 			store: { edits: {}, removes: {}, costs: {}, company_currency: null },
 			filter: "all",
 			search: "",
+			searchRaw: "",
+			searchHits: [],
+			paging: false,
 			showDetail: true,
 			sort: { key: null, dir: 1 },
 			limit: PAGE,
@@ -250,7 +282,10 @@ export default {
 		},
 		jobLabel() {
 			const op = this.doc.job_operation;
-			return { build: __("Building"), edit: __("Saving"), apply: __("Applying prices"), revert: __("Reverting") }[op] || __("Working");
+			return {
+				build: __("Building"), edit: __("Saving"), apply: __("Applying prices"), revert: __("Reverting"),
+				add_list: __("Adding a price list"), drop_list: __("Removing a price list"),
+			}[op] || __("Working");
 		},
 		dirtyCount() {
 			const s = this.store;
@@ -268,35 +303,61 @@ export default {
 				{ key: "edited", label: __("Set by hand") },
 			];
 		},
-		// one pass over every cell; filters and counts both read it
-		flags() {
+		rowByCode() {
+			const m = new Map();
+			if (this.grid) for (const row of this.grid.rows) m.set(row.item_code, row);
+			return m;
+		},
+		// the items the user has an unsaved change on — the only rows whose flags
+		// can differ from the server baseline
+		touched() {
+			const s = new Set();
+			for (const k of Object.keys(this.store.edits)) s.add(k.split(SEP)[0]);
+			for (const k of Object.keys(this.store.removes)) s.add(k.split(SEP)[0]);
+			for (const k of Object.keys(this.store.costs)) s.add(k);
+			return s;
+		},
+		// per-row flags for the untouched server state; computed once per load, not
+		// per keystroke, because it doesn't read the edit store's values
+		baseFlags() {
 			const out = new Map();
 			if (!this.grid) return out;
-			for (const row of this.grid.rows) {
-				const f = {
-					cost: Math.abs(row.new_cost - row.old_cost) >= 0.005 || row.item_code in this.store.costs,
-					changed: false, review: false, hold: false, new: false, remove: false,
-					edited: row.item_code in this.store.costs,
-				};
-				for (const l of this.lists) {
-					const v = cellView(row, l, this.store);
-					if (!v) continue;
-					if (v.state === "up") f.changed = true;
-					if (v.state === "review" || v.state === "under") f.review = true;
-					if (v.state === "hold") f.hold = true;
-					if (v.state === "remove") f.remove = true;
-					if (v.isNew && v.state === "up") f.new = true;
-					if (v.cell.edited || v.changed) f.edited = true;
-				}
-				out.set(row.item_code, f);
+			const empty = { edits: {}, removes: {}, costs: {}, company_currency: this.doc.company_currency };
+			for (const row of this.grid.rows) out.set(row.item_code, this.rowFlags(row, empty));
+			return out;
+		},
+		// baseline with only the touched rows recomputed against live edits, so
+		// typing is O(touched rows), not O(all rows × lists)
+		flags() {
+			const touched = this.touched;
+			if (!touched.size) return this.baseFlags;
+			const out = new Map(this.baseFlags);
+			for (const code of touched) {
+				const row = this.rowByCode.get(code);
+				if (row) out.set(code, this.rowFlags(row, this.store));
+			}
+			return out;
+		},
+		baseCounts() {
+			const out = { all: 0, cost: 0, changed: 0, review: 0, hold: 0, new: 0, remove: 0, edited: 0 };
+			for (const f of this.baseFlags.values()) {
+				out.all += 1;
+				for (const k in f) if (f[k]) out[k] += 1;
 			}
 			return out;
 		},
 		counts() {
-			const out = { all: 0, cost: 0, changed: 0, review: 0, hold: 0, new: 0, remove: 0, edited: 0 };
-			for (const f of this.flags.values()) {
-				out.all += 1;
-				for (const k in f) if (f[k]) out[k] += 1;
+			const touched = this.touched;
+			if (!touched.size) return this.baseCounts;
+			const out = { ...this.baseCounts };
+			for (const code of touched) {
+				const base = this.baseFlags.get(code);
+				const live = this.flags.get(code);
+				if (!base || !live) continue;
+				for (const k in base) {
+					if (base[k]) out[k] -= 1;
+					if (live[k]) out[k] += 1;
+				}
 			}
 			return out;
 		},
@@ -364,10 +425,31 @@ export default {
 		window.removeEventListener("beforeunload", this._unload);
 		frappe.realtime.off("price_revision_job", this._onJob);
 		clearInterval(this._poll);
+		clearTimeout(this._searchTimer);
 	},
 	methods: {
 		t(text, args) {
 			return __(text, args);
+		},
+
+		// one pass over a row's cells against a given edit store
+		rowFlags(row, store) {
+			const f = {
+				cost: Math.abs(row.new_cost - row.old_cost) >= 0.005 || row.item_code in store.costs,
+				changed: false, review: false, hold: false, new: false, remove: false,
+				edited: row.item_code in store.costs,
+			};
+			for (const l of this.lists) {
+				const v = cellView(row, l, store);
+				if (!v) continue;
+				if (v.state === "up") f.changed = true;
+				if (v.state === "review" || v.state === "under") f.review = true;
+				if (v.state === "hold") f.hold = true;
+				if (v.state === "remove") f.remove = true;
+				if (v.isNew && v.state === "up") f.new = true;
+				if (v.cell.edited || v.changed) f.edited = true;
+			}
+			return f;
 		},
 
 		// ------------------------------------------------------------ loading
@@ -439,7 +521,9 @@ export default {
 		},
 
 		onJob(data) {
-			if (!this.grid || !data || data.name !== this.grid.doc.name) return;
+			if (!this.grid || !data) return;
+			const forBatch = this._batchJobName && data.name === this._batchJobName;
+			if (data.name !== this.grid.doc.name && !forBatch) return;
 			if (data.status === "Done") return this.jobEnded(false);
 			if (data.status === "Failed") {
 				this.grid.doc.job_status = "Failed";
@@ -455,25 +539,39 @@ export default {
 		},
 
 		jobEnded(failed) {
+			// realtime and the 4s poll can both report the same finish; act once
+			if (this._ending) return;
+			this._ending = true;
+			this._batchJobName = null;
 			clearInterval(this._poll);
 			this._poll = null;
 			const name = this.grid.doc.name;
-			this.call("get_grid", { name }).then((g) => {
-				this.take(g, failed);  // a failed save keeps your unsaved edits
-				if (failed) frappe.msgprint({ title: __("Background job stopped"), message: g.doc.job_message || "", indicator: "red" });
-				else frappe.show_alert({ message: __("{0} is up to date", [name]), indicator: "green" }, 5);
-			});
+			this.call("get_grid", { name })
+				.then((g) => {
+					this.take(g, failed);  // a failed save keeps your unsaved edits
+					if (failed) frappe.msgprint({ title: __("Background job stopped"), message: g.doc.job_message || "", indicator: "red" });
+					else frappe.show_alert({ message: __("{0} is up to date", [name]), indicator: "green" }, 5);
+				})
+				.finally(() => (this._ending = false));
 		},
 
 		take(grid, keepEdits) {
 			const old = this.store;
+			// Server rows never change here (only the edit store overlays them), so
+			// keep them out of Vue's reactivity: big revisions load and type faster.
+			grid.rows = markRaw(grid.rows);
 			this.grid = grid;
 			if (["Queued", "Running"].includes(grid.doc.job_status) && !this._poll) this.$nextTick(() => this.watchJob());
 			this.store = { edits: {}, removes: {}, costs: {}, company_currency: grid.doc.company_currency };
 			if (keepEdits) {
 				const present = new Set(grid.rows.map((r) => r.item_code));
+				const columns = new Set((grid.lists || []).map((l) => l.name));
+				// drop edits for items or price-list columns no longer on the grid
 				for (const part of ["edits", "removes"])
-					for (const [k, v] of Object.entries(old[part])) if (present.has(k.split(SEP)[0])) this.store[part][k] = v;
+					for (const [k, v] of Object.entries(old[part])) {
+						const [code, list] = k.split(SEP);
+						if (present.has(code) && columns.has(list)) this.store[part][k] = v;
+					}
 				for (const [k, v] of Object.entries(old.costs)) if (present.has(k)) this.store.costs[k] = v;
 			}
 			this.syncActions();
@@ -573,6 +671,11 @@ export default {
 		},
 
 		apply() {
+			if (this.doc.batch) {
+				const go = () => this.applyBatch();
+				this.dirtyCount ? this.save().then(() => !this.busy && go()) : go();
+				return;
+			}
 			const run = () => {
 				const d = this.doc;
 				const costs = this.grid.rows.filter((r) => r.apply && Math.abs(r.new_cost - r.old_cost) >= 0.005).length;
@@ -594,6 +697,13 @@ export default {
 		},
 
 		revert() {
+			if (this.doc.batch) {
+				const b = this.doc.batch;
+				frappe.confirm(__("Put back every applied page of {0}?", [b.name]), () =>
+					this.call("revert_batch", { batch: b.name }, __("Starting…")).then((r) => r && this.startBatchJob("revert"))
+				);
+				return;
+			}
 			frappe.confirm(__("Put everything this revision changed back to what it was?"), () =>
 				this.mutate("revert_grid", { name: this.doc.name }, __("Reverting…")).then((r) => {
 					if (!r) return;
@@ -601,6 +711,42 @@ export default {
 					frappe.show_alert({ message: __("{0} prices put back", [r.reverted]), indicator: "orange" }, 6);
 				})
 			);
+		},
+
+		applyBatch() {
+			const b = this.doc.batch;
+			let msg = __("Apply all {0} page(s) of {1} — {2} price change(s) across {3} items — to Item Price?", [
+				b.page_count, b.name, b.total_price_changes, b.total_items,
+			]);
+			msg += "<br><br>" + __("Every page is submitted and written in the background. You can leave this page.");
+			frappe.confirm(msg, () =>
+				this.call("apply_batch", { batch: b.name }, __("Starting…")).then((r) => r && this.startBatchJob("apply"))
+			);
+		},
+
+		startBatchJob(operation) {
+			const b = this.doc.batch;
+			this._batchJobName = b.name;
+			Object.assign(this.grid.doc, {
+				job_status: "Queued", job_operation: operation, job_progress: 0, job_message: __("Waiting for a worker…"),
+			});
+			this.watchBatchJob();
+		},
+
+		watchBatchJob() {
+			this.syncActions();
+			clearInterval(this._poll);
+			this._poll = setInterval(() => {
+				if (!this.grid || !this._batchJobName) return clearInterval(this._poll);
+				this.call("batch_job_state", { batch: this._batchJobName }).then((j) => {
+					if (!j || !this.grid) return;
+					Object.assign(this.grid.doc, {
+						job_status: j.job_status || "", job_progress: j.job_progress, job_message: j.job_message,
+					});
+					if (!["Queued", "Running"].includes(j.job_status)) this.jobEnded(j.job_status === "Failed");
+					else this.syncActions();
+				});
+			}, 4000);
 		},
 
 		startNew() {
@@ -657,9 +803,14 @@ export default {
 					primary_action_label: __("Add"),
 					primary_action: ({ price_list }) => {
 						d.hide();
-						this.mutate("add_price_list", { name: this.doc.name, price_list }, __("Adding {0}…", [price_list])).then((g) =>
-							g && this.take(g, true)
-						);
+						if (this.doc.batch) {
+							this.call("add_price_list", { name: this.doc.name, price_list }, __("Adding {0} to all pages…", [price_list]))
+								.then((r) => r && r.queued && this.startBatchJob("add_list"));
+						} else {
+							this.mutate("add_price_list", { name: this.doc.name, price_list }, __("Adding {0}…", [price_list])).then((g) =>
+								g && this.take(g, true)
+							);
+						}
 					},
 				});
 				d.show();
@@ -669,7 +820,14 @@ export default {
 		dropPriceList(l) {
 			frappe.confirm(
 				__("Take {0} out of this revision? Its prices are not touched; they just won't be revised here.", [l.name]),
-				() => this.mutate("drop_price_list", { name: this.doc.name, price_list: l.name }).then((g) => g && this.take(g, true))
+				() => {
+					if (this.doc.batch) {
+						this.call("drop_price_list", { name: this.doc.name, price_list: l.name }, __("Removing {0} from all pages…", [l.name]))
+							.then((r) => r && r.queued && this.startBatchJob("drop_list"));
+					} else {
+						this.mutate("drop_price_list", { name: this.doc.name, price_list: l.name }).then((g) => g && this.take(g, true));
+					}
+				}
 			);
 		},
 
@@ -840,6 +998,72 @@ export default {
 
 		setFilter(f) {
 			this.filter = f;
+		},
+
+		// re-filtering thousands of rows on every keystroke is wasteful; settle first
+		onSearch() {
+			this.limit = PAGE;
+			clearTimeout(this._searchTimer);
+			this._searchTimer = setTimeout(() => {
+				this.search = this.searchRaw;
+				this.searchBatch();
+			}, 200);
+		},
+
+		// across a batch, which other pages hold matches for the search, so the
+		// pager can offer to jump to them (the current page filters in the grid)
+		searchBatch() {
+			const b = this.doc && this.doc.batch;
+			const q = this.searchRaw.trim();
+			if (!b || !q) {
+				this.searchHits = [];
+				return;
+			}
+			this.call("search_batch", { batch: b.name, query: q })
+				.then((hits) => (this.searchHits = hits || []))
+				.catch(() => (this.searchHits = []));
+		},
+
+		goPage(n) {
+			const b = this.doc && this.doc.batch;
+			if (!b) return;
+			n = parseInt(n, 10);
+			if (!n || n < 1 || n > b.page_count || n === b.page_no) return;
+			const target = (b.pages.find((p) => p.page_no === n) || {}).name;
+			if (!target) return;
+			const nav = () => this.loadPage(target);
+			if (this.dirtyCount) {
+				frappe.confirm(
+					__("Leave page {0} with {1} unsaved change(s)? They will be lost.", [b.page_no, this.dirtyCount]),
+					nav
+				);
+			} else {
+				nav();
+			}
+		},
+
+		// swap to another page in place: fetch its grid and replace the table
+		// contents without blanking the screen or re-running the route, so paging
+		// is instant. The URL is kept in step (for refresh/share) without a reload.
+		loadPage(name) {
+			if (this.paging) return;
+			this.paging = true;
+			this.error = null;
+			// paging shows the page's stored prices (already current with any
+			// edits); skip the recompute so switching pages is instant
+			this.call("get_grid", { name, recompute: 0 })
+				.then((g) => {
+					this.paging = false;
+					if (!g) return;
+					this.take(g);
+					this.state.name = name;
+					const url = "/app/price-grid/" + encodeURIComponent(name);
+					if (window.location.pathname !== url) window.history.replaceState(null, "", url);
+				})
+				.catch(() => {
+					this.paging = false;
+					this.error = __("Could not load {0}.", [name]);
+				});
 		},
 
 		// ----------------------------------------------------------- keyboard

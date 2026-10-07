@@ -10,7 +10,11 @@ from frappe.utils import cint, flt, nowdate
 
 from metactical.icl_pricing.doctype.icl_pricing_settings.icl_pricing_settings import (
 	always_price_lists,
+	items_per_page,
 	max_items,
+)
+from metactical.icl_pricing.doctype.price_revision_batch.price_revision_batch import (
+	HEADER_FIELDS,
 )
 
 # Lists that exist but are not really retail banners, so they are not offered
@@ -51,6 +55,57 @@ def supplier_price_list(supplier):
 	return guess if frappe.db.exists("Price List", guess) else None
 
 
+def finalize(header, item_rows):
+	"""Persist a built selection and return the name to open in the grid.
+
+	A selection that fits on one page becomes a single Price Revision, as
+	before. A larger one is split into a batch of page revisions (each up to the
+	page size); the first page is returned, so opening the result lands on it.
+	The batch itself is the collective the pages belong to.
+	"""
+	per = items_per_page()
+	cap = max_items()
+	n = len(item_rows)
+	if not n:
+		frappe.throw(_("Nothing to revise — no items were selected."))
+	if n > cap:
+		frappe.throw(_("{0} items selected; the most one batch can hold is {1} "
+		               "(ICL Pricing Settings). Narrow the selection down.").format(n, cap))
+
+	if n <= per:
+		doc = frappe.new_doc("Price Revision")
+		doc.update({k: header[k] for k in HEADER_FIELDS if header.get(k) is not None})
+		set_scope(doc)
+		for it in item_rows:
+			doc.append("items", it)
+		doc.insert(ignore_permissions=True)
+		return doc.name
+
+	batch = frappe.new_doc("Price Revision Batch")
+	batch.update({k: header[k] for k in HEADER_FIELDS if header.get(k) is not None})
+	batch.items_per_page = per
+	set_scope(batch)
+	batch.insert(ignore_permissions=True)
+
+	scope = [(d.price_list, d.include_all) for d in batch.price_lists]
+	pages = [item_rows[i:i + per] for i in range(0, n, per)]
+	first = None
+	for page_no, chunk in enumerate(pages, 1):
+		rev = frappe.new_doc("Price Revision")
+		rev.update({k: header[k] for k in HEADER_FIELDS if header.get(k) is not None})
+		rev.batch = batch.name
+		rev.page_no = page_no
+		for pl, include_all in scope:
+			rev.append("price_lists", {"price_list": pl, "include_all": include_all})
+		for it in chunk:
+			rev.append("items", it)
+		rev.insert(ignore_permissions=True)
+		first = first or rev.name
+
+	batch.save_roll_up()
+	return first
+
+
 @frappe.whitelist()
 def from_purchase_order(purchase_order, include_unchanged=0):
 	"""Build a draft revision from a PO whose rates differ from the cost list.
@@ -68,8 +123,7 @@ def from_purchase_order(purchase_order, include_unchanged=0):
 			.format(po.supplier)
 		)
 
-	doc = frappe.new_doc("Price Revision")
-	doc.update({
+	header = {
 		"supplier": po.supplier,
 		"buying_price_list": buying_list,
 		"source": "Purchase Order",
@@ -79,10 +133,9 @@ def from_purchase_order(purchase_order, include_unchanged=0):
 		"conversion_rate": po.conversion_rate or 1.0,
 		"rate_source": _("Purchase Order {0}").format(po.name),
 		"effective_from": nowdate(),
-	})
+	}
 
-	set_scope(doc)
-
+	item_rows = []
 	seen = set()
 	for it in po.items:
 		if it.item_code in seen:
@@ -99,7 +152,7 @@ def from_purchase_order(purchase_order, include_unchanged=0):
 		if not int(include_unchanged or 0) and old_cost and abs(new_cost - old_cost) < 0.005:
 			continue
 
-		doc.append("items", {
+		item_rows.append({
 			"item_code": it.item_code,
 			"po3_item": it.name,
 			"old_cost": old_cost,
@@ -109,14 +162,13 @@ def from_purchase_order(purchase_order, include_unchanged=0):
 			"apply": 1,
 		})
 
-	if not doc.items:
+	if not item_rows:
 		frappe.throw(
 			_("Every line on {0} already matches {1}. Nothing to revise.")
 			.format(po.name, buying_list)
 		)
 
-	doc.insert(ignore_permissions=True)
-	return doc.name
+	return finalize(header, item_rows)
 
 
 def order_lines(confirmation):
@@ -172,8 +224,7 @@ def from_confirmation(confirmation, whole_order=0):
 	if not any(l["changed"] for l in lines) and not cint(whole_order):
 		frappe.throw(_("{0} confirmed every line at the ordered cost.").format(soc.name))
 
-	doc = frappe.new_doc("Price Revision")
-	doc.update({
+	header = {
 		"supplier": po3.supplier,
 		"buying_price_list": po3.get("buying_price_list") or supplier_price_list(po3.supplier),
 		"source": "Supplier Confirmation",
@@ -185,13 +236,12 @@ def from_confirmation(confirmation, whole_order=0):
 		"conversion_rate": po3.conversion_rate or 1.0,
 		"rate_source": _("Purchase Order V3 {0}").format(po3.name),
 		"effective_from": nowdate(),
-	})
-	set_scope(doc)
-	for line in lines:
-		if line["changed"] or cint(whole_order):
-			doc.append("items", {k: v for k, v in line.items() if k != "changed"})
-	doc.insert(ignore_permissions=True)
-	return doc.name
+	}
+	item_rows = [
+		{k: v for k, v in line.items() if k != "changed"}
+		for line in lines if line["changed"] or cint(whole_order)
+	]
+	return finalize(header, item_rows)
 
 
 def set_whole_order(doc, on):
@@ -352,10 +402,8 @@ def from_selection(company=None, **kwargs):
 
 	Nothing has changed cost, so every existing price starts on Hold with its
 	suggestion shown alongside; edit prices directly, or change a cost and the
-	row reprices on save. A large selection is built by a background job.
+	row reprices on save. A selection over the page size is split into a batch.
 	"""
-	from metactical.pricing import jobs
-
 	chosen = _selection(kwargs)
 	supplier = chosen.get("supplier")
 	found = find_items(**chosen)
@@ -365,11 +413,6 @@ def from_selection(company=None, **kwargs):
 		frappe.throw(_("Those items come from more than one supplier. Pick the supplier first."))
 	pick = found["suppliers"][0]
 	codes = found["by_list"][pick["price_list"]]
-	if len(codes) > max_items():
-		frappe.throw(
-			_("{0} items match. A revision can hold up to {1} (ICL Pricing Settings); narrow it down.")
-			.format(len(codes), max_items())
-		)
 
 	company = company or frappe.defaults.get_user_default("Company") or frappe.db.get_single_value(
 		"Global Defaults", "default_company"
@@ -387,8 +430,7 @@ def from_selection(company=None, **kwargs):
 		"{0} {1}".format(labels[k], (v or "").replace("\n", " ")[:40]) if k in labels else v
 		for k, v in chosen.items() if k != "supplier"
 	)
-	doc = frappe.new_doc("Price Revision")
-	doc.update({
+	header = {
 		"supplier": pick["supplier"],
 		"buying_price_list": pick["price_list"],
 		"source": "Manual",
@@ -397,17 +439,8 @@ def from_selection(company=None, **kwargs):
 		"conversion_rate": rate,
 		"rate_source": _("Selection: {0}").format(picked or pick["supplier"]),
 		"effective_from": nowdate(),
-	})
-	set_scope(doc)
+	}
 	duty_field = "ifw_duty_rate" if frappe.get_meta("Item").has_field("ifw_duty_rate") else None
-
-	if jobs.is_large(len(codes)):
-		# the revision exists straight away; the job fills it in batches
-		doc.insert(ignore_permissions=True)
-		frappe.db.commit()
-		jobs.start(doc.name, "build", codes=codes, costs_list=pick["price_list"], duty_field=duty_field)
-		return doc.name
-
 	costs = dict(frappe.get_all(
 		"Item Price",
 		filters={"price_list": pick["price_list"], "item_code": ("in", codes)},
@@ -417,9 +450,10 @@ def from_selection(company=None, **kwargs):
 	duty = dict(frappe.get_all(
 		"Item", filters={"name": ("in", codes)}, fields=["name", duty_field], as_list=True,
 	)) if duty_field else {}
+	item_rows = []
 	for code in codes:
 		cost = flt(costs.get(code))
-		doc.append("items", {
+		item_rows.append({
 			"item_code": code,
 			"old_cost": cost,
 			"new_cost": cost,
@@ -427,5 +461,4 @@ def from_selection(company=None, **kwargs):
 			"supplier_currency": supplier_ccy,
 			"apply": 1,
 		})
-	doc.insert(ignore_permissions=True)
-	return doc.name
+	return finalize(header, item_rows)

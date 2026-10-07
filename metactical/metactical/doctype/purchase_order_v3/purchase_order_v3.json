@@ -491,7 +491,7 @@
   },
   {
    "group": "Fulfilment",
-   "link_doctype": "Goods Receipt V3",
+   "link_doctype": "Purchase Receipt V3",
    "link_fieldname": "purchase_order_v3"
   },
   {

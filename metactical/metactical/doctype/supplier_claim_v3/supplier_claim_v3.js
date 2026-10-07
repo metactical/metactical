@@ -25,3 +25,30 @@ frappe.ui.form.on('Supplier Claim V3', {
         });
     }
 });
+// Create > Purchase Return: a draft native Purchase Receipt (Is Return) for the
+// claimed goods - see make_purchase_return.
+frappe.ui.form.on('Supplier Claim V3', {
+    refresh: function(frm) {
+        if (frm.is_new()) return;
+        frm.add_custom_button(__('Purchase Return'), function() {
+            frappe.call({
+                method: 'metactical.metactical.doctype.supplier_claim_v3.supplier_claim_v3.make_purchase_return',
+                args: { claim: frm.doc.name },
+                freeze: true,
+                freeze_message: __('Creating Purchase Return...'),
+                callback: function(r) {
+                    var m = r.message || {};
+                    var links = (m.returns || []).map(function(n) {
+                        return '<a href="/app/purchase-receipt/' + n + '">' + n + '</a>';
+                    });
+                    var msg = __('Draft Purchase Return created: {0}. Review and submit it.', [links.join(', ')]);
+                    if ((m.skipped || []).length) {
+                        msg += '<br><br><b>' + __('Not returned:') + '</b><br>' + m.skipped.join('<br>');
+                    }
+                    frappe.msgprint({ title: __('Purchase Return'), message: msg, indicator: 'green' });
+                    frm.reload_doc();
+                }
+            });
+        }, __('Create'));
+    }
+});

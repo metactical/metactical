@@ -121,7 +121,7 @@ frappe.ui.form.on('Inbound Shipment V3 Box', {
 // ---------------------------------------------------------------------------
 // Migrated from Client Script "Inbound Shipment V3 Stale State Guard" (Form view).
 // Refuses a workflow action when the document has already moved on in the DB.
-// Especially relevant here: posting a Goods Receipt V3 can flip this shipment to
+// Especially relevant here: posting a Purchase Receipt V3 can flip this shipment to
 // Received server-side, so an open form can easily be looking at a stale state.
 // ---------------------------------------------------------------------------
 

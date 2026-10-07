@@ -1,0 +1,366 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-09-30 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "source_section",
+  "naming_series",
+  "supplier",
+  "supplier_name",
+  "buying_price_list",
+  "column_break_source",
+  "source",
+  "purchase_order",
+  "supplier_order_confirmation",
+  "whole_order",
+  "use_suggested",
+  "status",
+  "basis_section",
+  "company",
+  "company_currency",
+  "supplier_currency",
+  "column_break_basis",
+  "conversion_rate",
+  "rate_source",
+  "rounding_rule",
+  "effective_from",
+  "paging_section",
+  "items_per_page",
+  "page_count",
+  "column_break_paging",
+  "scope_section",
+  "price_lists",
+  "summary_section",
+  "total_items",
+  "total_price_changes",
+  "avg_cost_change_pct",
+  "column_break_summary",
+  "avg_margin_before",
+  "avg_margin_after",
+  "lines_needing_review",
+  "section_job",
+  "job_status",
+  "job_operation",
+  "column_break_job",
+  "job_progress",
+  "job_message"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "default": "PRB-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "PRB-.YYYY.-",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "description": "The cost list every revision in this batch writes to.",
+   "fieldname": "buying_price_list",
+   "fieldtype": "Link",
+   "label": "Supplier Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_source",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Raised From",
+   "options": "Supplier Confirmation\nPurchase Order\nManual",
+   "reqd": 1
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Purchase Order",
+   "options": "Purchase Order"
+  },
+  {
+   "description": "Set when raised from a V3 confirmation on deverp.",
+   "fieldname": "supplier_order_confirmation",
+   "fieldtype": "Data",
+   "label": "Supplier Order Confirmation"
+  },
+  {
+   "default": "0",
+   "fieldname": "whole_order",
+   "fieldtype": "Check",
+   "label": "Whole Order"
+  },
+  {
+   "default": "1",
+   "fieldname": "use_suggested",
+   "fieldtype": "Check",
+   "label": "Use Suggested Price"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nPending Review\nApplied\nPartially Applied\nReverted\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "basis_section",
+   "fieldtype": "Section Break",
+   "label": "Costing Basis"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "company.default_currency",
+   "fieldname": "company_currency",
+   "fieldtype": "Link",
+   "label": "Company Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_currency",
+   "fieldtype": "Link",
+   "label": "Supplier Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_basis",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Conversion Rate",
+   "precision": "9",
+   "reqd": 1
+  },
+  {
+   "fieldname": "rate_source",
+   "fieldtype": "Data",
+   "label": "Rate Taken From",
+   "read_only": 1
+  },
+  {
+   "default": "0.99",
+   "fieldname": "rounding_rule",
+   "fieldtype": "Select",
+   "label": "Round Prices To",
+   "options": "0.99\n0.95\nwhole\nnone"
+  },
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Date",
+   "label": "Effective From"
+  },
+  {
+   "fieldname": "paging_section",
+   "fieldtype": "Section Break",
+   "label": "Pages"
+  },
+  {
+   "description": "Items per revision (page) in this batch, fixed when the batch was created.",
+   "fieldname": "items_per_page",
+   "fieldtype": "Int",
+   "label": "Items Per Page",
+   "read_only": 1
+  },
+  {
+   "fieldname": "page_count",
+   "fieldtype": "Int",
+   "label": "Pages",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_paging",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "scope_section",
+   "fieldtype": "Section Break",
+   "label": "Price Lists In Scope"
+  },
+  {
+   "fieldname": "price_lists",
+   "fieldtype": "Table MultiSelect",
+   "label": "Selling Price Lists",
+   "options": "Price Revision Price List"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "Summary"
+  },
+  {
+   "fieldname": "total_items",
+   "fieldtype": "Int",
+   "label": "Items",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_price_changes",
+   "fieldtype": "Int",
+   "label": "Price Changes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "avg_cost_change_pct",
+   "fieldtype": "Percent",
+   "label": "Average Cost Change",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_summary",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "avg_margin_before",
+   "fieldtype": "Percent",
+   "label": "Average Margin Before",
+   "read_only": 1
+  },
+  {
+   "fieldname": "avg_margin_after",
+   "fieldtype": "Percent",
+   "label": "Average Margin After",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lines_needing_review",
+   "fieldtype": "Int",
+   "label": "Lines Needing Review",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_job",
+   "fieldtype": "Section Break",
+   "label": "Background Job",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "job_status",
+   "fieldtype": "Select",
+   "label": "Job Status",
+   "options": "\nQueued\nRunning\nFailed",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "job_operation",
+   "fieldtype": "Data",
+   "label": "Job",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_job",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "job_progress",
+   "fieldtype": "Percent",
+   "label": "Progress",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "job_message",
+   "fieldtype": "Small Text",
+   "label": "Job Message",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 0,
+ "links": [
+  {
+   "group": "Pages",
+   "link_doctype": "Price Revision",
+   "link_fieldname": "batch"
+  }
+ ],
+ "modified": "2026-09-30 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ICL Pricing",
+ "name": "Price Revision Batch",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier",
+ "track_changes": 0
+}

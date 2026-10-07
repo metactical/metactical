@@ -86,7 +86,7 @@
         </span>
       </div>
       <p class="im-lede">
-        Read from the old variants' names; combinations with stock history start ticked. Add more with <b>Add in bulk</b>,
+        Read from the old variants' names; every combination starts ticked, including ones with no stock history. Add more with <b>Add in bulk</b>,
         edit any code or name, and remove rows you don't want.
       </p>
 
@@ -423,7 +423,7 @@ async function suggest() {
     rows.value = s.combinations.map((c) => makeRow(c.values, {
       item_code: c.existing || c.item_code || c.suggested_code, item_name: c.item_name, from_old: c.from_old || [],
       existing: c.existing, qty: c.qty, ledger_count: c.ledger_count, suggested: c.suggested, manual: false,
-      tick: !!c.suggested && !c.existing,
+      tick: !c.existing,
     }))
     sortRows()
   } catch (e) {

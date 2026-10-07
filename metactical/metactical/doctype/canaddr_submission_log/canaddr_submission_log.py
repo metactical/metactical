@@ -1,9 +1,9 @@
 # Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 # For license information, please see license.txt
 
-# import frappe
+from __future__ import unicode_literals
 from frappe.model.document import Document
 
 
-class GoodsReceiptV3Item(Document):
+class CanaddrSubmissionLog(Document):
 	pass

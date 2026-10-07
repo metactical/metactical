@@ -22,6 +22,10 @@
 from __future__ import unicode_literals
 import json
 import os
+import time
+from dataclasses import asdict, dataclass
+from typing import Optional
+
 import frappe
 import requests
 from tqdm import tqdm
@@ -99,6 +103,7 @@ def verify_shipping_address(sales_order_name):
 					validation_status = "Validated"
 					validation_entity = "Melissa"
 					validation_warning = ""
+					_submit_verified_address_to_storebuilder(address, sales_order_name)
 	else:
 		if melissa_key:
 			melissa_result = verify_with_melissa(address, melissa_key, timeout, sales_order_name)
@@ -107,6 +112,7 @@ def verify_shipping_address(sales_order_name):
 				validation_entity = "Melissa"
 				if melissa_verified:
 					validation_status = "Validated"
+					_submit_verified_address_to_storebuilder(address, sales_order_name)
 				elif melissa_level != "unverified":
 					validation_status = "Validation Warning"
 					validation_warning = melissa_detail
@@ -324,6 +330,192 @@ def verify_with_melissa(address, melissa_key, timeout, sales_order_name=None):
 	_save_log()
 
 	return (best_level, verified, detail)
+
+
+# --- Submitting Melissa-verified addresses back to Storebuilder (canaddr) ---
+#
+# When Melissa verifies an address that Storebuilder itself could not, we
+# submit it to canaddr's /submit-address endpoint so Storebuilder's own
+# database learns about it and can verify it directly next time.
+
+SUBMIT_ADDRESS_PATH = "/submit-address"
+
+# Bounded retry for transient (network/5xx) failures only. 403/422 are not
+# retried -- they mean the request itself is wrong (bad key or bad data), so
+# retrying would just fail the same way again.
+SUBMIT_ADDRESS_MAX_ATTEMPTS = 3
+SUBMIT_ADDRESS_RETRY_BASE_DELAY = 2
+
+
+@dataclass
+class AddressSubmissionResult:
+	id: str
+	number: str
+	street: str
+	unit: Optional[str]
+	city: str
+	province: str
+	postal_code: str
+	source: str
+	duplicate: bool
+
+
+class CanaddrPermissionError(Exception):
+	"""Raised on HTTP 403: the API key lacks can_submit_addresses, or is invalid/inactive.
+
+	Not retryable -- this is a configuration problem, not a transient failure.
+	"""
+
+
+class CanaddrValidationError(Exception):
+	"""Raised on HTTP 422: province or postal_code could not be normalized by canaddr.
+
+	Not retryable -- the input data is bad, retrying will not help.
+	"""
+
+
+def submit_address(number, street, city, province, postal_code, *, unit=None, latitude=None, longitude=None):
+	"""Submit a Melissa-verified address to canaddr's POST /submit-address endpoint.
+
+	Retries up to SUBMIT_ADDRESS_MAX_ATTEMPTS times, with exponential backoff,
+	on network errors and 5xx responses only. Raises CanaddrPermissionError on
+	403 and CanaddrValidationError on 422 without retrying either. Returns an
+	AddressSubmissionResult on success (HTTP 201); ``duplicate`` on the result
+	is not an error, it just means canaddr already had this address on file.
+	"""
+	settings = frappe.get_single("Address Verification Settings")
+	base_url = (settings.base_url or "").rstrip("/")
+	api_key = settings.get_password("api_key")
+	timeout = settings.timeout or 10
+
+	if not base_url or not api_key:
+		frappe.throw("Please set the Base URL and API Key in Address Verification Settings.")
+
+	body = {
+		"number": number,
+		"street": street,
+		"city": city,
+		"province": province,
+		"postal_code": postal_code,
+		"validation_entity": "Melissa",
+	}
+	if unit:
+		body["unit"] = unit
+	if latitude is not None and longitude is not None:
+		body["latitude"] = latitude
+		body["longitude"] = longitude
+
+	last_error = None
+	for attempt in range(SUBMIT_ADDRESS_MAX_ATTEMPTS):
+		try:
+			response = requests.post(
+				"{0}{1}".format(base_url, SUBMIT_ADDRESS_PATH),
+				json=body,
+				headers={"X-API-Key": api_key},
+				timeout=timeout,
+			)
+		except requests.exceptions.RequestException as e:
+			last_error = e
+		else:
+			if response.status_code == 201:
+				return AddressSubmissionResult(**response.json())
+			if response.status_code == 403:
+				raise CanaddrPermissionError(
+					"Canaddr API key lacks can_submit_addresses permission, or is invalid/inactive."
+				)
+			if response.status_code == 422:
+				raise CanaddrValidationError(
+					"Canaddr could not normalize the submitted address: {0}".format(response.text)
+				)
+			if response.status_code >= 500:
+				last_error = requests.exceptions.HTTPError(
+					"Canaddr returned HTTP {0}".format(response.status_code)
+				)
+			else:
+				response.raise_for_status()
+
+		if attempt < SUBMIT_ADDRESS_MAX_ATTEMPTS - 1:
+			time.sleep(SUBMIT_ADDRESS_RETRY_BASE_DELAY * (2 ** attempt))
+
+	raise last_error
+
+
+def _split_street_number(address_line1):
+	"""Split an ERPNext address_line1 into (number, street) on the first space.
+
+	Same heuristic already used in metactical.utils.shipping.purolator for the
+	same purpose. Returns ("", "") when there's no space to split on -- e.g. a
+	single-token line like a bare PO Box -- since canaddr requires a number.
+	"""
+	parts = (address_line1 or "").split(" ")
+	if len(parts) >= 2:
+		return parts[0], " ".join(parts[1:])
+	return "", ""
+
+
+def _submit_verified_address_to_storebuilder(address, sales_order_name=None):
+	"""Best-effort: submit a Melissa-verified address to canaddr.
+
+	Never raises -- this is a side effect of verification, not part of the
+	verification result, so failures are logged and swallowed here rather than
+	propagated to the caller.
+	"""
+	number, street = _split_street_number(address.get("address_line1"))
+	if not number:
+		frappe.logger().info(
+			"Canaddr submission skipped, no street number could be derived: {0}".format(address.get("name"))
+		)
+		return
+
+	request_body = {
+		"number": number,
+		"street": street,
+		"unit": address.get("address_line2") or None,
+		"city": address.get("city") or "",
+		"province": address.get("state") or "",
+		"postal_code": address.get("pincode") or "",
+	}
+
+	log = frappe.new_doc("Canaddr Submission Log")
+	log.date = frappe.utils.now()
+	log.sales_order = sales_order_name
+	log.address = address.get("name")
+	log.request = frappe.as_json(request_body)
+
+	try:
+		result = submit_address(
+			number=number,
+			street=street,
+			city=request_body["city"],
+			province=request_body["province"],
+			postal_code=request_body["postal_code"],
+			unit=request_body["unit"],
+		)
+	except (CanaddrPermissionError, CanaddrValidationError) as e:
+		log.status = "Error"
+		log.error = str(e)
+		log.insert(ignore_permissions=True)
+		frappe.logger().info("Canaddr submission failed for {0}: {1}".format(address.get("name"), e))
+		return
+	except Exception:
+		log.status = "Error"
+		log.error = frappe.get_traceback()
+		log.insert(ignore_permissions=True)
+		frappe.log_error(
+			title="Address Verification - Canaddr submission failed",
+			message="Address: {0}\n{1}".format(address.get("name"), frappe.get_traceback()),
+		)
+		return
+
+	log.status = "Duplicate" if result.duplicate else "Success"
+	log.canaddr_id = result.id
+	log.response = frappe.as_json(asdict(result))
+	log.insert(ignore_permissions=True)
+	frappe.logger().info(
+		"Canaddr submission {0} for {1}".format(
+			"duplicate" if result.duplicate else "inserted", address.get("name")
+		)
+	)
 
 
 def build_address_payload(address):

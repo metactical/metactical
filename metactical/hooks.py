@@ -26,8 +26,8 @@ add_to_apps_screen = [
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["metactical.bundle.js"]
+app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css", "metactical_price_grid.bundle.css"]
+app_include_js = ["metactical.bundle.js", "metactical_price_grid.bundle.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -985,7 +985,7 @@ fixtures = [{
 			"Purchase Order-custom_po3_status",
 			"Supplier Claim V3-workflow_state",
 			"Inbound Shipment V3-workflow_state",
-			"Goods Receipt V3-workflow_state",
+			"Purchase Receipt V3-workflow_state",
 			"Supplier Order Confirmation V3-workflow_state",
 			"Purchase Order V3-workflow_state",
 			"Purchase Order-custom_purchase_order_v3",
@@ -1660,7 +1660,7 @@ fixtures = [{
 	{
 		"dt": "Workflow",
 		"filters": [["name", "in", [
-			"Goods Receipt V3 Flow",
+			"Purchase Receipt V3 Flow",
 			"Inbound Shipment V3 Flow",
 			"Purchase Order V3 Flow",
 			"Supplier Claim V3 Flow",

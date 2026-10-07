@@ -1,13 +1,13 @@
 // Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 // For license information, please see license.txt
 
-// Migrated from Client Script "Goods Receipt V3 List Bulk Delete" (List view).
+// Migrated from Client Script "Purchase Receipt V3 List Bulk Delete" (List view).
 // Adds a "Delete Drafts" bulk action that skips submitted rows.
 
-frappe.listview_settings['Goods Receipt V3'] = frappe.listview_settings['Goods Receipt V3'] || {};
+frappe.listview_settings['Purchase Receipt V3'] = frappe.listview_settings['Purchase Receipt V3'] || {};
 (function() {
-    var prev = frappe.listview_settings['Goods Receipt V3'].onload;
-    frappe.listview_settings['Goods Receipt V3'].onload = function(listview) {
+    var prev = frappe.listview_settings['Purchase Receipt V3'].onload;
+    frappe.listview_settings['Purchase Receipt V3'].onload = function(listview) {
         if (prev) prev(listview);
         listview.page.add_actions_menu_item(__('Delete Drafts'), function() {
             var picked = listview.get_checked_items() || [];
@@ -31,7 +31,7 @@ frappe.listview_settings['Goods Receipt V3'] = frappe.listview_settings['Goods R
             frappe.confirm(msg, function() {
                 frappe.call({
                     method: 'frappe.desk.reportview.delete_items',
-                    args: { doctype: 'Goods Receipt V3', items: names },
+                    args: { doctype: 'Purchase Receipt V3', items: names },
                     freeze: true,
                     freeze_message: __('Deleting {0}…', [names.length]),
                     callback: function() {

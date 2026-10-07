@@ -62,7 +62,7 @@ def v3_close_short_closed_po(doc):
 			continue
 		if float(st.per_billed or 0) + 0.001 < float(st.per_received or 0):
 			continue                     # still something received but unbilled
-		drafts = frappe.get_all("Goods Receipt V3",
+		drafts = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": p3.name, "docstatus": 0},
 			fields=["name"], limit_page_length=1)
 		if drafts:

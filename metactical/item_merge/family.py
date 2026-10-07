@@ -479,8 +479,8 @@ def suggest_combinations(template, attributes):
 					"suggested_code": code or "-".join([template] + [rules.code_part(abbr[a].get(values[a]), values[a]) for a in attrs]),
 					"item_name": " - ".join([style] + [values[a] for a in attrs]),
 					"from_old": olds_here, "existing": existing.get(key), "qty": qty, "ledger_count": ledger,
-					# No stock history anywhere in the combination: leave it out and the old
-					# variants become leftovers to delete (merge when there is data, delete when not).
+					# Stock history anywhere in the combination. Informational only: the page ticks
+					# every combination, this just marks the ones with nothing to carry over.
 					"suggested": bool(ledger or qty)})
 	return {"template": template, "attributes": attrs, "style_name": style, "combinations": out,
 			"unreadable": unread, "taken": taken, "values": vals, "ai_warning": ai_warning,

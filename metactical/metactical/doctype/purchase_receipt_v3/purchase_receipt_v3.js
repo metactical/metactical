@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 // For license information, please see license.txt
 
-// Migrated from Client Script "Goods Receipt V3 Form" (Form view).
+// Migrated from Client Script "Purchase Receipt V3 Form" (Form view).
 //
 // Depends on these Server Script APIs (still DB-resident, migrated later):
 //   v3_gr3_scan_map, v3_gr3_prefill_preview, v3_retry_gr3_posting
@@ -78,7 +78,7 @@ function gr3_load_scan_map(frm) {
     if (!frm.doc.purchase_order_v3) { frm._scan = null; return; }
     if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3) return;
     frappe.call({
-        method: 'metactical.metactical.doctype.goods_receipt_v3.goods_receipt_v3.v3_gr3_scan_map',
+        method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_scan_map',
         args: { po3: frm.doc.purchase_order_v3 },
         callback: function (r) {
             var m = r.message || {};
@@ -127,7 +127,6 @@ function gr3_apply_scan(frm, item_code, label, qty_override) {
         row.received_qty = 0;
         row.accepted_qty = 0;
         row.rejected_qty = 0;
-        row.disposition = 'Accept';
         added = true;
     }
     var was = flt(row.received_qty);
@@ -190,7 +189,7 @@ function gr3_fetch_lines(frm) {
     var filled = (frm.doc.items || []).filter(function (d) { return d.received_item_code; });
     if (filled.length) return;
     frappe.call({
-        method: 'metactical.metactical.doctype.goods_receipt_v3.goods_receipt_v3.v3_gr3_prefill_preview',
+        method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_prefill_preview',
         args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '' },
         callback: function (r) {
             var m = (r.message || {});
@@ -216,7 +215,7 @@ function gr3_fetch_lines(frm) {
     });
 }
 
-frappe.ui.form.on('Goods Receipt V3', {
+frappe.ui.form.on('Purchase Receipt V3', {
     // deliberately NOT triggered on change - see gr3_bind_scan_enter
     scan_barcode: function (frm) { },
     onload_post_render: function (frm) { gr3_load_scan_map(frm); gr3_bind_scan_enter(frm); },
@@ -225,7 +224,31 @@ frappe.ui.form.on('Goods Receipt V3', {
         gr3_fetch_lines(frm);
     },
     refresh: function(frm) {
+        // Print the native twin with Purchase Receipt's own print formats, as
+        // PO3 does with its native PO, so every PR format works here without a
+        // PR3 copy. Unlike PO3 this holds in draft too: sync_native_pr rewrites
+        // the twin on every save, so it always matches the last saved count.
+        if (frm.doc.erp_purchase_receipt) {
+            frm.print_doc = function() {
+                if (frm.is_dirty()) {
+                    frappe.toast({
+                        message: __('Unsaved changes are not on the Purchase Receipt yet - save first to print them.'),
+                        indicator: 'yellow'
+                    });
+                }
+                frappe.set_route('print', 'Purchase Receipt', frm.doc.erp_purchase_receipt);
+            };
+        } else {
+            delete frm.print_doc;
+        }
         gr3_bind_scan_enter(frm);
+        // a draft whose native twin refused the last save - say so where it
+        // cannot be missed, until a save brings the two back in step
+        if (frm.doc.docstatus === 0 && frm.doc.post_error) {
+            frm.dashboard.set_headline('<span style="color:var(--red-600)"><b>'
+                + __('Draft Purchase Receipt {0} is out of date.', [frm.doc.erp_purchase_receipt || ''])
+                + '</b> ' + frappe.utils.escape_html(frm.doc.post_error) + '</span>');
+        }
         frm.set_query('inbound_shipment_v3', function () {
             var f = { workflow_state: ['in', ['In Transit', 'Received']] };
             if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
@@ -267,9 +290,16 @@ frappe.ui.form.on('Goods Receipt V3', {
                 + bits.join(' &middot; '), 'orange');
         }
 
+        // the draft native twin, kept in step with the count (see sync_native_pr)
+        if (frm.doc.docstatus === 0 && frm.doc.erp_purchase_receipt) {
+            frm.add_custom_button(__('Draft Purchase Receipt'), function () {
+                frappe.set_route('Form', 'Purchase Receipt', frm.doc.erp_purchase_receipt);
+            }, __('View'));
+        }
+
         if (frm.doc.docstatus === 1) {
             frm.add_custom_button(__('Supplier Claim'), function () {
-                clm3_new_from('goods_receipt_v3', frm.doc.name);
+                clm3_new_from('purchase_receipt_v3', frm.doc.name);
             }, __('Create'));
         }
 
@@ -306,7 +336,7 @@ frappe.ui.form.on('Goods Receipt V3', {
                         '</b></span>');
                     frm.add_custom_button(__('Retry ERP Posting'), function() {
                         frappe.call({
-                            method: 'metactical.metactical.doctype.goods_receipt_v3.goods_receipt_v3.v3_retry_gr3_posting',
+                            method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_retry_gr3_posting',
                             args: { gr3: frm.doc.name },
                             freeze: true,
                             freeze_message: __('Posting to ERP...'),
@@ -321,7 +351,7 @@ frappe.ui.form.on('Goods Receipt V3', {
         }
     }
 });
-frappe.ui.form.on('Goods Receipt V3 Item', {
+frappe.ui.form.on('Purchase Receipt V3 Item', {
     received_qty: function(frm, cdt, cdn) {
         var row = locals[cdt][cdn];
         if (!flt(row.accepted_qty) && !flt(row.rejected_qty)) {
@@ -331,13 +361,13 @@ frappe.ui.form.on('Goods Receipt V3 Item', {
 });
 
 // ---------------------------------------------------------------------------
-// Migrated from Client Script "Goods Receipt V3 Stale State Guard" (Form view).
+// Migrated from Client Script "Purchase Receipt V3 Stale State Guard" (Form view).
 // Refuses a workflow action when the document has already moved on in the DB,
 // so the user re-picks from the refreshed action list. This flow has the most
 // states to slip between (Counting / Variance Review / Ready to Post / Posted).
 // ---------------------------------------------------------------------------
 
-frappe.ui.form.on('Goods Receipt V3', {
+frappe.ui.form.on('Purchase Receipt V3', {
     before_workflow_action: function(frm) {
         return new Promise(function(resolve, reject) {
             if (frm.is_new() || !frm.doc.name) { resolve(); return; }

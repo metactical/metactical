@@ -12,7 +12,7 @@
   "reason",
   "claim_type",
   "claim_amount",
-  "goods_receipt_v3",
+  "purchase_receipt_v3",
   "gr3_item",
   "sec_resolution",
   "supplier_response",
@@ -20,6 +20,7 @@
   "cb_resolution",
   "goods_outcome",
   "item_conversion",
+  "purchase_return",
   "current_warehouse",
   "photo",
   "remarks"
@@ -80,10 +81,10 @@
    "label": "Claim Amount"
   },
   {
-   "fieldname": "goods_receipt_v3",
+   "fieldname": "purchase_receipt_v3",
    "fieldtype": "Link",
    "label": "From Receipt",
-   "options": "Goods Receipt V3",
+   "options": "Purchase Receipt V3",
    "read_only": 1
   },
   {
@@ -135,6 +136,15 @@
    "read_only": 1
   },
   {
+   "description": "The native Purchase Receipt (Is Return) sending these goods back.",
+   "fieldname": "purchase_return",
+   "fieldtype": "Link",
+   "label": "Purchase Return",
+   "no_copy": 1,
+   "options": "Purchase Receipt",
+   "read_only": 1
+  },
+  {
    "allow_on_submit": 1,
    "fieldname": "current_warehouse",
    "fieldtype": "Link",
@@ -158,7 +168,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:45.265010",
+ "modified": "2026-10-02 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Claim V3 Item",

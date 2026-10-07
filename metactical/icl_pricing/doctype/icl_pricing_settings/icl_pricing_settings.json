@@ -14,6 +14,7 @@
   "column_order",
   "column_break_lists",
   "max_items",
+  "items_per_page",
   "section_batching",
   "background_threshold",
   "batch_size",
@@ -47,10 +48,18 @@
   {
    "fieldname": "max_items",
    "fieldtype": "Int",
-   "label": "Most Items Per Revision",
-   "default": "5000",
+   "label": "Most Items Per Batch",
+   "default": "1000",
    "non_negative": 1,
-   "description": "Upper limit when building a revision by supplier, brand or item group."
+   "description": "Hard cap on how many items one price revision (or one batch of them) can hold. A larger selection is refused, on every path that builds a revision."
+  },
+  {
+   "fieldname": "items_per_page",
+   "fieldtype": "Int",
+   "label": "Items Per Page",
+   "default": "100",
+   "non_negative": 1,
+   "description": "How many items one revision in a batch holds, and the page size in the grid. A batch splits its items into revisions of this size."
   },
   {
    "fieldname": "section_batching",

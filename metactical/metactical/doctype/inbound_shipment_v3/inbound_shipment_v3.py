@@ -306,7 +306,7 @@ def record_shipment(doc):
 # ---------------------------------------------------------------------------
 def cancel_guard(doc):
 	blockers = []
-	for g in frappe.get_all("Goods Receipt V3",
+	for g in frappe.get_all("Purchase Receipt V3",
 			filters={"inbound_shipment_v3": doc.name, "docstatus": ("<", 2)},
 			fields=["name", "workflow_state"], limit_page_length=0):
 		blockers.append("receipt " + g.name + " (" + str(g.workflow_state)

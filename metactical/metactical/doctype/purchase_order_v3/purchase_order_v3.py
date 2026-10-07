@@ -173,6 +173,9 @@ def shared_series_naming(doc):
 			# as ordered off the NATIVE PO, not off the PO3
 			r.material_request = d.material_request
 			r.material_request_item = d.material_request_item
+			# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+			# see copy_line_identifiers
+			copy_line_identifiers(r, d)
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -371,6 +374,16 @@ def get_item_identifiers(item_code, supplier=None):
 	return item_identifiers(item_code, supplier)
 
 
+# The native twin's lines are built from item_code/qty/rate alone, leaving
+# ERPNext's get_item_details to fill the rest. It only fills barcode when the
+# item has exactly ONE barcode (erpnext update_barcode_value), so any item with
+# two or more came through with the PO3 line's barcode missing on the native PO
+# -- and on everything printed from it. Carry both identifiers across as-is.
+def copy_line_identifiers(r, d):
+	r.barcode = d.barcode
+	r.supplier_part_no = d.supplier_part_no
+
+
 def fill_item_identifiers(doc):
 	for d in doc.get("items"):
 		if not d.item_code:
@@ -476,6 +489,9 @@ def auto_send_on_approve(doc):
 				# as ordered off the NATIVE PO, not off the PO3
 				r.material_request = d.material_request
 				r.material_request_item = d.material_request_item
+				# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+				# see copy_line_identifiers
+				copy_line_identifiers(r, d)
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -606,6 +622,9 @@ def submitted_updates(doc):
 				# as ordered off the NATIVE PO, not off the PO3
 				r.material_request = d.material_request
 				r.material_request_item = d.material_request_item
+				# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+				# see copy_line_identifiers
+				copy_line_identifiers(r, d)
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -709,7 +728,7 @@ def submitted_updates(doc):
 		frappe.db.set_value(doc.doctype, doc.name, {
 			"workflow_state": "Closed Short" if any_short else "Closed",
 			"receipt_status": "Closed Short" if any_short else "Received"})
-		open_grs = frappe.get_all("Goods Receipt V3",
+		open_grs = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": doc.name, "docstatus": 0},
 			fields=["name"], limit_page_length=1)
 		if any_short and doc.erp_purchase_order and not open_grs:
@@ -725,7 +744,7 @@ def submitted_updates(doc):
 	# ran from the receipt path, or when every line happened to be terminal.
 	if doc.erp_purchase_order:
 		native_now = frappe.db.get_value("Purchase Order", doc.erp_purchase_order, "status")
-		drafts = frappe.get_all("Goods Receipt V3",
+		drafts = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": doc.name, "docstatus": 0},
 			fields=["name"], limit_page_length=1)
 		# "Closed" is fully received - ERPNext shows that as To Bill and needs it
@@ -743,7 +762,7 @@ def submitted_updates(doc):
 				frappe.msgprint(gate["why"])
 			elif drafts:
 				frappe.msgprint("Native PO " + doc.erp_purchase_order
-					+ " left open - there is still a draft Goods Receipt against this order.")
+					+ " left open - there is still a draft Purchase Receipt 3 against this order.")
 		elif doc.workflow_state in ("Sent to Supplier", "Acknowledged",
 				"Partially Received", "Received") and native_now == "Closed":
 			try:
@@ -780,7 +799,7 @@ def cancel_guard(doc):
 		blockers.append("shipment " + s.name + " (" + str(s.workflow_state)
 			+ ") - goods are on the way; cancel or delete the shipment first")
 
-	for s in frappe.get_all("Goods Receipt V3",
+	for s in frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": doc.name, "docstatus": ("<", 2)},
 			fields=["name", "workflow_state"], limit_page_length=0):
 		blockers.append("receipt " + s.name + " (" + str(s.workflow_state)
@@ -1134,7 +1153,7 @@ def v3_sync_closed_short_natives():
 			skipped.append(p.erp_purchase_order + " (" + str(round(rec,1)) + "% received, "
 				+ str(round(bil,1)) + "% billed - still to invoice)")
 			continue
-		if frappe.get_all("Goods Receipt V3",
+		if frappe.get_all("Purchase Receipt V3",
 				filters={"purchase_order_v3": p.name, "docstatus": 0},
 				fields=["name"], limit_page_length=1):
 			skipped.append(p.erp_purchase_order + " (draft receipt open)")
@@ -1348,7 +1367,7 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 # The confirmation's version updates lines that are already there; this one
 # builds them, because a PO3 starts empty. Item resolution stays on the server:
 # the browser cannot search barcodes or supplier part numbers, and the same
-# identifier chain is used elsewhere in the flow (Goods Receipt V3 scanning).
+# identifier chain is used elsewhere in the flow (Purchase Receipt V3 scanning).
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def resolve_pasted_items(rows, supplier=None, price_list=None):
