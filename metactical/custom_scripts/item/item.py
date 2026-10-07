@@ -3,29 +3,9 @@ import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
+from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 import datetime
 import requests
-from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost, RepostItemValuation
-
-
-def _background_repost_and_update_inventory(doc_names, item_code, doctype):
-    """Run repost item valuations sequentially then update inventory output.
-
-    Runs as a single background job so update_item_inventory_output is
-    guaranteed to execute after the last repost completes.
-    """
-    for name in doc_names:
-        doc = frappe.get_doc("Repost Item Valuation", name)
-        try:
-            doc.deduplicate_similar_repost()
-            repost(doc)
-        except Exception:
-            frappe.log_error(
-                title="Error during reposting item valuation after item merge",
-                message=frappe.get_traceback(),
-            )
-
-    update_item_inventory_output(item_code=item_code, voucher_type=doctype)
 
 
 class CustomItem(Item):
@@ -131,94 +111,31 @@ class CustomItem(Item):
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
         finally:
-            if not merge:
-                return
-
-            self._repost_after_merge(new_item_code)
-            
-    def recalculate_bin_qty(self, new_name):
-        """Override to use only_bin=True so repost_actual_qty (which hardcodes
-        posting_date=1900-01-01) is skipped. That avoids the period-closing
-        ValidationError. Actual item-valuation reposting is handled separately
-        by _repost_after_merge which respects the period-closing date."""
-        from erpnext.stock.stock_balance import repost_stock
-
-        existing_allow_negative_stock = frappe.db.get_value("Stock Settings", None, "allow_negative_stock")
-        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
-
-        repost_stock_for_warehouses = frappe.get_all(
-            "Stock Ledger Entry",
-            "warehouse",
-            filters={"item_code": new_name},
-            pluck="warehouse",
-            distinct=True,
-        )
-
-        frappe.db.delete("Bin", {"item_code": new_name})
-
-        for warehouse in repost_stock_for_warehouses:
-            repost_stock(new_name, warehouse, only_bin=True)
-
-        frappe.db.set_single_value("Stock Settings", "allow_negative_stock", existing_allow_negative_stock)
-
-    def _repost_after_merge(self, item_code):
-        from frappe.utils import getdate
-        from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import RepostItemValuation
-
-        repost_item_valuations = frappe.get_list(
-            "Repost Item Valuation",
-            filters={"item_code": item_code, "status": "Queued"},
-            fields=["name", "warehouse", "posting_date"],
-            order_by="creation desc",
-        )
-        if not repost_item_valuations:
-            return
-
-        warehouses = [r.warehouse for r in repost_item_valuations if r.warehouse]
-        warehouse_map = {
-            r.name: r
-            for r in frappe.get_all(
-                "Warehouse",
-                filters={"name": ["in", warehouses]},
-                fields=["name", "company", "disabled"],
+            # Run any queued item-valuation reposts (created by the base recalculate_bin_qty
+            # during a merge) as background jobs.
+            repost_item_valuations = frappe.get_list(
+                "Repost Item Valuation",
+                filters={"item_code": new_item_code, "status": "Queued"},
+                fields=["name", "warehouse"],
+                order_by="creation desc",
             )
-        }
-        closing_date_cache = {}
-        docs_to_repost = []
 
-        for riv in repost_item_valuations:
-            wh = warehouse_map.get(riv.warehouse)
-            if not wh or wh.disabled:
-                continue
-
-            company = wh.company
-            if company:
-                if company not in closing_date_cache:
-                    closing_date_cache[company] = RepostItemValuation.get_max_period_closing_date(company)
-
-                max_closing_date = closing_date_cache[company]
-                if max_closing_date and getdate(riv.posting_date) <= getdate(max_closing_date):
-                    frappe.db.set_value("Repost Item Valuation", riv.name, "status", "Skipped")
+            for repost_item_valuation in repost_item_valuations:
+                if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
                     continue
 
-            docs_to_repost.append(riv.name)
+                doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
+                try:
+                    doc.deduplicate_similar_repost()
+                    frappe.enqueue(repost, doc=doc, queue="long")
+                except Exception:
+                    frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
 
-        if not docs_to_repost:
-            return
-
-        # Commit the rename before handing off to the background job so the
-        # worker sees the updated item_code in the stock ledger entries.
-        frappe.db.commit()
-
-        frappe.enqueue(
-            _background_repost_and_update_inventory,
-            doc_names=docs_to_repost,
-            item_code=item_code,
-            doctype=self.doctype,
-            queue="long",
-            timeout=1800,  # set a timeout of 3000 seconds for the background job
-        )
-
+            # Inventory output must run for both plain renames and merges, regardless of
+            # whether there were any reposts to process.
+            frappe.enqueue(update_item_inventory_output, item_code=new_item_code, voucher_type=self.doctype, queue="long")
+            frappe.db.commit()
+            
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
         old_defaults = frappe.get_all(
@@ -275,21 +192,6 @@ class CustomItem(Item):
                     message=frappe.get_traceback()
                 )
 
-    def repost_bin_qty(self, item_code):
-        bins = frappe.get_all(
-            "Bin",
-            filters={"item_code": item_code},
-            pluck="name",
-        )
-        for bin_name in bins:
-            try:
-                frappe.get_doc("Bin", bin_name).recalculate_qty()
-            except Exception:
-                frappe.log_error(
-                    title="Error recalculating bin qty after rename",
-                    message=frappe.get_traceback(),
-                )
-        
     def copy_barcodes(self, old_item_code, new_item_code):
         old_barcodes = frappe.get_all(
             "Item Barcode",
@@ -557,6 +459,12 @@ class CustomItem(Item):
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
 
+        # Schedule the re-create watchdog now, at drop time, rather than waiting for the first
+        # site to confirm: if a site's product is already gone it has nothing to delete and never
+        # reports back, and if no site reports back nothing would otherwise re-create the item.
+        # deduplicate keeps this to a single watchdog even alongside the first-response one.
+        from metactical.custom_scripts.utils.item_rmq_api import schedule_recreate_watchdog
+        schedule_recreate_watchdog(self.item_code, frappe.session.user)
 
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
         self.reload()

@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "creation": "2026-09-18 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "issingle": 1,
+ "module": "ICL Pricing",
+ "name": "ICL Pricing Settings",
+ "owner": "Administrator",
+ "modified_by": "Administrator",
+ "field_order": [
+  "section_lists",
+  "always_price_lists",
+  "column_order",
+  "column_break_lists",
+  "max_items",
+  "items_per_page",
+  "section_batching",
+  "background_threshold",
+  "batch_size",
+  "column_break_batching",
+  "batch_pause_ms"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_lists",
+   "fieldtype": "Section Break",
+   "label": "Price Lists"
+  },
+  {
+   "fieldname": "always_price_lists",
+   "fieldtype": "Table MultiSelect",
+   "label": "Always Include",
+   "options": "Price Revision Price List",
+   "description": "Every revision prices every item on these lists, even items that don't have a price there yet. Use it for lists every product must carry, like the franchise list."
+  },
+  {
+   "fieldname": "column_order",
+   "fieldtype": "Table MultiSelect",
+   "label": "Column Order",
+   "options": "Price Revision Price List",
+   "description": "Price lists shown first in the grid, in this order. Any other lists follow."
+  },
+  {
+   "fieldname": "column_break_lists",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_items",
+   "fieldtype": "Int",
+   "label": "Most Items Per Batch",
+   "default": "1000",
+   "non_negative": 1,
+   "description": "Hard cap on how many items one price revision (or one batch of them) can hold. A larger selection is refused, on every path that builds a revision."
+  },
+  {
+   "fieldname": "items_per_page",
+   "fieldtype": "Int",
+   "label": "Items Per Page",
+   "default": "100",
+   "non_negative": 1,
+   "description": "How many items one revision in a batch holds, and the page size in the grid. A batch splits its items into revisions of this size."
+  },
+  {
+   "fieldname": "section_batching",
+   "fieldtype": "Section Break",
+   "label": "Large Revisions",
+   "description": "Keeps big revisions from loading the ERP: past the threshold, building, recalculating, applying and reverting run as a background job that writes in batches, like an import."
+  },
+  {
+   "fieldname": "background_threshold",
+   "fieldtype": "Int",
+   "label": "Run In Background Above (Items)",
+   "default": "300",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "batch_size",
+   "fieldtype": "Int",
+   "label": "Prices Per Batch",
+   "default": "250",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_batching",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "batch_pause_ms",
+   "fieldtype": "Int",
+   "label": "Pause Between Batches (ms)",
+   "default": "250",
+   "non_negative": 1,
+   "description": "Breathing room for everyone else using the ERP while a big revision writes."
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "modified": "2026-09-19 09:00:00.000000"
+}

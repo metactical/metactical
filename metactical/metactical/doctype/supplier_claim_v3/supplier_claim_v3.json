@@ -9,7 +9,7 @@
  "field_order": [
   "sec_main",
   "purchase_order_v3",
-  "goods_receipt_v3",
+  "purchase_receipt_v3",
   "purchase_receipt",
   "supplier",
   "supplier_name",
@@ -37,13 +37,13 @@
    "options": "Purchase Order V3"
   },
   {
-   "fieldname": "goods_receipt_v3",
+   "fieldname": "purchase_receipt_v3",
    "fieldtype": "Link",
-   "label": "Goods Receipt V3",
-   "options": "Goods Receipt V3"
+   "label": "Purchase Receipt V3",
+   "options": "Purchase Receipt V3"
   },
   {
-   "description": "Claims are raised after receiving \u2014 link the receipt the problem came in on.",
+   "description": "Claims are raised after receiving — link the receipt the problem came in on.",
    "fieldname": "purchase_receipt",
    "fieldtype": "Link",
    "label": "ERP Purchase Receipt",
@@ -79,7 +79,7 @@
    "reqd": 1
   },
   {
-   "description": "Where the goods sit while the claim is open (e.g. by the manager\u2019s desk).",
+   "description": "Where the goods sit while the claim is open (e.g. by the manager’s desk).",
    "fieldname": "holding_warehouse",
    "fieldtype": "Link",
    "label": "Holding Location",
@@ -103,7 +103,7 @@
    "fieldtype": "Table",
    "label": "Items",
    "options": "Supplier Claim V3 Item",
-   "reqd": 1
+   "description": "Leave empty and save to pull the claimable lines from the Purchase Receipt V3."
   },
   {
    "collapsible": 1,
@@ -120,7 +120,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-23 22:44:45.063416",
+ "modified": "2026-10-02 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Claim V3",

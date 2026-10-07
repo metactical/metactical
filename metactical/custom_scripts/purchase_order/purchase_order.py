@@ -138,9 +138,10 @@ def make_purchase_order_based_on_supplier(source_name, target_doc=None, args=Non
 
 	supplier_items = get_items_based_on_default_supplier(args.get("supplier"))
 	
+	warehouse = args.get("warehouse")
 	material_requests = [mr]
 	if args.get("get_all_items", False):
-		material_requests = get_material_requests_based_on_items(supplier_items)
+		material_requests = get_material_requests_based_on_items(supplier_items, warehouse)
 
 	def postprocess(source, target_doc):
 		target_doc.supplier = args.get("supplier")
@@ -177,7 +178,7 @@ def make_purchase_order_based_on_supplier(source_name, target_doc=None, args=Non
 						["uom", "uom"],
 					],
 					"postprocess": update_item,
-					"condition": lambda doc: doc.ordered_qty < doc.qty,
+					"condition": open_mr_item_condition(warehouse),
 				},
 			},
 			target_doc,
@@ -197,10 +198,15 @@ def get_items_based_on_default_supplier(supplier):
 
 	return supplier_items
 	
-# Metactical Customization: Get material requests based on default supplier
-def get_material_requests_based_on_items(supplier_items):
+# Metactical Customization: Get material requests based on default supplier.
+# Shared with Purchase Order V3. `warehouse` (the order's Ship To Warehouse)
+# narrows it to requests with a line for that warehouse; blank = any warehouse.
+def get_material_requests_based_on_items(supplier_items, warehouse=None):
 	if not supplier_items:
 		frappe.throw(_("The supplier is not the default supplier for any items."))
+
+	warehouse_condition = "and mr_item.warehouse = %s" if warehouse else ""
+	values = tuple(supplier_items) + ((warehouse,) if warehouse else ())
 
 	material_requests = frappe.db.sql_list("""select distinct mr.name
 		from `tabMaterial Request` mr, `tabMaterial Request Item` mr_item
@@ -210,10 +216,19 @@ def get_material_requests_based_on_items(supplier_items):
 			and mr.per_ordered < 99.99
 			and mr.docstatus = 1
 			and mr.status != 'Stopped'
-		order by mr_item.item_code ASC""" % ', '.join(['%s']*len(supplier_items)),
-		tuple(supplier_items))
+			%s
+		order by mr_item.item_code ASC""" % (', '.join(['%s']*len(supplier_items)), warehouse_condition),
+		values)
 
 	return material_requests
+
+
+# Which Material Request lines get mapped: the part not ordered yet, and -- when
+# a Ship To Warehouse is given -- only lines for that warehouse, since one
+# request can carry lines for several.
+def open_mr_item_condition(warehouse=None):
+	return lambda doc: flt(doc.ordered_qty) < flt(doc.qty) and (
+		not warehouse or doc.warehouse == warehouse)
 
 
 @frappe.whitelist()

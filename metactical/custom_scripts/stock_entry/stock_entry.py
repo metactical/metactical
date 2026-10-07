@@ -114,31 +114,30 @@ class CustomStockEntry(StockEntry):
 					try:
 						_ensure_warehouse_exists(item.t_warehouse)
 					except Exception:
-						frappe.log_error(frappe.get_traceback(), f"_ensure_warehouse_exists failed: {item.t_warehouse}")
 						raise
 		super(CustomStockEntry, self)._validate_links()
 
 	def validate(self):
 		super(CustomStockEntry, self).validate()
-		# Metactical Customization: Validate that user has permission to make stock entry against warehouse
+		# Metactical Customization: Validate that user has permission to make stock entry against warehouse.
+		# Uses Nested Set lft/rgt so group warehouses cover all descendants without expanding them.
+		from metactical.metactical.doctype.warehouse_user_permissions.warehouse_user_permissions import (
+			get_setting_name, has_permitted_warehouses, is_warehouse_permitted,
+		)
 		user = frappe.session.user
-		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
-		if setting_exists:
-			s_warehouses = []
-			t_warehouses = []
-			settings = frappe.get_doc("Warehouse User Permissions", setting_exists)
-			for row in settings.source_warehouse:
-				s_warehouses.append(row.warehouse)
-				
-			for row in settings.target_warehouse:
-				t_warehouses.append(row.warehouse)
-			
-			for row in self.items:
-				if s_warehouses and row.s_warehouse and row.s_warehouse not in s_warehouses:
-					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, frappe.session.user))
+		setting_name = get_setting_name(user)
+		if not setting_name:
+			return
 
-				if t_warehouses and row.t_warehouse and row.t_warehouse not in t_warehouses:
-					frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, frappe.session.user))
+		check_source = has_permitted_warehouses(setting_name, "source_warehouse")
+		check_target = has_permitted_warehouses(setting_name, "target_warehouse")
+
+		for row in self.items:
+			if check_source and row.s_warehouse and not is_warehouse_permitted(row.s_warehouse, setting_name, "source_warehouse"):
+				frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.s_warehouse, user))
+
+			if check_target and row.t_warehouse and not is_warehouse_permitted(row.t_warehouse, setting_name, "target_warehouse"):
+				frappe.throw("Warehouse {} not in list of warehouse allowed for user {}".format(row.t_warehouse, user))
 				
 	def on_submit(self):
 		super(CustomStockEntry, self).on_submit()
@@ -217,42 +216,35 @@ def create_stock_entry(source_name, target_doc=None):
 @frappe.whitelist()
 def get_permitted_source(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
-	warehouses = []
-	if user:
-		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
-		if setting_exists:
-			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
-							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
-							AND parentfield='source_warehouse'""",
-							{
-								'txt': "%%%s%%" % txt,
-								'parent': setting_exists
-							})
+	if not user:
+		return []
+	from metactical.metactical.doctype.warehouse_user_permissions.warehouse_user_permissions import (
+		get_setting_name, has_permitted_warehouses, search_permitted_warehouses,
+	)
+	setting_name = get_setting_name(user)
+	if not setting_name or not has_permitted_warehouses(setting_name, "source_warehouse"):
+		return frappe.db.sql(
+			"SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s",
+			{"txt": "%%%s%%" % txt},
+		)
+	return search_permitted_warehouses(setting_name, "source_warehouse", txt, page_len)
 
-		if not setting_exists or not warehouses:
-			#Retrun all warehouses
-			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
-	return warehouses
-	
+
 @frappe.whitelist()
 def get_permitted_target(doctype, txt, searchfield, start, page_len, filters):
 	user = filters.get("user")
-	warehouses = []
-	if user:
-		setting_exists = frappe.db.get_value("Warehouse User Permissions", filters={"user": user})
-		if setting_exists:
-			warehouses = frappe.db.sql("""SELECT warehouse FROM `tabUser Permitted Warehouse`
-							WHERE warehouse LIKE %(txt)s AND parent= %(parent)s
-							AND parentfield='target_warehouse'""",
-							{
-								'txt': "%%%s%%" % txt,
-								'parent': setting_exists
-							})
-
-		if not setting_exists or not warehouses:
-			#Retrun all warehouses
-			warehouses = frappe.db.sql("""SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s""", {'txt': "%%%s%%" % txt})
-	return warehouses
+	if not user:
+		return []
+	from metactical.metactical.doctype.warehouse_user_permissions.warehouse_user_permissions import (
+		get_setting_name, has_permitted_warehouses, search_permitted_warehouses,
+	)
+	setting_name = get_setting_name(user)
+	if not setting_name or not has_permitted_warehouses(setting_name, "target_warehouse"):
+		return frappe.db.sql(
+			"SELECT name FROM `tabWarehouse` WHERE is_group=0 AND disabled=0 AND name LIKE %(txt)s",
+			{"txt": "%%%s%%" % txt},
+		)
+	return search_permitted_warehouses(setting_name, "target_warehouse", txt, page_len)
 	
 @frappe.whitelist()
 def get_default_transit(user):
@@ -348,7 +340,6 @@ def _ensure_site_bins_warehouse(site: str, company: str, company_abbr: str, site
 	wh.company = company
 	wh.is_group = 1
 	wh.insert(ignore_permissions=True)
-	frappe.log_error(f"Created '{site_bins_name}' under '{main_wh_name}'", "StorageBin Debug")
 
 
 def _ensure_warehouse_exists(warehouse_name: str) -> None:
@@ -365,11 +356,9 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 	chain[0] ("W01 - ICL") does NOT exist in this structure — it is skipped.
 	The zone level (chain[1]) is parented to the site group found by querying.
 	"""
-	frappe.log_error(f"Ensuring warehouse: {warehouse_name}", "StorageBin Debug")
 	sep = " - "
 	idx = warehouse_name.rfind(sep)
 	if idx < 0:
-		frappe.log_error(f"No ' - ' separator, skipping: {warehouse_name}", "StorageBin Debug")
 		return
 
 	code = warehouse_name[:idx]
@@ -378,11 +367,9 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 
 	# chain[0] = "W01 - ICL", chain[1] = "W01-D - ICL", ..., chain[-1] = full target
 	chain = ["-".join(parts[:i]) + sep + company_abbr for i in range(1, len(parts) + 1)]
-	frappe.log_error(f"Chain: {chain}", "StorageBin Debug")
 
 	company = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
 	if not company:
-		frappe.log_error(f"No company with abbr '{company_abbr}'", "StorageBin Debug")
 		frappe.throw(f"No company found with abbreviation '{company_abbr}'")
 
 	# Scan ALL chain entries to find the deepest existing one.
@@ -392,10 +379,7 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 		if frappe.db.exists("Warehouse", name):
 			anchor_idx = i
 
-	frappe.log_error(f"anchor_idx={anchor_idx}, chain_len={len(chain)}", "StorageBin Debug")
-
 	if anchor_idx == len(chain) - 1:
-		frappe.log_error(f"Leaf already exists: {warehouse_name}", "StorageBin Debug")
 		return
 
 	if anchor_idx >= 0:
@@ -425,13 +409,7 @@ def _ensure_warehouse_exists(warehouse_name: str) -> None:
 			wh.company = company
 			wh.is_group = 0 if is_leaf else 1
 			wh.insert(ignore_permissions=True)
-			frappe.log_error(
-				f"Created '{level_name}' (is_group={wh.is_group}, parent='{parent}')",
-				"StorageBin Debug"
-			)
 		except frappe.DuplicateEntryError:
 			frappe.db.rollback(save_point="before_warehouse_insert")
-			frappe.log_error(f"'{level_name}' already exists (concurrent), skipping", "StorageBin Debug")
 		except Exception:
-			frappe.log_error(frappe.get_traceback(), f"Failed to create warehouse '{level_name}'")
 			raise

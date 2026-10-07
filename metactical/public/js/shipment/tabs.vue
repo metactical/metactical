@@ -25,10 +25,12 @@
 				</tr>
 				<tr v-for="(item, idx) in getSummarizedRates(tabs[activeTab].rates.data)" :key="idx">
 					<td>
+						<!-- One radio group for the whole dialog: picking a rate here replaces
+						     the selection for every parcel, across providers. -->
 						<input
 							type="radio"
-							:name="item.provider.replace(/\s+/g, '')"
-							:id="item.provider.replace(/\s+/g, '') + '_combined'"
+							name="shipment_rate"
+							:id="'shipment_rate_' + serviceKey(item).replace(/\s+/g, '')"
 							:checked="isSelectedSummaryService(item)"
 							:data-piece="item.idx"
 							:data-service-name="item.service_name"
@@ -46,7 +48,11 @@
 				</tr>
 			</table>
 
-			<!-- Multiple tables for carriers that support multiple parcels -->
+			<!-- Multiple tables for carriers that support multiple parcels.
+			     Unreachable today: no provider returns supports_multiple: true. If one
+			     ever does, note that selectService below still emits a shipment-level
+			     selection - a per-parcel selection would let two carriers share one
+			     shipment, which is the bug this dialog now prevents. -->
 			<table
 				v-else
 				v-for="row in tabs[activeTab].rates.data"
@@ -94,6 +100,8 @@
 </template>
 
 <script>
+import { summarizeRates, serviceKey } from "./rate_utils";
+
 export default {
 name: "Tabs",
 props: {
@@ -106,6 +114,12 @@ props: {
 		required: false,
 		default: () => ({}),
 	},
+	// The single (provider, service) choice for the whole shipment.
+	selection: {
+		type: Object,
+		required: false,
+		default: null,
+	},
 },
 data() {
 	return {
@@ -113,7 +127,7 @@ data() {
 	};
 },
 watch: {
-	selectedServices: {
+	selection: {
 		handler() {
 			this.setTabWithSelectedService();
 		},
@@ -137,21 +151,18 @@ methods: {
 	},
 
 	setTabWithSelectedService() {
-		if (!this.tabs || this.tabs.length === 0 || !this.selectedServices) {
+		if (!this.tabs || this.tabs.length === 0 || !this.selection) {
 			return;
 		}
-		const firstSelectedIdx = Object.keys(this.selectedServices)[0];
-		if (!firstSelectedIdx) return;
-
-		const selectedProvider =
-			this.selectedServices[firstSelectedIdx].selectedProvider;
 		const tabIndex = this.tabs.findIndex(
-			(tab) => tab.title === selectedProvider
+			(tab) => tab.title === this.selection.provider
 		);
 		if (tabIndex !== -1) {
 			this.activeTab = tabIndex;
 		}
 		},
+
+	serviceKey,
 
 	isSelectedService(idx, item) {
 		if (!this.selectedServices || !this.selectedServices[idx]) return false;
@@ -165,85 +176,36 @@ methods: {
 	},
 
 	selectService(idx, piece_name, item) {
-		this.$emit("update-selected-service", { idx, piece_name, item });
+		// Emits the shipment-level summary for this service, not just this parcel.
+		const summary = this.getSummarizedRates(
+			this.tabs[this.activeTab].rates.data
+		).find(
+			(row) =>
+				row.carrier_service === item.carrier_service &&
+				row.service_name === item.service_name
+		);
+		if (summary) {
+			this.$emit("update-selected-service", summary);
+		}
 	},
 
 	getSummarizedRates(data) {
-		if (!data || !data.length) return [];
-
-		const serviceMap = new Map();
-
-		data.forEach((row) => {
-			row.items.forEach((item) => {
-			const key = `${item.provider}_${item.carrier_service}_${item.service_name}`;
-
-			if (!serviceMap.has(key)) {
-				serviceMap.set(key, {
-				...item,
-				total_base: parseFloat(item.base) || 0,
-				total_amount: parseFloat(item.shipment_amount) || 0,
-				parcels: [row.idx],
-				idx: "All",
-				});
-			} else {
-				const existing = serviceMap.get(key);
-				existing.total_base += parseFloat(item.base) || 0;
-				existing.total_amount += parseFloat(item.shipment_amount) || 0;
-				existing.parcels.push(row.idx);
-
-				if (item.expected_delivery_date) {
-				const currentDate = new Date(existing.expected_delivery_date);
-				const newDate = new Date(item.expected_delivery_date);
-				if (newDate > currentDate) {
-					existing.expected_delivery_date = item.expected_delivery_date;
-					existing.expected_transit_time = item.expected_transit_time;
-				}
-				}
-			}
-			});
-		});
-
-		return Array.from(serviceMap.values());
+		const tab = this.tabs[this.activeTab];
+		return summarizeRates(data, tab && tab.title);
 	},
 
 	isSelectedSummaryService(item) {
-		if (!item.parcels || !item.parcels.length) return false;
-
-		return item.parcels.every((parcelIdx) => {
-			const selected = this.selectedServices[parcelIdx];
-			return (
+		const selected = this.selection;
+		return !!(
 			selected &&
-			selected.selectedProvider === item.provider &&
-			selected.selectedCarrier === item.carrier_service &&
-			selected.selectedServiceName === item.service_name
-			);
-		});
+			selected.provider === item.provider &&
+			selected.carrier_service === item.carrier_service &&
+			selected.service_name === item.service_name
+		);
 	},
 
 	selectSummaryService(item) {
-		if (!item.parcels || !item.parcels.length) return;
-
-		item.parcels.forEach((idx) => {
-			const data = this.tabs[this.activeTab].rates.data;
-			const row = data.find((r) => r.idx === idx);
-
-			if (row) {
-			const matchingItem = row.items.find(
-				(i) =>
-				i.provider === item.provider &&
-				i.carrier_service === item.carrier_service &&
-				i.service_name === item.service_name
-			);
-
-			if (matchingItem) {
-				this.$emit("update-selected-service", {
-				idx,
-				piece_name: row.name,
-				item: matchingItem,
-				});
-			}
-			}
-		});
+		this.$emit("update-selected-service", item);
 	},
 
 	formatCurrency(value) {

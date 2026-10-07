@@ -1,0 +1,162 @@
+{
+ "actions": [],
+ "creation": "2026-09-17 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "retail_sku",
+  "po3_item",
+  "old_cost",
+  "new_cost",
+  "cost_change_pct",
+  "column_break_cost",
+  "duty_pct",
+  "landed_old_cad",
+  "landed_new_cad",
+  "landed_old_usd",
+  "landed_new_usd",
+  "supplier_currency",
+  "apply",
+  "needs_review",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Item",
+   "in_list_view": 1,
+   "columns": 3,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1,
+   "fetch_from": "item_code.item_name"
+  },
+  {
+   "fieldname": "retail_sku",
+   "fieldtype": "Data",
+   "label": "Retail SKU",
+   "read_only": 1,
+   "fetch_from": "item_code.ifw_retailskusuffix"
+  },
+  {
+   "fieldname": "po3_item",
+   "fieldtype": "Data",
+   "label": "PO Line",
+   "hidden": 1
+  },
+  {
+   "fieldname": "old_cost",
+   "fieldtype": "Currency",
+   "label": "Old Cost",
+   "options": "supplier_currency",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_cost",
+   "fieldtype": "Currency",
+   "label": "New Cost",
+   "options": "supplier_currency",
+   "in_list_view": 1,
+   "columns": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_change_pct",
+   "fieldtype": "Percent",
+   "label": "Change %",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_cost",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "duty_pct",
+   "fieldtype": "Percent",
+   "label": "Duty %",
+   "read_only": 1,
+   "fetch_from": "item_code.ifw_duty_rate"
+  },
+  {
+   "fieldname": "landed_old_cad",
+   "fieldtype": "Currency",
+   "label": "Landed Old (CAD)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "landed_new_cad",
+   "fieldtype": "Currency",
+   "label": "Landed New (CAD)",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "landed_old_usd",
+   "fieldtype": "Float",
+   "label": "Landed Old (USD)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "landed_new_usd",
+   "fieldtype": "Float",
+   "label": "Landed New (USD)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "supplier_currency",
+   "fieldtype": "Link",
+   "options": "Currency",
+   "label": "Supplier Currency",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "apply",
+   "fieldtype": "Check",
+   "label": "Apply",
+   "default": "1",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "needs_review",
+   "fieldtype": "Check",
+   "label": "Needs Review",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ICL Pricing",
+ "name": "Price Revision Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
