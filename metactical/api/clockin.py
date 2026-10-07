@@ -447,22 +447,39 @@ def send_details_change_request(log_name, checkInTime12, checkInTimeMilitary, ch
 
 @frappe.whitelist()
 def decline_details_change_request(request_name):
+	from metactical.time_tracker.api import assert_can_review
+	assert_can_review()
 	req = frappe.get_doc("Checkin Request Modification", request_name)
+	if req.status != "Pending":
+		frappe.throw("This request was already " + req.status.lower())
 	req.status = "Declined"
+	req.reviewed_by = frappe.session.user
+	req.reviewed_on = frappe.utils.now_datetime()
 	req.save(ignore_permissions=True)
 
 	return "success"
 
 @frappe.whitelist()
 def approve_details_change_request(request_name):
+	from metactical.time_tracker.api import assert_can_review, apply_request
+	assert_can_review()
 	req = frappe.get_doc("Checkin Request Modification", request_name)
-	req.status = "Approved"
-	req.save(ignore_permissions=True)
+	if req.status != "Pending":
+		frappe.throw("This request was already " + req.status.lower())
+	if req.user == frappe.session.user and frappe.session.user != "Administrator":
+		frappe.throw("You cannot approve your own request.", frappe.PermissionError)
 
-	clockin_log = frappe.get_doc("Clockin Log", req.log)
-	clockin_log.from_time = f"{clockin_log.date} {str(req.requested_checkin_military)}"
-	clockin_log.to_time = f"{clockin_log.date} {str(req.requested_checkout_military)}"
-	clockin_log.save(ignore_permissions=True)
+	if req.get("request_type") != "Add" and not req.requested_from:
+		# request made by the old page: only HH:MM were stored, so rebuild full datetimes on the log's date
+		log_date = frappe.db.get_value("Clockin Log", req.log, "date")
+		req.requested_from = f"{log_date} {req.requested_checkin_military}"
+		req.requested_to = f"{log_date} {req.requested_checkout_military}"
+	apply_request(req)
+
+	req.status = "Approved"
+	req.reviewed_by = frappe.session.user
+	req.reviewed_on = frappe.utils.now_datetime()
+	req.save(ignore_permissions=True)
 
 	return "success"
 
