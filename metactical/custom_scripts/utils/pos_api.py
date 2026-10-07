@@ -1535,6 +1535,7 @@ def create_return_invoice(form_data, invoiceId):
         
         sales_return.selling_price_list = form_data['PriceList']
         sales_return.currency = frappe.db.get_value("Price List", form_data['PriceList'], 'currency')
+        sales_return.source = form_data.get('LeadSource', '')
         
         frappe.set_user(form_data["SalesPerson"])
         sales_return.flags.ignore_permissions = True
