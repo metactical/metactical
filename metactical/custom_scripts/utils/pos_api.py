@@ -442,7 +442,14 @@ def convert_manual_to_regular_order(*args, **kwargs):
 			return
 
 		if sales_order.docstatus == 1:
-			sales_order.cancel()
+			has_linked_mr = frappe.db.exists(
+				"Material Request Item",
+				{"sales_order": order_id, "docstatus": 1}
+			)
+			if has_linked_mr:
+				sales_order.update_status("Closed")
+			else:
+				sales_order.cancel()
 			frappe.db.commit()
 		elif sales_order.docstatus == 0:
 			frappe.delete_doc('Sales Order', order_id, ignore_permissions=True, force=True)
