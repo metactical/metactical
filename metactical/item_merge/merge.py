@@ -86,12 +86,14 @@ def _apply_follow_ups(new, od, pair, fix_names, sku, specs_before, log):
 	rather than overwriting it from a stale copy."""
 	for attempt in range(1, FOLLOW_UP_ATTEMPTS + 1):
 		after = frappe.get_doc("Item", new)
+		was_sku = (after.get("ifw_retailskusuffix") or "").strip()
 		changed, removed = _plan_follow_ups(after, od, pair, fix_names, sku, specs_before)
 		if not changed:
 			return after, changed, removed
 		try:
 			after.save()
 			frappe.db.commit()
+			_remap_images_for_sku(new, was_sku, (after.get("ifw_retailskusuffix") or "").strip(), log)
 			return after, changed, removed
 		except CONTENDED as e:
 			frappe.db.rollback()
@@ -100,6 +102,31 @@ def _apply_follow_ups(new, od, pair, fix_names, sku, specs_before, log):
 			log(f"    {new}: the rename hook still holds the item ({type(e).__name__}) - "
 				f"retry {attempt}/{FOLLOW_UP_ATTEMPTS - 1}")
 			time.sleep(FOLLOW_UP_BACKOFF_S * attempt)
+
+
+def _remap_images_for_sku(item_code, old_sku, new_sku, log):
+	"""Re-point this item's S3 images at its new retail SKU.
+
+	Normally `Item.on_update` does this through `s3_image_api.queue_retail_sku_change`. That hook
+	returns early when `in_import` or `item_from_excel` is set - and a merge job sets both, for its
+	whole run, to hold the website webhooks back. So the one save that actually renames a retail SKU
+	is the one save where the hook never fires, and the images keep the old SKU in their filenames
+	and their mapping. Called here explicitly instead.
+
+	Never fatal: the pair is merged by the time this runs, and images are worth a warning, not a
+	failed merge.
+	"""
+	if not old_sku or not new_sku or old_sku == new_sku:
+		return
+	try:
+		from metactical.custom_scripts.utils.s3_image_api import apply_retail_sku_change_to_s3
+
+		apply_retail_sku_change_to_s3(old_sku, new_sku, item_code=item_code)
+		log(f"    {item_code}: images re-pointed {old_sku} -> {new_sku}")
+	except Exception as e:
+		frappe.log_error(title=f"Item Merge image SKU remap {item_code}",
+						 message=frappe.get_traceback())
+		log(f"    {item_code}: images NOT re-pointed {old_sku} -> {new_sku} ({str(e)[:120]})")
 
 
 def merge_pair(pair, log, fix_names=True, sku="keep"):

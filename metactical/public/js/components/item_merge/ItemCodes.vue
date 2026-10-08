@@ -85,7 +85,6 @@
       </section>
 
       <section class="im-card">
-        <WebsiteCheck :template="tmpl.item_code" auto />
         <p class="text-xs text-muted mt-2 mb-0">Changing the template code changes what each site's External ID must be.</p>
       </section>
     </template>
@@ -95,7 +94,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import TemplateCode from './TemplateCode.vue'
-import WebsiteCheck from './WebsiteCheck.vue'
 import { itemMergeApi } from './api.js'
 import { BAD_CODE, alertOk, confirmAction, itemUrl, makeLink, num } from './utils.js'
 

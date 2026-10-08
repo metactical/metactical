@@ -1,121 +1,146 @@
 <template>
-  <div class="im-split">
-    <!-- search -->
-    <section class="im-card">
-      <h3 class="im-card-title">Find templates</h3>
-      <p class="im-lede">
-        Search by template SKU, template name, or both. Both boxes suggest from the templates that exist - pick one
-        and it searches straight away - and part of a value still works: <span class="font-mono">RVX418</span> finds
-        every RavenX 418x template, and every word of the name must appear, in any order (<i>fleece vest</i>).
-      </p>
-      <form class="flex flex-wrap items-end gap-2" @submit.prevent="search">
-        <div style="flex: 1; min-width: 200px">
-          <label class="control-label-sm block">Template SKU</label>
-          <div ref="skuEl" class="im-link-control font-mono"></div>
-        </div>
-        <div style="flex: 1.4; min-width: 240px">
-          <label class="control-label-sm block">Template name</label>
-          <div ref="nameEl" class="im-link-control"></div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm" :disabled="loading || (!sku.trim() && !name.trim())">
-          {{ loading ? 'Searching…' : 'Search' }}
-        </button>
-      </form>
-      <div v-if="searched" class="mt-4">
-        <div v-if="!results.length" class="im-empty">No templates match <b>{{ searchedFor }}</b>.</div>
-        <template v-else>
-          <div class="im-table-wrap">
-            <table class="im-table">
-              <thead>
-                <tr>
-                  <th style="width: 36px"><input type="checkbox" :checked="allSelected" @change="toggleAll" aria-label="Select all" /></th>
-                  <th><button class="im-sort" :class="{ active: sortKey === 'item_code' }" @click="sortBy('item_code')">Template SKU <span class="arrow">{{ arrow('item_code') }}</span></button></th>
-                  <th><button class="im-sort" :class="{ active: sortKey === 'item_name' }" @click="sortBy('item_name')">Item name <span class="arrow">{{ arrow('item_name') }}</span></button></th>
-                  <th>Brand</th>
-                  <th class="r"><button class="im-sort" :class="{ active: sortKey === 'variant_count' }" @click="sortBy('variant_count')">Variants <span class="arrow">{{ arrow('variant_count') }}</span></button></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in sorted" :key="r.item_code" class="clickable" :class="{ selected: selected.includes(r.item_code) }" @click="toggle(r.item_code)">
-                  <td @click.stop><input type="checkbox" :checked="selected.includes(r.item_code)" @change="toggle(r.item_code)" :aria-label="'Select ' + r.item_code" /></td>
-                  <td class="font-mono whitespace-nowrap">
-                    {{ r.item_code }} <span v-if="r.disabled" class="indicator-pill gray">disabled</span>
-                  </td>
-                  <td>{{ r.item_name }}</td>
-                  <td class="text-muted">{{ r.brand }}</td>
-                  <td class="r tabular-nums">{{ r.variant_count }}</td>
-                </tr>
-              </tbody>
-            </table>
+  <div>
+    <div class="im-split">
+      <!-- search -->
+      <section class="im-card">
+        <h3 class="im-card-title">Find templates</h3>
+        <p class="im-lede">
+          Search by template SKU, template name, or both. Both boxes suggest from the templates that exist - pick one
+          and it searches straight away - and part of a value still works: <span class="font-mono">RVX418</span> finds
+          every RavenX 418x template, and every word of the name must appear, in any order (<i>fleece vest</i>).
+        </p>
+        <form class="flex flex-wrap items-end gap-2" @submit.prevent="search">
+          <div style="flex: 1; min-width: 200px">
+            <label class="control-label-sm block">Template SKU</label>
+            <div ref="skuEl" class="im-link-control font-mono"></div>
           </div>
-          <p class="text-xs text-muted mt-2 mb-0">
-            {{ results.length }} template(s){{ results.length >= 60 ? ' - showing the first 60, narrow the search' : '' }}
-          </p>
+          <div style="flex: 1.4; min-width: 240px">
+            <label class="control-label-sm block">Template name</label>
+            <div ref="nameEl" class="im-link-control"></div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" :disabled="loading || (!sku.trim() && !name.trim())">
+            {{ loading ? 'Searching…' : 'Search' }}
+          </button>
+        </form>
+        <div v-if="searched" class="mt-4">
+          <div v-if="!results.length" class="im-empty">No templates match <b>{{ searchedFor }}</b>.</div>
+          <template v-else>
+            <div class="im-table-wrap">
+              <table class="im-table">
+                <thead>
+                  <tr>
+                    <th style="width: 36px"><input type="checkbox" :checked="allSelected" @change="toggleAll" aria-label="Select all" /></th>
+                    <th><button class="im-sort" :class="{ active: sortKey === 'item_code' }" @click="sortBy('item_code')">Template SKU <span class="arrow">{{ arrow('item_code') }}</span></button></th>
+                    <th><button class="im-sort" :class="{ active: sortKey === 'item_name' }" @click="sortBy('item_name')">Item name <span class="arrow">{{ arrow('item_name') }}</span></button></th>
+                    <th>Brand</th>
+                    <th class="r"><button class="im-sort" :class="{ active: sortKey === 'variant_count' }" @click="sortBy('variant_count')">Variants <span class="arrow">{{ arrow('variant_count') }}</span></button></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in sorted" :key="r.item_code" class="clickable" :class="{ selected: selected.includes(r.item_code) }" @click="toggle(r.item_code)">
+                    <td @click.stop><input type="checkbox" :checked="selected.includes(r.item_code)" @change="toggle(r.item_code)" :aria-label="'Select ' + r.item_code" /></td>
+                    <td class="font-mono whitespace-nowrap">
+                      {{ r.item_code }} <span v-if="r.disabled" class="indicator-pill gray">disabled</span>
+                    </td>
+                    <td>{{ r.item_name }}</td>
+                    <td class="text-muted">{{ r.brand }}</td>
+                    <td class="r tabular-nums">{{ r.variant_count }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-muted mt-2 mb-0">
+              {{ results.length }} template(s){{ results.length >= 60 ? ' - showing the first 60, narrow the search' : '' }}
+            </p>
+          </template>
+        </div>
+      </section>
+
+      <!-- selection -->
+      <aside class="im-card space-y-3">
+        <div class="im-label">Selection</div>
+        <div v-if="!selected.length" class="text-muted text-sm">
+          Tick one template to work on its variants, or several to merge them into one first.
+        </div>
+
+        <template v-else-if="selected.length === 1">
+          <div><span class="font-mono font-semibold">{{ selected[0] }}</span> <span class="text-muted">· {{ totalVariants }} variant(s)</span></div>
+          <div class="im-note info">All the variants you'll work on are already under this template.</div>
+          <div v-if="!productsOk" class="im-note warn">
+            Storebuilder has to answer for this template first - see <b>Storebuilder products</b> below.
+          </div>
+          <button class="btn btn-primary btn-sm w-full" :disabled="!productsOk || busy" @click="chooseOne">
+            {{ busy ? 'Saving…' : 'Continue to variants →' }}
+          </button>
         </template>
-      </div>
-    </section>
 
-    <!-- selection -->
-    <aside class="im-card space-y-3">
-      <div class="im-label">Selection</div>
-      <div v-if="!selected.length" class="text-muted text-sm">
-        Tick one template to work on its variants, or several to merge them into one first.
-      </div>
-
-      <template v-else-if="selected.length === 1">
-        <div><span class="font-mono font-semibold">{{ selected[0] }}</span> <span class="text-muted">· {{ totalVariants }} variant(s)</span></div>
-        <div class="im-note info">All the variants you'll work on are already under this template.</div>
-        <button class="btn btn-primary btn-sm w-full" @click="emit('chosen', selected[0])">Continue to variants →</button>
-      </template>
-
-      <template v-else>
-        <div class="text-muted text-sm">{{ selected.length }} templates · {{ totalVariants }} variants</div>
-        <div>
-          <label class="control-label-sm block">Surviving template</label>
-          <div class="space-y-1">
-            <label v-for="r in selectedRows" :key="r.item_code" class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="im-survivor" :value="r.item_code" v-model="survivor" />
-              <span class="font-mono">{{ r.item_code }}</span><span class="text-faint text-xs">{{ r.variant_count }}</span>
-            </label>
+        <template v-else>
+          <div class="text-muted text-sm">{{ selected.length }} templates · {{ totalVariants }} variants</div>
+          <div>
+            <label class="control-label-sm block">Surviving template</label>
+            <div class="space-y-1">
+              <label v-for="r in selectedRows" :key="r.item_code" class="flex items-center gap-2"
+                     :class="canSurvive(r.item_code) ? 'cursor-pointer' : 'text-muted'">
+                <input type="radio" name="im-survivor" :value="r.item_code" v-model="survivor"
+                       :disabled="!canSurvive(r.item_code)" />
+                <span class="font-mono">{{ r.item_code }}</span><span class="text-faint text-xs">{{ r.variant_count }}</span>
+                <span v-if="liveSelected.length && !canSurvive(r.item_code)" class="text-faint text-xs">not on Storebuilder</span>
+              </label>
+            </div>
+            <div v-if="liveSelected.length === 1" class="im-note info mt-2">
+              <span class="font-mono">{{ liveSelected[0] }}</span> is the only one with a Storebuilder
+              product, so it survives - the others have no product to keep.
+            </div>
+            <div v-else-if="liveSelected.length > 1" class="im-note warn mt-2">
+              <b>{{ liveSelected.length }} templates have a Storebuilder product.</b> Pick the one to keep -
+              the others' products are dropped from the websites after the merge.
+            </div>
           </div>
-        </div>
-        <div>
-          <label class="control-label-sm block">Rename it to <span class="text-faint" style="font-weight: 400">(optional)</span></label>
-          <input v-model="renameTo" class="form-control input-sm font-mono"
-                 :placeholder="baseCode ? 'e.g. ' + baseCode : 'leave empty to keep ' + (survivor || '')" />
-          <div class="text-xs text-muted mt-1">Empty keeps <span class="font-mono">{{ survivor }}</span>. New variant codes start with the final template code.</div>
-        </div>
+          <div>
+            <label class="control-label-sm block">Rename it to <span class="text-faint" style="font-weight: 400">(optional)</span></label>
+            <input v-model="renameTo" class="form-control input-sm font-mono"
+                   :placeholder="baseCode ? 'e.g. ' + baseCode : 'leave empty to keep ' + (survivor || '')" />
+            <div class="text-xs text-muted mt-1">Empty keeps <span class="font-mono">{{ survivor }}</span>. New variant codes start with the final template code.</div>
+          </div>
 
-        <div>
-          <label class="control-label-sm block">What you are merging</label>
-          <div v-if="checking" class="text-muted text-sm"><span class="animate-spin">⟳</span> Checking…</div>
-          <div v-else class="space-y-2">
-            <div v-for="g in groupsOfSelection" :key="g.base_sku + g.product_name" class="im-kpi"
-                 :class="{ 'im-note warn': groupsOfSelection.length > 1 }">
-              <div><span class="font-mono font-semibold">{{ g.base_sku }}</span> · {{ g.product_name || '(no name)' }}</div>
-              <div class="text-xs text-muted">{{ g.templates }} template(s) · {{ g.variants }} variant(s)</div>
-              <div v-for="(n, grp) in g.group_counts" :key="grp" class="text-xs" :class="check && check.blocked ? 'text-danger' : 'text-muted'">
-                {{ grp }}: {{ n }} variant(s)
+          <div>
+            <label class="control-label-sm block">What you are merging</label>
+            <div v-if="checking" class="text-muted text-sm"><span class="animate-spin">⟳</span> Checking…</div>
+            <div v-else class="space-y-2">
+              <div v-for="g in groupsOfSelection" :key="g.base_sku + g.product_name" class="im-kpi"
+                   :class="{ 'im-note warn': groupsOfSelection.length > 1 }">
+                <div><span class="font-mono font-semibold">{{ g.base_sku }}</span> · {{ g.product_name || '(no name)' }}</div>
+                <div class="text-xs text-muted">{{ g.templates }} template(s) · {{ g.variants }} variant(s)</div>
+                <div v-for="(n, grp) in g.group_counts" :key="grp" class="text-xs" :class="check && check.blocked ? 'text-danger' : 'text-muted'">
+                  {{ grp }}: {{ n }} variant(s)
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div v-if="check && check.blocked" class="im-note danger"><b>Can't merge yet:</b> {{ check.block_reason }}.</div>
-        <div v-else-if="check && check.different_products" class="im-note warn">
-          <b>These look like different products:</b> {{ check.product_names.join(' / ') }}.
-          <label class="flex items-center gap-2 mt-2 cursor-pointer">
-            <input type="checkbox" v-model="confirmSame" /> I've checked - these are one product
-          </label>
-        </div>
-        <div class="im-note warn">
-          Every other selected template is merged into <b>{{ survivor }}</b> and removed. Their variants move with them. This can't be undone.
-        </div>
-        <button class="btn btn-danger btn-sm w-full" :disabled="!survivor || !mergeAllowed || busy" @click="consolidate">
-          {{ busy ? 'Merging…' : 'Merge ' + selected.length + ' templates into ' + (renameTo.trim() || survivor) }}
-        </button>
-      </template>
-    </aside>
+          <div v-if="check && check.blocked" class="im-note danger"><b>Can't merge yet:</b> {{ check.block_reason }}.</div>
+          <div v-else-if="check && check.different_products" class="im-note warn">
+            <b>These look like different products:</b> {{ check.product_names.join(' / ') }}.
+            <label class="flex items-center gap-2 mt-2 cursor-pointer">
+              <input type="checkbox" v-model="confirmSame" /> I've checked - these are one product
+            </label>
+          </div>
+          <div class="im-note warn">
+            Every other selected template is merged into <b>{{ survivor }}</b> and removed. Their variants move with them. This can't be undone.
+          </div>
+          <div v-if="!productsOk" class="im-note warn">
+            Storebuilder has to answer for every selected template first - see <b>Storebuilder products</b> below.
+            Their slugs are the only handle left on the products this merge removes.
+          </div>
+          <button class="btn btn-danger btn-sm w-full" :disabled="!survivor || !mergeAllowed || busy || !productsOk" @click="consolidate">
+            {{ busy ? 'Merging…' : 'Merge ' + selected.length + ' templates into ' + (renameTo.trim() || survivor) }}
+          </button>
+        </template>
+      </aside>
+    </div>
+
+    <TemplateProducts v-if="selected.length" ref="products" :templates="selected"
+                      @update:ok="(v) => productsOk = v" @update:live="(v) => live = v" />
   </div>
 </template>
 
@@ -123,6 +148,7 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { itemMergeApi, TEMPLATE_CODE_QUERY, TEMPLATE_NAME_QUERY } from './api.js'
 import { alertOk, confirmAction, makeAutocomplete } from './utils.js'
+import TemplateProducts from './TemplateProducts.vue'
 
 const emit = defineEmits(['chosen'])
 
@@ -136,6 +162,10 @@ const selected = ref([])
 const survivor = ref(null)
 const renameTo = ref('')
 const busy = ref(false)
+const products = ref(null)
+const productsOk = ref(false)
+// Templates Storebuilder has a product for, as the products table last read them.
+const live = ref([])
 
 // ---- the two search boxes, both native Frappe Autocompletes fed from Item ----
 // Autocomplete rather than Link: they suggest what exists, but a partial term ("RVX418") is a valid
@@ -199,9 +229,18 @@ async function search() {
   }
 }
 
+// The survivor keeps its Storebuilder product; every other template's is dropped. So when any
+// selected template has one, only those may survive - one of them is taken for you, several are
+// left for you to choose between.
+const liveSelected = computed(() => selected.value.filter((c) => live.value.includes(c)))
+const canSurvive = (code) => !liveSelected.value.length || liveSelected.value.includes(code)
 function keepSurvivor() {
-  if (!selected.value.includes(survivor.value)) survivor.value = selected.value[0] || null
+  if (liveSelected.value.length === 1) survivor.value = liveSelected.value[0]
+  else if (liveSelected.value.length > 1) {
+    if (!liveSelected.value.includes(survivor.value)) survivor.value = null
+  } else if (!selected.value.includes(survivor.value)) survivor.value = selected.value[0] || null
 }
+watch(liveSelected, keepSurvivor)
 function toggle(code) {
   const i = selected.value.indexOf(code)
   if (i >= 0) selected.value.splice(i, 1)
@@ -249,6 +288,34 @@ const groupsOfSelection = computed(() => {
 const mergeAllowed = computed(() => !!check.value && !check.value.blocked
   && (!check.value.different_products || confirmSame.value) && !checking.value)
 
+// Both ways out of this step write the register first: consolidate_templates deletes the source
+// templates, and after that their Storebuilder products can never be found again.
+// Nothing selected has a Storebuilder product (no slug, no External ID). Allowed, but the job then
+// has nothing to read images from and nothing to drop, so the operator is told before going on.
+const NOT_ON_SB_WARNING = "Storebuilder didn't return a website product (slug or External ID) for " +
+  'any of these templates. The merge job will not be able to load their images from Storebuilder, ' +
+  'and no Storebuilder products will be dropped for the merged items.'
+
+async function chooseOne() {
+  if (!liveSelected.value.length) {
+    const ok = await confirmAction({
+      title: 'No Storebuilder product found',
+      message: NOT_ON_SB_WARNING + '\n\nContinue anyway?',
+      label: 'Continue',
+    })
+    if (!ok) return
+  }
+  busy.value = true
+  try {
+    await products.value.save(selected.value[0])
+    emit('chosen', selected.value[0])
+  } catch (e) {
+    // Frappe has shown the reason
+  } finally {
+    busy.value = false
+  }
+}
+
 async function consolidate() {
   const sources = selected.value.filter((c) => c !== survivor.value)
   const finalCode = renameTo.value.trim() || survivor.value
@@ -256,14 +323,19 @@ async function consolidate() {
     title: 'Merge templates?',
     message: `Merge ${sources.length} template(s) into ${survivor.value}` +
       (renameTo.value.trim() ? `, then rename it to ${finalCode}` : '') +
-      `.\n${totalVariants.value} variants will sit under ${finalCode}. The other templates are removed.`,
+      `.\n${totalVariants.value} variants will sit under ${finalCode}. The other templates are removed.` +
+      (liveSelected.value.length ? '' : '\n\n' + NOT_ON_SB_WARNING),
     label: 'Merge templates',
     danger: true,
   })
   if (!ok) return
   busy.value = true
   try {
-    const res = await itemMergeApi.consolidateTemplates(survivor.value, sources, renameTo.value.trim() || null, confirmSame.value)
+    // The rows go with the call rather than in a save of their own: consolidate_templates records
+    // them in the same transaction as the renames, so a consolidation that fails does not leave
+    // register records behind for a merge that never happened.
+    const res = await itemMergeApi.consolidateTemplates(survivor.value, sources,
+      renameTo.value.trim() || null, confirmSame.value, products.value.rows)
     alertOk(`${res.variants_moved} variant(s) now under ${res.template}`)
     emit('chosen', res.template)
   } catch (e) {
@@ -274,8 +346,8 @@ async function consolidate() {
 }
 
 function refresh() {
-
   if (searched.value) search()
+  products.value?.refresh()
 }
 
 

@@ -322,3 +322,19 @@
 [data-theme="dark"] #item_merge_ui .text-ok { color: #86efac; }
 [data-theme="dark"] #item_merge_ui .text-warn { color: #fde047; }
 [data-theme="dark"] #item_merge_ui .text-danger { color: #fca5a5; }
+
+/* ---- legacy website products: the expander on the variants table and the grid under it ---- */
+#item_merge_ui .im-expand {
+  background: none;
+  border: 0;
+  padding: 0 0.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+#item_merge_ui .im-expand:hover { color: var(--text-color); }
+#item_merge_ui .im-table tbody tr.im-subrow > td { background-color: var(--fg-hover-color, rgba(0, 0, 0, 0.02)); padding: 0.75rem; }
+/* The Frappe grid control brings its own chrome; drop the outer form spacing it assumes. */
+#item_merge_ui .im-slug-grid .frappe-control { margin: 0; }
+#item_merge_ui .im-slug-grid .form-group { margin-bottom: 0; }
+#item_merge_ui .im-slug-grid .grid-heading-row { font-size: 0.75rem; }

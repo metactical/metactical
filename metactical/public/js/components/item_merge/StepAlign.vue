@@ -8,6 +8,10 @@
       <button class="btn btn-default btn-xs ml-auto" @click="emit('back')">Back to variants</button>
     </div>
 
+    <div v-if="aiWarning" class="im-note warn">
+      <b>The AI alignment is not working.</b> {{ aiWarning }}
+    </div>
+
     <!-- the aligner -->
     <section class="im-card">
       <div class="flex items-center flex-wrap gap-2">
@@ -132,6 +136,9 @@
       </div>
     </section>
 
+    <!-- the Storebuilder products this merge deletes, collected before it runs -->
+    <LegacyProducts :template="template" @change="onLegacy" />
+
     <!-- merge options + actions -->
     <section class="im-card">
       <div class="flex flex-wrap items-end gap-4">
@@ -156,7 +163,10 @@
           </div>
         </div>
         <div class="flex flex-col items-end gap-2 ml-auto">
-          <div class="text-muted tabular-nums">{{ pairs.length }} to merge · {{ leftovers.length }} to delete</div>
+          <div class="text-muted tabular-nums">
+            {{ pairs.length }} to merge · {{ leftovers.length }} to delete
+            <span v-if="legacy.dropping"> · {{ legacy.dropping }} website product(s) to drop</span>
+          </div>
           <div class="flex flex-wrap gap-2 justify-end">
             <button v-if="needsFix.length" class="btn btn-warning btn-sm" :disabled="busy" @click="fixSettings">
               {{ busy ? 'Working…' : 'Fix settings on ' + needsFix.length }}
@@ -174,6 +184,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import LegacyProducts from './LegacyProducts.vue'
 import { itemMergeApi } from './api.js'
 import { alertOk, confirmAction, go, itemUrl, pillClass } from './utils.js'
 
@@ -204,6 +215,7 @@ const hints = ref({}) // old item_code -> why the server couldn't pair it
 function place(data) {
   tmpl.value = data.template
   nameAliases.value = data.name_aliases || {}
+  aiWarning.value = data.ai_warning || ''
   const l = []
   const r = []
   for (const row of data.rows) { l.push(row.old); r.push(row.new) }
@@ -255,6 +267,8 @@ function settingsDiff(o, n) {
 // tables the server pairs with - it had lost S, M, L and XXS, so every single-letter size raised a
 // "names differ" warning on a pair the server had matched perfectly well.
 const nameAliases = ref({})
+// Set when the pairing fell back to the built-in name matching, so the operator knows to check it.
+const aiWarning = ref('')
 function nameHas(name, value) {
   const parts = String(name || '').split(' - ').map((s) => s.trim().toLowerCase())
   return [value, ...(nameAliases.value[value] || [])].some((v) => parts.includes(String(v).toLowerCase()))
@@ -337,7 +351,15 @@ const leftovers = computed(() => rows.value.filter((r) => r.status === 'leftover
   .map((r) => r.o.item_code))
 const needsFix = computed(() => rows.value.filter((r) => r.status === 'fix'))
 const noNew = computed(() => !loading.value && right.value.every((v) => !v))
-const canQueue = computed(() => pairs.value.length > 0 && counts.value.blocked === 0 && !editProblems.value.length && !busy.value)
+
+// ---- legacy website products ----
+// The items this merge deletes: the OLD side of every pair, plus the leftovers. Each is its own
+// product on the Storebuilder sites and has to be dropped by hand once ERPNext has let go of it.
+const legacy = ref({ dropping: 0 })
+const onLegacy = (v) => { legacy.value = v }
+
+const canQueue = computed(() => pairs.value.length > 0 && counts.value.blocked === 0 && !editProblems.value.length
+  && !busy.value)
 
 // ---- moving rows: swap keeps every other pair where it is ----
 const sideArr = (side) => (side === 'left' ? left : right)
@@ -433,6 +455,9 @@ async function queue() {
     (changedNames.value ? ` ${changedNames.value} item name(s) and` : ' No item names and') +
     ` ${changedSkus.value || 'no'} retail SKU(s) change as shown.` +
     (mismatches.value ? ` ${mismatches.value} pair(s) have names that don't match - make sure they're lined up right.` : '') +
+    (legacy.value.dropping
+      ? ` Afterwards, ${legacy.value.dropping} legacy product(s) are dropped from the websites and not re-created.`
+      : ' No legacy website products are dropped - nothing was captured on the Find Template screen.') +
     ' Old variants disappear once merged. This writes to ERPNext.'
   const ok = await confirmAction({ title: 'Queue the merge?', message, label: 'Queue merge', danger: true })
   if (!ok) return

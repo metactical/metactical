@@ -1,0 +1,145 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-09-22 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "provider",
+  "column_break_conn",
+  "base_url",
+  "timeout",
+  "section_break_model",
+  "model",
+  "api_key",
+  "column_break_model",
+  "max_output_tokens",
+  "max_items_per_request",
+  "section_break_cost",
+  "input_cost_per_million",
+  "column_break_cost",
+  "output_cost_per_million"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "When off, nothing is sent to the provider and every caller falls back to its built-in logic.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "OpenAI",
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Provider",
+   "options": "OpenAI",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_conn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "https://api.openai.com/v1",
+   "description": "No trailing slash. /chat/completions is appended.",
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL",
+   "reqd": 1
+  },
+  {
+   "default": "60",
+   "description": "Read timeout in seconds. The connect timeout is fixed at 5.",
+   "fieldname": "timeout",
+   "fieldtype": "Int",
+   "label": "Timeout (seconds)"
+  },
+  {
+   "fieldname": "section_break_model",
+   "fieldtype": "Section Break",
+   "label": "Model"
+  },
+  {
+   "default": "gpt-4o-mini",
+   "description": "The chat completions model, e.g. gpt-4o-mini.",
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "reqd": 1
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "column_break_model",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "4096",
+   "description": "Ceiling on the answer. A reply cut short is discarded, so this has to fit the largest batch.",
+   "fieldname": "max_output_tokens",
+   "fieldtype": "Int",
+   "label": "Max Output Tokens"
+  },
+  {
+   "default": "60",
+   "description": "How many items go in one request. Large families are split into several calls so no single answer is truncated.",
+   "fieldname": "max_items_per_request",
+   "fieldtype": "Int",
+   "label": "Max Items Per Request"
+  },
+  {
+   "fieldname": "section_break_cost",
+   "fieldtype": "Section Break",
+   "label": "Cost",
+   "description": "Used only to price the AI Request Log. Provider list prices in USD per million tokens."
+  },
+  {
+   "default": "0.15",
+   "fieldname": "input_cost_per_million",
+   "fieldtype": "Float",
+   "label": "Input Cost Per Million Tokens",
+   "precision": "6"
+  },
+  {
+   "fieldname": "column_break_cost",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.6",
+   "fieldname": "output_cost_per_million",
+   "fieldtype": "Float",
+   "label": "Output Cost Per Million Tokens",
+   "precision": "6"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-22 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "AI Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

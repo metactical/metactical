@@ -1,0 +1,162 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-20 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "product",
+  "external_id",
+  "kind",
+  "lead_source",
+  "price_list",
+  "site",
+  "slug",
+  "new_template",
+  "new_external_id",
+  "new_slug",
+  "source",
+  "verified",
+  "state",
+  "status",
+  "drop_log",
+  "message"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "description": "The legacy template code. It no longer exists as an Item once the merge has run.",
+   "fieldname": "product",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Legacy Product",
+   "read_only": 1
+  },
+  {
+   "description": "The External ID Storebuilder answered with for this legacy product.",
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "Old External ID"
+  },
+  {
+   "default": "Primary",
+   "description": "Duplicate: Storebuilder returned more than one product for this template. The first is kept as the product; every other one is an orphan and is dropped.",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Kind",
+   "options": "Primary\nDuplicate"
+  },
+  {
+   "columns": 2,
+   "fieldname": "lead_source",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Website",
+   "options": "Lead Source",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "in_list_view": 0,
+   "label": "Price List",
+   "options": "Price List",
+   "read_only": 1
+  },
+  {
+   "fieldname": "site",
+   "fieldtype": "Data",
+   "label": "Website",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Slug",
+   "read_only": 1
+  },
+  {
+   "description": "The surviving template this legacy product was consolidated into.",
+   "fieldname": "new_template",
+   "fieldtype": "Data",
+   "label": "New Template"
+  },
+  {
+   "fieldname": "new_external_id",
+   "fieldtype": "Data",
+   "label": "New External ID"
+  },
+  {
+   "description": "The surviving product's slug on this website, so a failed drop can be retried or its images re-loaded without going back to the screen.",
+   "fieldname": "new_slug",
+   "fieldtype": "Data",
+   "label": "New Slug"
+  },
+  {
+   "default": "Lookup",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Lookup\nManual",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "description": "The website confirmed this slug. 0 means the website has no slug endpoint and the operator vouched for it instead.",
+   "fieldname": "verified",
+   "fieldtype": "Check",
+   "label": "Slug Verified",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "Page When Recorded",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "Validated",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Validated\nIssued\nSkipped\nFailed",
+   "read_only": 1
+  },
+  {
+   "description": "The Item Drop and Create Log this row issued",
+   "fieldname": "drop_log",
+   "fieldtype": "Data",
+   "label": "Drop Log",
+   "read_only": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Message",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-20 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Item Merge Job Legacy Product",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

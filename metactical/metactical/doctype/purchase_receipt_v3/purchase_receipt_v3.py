@@ -6,16 +6,21 @@ from frappe.model.document import Document
 
 from metactical.procurement_v3.utils import (
 	F,
+	item_supplier_part_no,
 	mirror_po3_status,
 	v3_may_close_native,
 	v3_open_bo,
+	v3_recalc_totals,
 	v3_reconcile,
 )
 
 
-class GoodsReceiptV3(Document):
+class PurchaseReceiptV3(Document):
 	def validate(self):
 		validate(self)
+
+	def on_update(self):
+		sync_native_pr(self)
 
 	def on_submit(self):
 		post_to_po3(self)
@@ -23,15 +28,21 @@ class GoodsReceiptV3(Document):
 	def before_cancel(self):
 		cancel_guard(self)
 
+	def on_cancel(self):
+		delete_native_pr(self)
+
+	def on_trash(self):
+		delete_native_pr(self)
+
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Validate And Classify"
-# (DocType Event / Before Save on Goods Receipt V3).
+# (DocType Event / Before Save on Purchase Receipt V3).
 #
 # Picks the shipment this count belongs to, lays out the expected lines, and
 # classifies every counted row against what was expected -- Match / Short /
 # Over / Wrong Variant / Wrong Item / Damaged / Unordered -- enforcing a
-# disposition on anything that is not a clean match once counting is done.
+# Reject Reason on every Short line once counting is done.
 #
 # resolve_item and ident stay nested here ON PURPOSE. Supplier Order
 # Confirmation V3 has functions of the same names with DIFFERENT bodies, so
@@ -57,7 +68,9 @@ def validate(doc):
 		return {
 			"rs": frappe.db.get_value("Item", item_code, "ifw_retailskusuffix"),
 			"bc": frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode"),
-			"sp": frappe.db.get_value("Item Supplier", {"parent": item_code, "supplier": supplier}, "supplier_part_no")}
+			# the same fallbacks PO3 and SOC3 use, so the receipt shows the
+			# supplier SKU the order line does
+			"sp": item_supplier_part_no(item_code, supplier)}
 
 
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
@@ -84,10 +97,10 @@ def validate(doc):
 					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
 				onboard = onboard + float(si.qty or 0)
 			taken = 0.0
-			for prior in frappe.get_all("Goods Receipt V3",
+			for prior in frappe.get_all("Purchase Receipt V3",
 					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
 					fields=["name"], limit_page_length=0):
-				for gi in frappe.get_all("Goods Receipt V3 Item",
+				for gi in frappe.get_all("Purchase Receipt V3 Item",
 						filters={"parent": prior.name}, fields=["received_qty"],
 						limit_page_length=0):
 					taken = taken + float(gi.received_qty or 0)
@@ -118,12 +131,12 @@ def validate(doc):
 				shipped_map[si.po3_item] = shipped_map.get(si.po3_item, 0) + float(si.qty or 0)
 
 		# what earlier receipts already took off THIS shipment
-		for p in frappe.get_all("Goods Receipt V3",
+		for p in frappe.get_all("Purchase Receipt V3",
 				filters={"inbound_shipment_v3": doc.inbound_shipment_v3, "docstatus": 1},
 				fields=["name"], limit_page_length=0):
 			if p.name == doc.name:
 				continue
-			for gi in frappe.get_all("Goods Receipt V3 Item", filters={"parent": p.name},
+			for gi in frappe.get_all("Purchase Receipt V3 Item", filters={"parent": p.name},
 					fields=["po3_item", "received_qty"], limit_page_length=0):
 				if gi.po3_item:
 					recv_on_ship[gi.po3_item] = recv_on_ship.get(gi.po3_item, 0) + float(gi.received_qty or 0)
@@ -260,11 +273,15 @@ def validate(doc):
 			d.variance_qty = 0
 		if vt != "Match":
 			var_count += 1
-			if strict and not d.disposition:
-				frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): variance '"
-					+ vt + "' needs a Disposition before this receipt can move on.")
-		if strict and vt == "Match" and not d.disposition:
-			d.disposition = "Accept"
+		# a short line has to say why before the receipt can move on
+		if strict and vt == "Short" and not d.reject_reason:
+			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): counted "
+				+ str(rec) + " of " + str(F(d.expected_qty)) + " expected - set a Reject Reason "
+				+ "before this receipt can move on.")
+		# "Other" is only a reason once it is written down
+		if d.reject_reason == "Other" and not (d.remarks or "").strip():
+			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): Reject "
+				+ "Reason is Other - write the reason in Remarks.")
 
 	doc.has_variance = 1 if var_count else 0
 	doc.variance_count = var_count
@@ -303,14 +320,14 @@ def validate(doc):
 		if over_lines:
 			frappe.msgprint("<b>Counted above what the shipment says it carried.</b><br>"
 				+ "<br>".join(over_lines)
-				+ "<br><br>If the supplier genuinely sent extra, carry on and give the "
-				+ "line a Disposition. If the count is wrong, correct it now - after "
+				+ "<br><br>If the supplier genuinely sent extra, carry on. If the count "
+				+ "is wrong, correct it now - after "
 				+ "posting it becomes an over-receipt on the order.")
 
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Post To PO3"
-# (DocType Event / After Submit on Goods Receipt V3).
+# (DocType Event / After Submit on Purchase Receipt V3).
 #
 # Writes the counted quantities back onto the PO3 lines and re-derives each
 # line status, reconciles the confirmation's backorders and any open shipments,
@@ -324,11 +341,12 @@ def post_to_po3(doc):
 		rows[r.name] = r
 
 	open_bo_before = v3_open_bo(po.name)
+	short_changed = False
 	for d in doc.items:
 		if not d.po3_item:
 			continue
 		# wrong-variant / wrong-item rows do NOT fulfil the ordered line -
-		# the ordered item never arrived; those goods are handled by disposition + claim
+		# the ordered item never arrived; those goods are handled by a supplier claim
 		if d.received_item_code != d.expected_item_code:
 			continue
 		r = rows[d.po3_item]
@@ -350,6 +368,7 @@ def post_to_po3(doc):
 			upd["line_status"] = "Closed Short"
 			upd["short_qty"] = F(r.qty) - rec
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
+		short_changed = short_changed or "short_qty" in upd
 
 	# write receipts back onto the confirmation's Back Orders rows
 	for d in doc.items:
@@ -385,7 +404,7 @@ def post_to_po3(doc):
 	if all_terminal:
 		hdr["receipt_status"] = "Closed Short" if any_short else "Received"
 		hdr["workflow_state"] = "Closed Short" if any_short else "Closed"
-		open_grs = frappe.get_all("Goods Receipt V3",
+		open_grs = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": po.name, "docstatus": 0,
 					"name": ("!=", doc.name)}, fields=["name"], limit_page_length=1)
 		if any_short and po.erp_purchase_order and not open_grs:
@@ -397,6 +416,10 @@ def post_to_po3(doc):
 		if po.workflow_state in ("Sent to Supplier", "Acknowledged"):
 			hdr["workflow_state"] = "Partially Received"
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
+
+	if short_changed:
+		# a line was short-closed, so the order will never be worth what it says
+		v3_recalc_totals(po.name)
 
 	frappe.db.set_value(doc.doctype, doc.name, {
 		"posted_on": frappe.utils.now_datetime(), "posted_by": frappe.session.user})
@@ -411,34 +434,10 @@ def post_to_po3(doc):
 					frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "To Receive and Bill")
 				frappe.msgprint("Native PO " + po.erp_purchase_order
 					+ " was Closed - reopened so this receipt could post.")
-			pr = frappe.new_doc("Purchase Receipt")
-			pr.supplier = doc.supplier
-			pr.company = po.company
-			npo = frappe.db.get_value("Purchase Order", po.erp_purchase_order,
-				["currency", "conversion_rate", "buying_price_list"], as_dict=True)
-			pr.currency = npo.currency
-			pr.conversion_rate = F(npo.conversion_rate) or 1
-			pr.buying_price_list = npo.buying_price_list
-			pr.purchase_order = po.erp_purchase_order
-			for d in doc.items:
-				if F(d.accepted_qty) <= 0 and F(d.rejected_qty) <= 0:
-					continue
-				row = pr.append("items", {})
-				row.item_code = d.received_item_code
-				row.qty = F(d.accepted_qty)
-				row.rejected_qty = F(d.rejected_qty)
-				row.warehouse = doc.warehouse
-				row.rejected_warehouse = doc.rejected_warehouse
-				if d.po3_item and d.received_item_code == d.expected_item_code:
-					r = rows[d.po3_item]
-					row.purchase_order = po.erp_purchase_order
-					row.purchase_order_item = r.erp_po_item
-					row.rate = F(r.rate)
-				row.neb_source_doctype = doc.doctype
-				row.neb_source_name = doc.name
-				row.neb_source_detail = d.name
-				row.neb_box_no = doc.box_no
-			pr.insert()
+			# the draft kept in step while counting, now with the final count
+			pr = draft_native_pr(doc) or frappe.new_doc("Purchase Receipt")
+			fill_native_pr(pr, doc, po, final=True)
+			pr.save()
 			frappe.db.set_value(doc.doctype, doc.name, {"erp_purchase_receipt": pr.name})
 			# The metactical app writes to the PR during insert, so the in-memory
 			# copy is stale - reload before submitting or it fails on timestamp.
@@ -463,7 +462,7 @@ def post_to_po3(doc):
 				frappe.db.set_value(doc.doctype, doc.name, {"post_error": pr_err})
 				frappe.msgprint("<b>Stock NOT updated.</b> Purchase Receipt " + pr.name
 					+ " was created but could not be submitted:<br>" + pr_err
-					+ "<br><br>Fix the cause, then use <b>Retry ERP Posting</b> on this Goods Receipt.")
+					+ "<br><br>Fix the cause, then use <b>Retry ERP Posting</b> on this Purchase Receipt 3.")
 
 	# a receipt supersedes a manual reopen - normal closing rules apply again
 	frappe.db.set_value("Purchase Order V3", po.name, "manually_reopened", 0,
@@ -486,8 +485,130 @@ def post_to_po3(doc):
 
 
 # ---------------------------------------------------------------------------
+# The native Purchase Receipt twin, kept as a draft while counting.
+#
+# Like Purchase Order V3 and its native PO: the twin exists from the first save
+# that has lines, follows every save of the count, and Post to Stock submits
+# that same document rather than raising a new one. Until then it is a draft,
+# so nothing has moved in stock.
+#
+# fill_native_pr is the one place a PR3 is turned into native lines -- posting,
+# Retry ERP Posting and the draft sync all go through it. A draft keeps the
+# lines not counted yet at zero (allow_zero_qty) so it reads like the count
+# sheet; the final fill drops them, as ERPNext will not post a zero line.
+# ---------------------------------------------------------------------------
+def fill_native_pr(pr, doc, po, final):
+	rows = {}
+	for r in po.items:
+		rows[r.name] = r
+	npo = frappe.db.get_value("Purchase Order", po.erp_purchase_order,
+		["currency", "conversion_rate", "buying_price_list"], as_dict=True)
+	pr.supplier = doc.supplier
+	pr.company = po.company
+	pr.currency = npo.currency
+	pr.conversion_rate = F(npo.conversion_rate) or 1
+	pr.buying_price_list = npo.buying_price_list
+	pr.purchase_order = po.erp_purchase_order
+	pr.set("items", [])
+	for d in doc.items:
+		if not d.received_item_code:
+			continue
+		if final and F(d.accepted_qty) <= 0 and F(d.rejected_qty) <= 0:
+			continue
+		row = pr.append("items", {})
+		row.item_code = d.received_item_code
+		row.qty = F(d.accepted_qty)
+		row.rejected_qty = F(d.rejected_qty)
+		row.warehouse = doc.warehouse
+		row.rejected_warehouse = doc.rejected_warehouse
+		# ours, not ERPNext's: it only looks at this exact supplier
+		if d.supplier_part_no:
+			row.supplier_part_no = d.supplier_part_no
+		if d.po3_item and d.received_item_code == d.expected_item_code:
+			r = rows.get(d.po3_item)
+			if r:
+				row.purchase_order = po.erp_purchase_order
+				row.purchase_order_item = r.erp_po_item
+				row.rate = F(r.rate)
+		row.neb_source_doctype = doc.doctype
+		row.neb_source_name = doc.name
+		row.neb_source_detail = d.name
+		row.neb_box_no = doc.box_no
+	pr.flags.allow_zero_qty = not final
+
+
+def draft_native_pr(doc):
+	if doc.erp_purchase_receipt and frappe.db.get_value("Purchase Receipt",
+			doc.erp_purchase_receipt, "docstatus") == 0:
+		return frappe.get_doc("Purchase Receipt", doc.erp_purchase_receipt)
+	return None
+
+
+def sync_native_pr(doc):
+	# on_update also runs on the submit save; posting handles that one
+	if doc.docstatus != 0:
+		return
+	pr = draft_native_pr(doc)
+
+	# a rejected delivery is never posted, so its twin has nothing to become
+	if doc.workflow_state == "Rejected":
+		if pr:
+			frappe.delete_doc("Purchase Receipt", pr.name, force=1, ignore_permissions=True)
+			frappe.db.set_value(doc.doctype, doc.name, "erp_purchase_receipt", None,
+				update_modified=False)
+		return
+
+	# already submitted or cancelled outside this flow - not ours to rewrite
+	if not pr and doc.erp_purchase_receipt and frappe.db.exists("Purchase Receipt",
+			doc.erp_purchase_receipt):
+		return
+	if not frappe.db.get_single_value("Procurement Settings V3", "posting_enabled"):
+		return
+	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
+	# a receipt can only be raised against a submitted native PO
+	if not po.erp_purchase_order or frappe.db.get_value("Purchase Order",
+			po.erp_purchase_order, "docstatus") != 1:
+		return
+	if not any(d.received_item_code for d in doc.items):
+		return
+
+	pr = pr or frappe.new_doc("Purchase Receipt")
+	fill_native_pr(pr, doc, po, final=False)
+	# A twin that will not save must not stop the count being saved - the
+	# receiver is mid-scan. Say why, and Post to Stock tries again with the
+	# final count.
+	frappe.db.savepoint("prv3_native_pr")
+	logged = len(frappe.local.message_log)
+	try:
+		pr.save()
+	except Exception as e:
+		frappe.db.rollback(save_point="prv3_native_pr")
+		# drop the PR's own error popup; the count did save
+		del frappe.local.message_log[logged:]
+		msg = str(e)[:300]
+		doc.post_error = "Draft Purchase Receipt not updated: " + msg
+		frappe.db.set_value(doc.doctype, doc.name, "post_error", doc.post_error,
+			update_modified=False)
+		frappe.msgprint("This count was saved, but the draft Purchase Receipt "
+			+ (doc.erp_purchase_receipt or "") + " was <b>not</b> updated to match:<br><br>" + msg
+			+ "<br><br>Fix the cause and save again.",
+			title="Purchase Receipt not updated", indicator="orange")
+		return
+	doc.erp_purchase_receipt = pr.name
+	doc.post_error = None
+	frappe.db.set_value(doc.doctype, doc.name, {"erp_purchase_receipt": pr.name,
+		"post_error": None}, update_modified=False)
+
+
+def delete_native_pr(doc):
+	if draft_native_pr(doc):
+		frappe.delete_doc("Purchase Receipt", doc.erp_purchase_receipt, force=1,
+			ignore_permissions=True)
+
+
+# ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Cancel Guard"
-# (DocType Event / Before Cancel on Goods Receipt V3).
+# (DocType Event / Before Cancel on Purchase Receipt V3).
 #
 # While the native Purchase Receipt is still submitted the stock it moved is
 # on hand, so that has to be cancelled first -- which rolls the quantities back
@@ -512,7 +633,7 @@ def cancel_guard(doc):
 # item code, retail SKU suffix, every Item Barcode, and this supplier's part
 # numbers, all upper-cased. Called once per receipt and cached client-side.
 #
-# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed to
+# No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed to
 # this dotted path.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
@@ -550,7 +671,7 @@ def v3_gr3_scan_map(po3=None):
 # each, so the form can lay the grid out before anything is saved. Counts are
 # always returned at zero -- the server re-derives them on save.
 #
-# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed here.
+# No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed here.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def v3_gr3_prefill_preview(po3=None, shipment=None):
@@ -571,10 +692,10 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
 				onboard = onboard + float(si.qty or 0)
 			taken = 0.0
-			for prior in frappe.get_all("Goods Receipt V3",
+			for prior in frappe.get_all("Purchase Receipt V3",
 					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
 					fields=["name"], limit_page_length=0):
-				for gi in frappe.get_all("Goods Receipt V3 Item",
+				for gi in frappe.get_all("Purchase Receipt V3 Item",
 						filters={"parent": prior.name}, fields=["received_qty"],
 						limit_page_length=0):
 					taken = taken + float(gi.received_qty or 0)
@@ -593,10 +714,10 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 				fields=["po3_item", "qty"], limit_page_length=0):
 			if si.po3_item:
 				shipped_map[si.po3_item] = shipped_map.get(si.po3_item, 0) + float(si.qty or 0)
-		for p in frappe.get_all("Goods Receipt V3",
+		for p in frappe.get_all("Purchase Receipt V3",
 				filters={"inbound_shipment_v3": ship, "docstatus": 1},
 				fields=["name"], limit_page_length=0):
-			for gi in frappe.get_all("Goods Receipt V3 Item", filters={"parent": p.name},
+			for gi in frappe.get_all("Purchase Receipt V3 Item", filters={"parent": p.name},
 					fields=["po3_item", "received_qty"], limit_page_length=0):
 				if gi.po3_item:
 					recv_on_ship[gi.po3_item] = recv_on_ship.get(gi.po3_item, 0) + float(gi.received_qty or 0)
@@ -626,21 +747,21 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 # Migrated from Server Script "V3 Retry GR3 Posting"
 # (API: v3_retry_gr3_posting).
 #
-# Recovery for a posted Goods Receipt V3 whose native Purchase Receipt never
+# Recovery for a posted Purchase Receipt V3 whose native Purchase Receipt never
 # made it: submits an existing draft PR, or builds and submits a new one.
 # Backs the "Retry ERP Posting" button.
 #
-# No alias in hooks.py: the only caller is goods_receipt_v3.js, repointed here.
+# No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed here.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def v3_retry_gr3_posting(gr3=None):
-	# v3_retry_gr3_posting?gr3=GR3-YYYY-NNNNN
-	# Submits the draft PR a Goods Receipt already created, or creates one if the
+	# v3_retry_gr3_posting?gr3=PR3-YYYY-NNNNN
+	# Submits the draft PR a Purchase Receipt 3 already created, or creates one if the
 	# earlier attempt never got that far. Safe to call repeatedly.
 	name = gr3
 	if not name:
 		frappe.throw("pass gr3=<name>")
-	doc = frappe.get_doc("Goods Receipt V3", name)
+	doc = frappe.get_doc("Purchase Receipt V3", name)
 	if doc.docstatus != 1 or doc.workflow_state != "Posted":
 		frappe.throw(name + " is not Posted - nothing to retry.")
 
@@ -650,7 +771,7 @@ def v3_retry_gr3_posting(gr3=None):
 			frappe.db.set_value(doc.doctype, doc.name, {"post_error": None})
 			frappe.response["message"] = {"status": "already submitted", "pr": pr.name}
 		elif pr.docstatus == 2:
-			frappe.throw("Purchase Receipt " + pr.name + " was cancelled. Amend it in ERP, or cancel this Goods Receipt and re-receive.")
+			frappe.throw("Purchase Receipt " + pr.name + " was cancelled. Amend it in ERP, or cancel this Purchase Receipt 3 and re-receive.")
 		else:
 			try:
 				pr.submit()
@@ -666,11 +787,6 @@ def v3_retry_gr3_posting(gr3=None):
 		po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 		if not po.erp_purchase_order:
 			frappe.throw(po.name + " has no native Purchase Order yet.")
-		rows = {}
-		for r in po.items:
-			rows[r.name] = r
-		npo = frappe.db.get_value("Purchase Order", po.erp_purchase_order,
-			["currency", "conversion_rate", "buying_price_list"], as_dict=True)
 		po_status = frappe.db.get_value("Purchase Order", po.erp_purchase_order, "status")
 		if po_status == "Closed":
 			try:
@@ -680,31 +796,7 @@ def v3_retry_gr3_posting(gr3=None):
 			frappe.msgprint("Native PO " + po.erp_purchase_order
 				+ " was Closed - reopened so this receipt could post.")
 		pr = frappe.new_doc("Purchase Receipt")
-		pr.supplier = doc.supplier
-		pr.company = po.company
-		pr.currency = npo.currency
-		pr.conversion_rate = F(npo.conversion_rate) or 1
-		pr.buying_price_list = npo.buying_price_list
-		pr.purchase_order = po.erp_purchase_order
-		for d in doc.items:
-			if F(d.accepted_qty) <= 0 and F(d.rejected_qty) <= 0:
-				continue
-			row = pr.append("items", {})
-			row.item_code = d.received_item_code
-			row.qty = F(d.accepted_qty)
-			row.rejected_qty = F(d.rejected_qty)
-			row.warehouse = doc.warehouse
-			row.rejected_warehouse = doc.rejected_warehouse
-			if d.po3_item and d.received_item_code == d.expected_item_code:
-				r = rows.get(d.po3_item)
-				if r:
-					row.purchase_order = po.erp_purchase_order
-					row.purchase_order_item = r.erp_po_item
-					row.rate = F(r.rate)
-			row.neb_source_doctype = doc.doctype
-			row.neb_source_name = doc.name
-			row.neb_source_detail = d.name
-			row.neb_box_no = doc.box_no
+		fill_native_pr(pr, doc, po, final=True)
 		pr.insert()
 		frappe.db.set_value(doc.doctype, doc.name, {"erp_purchase_receipt": pr.name})
 		try:

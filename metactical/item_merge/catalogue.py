@@ -65,6 +65,38 @@ def price_lists():
 	return sorted(websites())
 
 
+def storefronts():
+	"""{Lead Source: {"domain":…, "price_list":…}} for every Lead Source with a domain set.
+
+	`websites()` above answers "which price lists does a merge touch", which is what the Item Detail
+	rows and the sync key off. This answers "which websites are there", which is what an operator
+	naming one actually picks. A storefront with no price list can be named but nothing can be
+	routed to it - the drop message and its confirmation both key on the price list - so the caller
+	has to say so rather than silently do nothing.
+	"""
+	def build():
+		out = {}
+		for row in frappe.get_all("Lead Source", filters={"lead_source_domain": ["is", "set"]},
+								  fields=["name", "custom_neb_price_list", "lead_source_domain"]):
+			domain = (row.lead_source_domain or "").lower().strip().split("://")[-1].split("/")[0]
+			out[row.name] = {"domain": domain[4:] if domain.startswith("www.") else domain,
+							 "price_list": row.custom_neb_price_list}
+		return out
+	return cached("storefronts", build)
+
+
+def storefront_names():
+	return sorted(storefronts())
+
+
+def price_list_for(lead_source):
+	return (storefronts().get(lead_source) or {}).get("price_list")
+
+
+def storefront_domain(lead_source):
+	return (storefronts().get(lead_source) or {}).get("domain")
+
+
 def lead_source_for(price_list):
 	return (websites().get(price_list) or {}).get("lead_source")
 

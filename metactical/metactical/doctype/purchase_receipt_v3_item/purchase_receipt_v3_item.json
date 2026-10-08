@@ -22,7 +22,6 @@
   "cb_split",
   "variance_type",
   "variance_qty",
-  "disposition",
   "overage_billed",
   "photo",
   "remarks"
@@ -115,7 +114,9 @@
    "fieldname": "reject_reason",
    "fieldtype": "Select",
    "label": "Reject Reason",
-   "options": "\nDamaged\nDefective\nExpired\nWrong Labelling\nOther"
+   "options": "\nShort Shipped\nDamaged\nDefective\nExpired\nWrong Labelling\nOther",
+   "description": "Required when the line is Short. Other needs the reason written in Remarks.",
+   "mandatory_depends_on": "eval:!in_list(['Draft', 'Counting'], parent.workflow_state) && doc.variance_type == 'Short'"
   },
   {
    "fieldname": "cb_split",
@@ -139,12 +140,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "disposition",
-   "fieldtype": "Select",
-   "label": "Disposition",
-   "options": "\nAccept\nKeep - Free of Charge\nKeep - Claim Credit\nAccept as Substitution\nQuarantine\nReturn to Supplier\nClose Short\nWrite Off"
-  },
-  {
    "default": "0",
    "description": "Supplier invoiced the extra qty. Decides free-of-charge vs claim.",
    "fieldname": "overage_billed",
@@ -159,17 +154,18 @@
   {
    "fieldname": "remarks",
    "fieldtype": "Small Text",
-   "label": "Remarks"
+   "label": "Remarks",
+   "mandatory_depends_on": "eval:doc.reject_reason == 'Other'"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:43.845201",
+ "modified": "2026-10-02 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
- "name": "Goods Receipt V3 Item",
+ "name": "Purchase Receipt V3 Item",
  "owner": "akpoclaudeuser@goldenplazadistributors.com",
  "permissions": [],
  "row_format": "Dynamic",

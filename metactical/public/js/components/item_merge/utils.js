@@ -7,8 +7,13 @@ const PILL = {
   ready: 'green', ok: 'green', done: 'green', created: 'green', exists: 'green', deleted: 'green',
   fix: 'orange', attention: 'orange', interrupted: 'orange', notfound: 'orange', warn: 'orange', check: 'orange',
   blocked: 'red', failed: 'red', mismatch: 'red', error: 'red',
-  running: 'blue', syncing: 'blue', unused: 'blue', planned: 'blue', added: 'blue', new: 'blue',
+  running: 'blue', syncing: 'blue', unused: 'blue', planned: 'blue', added: 'blue', new: 'blue', issued: 'blue',
   queued: 'gray', skipped: 'gray', kept: 'gray', leftover: 'gray', waiting: 'gray', empty: 'gray', old: 'gray',
+  validated: 'gray',
+  // step 1, what Storebuilder holds for a template
+  full: 'green', noexternalid: 'orange', wrongexternalid: 'orange', noslug: 'orange',
+  notconfigured: 'orange', missing: 'red', unchecked: 'gray', nowebsite: 'gray', notonsb: 'gray',
+  zeroprice: 'gray', stale: 'orange', pending: 'blue', ok: 'green',
 }
 export const pillClass = (status) => `indicator-pill ${PILL[String(status || '').toLowerCase()] || 'gray'}`
 
