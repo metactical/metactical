@@ -452,4 +452,4 @@ def screen_version():
 	compares it with the one it loaded and offers a reload."""
 	from frappe.utils import get_assets_json
 
-	return get_assets_json().get("price_grid.bundle.js")
+	return get_assets_json().get("metactical_price_grid.bundle.js")
