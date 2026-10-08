@@ -1,0 +1,200 @@
+{
+ "actions": [],
+ "creation": "2026-09-17 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "price_list",
+  "currency",
+  "old_price",
+  "old_margin_pct",
+  "column_break_old",
+  "suggested_price",
+  "suggested_by_matrix",
+  "suggested_by_margin",
+  "markup_used",
+  "markup_source",
+  "column_break_new",
+  "new_price",
+  "edited",
+  "remove",
+  "new_margin_pct",
+  "margin_delta_pct",
+  "landed_in_list_ccy",
+  "action",
+  "below_floor",
+  "low_margin_exempt",
+  "note"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Item",
+   "in_list_view": 1,
+   "columns": 2,
+   "reqd": 1
+  },
+  {
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "options": "Price List",
+   "label": "Price List",
+   "in_list_view": 1,
+   "columns": 2,
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "options": "Currency",
+   "label": "Currency",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "old_price",
+   "fieldtype": "Currency",
+   "label": "Old Price",
+   "options": "currency",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "old_margin_pct",
+   "fieldtype": "Percent",
+   "label": "Old Margin %",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_old",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "suggested_price",
+   "fieldtype": "Currency",
+   "label": "Suggested",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_by_matrix",
+   "fieldtype": "Currency",
+   "label": "By Markup Matrix",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_by_margin",
+   "fieldtype": "Currency",
+   "label": "By Preserving Margin",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "markup_used",
+   "fieldtype": "Float",
+   "label": "Markup Used",
+   "precision": "4",
+   "read_only": 1
+  },
+  {
+   "fieldname": "markup_source",
+   "fieldtype": "Data",
+   "label": "Markup Matched On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_new",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "new_price",
+   "fieldtype": "Currency",
+   "label": "New Price",
+   "options": "currency",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "edited",
+   "fieldtype": "Check",
+   "label": "Set By Hand",
+   "default": "0",
+   "description": "The new price was typed in the grid. Recalculating keeps it; clear it to go back to the suggestion."
+  },
+  {
+   "fieldname": "remove",
+   "fieldtype": "Check",
+   "label": "Remove Price",
+   "default": "0",
+   "description": "Delete this item's price on this list when the revision is applied. Revert puts it back."
+  },
+  {
+   "fieldname": "new_margin_pct",
+   "fieldtype": "Percent",
+   "label": "New Margin %",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "margin_delta_pct",
+   "fieldtype": "Percent",
+   "label": "Margin Change",
+   "read_only": 1
+  },
+  {
+   "fieldname": "landed_in_list_ccy",
+   "fieldtype": "Currency",
+   "label": "Landed Cost",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "label": "Action",
+   "options": "Update\nHold\nSkip\nReview\nDelete",
+   "default": "Update",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "below_floor",
+   "fieldtype": "Check",
+   "label": "Below Margin Floor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "low_margin_exempt",
+   "fieldtype": "Check",
+   "label": "Low Margin List",
+   "read_only": 1
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Small Text",
+   "label": "Note"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ICL Pricing",
+ "name": "Price Revision Price",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
