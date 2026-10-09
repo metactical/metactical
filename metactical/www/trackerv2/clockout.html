@@ -1,0 +1,74 @@
+{% extends "templates/web.html" %}
+{% block title %}{{ _("Clock out") }}{% endblock %}
+{% block page_content %}
+<style>
+  nav.navbar, footer.web-footer { display: none; }
+  #clockout { max-width: 460px; margin: 40px auto; }
+  #clockout .co-card { border: 1px solid var(--border-color, #d1d8dd); border-radius: 12px; padding: 24px; text-align: center; }
+  #clockout h1 { font-size: 22px; margin: 0 0 8px; }
+  #clockout p { margin: 8px 0; color: var(--text-muted, #6b7280); }
+  #clockout .co-big { font-size: 20px; font-weight: 700; color: var(--text-color, #111); }
+  #clockout button { width: 100%; min-height: 72px; margin-top: 18px; border: 0; border-radius: 12px; font-size: 22px; font-weight: 700; color: #fff; background: #e03636; cursor: pointer; }
+  #clockout button:disabled { opacity: .6; cursor: default; }
+  #clockout a.co-link { display: inline-block; margin-top: 16px; }
+  #clockout .co-err { color: #c22d2d; }
+</style>
+<div id="clockout"><div class="co-card"><p>Loading…</p></div></div>
+{% endblock %}
+{% block script %}
+<script>
+(function () {
+  var root = document.querySelector("#clockout .co-card");
+  var token = new URLSearchParams(location.search).get("t") || "";
+  var api = "/api/method/metactical.time_tracker.api.";
+
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
+  function fmt(iso) {
+    try {
+      return new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+    } catch (e) { return iso; }
+  }
+  function call(method, post) {
+    return fetch(api + method + (post ? "" : "?token=" + encodeURIComponent(token)), {
+      method: post ? "POST" : "GET",
+      headers: { "Content-Type": "application/json", Accept: "application/json", "X-Frappe-CSRF-Token": window.csrf_token || "" },
+      body: post ? JSON.stringify({ token: token }) : undefined,
+    }).then(function (r) {
+      return r.json().then(function (b) {
+        if (!r.ok) {
+          var msg = "This link is not valid or has expired.";
+          try { msg = JSON.parse(JSON.parse(b._server_messages)[0]).message.replace(/<[^>]+>/g, ""); } catch (e) {}
+          throw new Error(msg);
+        }
+        return b.message;
+      });
+    });
+  }
+  function fail(e) { root.innerHTML = '<h1>Link problem</h1><p class="co-err">' + esc(e.message) + '</p><a class="co-link" href="/trackerv2">Open the Time Clock</a>'; }
+
+  function render(i, justDone) {
+    if (i.open) {
+      root.innerHTML =
+        "<h1>Hi " + esc(i.first_name) + ", still clocked in?</h1>" +
+        '<p>You clocked in at</p><p class="co-big">' + esc(fmt(i.since)) + "</p>" +
+        "<p>Pressing the button clocks you out <b>right now</b>.</p>" +
+        '<button id="co-btn">Clock me out now</button>' +
+        '<p style="font-size:13px">Left earlier? Clock out, then log in to the Time Clock and ask for a correction.</p>';
+      document.getElementById("co-btn").onclick = function () {
+        this.disabled = true; this.textContent = "One moment…";
+        call("confirm_clockout", true).then(function (r) { render(r, true); }).catch(fail);
+      };
+    } else {
+      root.innerHTML =
+        "<h1>" + (justDone ? "You're clocked out" : "Already clocked out") + "</h1>" +
+        '<p class="co-big">' + esc(fmt(i.closed_at)) + "</p>" +
+        (i.auto_closed ? "<p>This entry was closed automatically at the end of your shift.</p>" : "") +
+        "<p>If that time isn't right, log in to the Time Clock and ask for a correction.</p>" +
+        '<a class="co-link" href="/trackerv2">Open the Time Clock</a>';
+    }
+  }
+  if (!token) { fail(new Error("This link is not valid or has expired.")); return; }
+  call("get_clockout_link").then(function (i) { render(i, false); }).catch(fail);
+})();
+</script>
+{% endblock %}

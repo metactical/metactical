@@ -6,3 +6,4 @@ import "./canada_post_management.js";
 import "./shipment_rate.js";
 import "./utils.js";
 import "./item_dashboard.js";
+import "./time_clock.js";
