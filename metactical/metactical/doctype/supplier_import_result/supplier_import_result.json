@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "row_no",
+  "match_value",
+  "fallback_value",
+  "item_code",
+  "matched_by",
+  "status",
+  "reason",
+  "action_taken"
+ ],
+ "fields": [
+  {
+   "fieldname": "row_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "File Row",
+   "columns": 1
+  },
+  {
+   "fieldname": "match_value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Primary Match Value",
+   "columns": 1
+  },
+  {
+   "fieldname": "fallback_value",
+   "fieldtype": "Data",
+   "label": "Fallback Match Value",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "columns": 2
+  },
+  {
+   "fieldname": "matched_by",
+   "fieldtype": "Data",
+   "label": "Matched By"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Not Imported\nImported With Issues",
+   "columns": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Reason",
+   "columns": 2
+  },
+  {
+   "fieldname": "action_taken",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "What Happened",
+   "columns": 2
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Import Result",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
