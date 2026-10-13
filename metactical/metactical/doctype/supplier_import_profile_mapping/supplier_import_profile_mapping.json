@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "file_column",
+  "target_doctype",
+  "target_field",
+  "target_field_label",
+  "conversion",
+  "only_if_blank"
+ ],
+ "fields": [
+  {
+   "fieldname": "file_column",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "File Column",
+   "reqd": 1,
+   "columns": 2
+  },
+  {
+   "default": "Item",
+   "fieldname": "target_doctype",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Target Table",
+   "options": "Item\nItem Supplier",
+   "reqd": 1,
+   "columns": 2
+  },
+  {
+   "description": "Start typing the field's label, e.g. Weight or Country",
+   "fieldname": "target_field",
+   "fieldtype": "Autocomplete",
+   "in_list_view": 0,
+   "label": "Target Field",
+   "reqd": 1
+  },
+  {
+   "fieldname": "target_field_label",
+   "fieldtype": "Data",
+   "label": "Target Field",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "conversion",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Conversion",
+   "options": "\nlb to kg\ninch to cm\nCountry Code to Country",
+   "description": "lb to kg also sets Weight UOM to Kg",
+   "columns": 2
+  },
+  {
+   "default": "0",
+   "description": "Leave the existing value alone if the field already has one",
+   "fieldname": "only_if_blank",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Only If Blank",
+   "columns": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Import Profile Mapping",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

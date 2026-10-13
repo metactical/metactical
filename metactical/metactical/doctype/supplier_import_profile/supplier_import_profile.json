@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "autoname": "field:supplier",
+ "creation": "2026-10-13 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "supplier",
+  "enabled",
+  "section_primary_match",
+  "primary_match_on",
+  "primary_match_column",
+  "column_break_fallback",
+  "fallback_match_on",
+  "fallback_match_column",
+  "section_mappings",
+  "mappings"
+ ],
+ "fields": [
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "section_primary_match",
+   "fieldtype": "Section Break",
+   "label": "Matching",
+   "description": "Each file row is matched to an Item by the Primary Match. If that finds nothing, the Fallback Match is tried, and the item then also gets the primary value added (e.g. the barcode)."
+  },
+  {
+   "default": "Barcode",
+   "fieldname": "primary_match_on",
+   "fieldtype": "Select",
+   "label": "Primary Match On",
+   "options": "Barcode\nSupplier Part Number",
+   "reqd": 1
+  },
+  {
+   "description": "Column in the supplier file, e.g. upc",
+   "fieldname": "primary_match_column",
+   "fieldtype": "Data",
+   "label": "Primary Match Column",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fallback",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fallback_match_on",
+   "fieldtype": "Select",
+   "label": "Fallback Match On",
+   "options": "\nBarcode\nSupplier Part Number"
+  },
+  {
+   "depends_on": "fallback_match_on",
+   "mandatory_depends_on": "fallback_match_on",
+   "description": "Column in the supplier file, e.g. sku_code",
+   "fieldname": "fallback_match_column",
+   "fieldtype": "Data",
+   "label": "Fallback Match Column"
+  },
+  {
+   "description": "Every File Column listed here must be present in the uploaded file",
+   "fieldname": "section_mappings",
+   "fieldtype": "Section Break",
+   "label": "Column Mapping"
+  },
+  {
+   "fieldname": "mappings",
+   "fieldtype": "Table",
+   "label": "Mappings",
+   "options": "Supplier Import Profile Mapping"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-13 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Import Profile",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
