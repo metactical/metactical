@@ -4,13 +4,14 @@
 """Update Item profiles (weights, sizes, country, supplier part numbers...) from a supplier's file,
 using that supplier's Supplier Import Profile.
 
-Each file row is matched to one Item by the profile's primary match (barcode or supplier part
-number), and if that finds nothing, by its fallback match. An item found by the fallback also gets
-the primary value added, e.g. the file's barcode, so the next import matches it directly.
+Only items whose default supplier, on the Item Defaults rows of the profile's companies, is the
+profile's supplier are ever matched or updated. Each file row is matched to one of those items by the
+profile's primary match (barcode or supplier part number), and if that finds nothing, by its fallback
+match. A part number only matches a row of the profile's supplier, and only exactly.
 
-Values are written straight to the database. Item.save() is deliberately avoided: its on_update
-pushes to websites, inventory output and the S3 image queue, which is far too much to set off for
-thousands of items at once just to correct weights or a country.
+The file's barcode is only added to an item matched by its exact part number.
+
+Each updated item is saved with Item.save(), so validations, hooks and webhooks run as for a manual edit.
 
 Every row that is not fully imported comes back as a result saying why and what was done instead.
 """
@@ -41,6 +42,8 @@ def get_profile(supplier):
 	profile = frappe.get_doc("Supplier Import Profile", supplier)
 	if not profile.enabled:
 		frappe.throw(_("The Supplier Import Profile for {0} is disabled.").format(frappe.bold(supplier)))
+	if not profile.companies:
+		frappe.throw(_("Set the Companies on the Supplier Import Profile for {0}.").format(frappe.bold(supplier)))
 	return profile
 
 
@@ -75,8 +78,8 @@ def normalize(match_on, value):
 	if match_on == BARCODE:
 		# UPC-A, EAN-13 and numeric cells differ only by leading zeros
 		return clean_text(value).lstrip("0")
-	# Part numbers are compared the way the database does, ignoring case
-	return clean_text(value).upper()
+	# Part numbers must match exactly
+	return clean_text(value)
 
 
 class SupplierImporter:
@@ -106,12 +109,30 @@ class SupplierImporter:
 		self.seen_keys = {}
 		self.seen_items = {}
 		self.countries = {}
+		self.companies = [d.company for d in profile.companies]
+		self.default_suppliers = self.load_default_suppliers()
 		self.index = {match_on: self.build_index(match_on) for match_on in (BARCODE, PART_NO)}
 
 	# ---- matching ------------------------------------------------------------------------------
 
+	def load_default_suppliers(self):
+		"""Item name -> set of default suppliers on its Item Defaults rows of the profile's companies."""
+		defaults = {}
+		for parent, supplier in frappe.db.sql("""select parent, default_supplier from `tabItem Default`
+				where parenttype = 'Item' and company in %s and ifnull(default_supplier, '') != ''""",
+				(tuple(self.companies),)):
+			defaults.setdefault(parent, set()).add(supplier)
+		return defaults
+
+	def is_supplier_item(self, item_code):
+		return self.supplier in self.default_suppliers.get(item_code, ())
+
+	def describe_default(self, item_code):
+		suppliers = self.default_suppliers.get(item_code)
+		return ", ".join(sorted(suppliers)) if suppliers else _("not set")
+
 	def build_index(self, match_on):
-		"""Normalized value -> set of Item names, for the whole file in one query."""
+		"""Normalized value -> set of Item names (whatever their default supplier), in one query."""
 		if match_on == BARCODE:
 			rows = frappe.db.sql("""select barcode as k, parent from `tabItem Barcode`
 				where parenttype = 'Item'""", as_dict=True)
@@ -154,13 +175,19 @@ class SupplierImporter:
 			if value:
 				self.seen_keys[(match_on, normalize(match_on, value))] = row_no
 
-		not_found = []
+		not_found, other_supplier = [], []
 		for match_on, value in values:
 			if not value:
 				continue
-			item_codes = self.index[match_on].get(normalize(match_on, value))
-			if not item_codes:
+			owners = self.index[match_on].get(normalize(match_on, value))
+			if not owners:
 				not_found.append(self.describe(match_on, value))
+				continue
+			item_codes = {code for code in owners if self.is_supplier_item(code)}
+			if not item_codes:
+				other_supplier.append(_("{0} is on {1}").format(self.describe(match_on, value), ", ".join(
+					_("item {0} (default supplier {1})").format(code, self.describe_default(code))
+					for code in sorted(owners))))
 				continue
 			if len(item_codes) > 1:
 				self.add_result(row_no, row, None, NOT_IMPORTED,
@@ -178,9 +205,12 @@ class SupplierImporter:
 			self.seen_items[item_code] = row_no
 			return item_code, match_on
 
-		self.add_result(row_no, row, None, NOT_IMPORTED,
-						_("No item found with {0}").format(_(" or ").join(not_found)),
-						_("Row not imported"))
+		if other_supplier:
+			reason = _("No item with default supplier {0} found: {1}").format(
+				self.supplier, "; ".join(other_supplier + [_("no item has {0}").format(v) for v in not_found]))
+		else:
+			reason = _("No item found with {0}").format(_(" or ").join(not_found))
+		self.add_result(row_no, row, None, NOT_IMPORTED, reason, _("Row not imported"))
 		return None, None
 
 	# ---- conversion ----------------------------------------------------------------------------
@@ -263,19 +293,7 @@ class SupplierImporter:
 				fields=list(supplier_fields), order_by="idx asc"):
 			supplier_rows.setdefault(d.parent, []).append(d)
 
-		max_idx = {}
-		for doctype in ("Item Supplier", "Item Barcode"):
-			max_idx[doctype] = dict(frappe.db.sql(f"""select parent, max(idx) from `tab{doctype}`
-				where parenttype = 'Item' and parent in %s group by parent""", (tuple(item_codes),)))
-
-		defaults = {}
-		for d in frappe.get_all("Item Default",
-				filters={"parent": ["in", item_codes], "parenttype": "Item"},
-				fields=["parent", "default_supplier"]):
-			if d.default_supplier:
-				defaults.setdefault(d.parent, set()).add(d.default_supplier)
-
-		return items, supplier_rows, max_idx, defaults
+		return items, supplier_rows
 
 	# ---- run -----------------------------------------------------------------------------------
 
@@ -306,30 +324,35 @@ class SupplierImporter:
 		if not matched:
 			return
 
-		items, supplier_rows, max_idx, defaults = self.load_items(list({m[2] for m in matched}))
+		items, supplier_rows = self.load_items(list({m[2] for m in matched}))
 		for row_no, row, item_code, matched_by in matched:
 			if not self.dry_run:
 				frappe.db.savepoint("supplier_import_row")
 			try:
-				self.import_row(row_no, row, items[item_code], matched_by, supplier_rows.setdefault(item_code, []),
-								max_idx, defaults.get(item_code, set()))
+				self.import_row(row_no, row, items[item_code], matched_by, supplier_rows.setdefault(item_code, []))
 			except Exception as e:
 				if not self.dry_run:
 					frappe.db.rollback(save_point="supplier_import_row")
 				frappe.log_error(title=f"Item profile import row {row_no}", message=frappe.get_traceback())
+				# Validation messages from Item.save() would otherwise pile up for the whole job
+				frappe.clear_messages()
 				self.add_result(row_no, row, item_code, NOT_IMPORTED,
-								_("Unexpected error: {0}").format(str(e)[:200]),
+								_("Could not update the item: {0}").format(frappe.utils.strip_html(str(e))[:200]),
 								_("Row not imported; nothing was changed on the item"), matched_by)
 
-	def import_row(self, row_no, row, item, matched_by, supplier_rows, max_idx, default_suppliers):
-		problems, done, changes = [], [], []
+	def import_row(self, row_no, row, item, matched_by, supplier_rows):
+		# match_row only returns items whose default supplier is this supplier
+		# key_changes are barcode / part number changes, reported in the reason so they get checked
+		problems, key_changes, done, changes = [], [], [], []
 
-		# Barcode: add the file's barcode when the item was found some other way and doesn't have it
-		if self.barcode_column:
-			problem, note = self.add_barcode(row, item, max_idx)
+		# Barcode: only added to an item found by its exact part number (an item found by barcode has it)
+		new_barcode = None
+		if self.barcode_column and matched_by == PART_NO:
+			new_barcode, problem, note = self.add_barcode(row, item)
 			if problem:
 				problems.append(problem)
 			if note:
+				key_changes.append(note)
 				done.append(note)
 
 		# Item fields
@@ -351,12 +374,13 @@ class SupplierImporter:
 				changes.append((unit[0], item.get(unit[0]), unit[1]))
 
 		# Item Supplier fields, on this supplier's row for the item
-		supplier_updates, target_row, new_row = {}, None, None
+		supplier_updates, target_row, new_row, set_part_no = {}, None, None, None
 		if self.part_no_column or self.supplier_maps:
-			target_row, new_row, problem, note = self.find_supplier_row(row, item, supplier_rows, default_suppliers, max_idx)
+			target_row, new_row, set_part_no, problem, note = self.find_supplier_row(row, item, supplier_rows)
 			if problem:
 				problems.append(problem)
 			if note:
+				key_changes.append(note)
 				done.append(note)
 			for m in self.supplier_maps:
 				value, problem = self.convert(m, self.cell(row, m.file_column))
@@ -379,14 +403,19 @@ class SupplierImporter:
 			done.append(_("Updated {0} supplier row: {1}").format(self.supplier, ", ".join(
 				f"{k} → {fmt(v)}" for k, v in supplier_updates.items())))
 
-		if not self.dry_run:
-			if item_updates:
-				frappe.db.set_value("Item", item.name, item_updates)
-			if supplier_updates:
-				frappe.db.set_value("Item Supplier", target_row.name, supplier_updates)
+		if not self.dry_run and (item_updates or new_barcode or supplier_updates or set_part_no or new_row is not None):
+			doc = frappe.get_doc("Item", item.name)
+			doc.update(item_updates)
+			if new_barcode:
+				doc.append("barcodes", {"barcode": new_barcode})
+			if supplier_updates or set_part_no:
+				supplier_row = next(d for d in doc.supplier_items if d.name == target_row.name)
+				supplier_row.update(supplier_updates)
+				if set_part_no:
+					supplier_row.supplier_part_no = set_part_no
 			if new_row is not None:
-				self.insert_child(item.name, "Item Supplier", "supplier_items", max_idx,
-								  {"supplier": self.supplier, **new_row})
+				doc.append("supplier_items", {"supplier": self.supplier, **new_row})
+			doc.save()
 
 		if self.sample_size and len(self.samples) < self.sample_size and done:
 			self.samples.append({
@@ -398,93 +427,73 @@ class SupplierImporter:
 				"notes": done,
 			})
 
-		if problems:
-			self.add_result(row_no, row, item.name, WITH_ISSUES, "; ".join(problems),
+		if problems or key_changes:
+			self.add_result(row_no, row, item.name, WITH_ISSUES, "; ".join(problems + key_changes),
 							"; ".join(done) or _("Nothing else needed changing"), matched_by)
 		elif done:
 			self.counts["updated"] += 1
 		else:
 			self.counts["unchanged"] += 1
 
-	def insert_child(self, item_code, doctype, parentfield, max_idx, values):
-		idx = cint(max_idx[doctype].get(item_code)) + 1
-		max_idx[doctype][item_code] = idx
-		frappe.get_doc({
-			"doctype": doctype,
-			"parent": item_code,
-			"parenttype": "Item",
-			"parentfield": parentfield,
-			"idx": idx,
-			**values,
-		}).db_insert()
-		frappe.db.set_value("Item", item_code, "modified", frappe.utils.now(), update_modified=False)
-
-	def add_barcode(self, row, item, max_idx):
-		"""Return (problem, note) after adding the file's barcode to the item if it lacks it."""
+	def add_barcode(self, row, item):
+		"""Return (barcode to add, problem, note) for the file's barcode on the item."""
 		barcode = clean_text(self.cell(row, self.barcode_column))
 		key = normalize(BARCODE, barcode)
 		if not key:
-			return None, None
+			return None, None, None
 		owners = self.index[BARCODE].get(key, set())
 		if item.name in owners:
-			return None, None
+			return None, None, None
 		if owners:
-			return _("Barcode {0} is already on item {1}, so it was not added").format(
+			return None, _("Barcode {0} is already on item {1}, so it was not added").format(
 				barcode, ", ".join(sorted(owners))), None
 
-		if not self.dry_run:
-			self.insert_child(item.name, "Item Barcode", "barcodes", max_idx, {"barcode": barcode})
 		self.index[BARCODE][key] = {item.name}
-		return None, _("Added barcode {0}").format(barcode)
+		return barcode, None, _("Added barcode {0}").format(barcode)
 
-	def find_supplier_row(self, row, item, supplier_rows, default_suppliers, max_idx):
-		"""Return (existing row, new row dict, problem, note) for this supplier's row on the item.
+	def find_supplier_row(self, row, item, supplier_rows):
+		"""Return (existing row, new row dict, part no to set on the existing row, problem, note) for
+		this supplier's row on the item.
 
-		The part number decides which row: the one that already has it, else a row of this
-		supplier with no part number yet, else a new row - but a new row is only added when the
-		item's default supplier is this supplier, so we never attach a supplier to an item that
-		buys elsewhere.
+		The part number decides which row: the one that already has it, else an existing row of this
+		supplier gets the file's part number (one with no part number first), else a new row.
 		"""
 		if not self.part_no_column:
 			if supplier_rows:
-				return supplier_rows[0], None, None, None
-			return None, None, _("Item has no {0} supplier row").format(self.supplier), None
+				return supplier_rows[0], None, None, None, None
+			return None, None, None, _("Item has no {0} supplier row").format(self.supplier), None
 
 		part_no = clean_text(self.cell(row, self.part_no_column))
 		if not part_no:
-			return None, None, _("{0} is blank in the file").format(self.part_no_column), None
+			return None, None, None, _("{0} is blank in the file").format(self.part_no_column), None
 
 		key = normalize(PART_NO, part_no)
 		for d in supplier_rows:
 			if normalize(PART_NO, d.supplier_part_no) == key:
-				return d, None, None, None
+				return d, None, None, None, None
 
 		owners = self.index[PART_NO].get(key, set()) - {item.name}
 		if owners:
-			return None, None, _("{0} part no {1} is already on item {2}, so it was not added").format(
+			return None, None, None, _("{0} part no {1} is already on item {2}, so it was not added").format(
 				self.supplier, part_no, ", ".join(sorted(owners))), None
 
-		for d in supplier_rows:
-			if not d.supplier_part_no:
-				if not self.dry_run:
-					frappe.db.set_value("Item Supplier", d.name, "supplier_part_no", part_no)
-				d.supplier_part_no = part_no
-				self.index[PART_NO][key] = {item.name}
-				return d, None, None, _("Set {0} part no {1} on the existing {0} supplier row").format(
-					self.supplier, part_no)
+		if supplier_rows:
+			d = next((d for d in supplier_rows if not d.supplier_part_no), supplier_rows[0])
+			old = d.supplier_part_no
+			if old:
+				self.index[PART_NO].get(normalize(PART_NO, old), set()).discard(item.name)
+				note = _("Changed {0} part no {1} → {2} on the existing {0} supplier row").format(
+					self.supplier, old, part_no)
+			else:
+				note = _("Set {0} part no {1} on the existing {0} supplier row").format(self.supplier, part_no)
+			d.supplier_part_no = part_no
+			self.index[PART_NO][key] = {item.name}
+			return d, None, part_no, None, note
 
-		if self.supplier not in default_suppliers:
-			current = ", ".join(sorted(default_suppliers)) or _("not set")
-			return None, None, _("{0} part no {1} is not on the item and the item's default supplier is {2}, not {0}").format(
-				self.supplier, part_no, current), None
-
-		others = [d.supplier_part_no for d in supplier_rows]
 		supplier_rows.append(frappe._dict(name=None, supplier_part_no=part_no))
 		self.index[PART_NO][key] = {item.name}
-		note = _("Added {0} supplier row with part no {1}").format(self.supplier, part_no)
-		if others:
-			note += _(" (item already had {0} part no {1})").format(self.supplier, ", ".join(others))
-		return None, {"supplier_part_no": part_no}, None, note
+		return None, {"supplier_part_no": part_no}, None, None, _("Added {0} supplier row with part no {1}").format(
+			self.supplier, part_no)
 
 	def add_result(self, row_no, row, item_code, status, reason, action, matched_by=None):
 		self.counts["not_imported" if status == NOT_IMPORTED else "with_issues"] += 1

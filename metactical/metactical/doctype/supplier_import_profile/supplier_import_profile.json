@@ -8,6 +8,7 @@
  "field_order": [
   "supplier",
   "enabled",
+  "companies",
   "section_primary_match",
   "primary_match_on",
   "primary_match_column",
@@ -35,10 +36,18 @@
    "label": "Enabled"
   },
   {
+   "description": "Only the Item Defaults rows of these companies are checked for the item's default supplier",
+   "fieldname": "companies",
+   "fieldtype": "Table MultiSelect",
+   "label": "Companies",
+   "options": "Supplier Import Profile Company",
+   "reqd": 1
+  },
+  {
    "fieldname": "section_primary_match",
    "fieldtype": "Section Break",
    "label": "Matching",
-   "description": "Each file row is matched to an Item by the Primary Match. If that finds nothing, the Fallback Match is tried, and the item then also gets the primary value added (e.g. the barcode)."
+   "description": "Only items whose default supplier (on the Item Defaults rows of the Companies above) is this supplier are matched. Each file row is matched by the Primary Match, and if that finds nothing, by the Fallback Match. Part numbers must match exactly, and the file's barcode is only added to an item matched by its part number."
   },
   {
    "default": "Barcode",
@@ -87,7 +96,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-13 10:00:00.000000",
+ "modified": "2026-10-14 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Import Profile",
