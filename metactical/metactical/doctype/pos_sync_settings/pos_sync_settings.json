@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-10-13 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "server_ip",
+  "username",
+  "password",
+  "column_break_1",
+  "exchange",
+  "exchange_type",
+  "routing_key",
+  "queue_name"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "When on, Food and Beverage items, prices and POS Profiles are published to POSWeb through RabbitMQ on save (the same messages retail uses).",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "server_ip",
+   "fieldtype": "Data",
+   "label": "RabbitMQ Host",
+   "reqd": 1
+  },
+  {
+   "fieldname": "username",
+   "fieldtype": "Data",
+   "label": "Username"
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Password",
+   "label": "Password"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "exchange",
+   "fieldtype": "Data",
+   "label": "Exchange",
+   "reqd": 1
+  },
+  {
+   "default": "topic",
+   "fieldname": "exchange_type",
+   "fieldtype": "Select",
+   "label": "Exchange Type",
+   "options": "topic\ndirect\nfanout"
+  },
+  {
+   "fieldname": "routing_key",
+   "fieldtype": "Data",
+   "label": "Routing Key"
+  },
+  {
+   "description": "The queue POSWeb consumes (RabbitMq:QueueName in its appsettings).",
+   "fieldname": "queue_name",
+   "fieldtype": "Data",
+   "label": "Queue Name",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-13 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "POS Sync Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

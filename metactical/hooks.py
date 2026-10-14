@@ -158,7 +158,19 @@ doc_events = {
 		"on_update": "metactical.custom_scripts.project.project.on_update"
 	},
 	"Item Price": {
-		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
+		"validate": "metactical.custom_scripts.item_price.item_price.on_validate",
+		"on_update": "metactical.custom_scripts.utils.fnb_sync.item_price_on_update",
+		"on_trash": "metactical.custom_scripts.utils.fnb_sync.item_price_on_trash",
+	},
+	# Food and Beverage (restaurant) support: sync to POSWeb + marketing guard
+	"Item": {
+		"on_update": "metactical.custom_scripts.utils.fnb_sync.item_on_update"
+	},
+	"POS Profile": {
+		"on_update": "metactical.custom_scripts.utils.fnb_sync.pos_profile_on_update"
+	},
+	"Email Group Member": {
+		"before_insert": "metactical.custom_scripts.utils.fnb_api.guard_email_group_member"
 	},
 	# "RabbitMQ Config": {
 	# 	"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
@@ -275,6 +287,26 @@ override_whitelisted_methods = {
 fixtures = [{
 		"dt": "Custom Field",
 		"filters": [["name", "in", [
+			'POS Profile-neb_food_and_beverage',
+			'POS Profile-neb_fnb_section',
+			'POS Profile-neb_idle_lock_minutes',
+			'POS Profile-neb_fnb_customer_group',
+			'POS Profile-neb_fnb_item_group',
+			'POS Profile-neb_fnb_column',
+			'POS Profile-neb_tips_payable_account',
+			'POS Profile-neb_slice_cost_account',
+			'POS Profile-neb_slices_per_pie',
+			'Sales Order-neb_order_type',
+			'Sales Order-neb_delivery_area',
+			'Sales Order-neb_tip_amount',
+			'Sales Order-neb_cash_rounding',
+			'Sales Invoice-neb_order_type',
+			'Sales Invoice-neb_delivery_area',
+			'Sales Invoice-neb_tip_amount',
+			'Sales Invoice-neb_cash_rounding',
+			'Customer-neb_owned_by_pos_profile',
+			'Address-neb_delivery_area',
+			'Address-neb_delivery_zone',
 			'Sales Invoice-section_esr',
 			'Sales Invoice-esr_reference',
 			'Sales Invoice-column_esr',

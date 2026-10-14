@@ -47,6 +47,9 @@ def create_opening_entry(*args, **kwargs):
         opening.opening_time = frappe.utils.nowtime()
         opening.company = pos_profile_doc.company
         opening.cash_float = form_data.get("CashFloat")
+        fnb = form_data.get("FoodAndBeverage") or {}
+        if fnb:
+            opening.neb_opening_slices = int(fnb.get("OpeningSlices") or 0)
         
         # Process EOD Cash with validations
         cash_denominations = [100, 50, 20, 10, 5, 2, 1, 0.25, 0.10, 0.05, 0.01]

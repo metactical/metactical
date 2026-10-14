@@ -21,7 +21,8 @@
   "opening_cash",
   "bills_total",
   "coins_total",
-  "total_cash"
+  "total_cash",
+  "neb_opening_slices"
  ],
  "fields": [
   {
@@ -122,12 +123,18 @@
    "fieldtype": "Currency",
    "label": "Total Cash",
    "read_only": 1
+  },
+  {
+   "fieldname": "neb_opening_slices",
+   "fieldtype": "Int",
+   "label": "Opening Slices (Food and Beverage)",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-11-24 00:58:12.577039",
+ "modified": "2026-10-13 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS Opening",

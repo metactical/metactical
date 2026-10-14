@@ -11,6 +11,9 @@ from metactical.custom_scripts.payment_entry.payment_entry import get_payment_en
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from frappe.desk.doctype.tag.tag import add_tag
 from datetime import timedelta
+from metactical.custom_scripts.utils.fnb_api import (
+	get_fnb_profile, apply_fnb_invoice_fields, create_tip_entry_safe, is_fnb_customer, cash_rounding_row, ORDER_TYPES,
+)
 
 @frappe.whitelist()
 def receive_pos_data(*args, **kwargs):
@@ -513,6 +516,17 @@ def create_sales_order(form_data, customer, company=None):
 		"owner": form_data['SalesPerson'],
 		"ifw_store_pickup": 1 if form_data.get('Location') else 0,
 	}
+
+	fnb = get_fnb_profile(form_data.get('POSProfile'))
+	if fnb:
+		order_type = form_data.get('OrderType') or ''
+		so_data.update({
+			'disable_rounded_total': 1,
+			'neb_order_type': order_type if order_type in ORDER_TYPES else '',
+			'neb_tip_amount': flt(form_data.get('Tip')),
+			'neb_cash_rounding': flt(form_data.get('CashRounding')),
+			'neb_delivery_area': (form_data.get('Customer') or {}).get('DeliveryArea') or None,
+		})
  
 	if form_data.get("Location"):
 		so_data.update({'shipping_address_name': company.company_address})
@@ -528,6 +542,10 @@ def create_sales_order(form_data, customer, company=None):
 	so_data.update({'items': items})
 	
 	taxes = get_taxes(form_data, company.company)
+	if fnb:
+		rounding_row = cash_rounding_row(form_data, fnb)
+		if rounding_row:
+			taxes.append(rounding_row)
 	so_data.update({'taxes': taxes})
 		
 	frappe.set_user(form_data['SalesPerson'])
@@ -606,6 +624,7 @@ def get_shipping_address(form_data, customer):
 		"pincode": postal_code,
 		"phone": phone,
 		"email_id": email,
+		"neb_delivery_area": customer_data.get("DeliveryArea") or None,
 		"links": [{
 			"link_doctype": "Customer",
 			"link_name": customer["customer"]
@@ -796,6 +815,9 @@ def submit_sales_order(sales_order, form_data, log):
             # add payment info to sales order
             add_payment_info_to_sales_order(sales_order, form_data)
             
+        if sales_invoice.docstatus == 1:
+            create_tip_entry_safe(sales_invoice, form_data)
+
         # queue_action(sales_invoice, 'submit')
         frappe.set_user("Administrator")
 
@@ -851,6 +873,7 @@ def create_invoice(sales_order, form_data, update_stock=1):
     frappe.set_user(form_data['SalesPerson'])
     payments = get_payments(form_data)
     sales_invoice.update({'payments': payments})
+    apply_fnb_invoice_fields(sales_invoice, form_data)
     sales_invoice.save()
     
     # add a write off amount when there is a difference between the total and the payment amount 
@@ -988,10 +1011,12 @@ def get_customer(form_data):
 			customer = frappe.db.get_value('POS Profile', form_data['POSProfile'] + ' Operators', 'customer')
 			return {"error": "", "success": True, "customer": customer}
 		
+		fnb = get_fnb_profile(form_data.get('POSProfile'))
 		customer = frappe.get_doc({
 			'doctype': 'Customer',
-			'customer_name': form_data['Customer']['FirstName'] + ' ' + form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
-			'customer_group': 'Retail',
+			'customer_name': (form_data['Customer']['FirstName'] + ' ' + (form_data['Customer']['LastName'] or '')).strip(),
+			'customer_group': fnb.neb_fnb_customer_group if fnb and fnb.neb_fnb_customer_group else 'Retail',
+			'neb_owned_by_pos_profile': fnb.name if fnb else None,
 			'territory': 'All Territories',
 			'first_name': form_data['Customer']['FirstName'],
 			'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
@@ -1031,7 +1056,8 @@ def create_address(form_data, customer):
 			'address_type': 'Shipping',
 			'ifw_first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
 			'ifw_last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
-			'address_title': form_data['Customer']['FirstName'] + ' ' + form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
+			'address_title': (form_data['Customer']['FirstName'] + ' ' + (form_data['Customer']['LastName'] or '')).strip(),
+			'neb_delivery_area': form_data['Customer'].get('DeliveryArea') or None,
 			'address_line1': form_data['Customer']['AddressLine1'] if form_data['Customer']['AddressLine1'] else '',
 			'address_line2': form_data['Customer']['AddressLine2'] if form_data['Customer']['AddressLine2'] else '',
 			'city': form_data['Customer']['City'] if form_data['Customer']['City'] else '',
@@ -1971,6 +1997,10 @@ def get_customer_detail(phone=None, email=None):
 			frappe.response["Message"] = "Existing Address Not Found"
 			return
 		
+	if customer and is_fnb_customer(getattr(customer, "name", None)):
+		frappe.response["Message"] = "Existing Address Not Found"
+		return
+
 	billing_address = address.get("Billing") if address else None
 	shipping_address = address.get("Shipping") if address else None
 
