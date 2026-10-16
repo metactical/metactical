@@ -1,0 +1,282 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "INS3-.YYYY.-.#####",
+ "creation": "2026-08-12 13:04:20.711432",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_main",
+  "purchase_order_v3",
+  "supplier",
+  "supplier_name",
+  "supplier_order_confirmation_v3",
+  "cb_main",
+  "ship_date",
+  "expected_arrival",
+  "carrier",
+  "carrier_service",
+  "tracking_no",
+  "tracking_url",
+  "sec_items",
+  "items",
+  "sec_boxes",
+  "boxes",
+  "sec_tot",
+  "total_boxes",
+  "total_qty",
+  "cb_tot",
+  "total_weight_kg",
+  "sec_src",
+  "source_type",
+  "source_document",
+  "notes",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_main",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "purchase_order_v3",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Purchase Order V3",
+   "options": "Purchase Order V3",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "purchase_order_v3.supplier",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "description": "Filled automatically \u2014 there is one confirmation per PO. It governs what this shipment should contain.",
+   "fieldname": "supplier_order_confirmation_v3",
+   "fieldtype": "Link",
+   "label": "Confirmation",
+   "options": "Supplier Order Confirmation V3",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ship_date",
+   "fieldtype": "Date",
+   "label": "Ship Date"
+  },
+  {
+   "allow_on_submit": 1,
+   "columns": 1,
+   "fieldname": "expected_arrival",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expected Arrival"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "carrier",
+   "fieldtype": "Link",
+   "label": "Carrier",
+   "options": "Supplier"
+  },
+  {
+   "description": "Filtered to the carrier chosen above.",
+   "fieldname": "carrier_service",
+   "fieldtype": "Link",
+   "label": "Service",
+   "options": "Carrier Service"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "tracking_no",
+   "fieldtype": "Data",
+   "label": "Tracking No"
+  },
+  {
+   "description": "Built from the carrier\u2019s tracking URL template.",
+   "fieldname": "tracking_url",
+   "fieldtype": "Data",
+   "label": "Track",
+   "options": "URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_items",
+   "fieldtype": "Section Break",
+   "label": "Packing List \u2014 Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Inbound Shipment V3 Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_boxes",
+   "fieldtype": "Section Break",
+   "label": "Packing List \u2014 Boxes"
+  },
+  {
+   "fieldname": "boxes",
+   "fieldtype": "Table",
+   "label": "Boxes",
+   "options": "Inbound Shipment V3 Box"
+  },
+  {
+   "fieldname": "sec_tot",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_boxes",
+   "fieldtype": "Int",
+   "label": "Total Boxes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "label": "Total Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb_tot",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_weight_kg",
+   "fieldtype": "Float",
+   "label": "Total Weight (kg)",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "sec_src",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "source_type",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Manual\nEmail\nInvoice PDF\nEDI\nPortal"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "source_document",
+   "fieldtype": "Attach",
+   "label": "Source Document"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Inbound Shipment V3",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-23 22:42:23.551269",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Inbound Shipment V3",
+ "naming_rule": "Expression (old style)",
+ "owner": "akpoclaudeuser@goldenplazadistributors.com",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "supplier_name",
+ "track_changes": 1
+}

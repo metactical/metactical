@@ -74,6 +74,13 @@ class CustomPurchaseOrder(PurchaseOrder):
 					"minimum order quantity ({2})."
 				).format(item.idx, frappe.bold(item.item_code), min_order_qty))
 
+	def on_workflow_action(self, workflow_action):
+		if workflow_action == "Mark as Sent":
+			frappe.db.set_value("Purchase Order", self.name, {
+				"custom_sent_on": frappe.utils.now_datetime(),
+				"custom_sent_by": frappe.session.user,
+			})
+
 	def before_submit(self):
 		self.barcode_check()
 
@@ -131,9 +138,10 @@ def make_purchase_order_based_on_supplier(source_name, target_doc=None, args=Non
 
 	supplier_items = get_items_based_on_default_supplier(args.get("supplier"))
 	
+	warehouse = args.get("warehouse")
 	material_requests = [mr]
 	if args.get("get_all_items", False):
-		material_requests = get_material_requests_based_on_items(supplier_items)
+		material_requests = get_material_requests_based_on_items(supplier_items, warehouse)
 
 	def postprocess(source, target_doc):
 		target_doc.supplier = args.get("supplier")
@@ -155,6 +163,11 @@ def make_purchase_order_based_on_supplier(source_name, target_doc=None, args=Non
 			{
 				"Material Request": {
 					"doctype": "Purchase Order",
+					# Metactical Customization: Material Request's own buying_price_list
+					# is incidental to the requester, not the supplier being purchased
+					# from — don't let get_mapped_doc auto-copy it onto the PO and clobber
+					# the supplier-driven price list set in set_missing_values() below.
+					"field_no_map": ["buying_price_list"],
 				},
 				"Material Request Item": {
 					"doctype": "Purchase Order Item",
@@ -165,7 +178,7 @@ def make_purchase_order_based_on_supplier(source_name, target_doc=None, args=Non
 						["uom", "uom"],
 					],
 					"postprocess": update_item,
-					"condition": lambda doc: doc.ordered_qty < doc.qty,
+					"condition": open_mr_item_condition(warehouse),
 				},
 			},
 			target_doc,
@@ -185,10 +198,15 @@ def get_items_based_on_default_supplier(supplier):
 
 	return supplier_items
 	
-# Metactical Customization: Get material requests based on default supplier
-def get_material_requests_based_on_items(supplier_items):
+# Metactical Customization: Get material requests based on default supplier.
+# Shared with Purchase Order V3. `warehouse` (the order's Ship To Warehouse)
+# narrows it to requests with a line for that warehouse; blank = any warehouse.
+def get_material_requests_based_on_items(supplier_items, warehouse=None):
 	if not supplier_items:
 		frappe.throw(_("The supplier is not the default supplier for any items."))
+
+	warehouse_condition = "and mr_item.warehouse = %s" if warehouse else ""
+	values = tuple(supplier_items) + ((warehouse,) if warehouse else ())
 
 	material_requests = frappe.db.sql_list("""select distinct mr.name
 		from `tabMaterial Request` mr, `tabMaterial Request Item` mr_item
@@ -198,10 +216,19 @@ def get_material_requests_based_on_items(supplier_items):
 			and mr.per_ordered < 99.99
 			and mr.docstatus = 1
 			and mr.status != 'Stopped'
-		order by mr_item.item_code ASC""" % ', '.join(['%s']*len(supplier_items)),
-		tuple(supplier_items))
+			%s
+		order by mr_item.item_code ASC""" % (', '.join(['%s']*len(supplier_items)), warehouse_condition),
+		values)
 
 	return material_requests
+
+
+# Which Material Request lines get mapped: the part not ordered yet, and -- when
+# a Ship To Warehouse is given -- only lines for that warehouse, since one
+# request can carry lines for several.
+def open_mr_item_condition(warehouse=None):
+	return lambda doc: flt(doc.ordered_qty) < flt(doc.qty) and (
+		not warehouse or doc.warehouse == warehouse)
 
 
 @frappe.whitelist()
@@ -245,6 +272,17 @@ def get_material_requests_based_on_supplier(doctype, txt, searchfield, start, pa
 def set_missing_values(source, target_doc, for_validate=False):
 	if target_doc.doctype == "Purchase Order" and getdate(target_doc.schedule_date) <  getdate(nowdate()):
 		target_doc.schedule_date = None
+
+	# Metactical Customization: price the PO off the Supplier's own default
+	# price list *before* item rates / price list currency are computed below
+	# (super().set_missing_values() fetches item rates against buying_price_list),
+	# falling back to Buying Settings' default when the supplier has none set.
+	if target_doc.doctype == "Purchase Order" and getattr(target_doc, "supplier", None):
+		target_doc.buying_price_list = (
+			frappe.db.get_value("Supplier", target_doc.supplier, "default_price_list")
+			or frappe.db.get_single_value("Buying Settings", "buying_price_list")
+		)
+
 	super(BuyingController, target_doc).set_missing_values(for_validate)
 
 	target_doc.set_supplier_from_item_default()
@@ -341,3 +379,37 @@ def get_billing_shipping_address(supplier_name):
 	shipping_address, billing_address = get_default_supplier_address(supplier_name)
 
 	return {"shipping_address": shipping_address, "billing_address": billing_address}
+
+@frappe.whitelist()
+def make_inbound_shipment(source_name, target_doc=None):
+	def set_missing_values(source, target):
+		target.source_type = "Manual"
+
+	def update_item(obj, target, source_parent):
+		target.shipped_qty = flt(obj.qty) - flt(obj.received_qty)
+
+	doc = get_mapped_doc(
+		"Purchase Order",
+		source_name,
+		{
+			"Purchase Order": {
+				"doctype": "Inbound Shipment",
+				"field_map": {"name": "purchase_order"},
+				"validation": {
+					"docstatus": ["=", 1],
+				},
+			},
+			"Purchase Order Item": {
+				"doctype": "Inbound Shipment Item",
+				"field_map": {
+					"name": "po_detail",
+				},
+				"postprocess": update_item,
+				"condition": lambda doc: abs(doc.received_qty) < abs(doc.qty),
+			},
+		},
+		target_doc,
+		set_missing_values,
+	)
+
+	return doc

@@ -5,16 +5,30 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "websites_section",
+  "storebuilder_websites",
+  "merge_section",
   "use_old_item_price",
   "fields_to_copy",
   "fields_to_overwrite"
  ],
  "fields": [
   {
-   "fieldname": "fields_to_overwrite",
+   "fieldname": "websites_section",
+   "fieldtype": "Section Break",
+   "label": "Storebuilder Websites"
+  },
+  {
+   "description": "One row per website Item Merge should read from Storebuilder.",
+   "fieldname": "storebuilder_websites",
    "fieldtype": "Table",
-   "label": "Fields to Overwrite",
-   "options": "Variant Field"
+   "label": "Storebuilder Websites",
+   "options": "Item Merge Website"
+  },
+  {
+   "fieldname": "merge_section",
+   "fieldtype": "Section Break",
+   "label": "Merge"
   },
   {
    "default": "0",
@@ -27,13 +41,19 @@
    "fieldtype": "Table",
    "label": "Fields to Copy If Not Exist",
    "options": "Variant Field"
+  },
+  {
+   "fieldname": "fields_to_overwrite",
+   "fieldtype": "Table",
+   "label": "Fields to Overwrite",
+   "options": "Variant Field"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-23 05:01:35.781314",
+ "modified": "2026-09-23 06:25:04.577852",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Merge Settings",

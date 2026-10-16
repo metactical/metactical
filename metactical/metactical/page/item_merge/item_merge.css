@@ -1,0 +1,340 @@
+/*
+ * Item Merge page styling.
+ *
+ * Same approach as the S3 Uploader page: Frappe's build does not run Tailwind, so the small set of
+ * utility classes the components use is written out here, plus a few component classes (tables,
+ * stepper, aligner, inline edits). Everything is scoped under #item_merge_ui and uses Frappe's theme
+ * variables, so it follows light and dark mode and nothing leaks into the rest of the desk.
+ * Buttons are Frappe's own (.btn .btn-default/.btn-primary/.btn-danger .btn-xs/.btn-sm) and statuses
+ * are Frappe indicator pills (.indicator-pill green/orange/red/blue/gray).
+ */
+
+#item_merge_ui {
+	color: var(--text-color, #1f2937);
+	font-size: 0.875rem;
+	--im-ok: #16a34a;
+	--im-warn: #d97706;
+	--im-danger: #dc2626;
+	--im-info: #2563eb;
+	--im-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Native Frappe buttons with no hover/focus effect (freeze to base state), as on the S3 Uploader. */
+#item_merge_ui .btn { transition: none; }
+#item_merge_ui .btn:focus,
+#item_merge_ui .btn:focus-visible,
+#item_merge_ui .btn:active { box-shadow: none !important; outline: none !important; }
+#item_merge_ui .btn[disabled] { cursor: not-allowed; }
+
+/* ---- layout ---- */
+#item_merge_ui .block { display: block; }
+#item_merge_ui .inline-flex { display: inline-flex; }
+#item_merge_ui .flex { display: flex; }
+#item_merge_ui .grid { display: grid; }
+#item_merge_ui .hidden { display: none; }
+#item_merge_ui .flex-col { flex-direction: column; }
+#item_merge_ui .flex-wrap { flex-wrap: wrap; }
+#item_merge_ui .flex-1 { flex: 1 1 0%; min-width: 0; }
+#item_merge_ui .flex-shrink-0 { flex-shrink: 0; }
+#item_merge_ui .items-center { align-items: center; }
+#item_merge_ui .items-start { align-items: flex-start; }
+#item_merge_ui .items-end { align-items: flex-end; }
+#item_merge_ui .justify-between { justify-content: space-between; }
+#item_merge_ui .justify-end { justify-content: flex-end; }
+#item_merge_ui .ml-auto { margin-left: auto; }
+#item_merge_ui .w-full { width: 100%; }
+#item_merge_ui .min-w-0 { min-width: 0; }
+#item_merge_ui .overflow-x-auto { overflow-x: auto; }
+#item_merge_ui .overflow-y-auto { overflow-y: auto; }
+#item_merge_ui .max-h-96 { max-height: 24rem; }
+#item_merge_ui .relative { position: relative; }
+
+/* main + side panel: stacks on narrow screens */
+#item_merge_ui .im-split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 992px) {
+	#item_merge_ui .im-split { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+
+/* ---- spacing ---- */
+#item_merge_ui .p-2 { padding: 0.5rem; }
+#item_merge_ui .p-3 { padding: 0.75rem; }
+#item_merge_ui .p-4 { padding: 1rem; }
+#item_merge_ui .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+#item_merge_ui .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+#item_merge_ui .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+#item_merge_ui .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+#item_merge_ui .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+#item_merge_ui .mb-0 { margin-bottom: 0; }
+#item_merge_ui .mb-1 { margin-bottom: 0.25rem; }
+#item_merge_ui .mb-2 { margin-bottom: 0.5rem; }
+#item_merge_ui .mb-3 { margin-bottom: 0.75rem; }
+#item_merge_ui .mb-4 { margin-bottom: 1rem; }
+#item_merge_ui .mt-0 { margin-top: 0; }
+#item_merge_ui .mt-1 { margin-top: 0.25rem; }
+#item_merge_ui .mt-2 { margin-top: 0.5rem; }
+#item_merge_ui .mt-3 { margin-top: 0.75rem; }
+#item_merge_ui .mt-4 { margin-top: 1rem; }
+#item_merge_ui .ml-2 { margin-left: 0.5rem; }
+#item_merge_ui .mr-2 { margin-right: 0.5rem; }
+#item_merge_ui .gap-1 { gap: 0.25rem; }
+#item_merge_ui .gap-2 { gap: 0.5rem; }
+#item_merge_ui .gap-3 { gap: 0.75rem; }
+#item_merge_ui .gap-4 { gap: 1rem; }
+#item_merge_ui .space-y-1 > * + * { margin-top: 0.25rem; }
+#item_merge_ui .space-y-2 > * + * { margin-top: 0.5rem; }
+#item_merge_ui .space-y-3 > * + * { margin-top: 0.75rem; }
+#item_merge_ui .space-y-4 > * + * { margin-top: 1rem; }
+#item_merge_ui .space-y-6 > * + * { margin-top: 1.5rem; }
+
+/* ---- typography ---- */
+#item_merge_ui .text-xs { font-size: 0.75rem; line-height: 1rem; }
+#item_merge_ui .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+#item_merge_ui .text-base { font-size: 1rem; line-height: 1.5rem; }
+#item_merge_ui .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+#item_merge_ui .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+#item_merge_ui .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+#item_merge_ui .font-medium { font-weight: 500; }
+#item_merge_ui .font-semibold { font-weight: 600; }
+#item_merge_ui .font-bold { font-weight: 700; }
+#item_merge_ui .font-mono { font-family: var(--im-mono); }
+#item_merge_ui .text-right { text-align: right; }
+#item_merge_ui .text-center { text-align: center; }
+#item_merge_ui .whitespace-nowrap { white-space: nowrap; }
+#item_merge_ui .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#item_merge_ui .break-all { overflow-wrap: anywhere; }
+#item_merge_ui .tabular-nums { font-variant-numeric: tabular-nums; }
+#item_merge_ui .uppercase { text-transform: uppercase; letter-spacing: 0.04em; }
+#item_merge_ui .text-muted { color: var(--text-muted); }
+#item_merge_ui .text-faint { color: var(--text-light); }
+#item_merge_ui .text-ok { color: var(--im-ok); }
+#item_merge_ui .text-warn { color: var(--im-warn); }
+#item_merge_ui .text-danger { color: var(--im-danger); }
+#item_merge_ui .cursor-pointer { cursor: pointer; }
+#item_merge_ui a.im-link { color: var(--text-color); text-decoration: underline; text-decoration-color: var(--border-color); }
+#item_merge_ui a.im-link:hover { text-decoration-color: currentColor; }
+
+/* Bootstrap gives every bare <label> margin-bottom: 0.5rem; inline labels next to checkboxes don't want it. */
+#item_merge_ui label:not(.block) { margin-bottom: 0; }
+#item_merge_ui label.control-label-sm { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem; }
+
+/* ---- cards (the S3 Uploader's bordered, rounded, lightly shadowed panels) ---- */
+#item_merge_ui .im-card {
+	background-color: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: 0.5rem;
+	box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+	padding: 1rem;
+}
+#item_merge_ui .im-card-title { font-size: 1rem; font-weight: 700; margin: 0; }
+#item_merge_ui .im-lede { color: var(--text-muted); font-size: 0.8125rem; margin: 0.25rem 0 0.75rem; }
+#item_merge_ui .im-label { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+
+/* callouts: info / ok / warn / danger - same palette the S3 Uploader uses for its mode panels */
+#item_merge_ui .im-note { border: 1px solid; border-radius: 0.5rem; padding: 0.625rem 0.75rem; font-size: 0.8125rem; }
+#item_merge_ui .im-note.info { background-color: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+#item_merge_ui .im-note.ok { background-color: #f0fdf4; border-color: #86efac; color: #166534; }
+#item_merge_ui .im-note.warn { background-color: #fefce8; border-color: #fde047; color: #854d0e; }
+#item_merge_ui .im-note.danger { background-color: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+#item_merge_ui .im-note .issue { display: block; margin-top: 0.125rem; }
+
+/* locked template header (green once chosen, like the S3 Uploader's product template panel) */
+#item_merge_ui .im-locked {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
+	background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 0.5rem; padding: 0.625rem 0.875rem;
+}
+#item_merge_ui .im-locked .im-code {
+	font-family: var(--im-mono); font-weight: 700; padding: 0.125rem 0.625rem; border-radius: 9999px;
+	background-color: #bbf7d0; border: 1px solid #86efac; color: #166534;
+}
+
+/* ---- inputs ---- */
+#item_merge_ui input:not([type="checkbox"]):not([type="radio"]),
+#item_merge_ui select,
+#item_merge_ui textarea {
+	background-color: var(--control-bg);
+	color: var(--text-color);
+	border-color: var(--border-color);
+}
+#item_merge_ui .form-control.font-mono { font-family: var(--im-mono); }
+#item_merge_ui .im-link-control .frappe-control { margin-bottom: 0; }
+#item_merge_ui .im-link-control .form-group { margin-bottom: 0; }
+#item_merge_ui input[type="checkbox"], #item_merge_ui input[type="radio"] { margin: 0; vertical-align: middle; }
+
+/* an input inside a table cell with small action buttons at its end (reset, copy from old) */
+#item_merge_ui .im-edit {
+	display: flex; align-items: center; min-width: 0;
+	background-color: var(--control-bg); border: 1px solid transparent; border-radius: 0.375rem;
+}
+#item_merge_ui .im-edit:focus-within { border-color: var(--primary, #2490ef); background-color: var(--card-bg); }
+#item_merge_ui .im-edit input {
+	flex: 1; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important;
+	padding: 0.25rem 0.5rem; font-size: 0.8125rem; outline: none;
+}
+#item_merge_ui .im-edit.font-mono input { font-family: var(--im-mono); }
+#item_merge_ui .im-edit.changed { border-color: #93c5fd; background-color: #eff6ff; }
+#item_merge_ui .im-edit.invalid { border-color: #fca5a5; background-color: #fef2f2; }
+#item_merge_ui .im-edit button {
+	border: 0; background: transparent; color: var(--text-muted); padding: 0 0.375rem; line-height: 1;
+	font-size: 0.8125rem; cursor: pointer;
+}
+#item_merge_ui .im-edit button:hover { color: var(--text-color); }
+
+/* ---- tables ---- */
+#item_merge_ui .im-table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 0.5rem; }
+#item_merge_ui .im-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+#item_merge_ui .im-table th {
+	position: sticky; top: 0; z-index: 1;
+	background-color: var(--subtle-fg, #f9fafb); color: var(--text-muted);
+	font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+	text-align: left; padding: 0.5rem 0.625rem; border-bottom: 1px solid var(--border-color); white-space: nowrap;
+}
+#item_merge_ui .im-table td { padding: 0.4375rem 0.625rem; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+#item_merge_ui .im-table tbody tr:last-child td { border-bottom: 0; }
+#item_merge_ui .im-table tbody tr.clickable { cursor: pointer; }
+#item_merge_ui .im-table tbody tr.clickable:hover td,
+#item_merge_ui .im-table tbody tr.selected td { background-color: var(--fg-hover-color, rgba(0, 0, 0, 0.03)); }
+#item_merge_ui .im-table tbody tr.bad td { background-color: rgba(239, 68, 68, 0.05); }
+#item_merge_ui .im-table .r { text-align: right; }
+#item_merge_ui .im-table.edit td { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+#item_merge_ui .im-sort { border: 0; background: transparent; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; padding: 0; cursor: pointer; }
+#item_merge_ui .im-sort .arrow { opacity: 0.45; margin-left: 0.125rem; }
+#item_merge_ui .im-sort.active .arrow { opacity: 1; }
+#item_merge_ui .im-empty { color: var(--text-muted); text-align: center; padding: 1.5rem 0.5rem; }
+#item_merge_ui .im-row-remove { border: 0; background: transparent; color: var(--text-light); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0.125rem 0.375rem; border-radius: 0.25rem; }
+#item_merge_ui .im-row-remove:hover { color: var(--im-danger); background-color: rgba(239, 68, 68, 0.08); }
+
+#item_merge_ui .indicator-pill { white-space: nowrap; }
+
+/* ---- page tabs + stepper ---- */
+#item_merge_ui .im-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem; }
+#item_merge_ui .im-tabs button {
+	border: 0; background: transparent; color: var(--text-muted); font-weight: 600; font-size: 0.875rem;
+	padding: 0.5rem 0.875rem; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
+}
+#item_merge_ui .im-tabs button:hover { color: var(--text-color); }
+#item_merge_ui .im-tabs button.active { color: var(--text-color); border-bottom-color: var(--text-color); }
+
+#item_merge_ui .im-stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+#item_merge_ui .im-step {
+	display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.75rem; border-radius: 0.5rem;
+	border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-muted); min-width: 0;
+}
+#item_merge_ui .im-step .n {
+	flex-shrink: 0; width: 1.5rem; height: 1.5rem; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center;
+	font-size: 0.75rem; font-weight: 700; background-color: var(--subtle-accent, #f3f4f6); color: var(--text-muted);
+}
+#item_merge_ui .im-step .t { font-weight: 700; font-size: 0.8125rem; color: var(--text-color); }
+#item_merge_ui .im-step .s { font-size: 0.6875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#item_merge_ui .im-step.current { border-color: #93c5fd; background-color: #eff6ff; }
+#item_merge_ui .im-step.current .n { background-color: #2563eb; color: #fff; }
+#item_merge_ui .im-step.done .n { background-color: #22c55e; color: #fff; }
+@media (max-width: 767px) {
+	#item_merge_ui .im-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---- align: OLD | merge | NEW ---- */
+#item_merge_ui .im-aligner { display: grid; grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr); min-width: 1120px; }
+#item_merge_ui .im-aligner .side-head {
+	display: grid; grid-template-columns: 28px 1fr 1.5fr 1fr 44px; gap: 0.5rem; align-items: center;
+	padding: 0.5rem 0.5rem; background-color: var(--subtle-fg, #f9fafb); border-bottom: 1px solid var(--border-color);
+}
+#item_merge_ui .im-aligner .side-head .ttl { font-weight: 800; font-size: 0.75rem; letter-spacing: 0.08em; }
+#item_merge_ui .im-aligner .side-head button { text-align: left; }
+#item_merge_ui .im-aligner .mid-head {
+	display: flex; align-items: center; justify-content: center; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
+	color: var(--text-muted); background-color: var(--subtle-fg, #f9fafb); border-bottom: 1px solid var(--border-color);
+}
+#item_merge_ui .im-aligner .cell-row {
+	display: grid; grid-template-columns: 28px 1fr 1.5fr 1fr 44px; gap: 0.5rem; align-items: center;
+	padding: 0.25rem 0.5rem; min-height: 2.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--card-bg);
+}
+#item_merge_ui .im-aligner .cell-row.empty { background-color: var(--subtle-fg, #f9fafb); }
+#item_merge_ui .im-aligner .cell-row.drag-over { box-shadow: inset 0 0 0 2px #60a5fa; }
+#item_merge_ui .im-aligner .cell-row.dragging { opacity: 0.45; }
+#item_merge_ui .im-aligner .mid-cell {
+	display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.125rem;
+	border-bottom: 1px solid var(--border-color); padding: 0.25rem; text-align: center;
+}
+#item_merge_ui .im-aligner .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
+#item_merge_ui .im-aligner .handle { cursor: grab; color: var(--text-light); text-align: center; user-select: none; }
+#item_merge_ui .im-aligner .movers { display: flex; flex-direction: column; }
+#item_merge_ui .im-aligner .movers button { border: 0; background: transparent; color: var(--text-light); font-size: 0.625rem; line-height: 1.1; padding: 0.0625rem 0.25rem; cursor: pointer; }
+#item_merge_ui .im-aligner .movers button:hover:not([disabled]) { color: var(--text-color); }
+#item_merge_ui .im-aligner .movers button[disabled] { opacity: 0.3; cursor: default; }
+
+/* ---- job view ---- */
+#item_merge_ui .im-progress { height: 0.5rem; border-radius: 9999px; background-color: var(--subtle-accent, #e5e7eb); overflow: hidden; }
+#item_merge_ui .im-progress > div { height: 100%; background-color: #22c55e; transition: width 0.3s ease; }
+#item_merge_ui .im-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; }
+#item_merge_ui .im-kpi { border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.625rem 0.75rem; }
+#item_merge_ui .im-kpi .v { font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+#item_merge_ui .im-kpi .k { font-size: 0.75rem; color: var(--text-muted); }
+#item_merge_ui .im-steps > div { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.375rem 0; border-bottom: 1px dashed var(--border-color); font-size: 0.8125rem; }
+#item_merge_ui .im-steps > div:last-child { border-bottom: 0; }
+#item_merge_ui .im-log {
+	font-family: var(--im-mono); font-size: 0.75rem; line-height: 1.45; max-height: 22rem; overflow: auto;
+	background-color: var(--subtle-fg, #f9fafb); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.625rem 0.75rem;
+	white-space: pre-wrap; word-break: break-word;
+}
+#item_merge_ui .im-log .fail { color: var(--im-danger); }
+#item_merge_ui .im-log .ok { color: var(--im-ok); }
+
+/* ---- modal (bulk add), styled like Frappe's own dialogs ---- */
+#item_merge_ui .im-modal-backdrop {
+	position: fixed; inset: 0; z-index: 1040; background-color: rgba(0, 0, 0, 0.45);
+	display: flex; align-items: flex-start; justify-content: center; padding: 4vh 1rem; overflow-y: auto;
+}
+#item_merge_ui .im-modal {
+	width: min(880px, 100%); background-color: var(--modal-bg, var(--card-bg)); color: var(--text-color);
+	border-radius: 0.75rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid var(--border-color);
+}
+#item_merge_ui .im-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-color); }
+#item_merge_ui .im-modal-header h4 { margin: 0; font-size: 1rem; font-weight: 700; }
+#item_merge_ui .im-modal-body { padding: 1rem; }
+#item_merge_ui .im-modal-footer { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border-color); }
+#item_merge_ui .im-pick-list { border: 1px solid var(--border-color); border-radius: 0.5rem; height: 300px; overflow-y: auto; }
+#item_merge_ui .im-pick-list label { display: flex; align-items: center; gap: 0.5rem; padding: 0.3125rem 0.625rem; cursor: pointer; font-size: 0.8125rem; }
+#item_merge_ui .im-pick-list label:hover { background-color: var(--fg-hover-color, rgba(0, 0, 0, 0.03)); }
+#item_merge_ui .im-pick-list label.on { background-color: #eff6ff; }
+#item_merge_ui .im-bulk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+#item_merge_ui .im-bulk-grid.one { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+	#item_merge_ui .im-bulk-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- animations ---- */
+#item_merge_ui .animate-spin { animation: im-spin 1s linear infinite; display: inline-block; }
+@keyframes im-spin { to { transform: rotate(360deg); } }
+
+/* =====================================================================
+ * Dark mode: soften the pale callouts so they stay readable, as the S3 Uploader does.
+ * ===================================================================== */
+[data-theme="dark"] #item_merge_ui .im-note.info { background-color: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd; }
+[data-theme="dark"] #item_merge_ui .im-note.ok { background-color: rgba(34, 197, 94, 0.12); border-color: rgba(34, 197, 94, 0.4); color: #86efac; }
+[data-theme="dark"] #item_merge_ui .im-note.warn { background-color: rgba(234, 179, 8, 0.12); border-color: rgba(234, 179, 8, 0.4); color: #fde047; }
+[data-theme="dark"] #item_merge_ui .im-note.danger { background-color: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+[data-theme="dark"] #item_merge_ui .im-locked { background-color: rgba(34, 197, 94, 0.12); border-color: rgba(34, 197, 94, 0.4); }
+[data-theme="dark"] #item_merge_ui .im-locked .im-code { background-color: rgba(34, 197, 94, 0.22); border-color: rgba(34, 197, 94, 0.4); color: #86efac; }
+[data-theme="dark"] #item_merge_ui .im-edit.changed { background-color: rgba(59, 130, 246, 0.14); border-color: rgba(59, 130, 246, 0.5); }
+[data-theme="dark"] #item_merge_ui .im-edit.invalid { background-color: rgba(239, 68, 68, 0.14); border-color: rgba(239, 68, 68, 0.5); }
+[data-theme="dark"] #item_merge_ui .im-step.current { background-color: rgba(59, 130, 246, 0.14); border-color: rgba(59, 130, 246, 0.5); }
+[data-theme="dark"] #item_merge_ui .im-pick-list label.on { background-color: rgba(59, 130, 246, 0.14); }
+[data-theme="dark"] #item_merge_ui .text-ok { color: #86efac; }
+[data-theme="dark"] #item_merge_ui .text-warn { color: #fde047; }
+[data-theme="dark"] #item_merge_ui .text-danger { color: #fca5a5; }
+
+/* ---- legacy website products: the expander on the variants table and the grid under it ---- */
+#item_merge_ui .im-expand {
+  background: none;
+  border: 0;
+  padding: 0 0.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+#item_merge_ui .im-expand:hover { color: var(--text-color); }
+#item_merge_ui .im-table tbody tr.im-subrow > td { background-color: var(--fg-hover-color, rgba(0, 0, 0, 0.02)); padding: 0.75rem; }
+/* The Frappe grid control brings its own chrome; drop the outer form spacing it assumes. */
+#item_merge_ui .im-slug-grid .frappe-control { margin: 0; }
+#item_merge_ui .im-slug-grid .form-group { margin-bottom: 0; }
+#item_merge_ui .im-slug-grid .grid-heading-row { font-size: 0.75rem; }

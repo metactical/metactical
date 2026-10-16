@@ -11,7 +11,8 @@
   "nat_skus",
   "nat_sites",
   "nat_images",
-  "nat_metadata"
+  "nat_metadata",
+  "nat_skip_website_push"
  ],
  "fields": [
   {
@@ -59,6 +60,15 @@
    "fieldname": "nat_metadata",
    "fieldtype": "Code",
    "label": "Metadata",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Set only while an automated import is saving this record, so the outbound website webhook does not fire. The webhook's condition must test this field.",
+   "fieldname": "nat_skip_website_push",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Skip Website Push",
    "read_only": 1
   }
  ],

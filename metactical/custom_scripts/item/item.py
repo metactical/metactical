@@ -3,9 +3,10 @@ import json
 from metactical.metactical.doctype.item_inventory_output.item_inventory_output import update_item_inventory_output, get_all_bins_for_product_bundle
 from frappe.integrations.doctype.webhook.webhook import enqueue_webhook
 from erpnext.stock.doctype.item.item import Item
+from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 import datetime
 import requests
-from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
+
 
 class CustomItem(Item):
     def before_rename(self, old_item_code, new_item_code, merge=False):
@@ -89,20 +90,18 @@ class CustomItem(Item):
             else:
                 old_item = new_item
                 old_item.item_code = old_item_code
-            
+
             item_merge_history = frappe.new_doc("Item Merge History")
             item_merge_history.old_item_code = old_item_code
             item_merge_history.new_item_code = new_item_code
-            
             item_merge_history.old_item = self.sanitize(old_item.as_dict())
             item_merge_history.new_item = self.sanitize(new_item.as_dict())
-            
             item_merge_history.insert(ignore_permissions=True)
 
             if merge:
                 if old_item.variant_of:
                     remaining_variants = frappe.db.count("Item", filters={"variant_of": old_item.variant_of, "name": ["!=", old_item_code]})
-                    if remaining_variants == 0 or remaining_variants is None:  
+                    if remaining_variants == 0 or remaining_variants is None:
                         try:
                             frappe.db.delete("Item", old_item.variant_of)
                         except Exception as e:
@@ -111,29 +110,32 @@ class CustomItem(Item):
 
         except Exception as e:
             frappe.log_error(title="Error in after_rename of Item", message=frappe.get_traceback())
-        finally:    
-            repost_item_valuations = frappe.get_list("Repost Item Valuation", 
-                                                    filters={"item_code": new_item_code, "status": "Queued"}, 
-                                                    fields=["name", "warehouse"],
-                                                    order_by="creation desc"
-                                                )
-            if not repost_item_valuations:
-                return
+        finally:
+            # Run any queued item-valuation reposts (created by the base recalculate_bin_qty
+            # during a merge) as background jobs.
+            repost_item_valuations = frappe.get_list(
+                "Repost Item Valuation",
+                filters={"item_code": new_item_code, "status": "Queued"},
+                fields=["name", "warehouse"],
+                order_by="creation desc",
+            )
 
             for repost_item_valuation in repost_item_valuations:
                 if frappe.db.get_value("Warehouse", repost_item_valuation.warehouse, "disabled"):
                     continue
-                
+
                 doc = frappe.get_doc("Repost Item Valuation", repost_item_valuation.name)
                 try:
-                    
                     doc.deduplicate_similar_repost()
-                    frappe.enqueue(repost, doc=doc, queue='long')
-                except Exception as e:
+                    frappe.enqueue(repost, doc=doc, queue="long")
+                except Exception:
                     frappe.log_error(title="Error during reposting item valuation after item merge", message=frappe.get_traceback())
-                    
-            frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='long')
 
+            # Inventory output must run for both plain renames and merges, regardless of
+            # whether there were any reposts to process.
+            frappe.enqueue(update_item_inventory_output, item_code=new_item_code, voucher_type=self.doctype, queue="long")
+            frappe.db.commit()
+            
     def overwrite_item_defaults(self, old_item_code, new_item_code):
         # overwrite item defaults from old item to new item
         old_defaults = frappe.get_all(
@@ -190,21 +192,6 @@ class CustomItem(Item):
                     message=frappe.get_traceback()
                 )
 
-    def repost_bin_qty(self, item_code):
-        bins = frappe.get_all(
-            "Bin",
-            filters={"item_code": item_code},
-            pluck="name",
-        )
-        for bin_name in bins:
-            try:
-                frappe.get_doc("Bin", bin_name).recalculate_qty()
-            except Exception:
-                frappe.log_error(
-                    title="Error recalculating bin qty after rename",
-                    message=frappe.get_traceback(),
-                )
-        
     def copy_barcodes(self, old_item_code, new_item_code):
         old_barcodes = frappe.get_all(
             "Item Barcode",
@@ -316,6 +303,8 @@ class CustomItem(Item):
         if self.request_ai_suggestion and self.drop_and_create_in_websites:
             frappe.throw("You cannot 'Drop and Create in Websites' while requesting AI Suggestion. Please uncheck one of these options or wait until the AI Suggestion is completed.")
 
+        validate_variants_in_websites(self)
+
     def on_update(self):
         super().on_update()
         
@@ -324,15 +313,25 @@ class CustomItem(Item):
         validate_item_group(self)
         self.update_item_inventory_output()
         self.update_sb_tags()
-        
+
+        # Image work lives in its own module; item.py just says when.
+        from metactical.custom_scripts.utils import s3_image_api
+        s3_image_api.queue_retail_sku_change(self)
+
+        self.sync_retail_sku_to_inventory_output()
+
         if self.drop_and_create_in_websites:
             if not self.item_detail:
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
-            
+
+            # A drop and create re-pushes this product's images from the S3 record. Letting it run
+            # while the image import is still writing that record would push a half-built image set.
+            s3_image_api.block_if_image_job_running(self.item_code)
+
             self.create_item_deletion_log()
-        
+
         frappe.flags.renaming = False
-            
+
     def update_sb_tags(self):
         item_specs = {
             (row.label, row.description)
@@ -426,6 +425,20 @@ class CustomItem(Item):
             else:
                 frappe.enqueue(update_item_inventory_output, item_code=self.item_code, voucher_type=self.doctype, queue='default')
                 
+    def sync_retail_sku_to_inventory_output(self):
+        previous = self.get_doc_before_save()
+        if not previous:
+            return
+
+        new_sku = self.get("ifw_retailskusuffix")
+        if previous.get("ifw_retailskusuffix") == new_sku:
+            return
+
+        frappe.db.set_value(
+            "Item Inventory Output", {"item_code": self.name},
+            "ifw_retailskusuffix", new_sku, update_modified=False,
+        )
+
     def create_item_deletion_log(self):
         existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
         for log in existing_active_logs:
@@ -446,6 +459,12 @@ class CustomItem(Item):
             item_deletion_log.status = "Issued"
             item_deletion_log.insert(ignore_permissions=True)
 
+        # Schedule the re-create watchdog now, at drop time, rather than waiting for the first
+        # site to confirm: if a site's product is already gone it has nothing to delete and never
+        # reports back, and if no site reports back nothing would otherwise re-create the item.
+        # deduplicate keeps this to a single watchdog even alongside the first-response one.
+        from metactical.custom_scripts.utils.item_rmq_api import schedule_recreate_watchdog
+        schedule_recreate_watchdog(self.item_code, frappe.session.user)
 
         frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
         self.reload()
@@ -610,7 +629,15 @@ def get_item_details(item_code):
                     setting_found = True
                     url =item_detail_api.api_url + "?slug=" + item_detail.slug
                     
-                    response = requests.get(url, headers={"Authorization": "Bearer " + item_detail_api.api_key})
+                    headers = {
+						"Authorization": "Bearer " + item_detail_api.api_key,
+					}
+                    
+                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
+                    if custom_header:
+                        headers["X-Origin-Verify"] = custom_header
+                                            
+                    response = requests.get(url, headers=headers)                    
                     if response.status_code == 200:
                         data = response.json()
                         
@@ -618,7 +645,10 @@ def get_item_details(item_code):
                             failed_slugs.append({
                                 "message": f"<span class='text-danger'>Slug {item_detail.slug} not found in {site_name}</span>"
                             })
-                                                
+                        elif "error" in data:
+                            failed_slugs.append({
+								"message": f"<span class='text-danger'>Error fetching details for slug {item_detail.slug} from {site_name}: {data.get('error')}</span>"
+							})            
                         else:
                             item_detail_doc = frappe.get_doc("Item Detail", item_detail.name)
                             item_detail_doc.item_name = data.get("Name", "")
@@ -647,3 +677,293 @@ def get_item_details(item_code):
     except Exception as e:
         frappe.log_error(title="Error in get_item_details API", message=frappe.get_traceback())
         frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
+
+
+@frappe.whitelist()
+def preview_item_details(item_code, slug_price_list=None):
+    """Fetch item details from the external APIs and return them without saving.
+
+    Uses the given slug_price_list overrides (a list of {"slug", "price_list"}) instead of the
+    item's saved Item Detail rows when provided.
+    """
+    if not frappe.db.exists("Item", item_code):
+        frappe.response["message"] = f"Item {item_code} not found"
+        frappe.response["status"] = "error"
+        frappe.response["results"] = []
+        return 
+
+    try:
+        if isinstance(slug_price_list, str):
+            slug_price_list = json.loads(slug_price_list) if slug_price_list else None
+
+        if slug_price_list:
+            for entry in slug_price_list:
+                if not entry.get("slug") or not entry.get("price_list"):
+                    frappe.response["message"] = "Each slug_price_list entry must have both slug and price_list"
+                    frappe.response["status"] = "error"
+                    frappe.response["results"] = []
+                    return
+
+        item_detail_apis = frappe.get_all("Item Import Validation", filters={"parentfield": "item_detail_apis"}, fields=["*"])
+
+        if slug_price_list:
+            entries = slug_price_list
+        else:
+            item = frappe.get_doc("Item", item_code)
+            entries = [{"slug": d.slug, "price_list": d.price_list} for d in item.item_detail]
+
+        results = []
+
+        for entry in entries:
+            slug = entry.get("slug")
+            price_list = entry.get("price_list")
+            site_name = price_list.split("-")[-1].strip() if price_list else ""
+
+            setting_found = False
+            for item_detail_api in item_detail_apis:
+                if price_list == item_detail_api.price_list:
+                    setting_found = True
+                    url = item_detail_api.api_url + "?slug=" + slug
+
+                    headers = {
+                        "Authorization": "Bearer " + item_detail_api.api_key,
+                    }
+
+                    custom_header = frappe.get_doc("Item Import Validation", item_detail_api.name).get_password("custom_header") if item_detail_api.get("custom_header") else None
+                    if custom_header:
+                        headers["X-Origin-Verify"] = custom_header
+
+                    response = requests.get(url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+
+                        if data.get("Found") == False:
+                            results.append({
+                                "slug": slug,
+                                "price_list": price_list,
+                                "message": f"<span class='text-danger'>Slug {slug} not found in {site_name}</span>"
+                            })
+                        elif "error" in data:
+                            results.append({
+                                "slug": slug,
+                                "price_list": price_list,
+                                "message": f"<span class='text-danger'>Error fetching details for slug {slug} from {site_name}: {data.get('error')}</span>"
+                            })
+                        else:
+                            results.append({
+                                "slug": slug,
+                                "price_list": price_list,
+                                "item_name": data.get("Name", ""),
+                                "description": data.get("Description", ""),
+                                "productmetasedescription": data.get("ProductMetaSEDescription", ""),
+                                "productmetasekeywords": data.get("ProductMetaSEKeywords", ""),
+                                "productmetasetitle": data.get("ProductMetaSETitle", ""),
+                                "h2": data.get("h2", ""),
+                                "h3": data.get("h3", ""),
+                                "message": f"<span class='text-success'>Successfully fetched details for slug {slug} from {site_name}</span>"
+                            })
+                    else:
+                        results.append({
+                            "slug": slug,
+                            "price_list": price_list,
+                            "message": "Failed to fetch details for slug {0} from API {1}. Status code: {2}".format(slug, item_detail_api.api_url, response.status_code)
+                        })
+
+            if not setting_found:
+                results.append({
+                    "slug": slug,
+                    "price_list": price_list,
+                    "message": "<span class='text-warning'>No API setting found for price list {0}</span>".format(price_list)
+                })
+
+        frappe.response["results"] = results
+        frappe.response["status"] = "success"
+    except Exception as e:
+        frappe.log_error(title="Error in preview_item_details API", message=frappe.get_traceback())
+        frappe.msgprint("An error occurred while fetching item details. Please check the error log for more information.")
+
+
+def validate_variants_in_websites(doc):
+    """Ask every website this product is published to whether its variants are acceptable.
+
+    Called on each Item save. Warn only, never block: a website being unreachable — or rejecting a
+    variant — must not stop anyone saving an item in ERP.
+    """
+    # Bulk paths would fire a request per row, and nobody is there to read the warnings.
+    if (frappe.flags.get("item_from_excel") or frappe.flags.in_import
+            or frappe.flags.in_migrate or frappe.flags.in_install):
+        return
+
+    template = doc.variant_of or doc.item_code
+
+    # Saving a template cascades into a save of every variant (erpnext's Item.update_variants) and
+    # they all resolve to the same family, so validate it once per request.
+    validated = frappe.flags.setdefault("variant_validation_done", set())
+    if template in validated:
+        return
+
+    try:
+        variants = frappe.get_all("Item", filters={"variant_of": template}, order_by="name", pluck="name")
+        if not variants:
+            # A plain item, or a template with no variants yet — nothing to validate.
+            return
+
+        validated.add(template)
+
+        # Use the in-flight document when it is the template, so the retail SKU and price lists
+        # being validated are the ones the user is saving, not the stored copy.
+        template_doc = doc if doc.item_code == template else frappe.get_doc("Item", template)
+
+        # The product is identified by its retail SKU, but most templates carry none — fall
+        # back to the item code, which is always set, rather than skipping the validation.
+        product_external_id = template_doc.ifw_retailskusuffix or template_doc.item_code
+
+        configs = frappe.get_all(
+            "Item Import Validation",
+            filters={"parentfield": "variant_validation_apis", "enabled": 1},
+            fields=["*"]
+        )
+        if not configs:
+            return
+
+        payload = build_variant_payload(product_external_id, variants, doc)
+
+        problems_by_site = {}
+        for item_detail in template_doc.item_detail:
+            site_name = item_detail.price_list.split("-")[-1].strip()
+
+            for config in configs:
+                if item_detail.price_list == config.price_list:
+                    problems = post_variant_validation(config, payload, site_name)
+                    if problems:
+                        problems_by_site.setdefault(site_name, []).extend(problems)
+
+        if problems_by_site:
+            frappe.msgprint(
+                format_variant_problems(problems_by_site),
+                title="Variants need attention",
+                indicator="orange"
+            )
+
+    except Exception as e:
+        frappe.log_error(title="Error in variant validation API", message=frappe.get_traceback())
+        frappe.msgprint("Could not validate the variants against the websites. Please check the error log for more information.")
+
+def build_variant_payload(product_external_id, variants, in_flight_doc=None):
+    """Build the papi_validate_variants body for one product.
+
+    `in_flight_doc` is the document being saved; its own values are used in place of the stored
+    copy, so the user is warned about the edits they are making rather than the ones on disk.
+    """
+    variant_payload = []
+
+    for variant_code in variants:
+        if in_flight_doc is not None and in_flight_doc.item_code == variant_code:
+            variant = in_flight_doc
+        else:
+            variant = frappe.get_doc("Item", variant_code)
+
+        # Specifications the websites use to tell variants apart: label -> chosen description.
+        # Rows with no description carry no selector value, so they are left out.
+        specifications = {}
+        for spec in variant.get("neb_website_specifications") or []:
+            if spec.label and spec.description:
+                specifications[spec.label] = spec.description
+
+        variant_payload.append({
+            "identifier": variant.item_code,
+            "retailSkuSuffix": variant.ifw_retailskusuffix,
+            "specifications": specifications
+        })
+
+    return {
+        "productExternalId": product_external_id,
+        "variants": variant_payload
+    }
+
+def format_variant_problems(problems_by_site):
+    """Render the per-website problems as something readable in a popup.
+
+    One block per website, its problems as a plain list — no error codes, since they say nothing
+    the sentence next to them doesn't already say.
+    """
+    blocks = ["<div style='margin-bottom:6px'>The item was saved, but these websites will not accept its variants:</div>"]
+
+    for site_name, problems in problems_by_site.items():
+        # A site can report the same problem several times — once per offending variant — and the
+        # messages carry no variant name, so the repeats read as identical lines. Show each once.
+        unique_problems = list(dict.fromkeys(problems))
+
+        items = "".join("<li style='margin-bottom:2px'>{0}</li>".format(problem) for problem in unique_problems)
+        blocks.append(
+            "<div style='margin-bottom:8px'><b>{0}</b>"
+            "<ul style='margin:4px 0 0 0; padding-left:18px'>{1}</ul></div>".format(site_name, items)
+        )
+
+    return "".join(blocks)
+
+def post_variant_validation(config, payload, site_name):
+    """Send one product's variants to one website; return what it objected to, in plain words.
+
+    An empty list means the site is happy — nothing is reported on success, since this runs on
+    every save and a confirmation each time would just be noise. The site's name is added by the
+    caller, which groups the problems per website.
+    """
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + config.api_key
+    }
+
+    # Stored as a Password field, so it has to be read back with get_password — a plain read
+    # returns asterisks. Same header the other two callers of these settings send.
+    custom_header = frappe.get_doc("Item Import Validation", config.name).get_password("custom_header") if config.get("custom_header") else None
+    if custom_header:
+        headers["X-Origin-Verify"] = custom_header
+
+    try:
+        response = requests.post(
+            config.api_url,
+            json=payload,
+            headers=headers,
+            # This runs inside a save, so a slow site must not hold the user's form open.
+            timeout=10
+        )
+    except Exception as e:
+        frappe.log_error(
+            title="Variant validation request failed for {0}".format(site_name),
+            message=frappe.get_traceback()
+        )
+        return ["This website could not be reached, so its variants were not checked."]
+
+    if response.status_code != 200:
+        frappe.log_error(
+            title="Variant validation failed for {0}".format(site_name),
+            message="Status: {0}\nResponse: {1}".format(response.status_code, response.text)
+        )
+        return ["This website returned an error ({0}), so its variants were not checked.".format(response.status_code)]
+
+    try:
+        data = response.json() or {}
+    except ValueError:
+        frappe.log_error(
+            title="Variant validation returned invalid JSON for {0}".format(site_name),
+            message=response.text
+        )
+        return ["This website sent back a response we could not read, so its variants were not checked."]
+
+    if data.get("valid"):
+        return []
+
+    errors = data.get("errors") or []
+    if not errors:
+        return ["The variants were rejected, but no reason was given."]
+
+    messages = []
+    for error in errors:
+        # The Message is a full sentence already; the Code repeats it in shouting case.
+        message = error.get("Message") or error.get("message")
+        if not message:
+            message = "Rejected: {0}".format(error.get("Code") or error.get("code") or "no reason given")
+        messages.append(frappe.utils.escape_html(message))
+
+    return messages

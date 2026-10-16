@@ -184,12 +184,18 @@ def _populate(doc, files, override_full_product, template_item):
 				)
 
 
-def upsert_upload(files, override_full_product=0, template_item=None):
+def upsert_upload(files, override_full_product=0, template_item=None, suppress_push=False):
 	"""Upsert one record per product template from the per-FILE upload payload.
 
 	If a record already exists for `template_item` it is updated in place and a
 	timeline comment logs what changed (SKUs / websites / images added or removed);
 	otherwise a new record named "<template> <timestamp>" is created.
+
+	`suppress_push` stops the save firing the outbound website webhook — for imports that
+	built these rows *from* the websites, where pushing straight back would be a round trip
+	to nowhere. It works by setting `nat_skip_website_push`, which the webhook's condition
+	tests; the flag is cleared again once the save is done, since the condition is evaluated
+	during the save and not at the after-commit flush.
 	"""
 	files = [f for f in files if f.get("role") and (f.get("skuItems") or [])]
 	if not files:
@@ -218,6 +224,7 @@ def upsert_upload(files, override_full_product=0, template_item=None):
 		old_state = _doc_state(doc)
 		old_override = 1 if cint(doc.nat_override_full_product) else 0
 		_populate(doc, files, override_full_product, template_item)
+		doc.nat_skip_website_push = 1 if suppress_push else 0
 		doc.save(ignore_permissions=True)
 
 		# Always log the save; spell out exactly what changed (incl. override).
@@ -232,6 +239,7 @@ def upsert_upload(files, override_full_product=0, template_item=None):
 		doc.name = _build_record_name(template_item)
 		doc.flags.name_set = True
 		_populate(doc, files, override_full_product, template_item)
+		doc.nat_skip_website_push = 1 if suppress_push else 0
 		doc.insert(ignore_permissions=True)
 
 		items = ", ".join(sorted({(v or k) for k, v in new_state["skus"].items()})) or "—"
@@ -244,6 +252,14 @@ def upsert_upload(files, override_full_product=0, template_item=None):
 			f"• Websites: {sites}<br>"
 			f"• Images: {len(new_state['images'])}<br>"
 			f"• Override Full Product: {'ON' if new_override else 'OFF'}",
+		)
+
+	if suppress_push:
+		# Put the record back to its normal state now the save that had to be silenced is
+		# done, so the next manual save from the uploader page pushes as it always has.
+		# update_modified=False keeps this off the timeline — it is bookkeeping, not a change.
+		frappe.db.set_value(
+			"S3 Product Image Meta Data", doc.name, "nat_skip_website_push", 0, update_modified=False
 		)
 
 	return doc.name

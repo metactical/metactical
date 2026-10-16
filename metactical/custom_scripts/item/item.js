@@ -42,7 +42,11 @@ frappe.ui.form.on("Item", {
                     limit_page_length: 50 
                 },
                 callback(r) {
-                    const rows = r.message || [];
+                    const rows = (r.message || []).sort((a, b) =>
+                        (a.warehouse || '').localeCompare(b.warehouse || '', undefined, {
+                            numeric: true,
+                            sensitivity: 'base'
+                        }));
                     let html;
                     if (!rows.length) {
                         html = '<div class="text-muted" style="padding:6px 2px;">No Stock Available Currently</div>'; 
@@ -196,7 +200,7 @@ frappe.ui.form.on("Item", {
         grid.add_custom_button(__('Load Data From SB'), function() {
             frappe.call({
                 freeze: true,
-                method: "metactical.custom_scripts.item.item.get_item_details",
+                method: "metactical.custom_scripts.utils.s3_image_api.load_data_from_sb",
                 args: {
                     item_code: frm.doc.item_code
                 },

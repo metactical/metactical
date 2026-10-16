@@ -1,0 +1,188 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-07-17 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "supplier",
+  "purchase_order",
+  "company",
+  "col_b_hdr",
+  "confirmation_date",
+  "promised_ship_date",
+  "source_type",
+  "section_supplier_ref",
+  "supplier_invoice_no",
+  "supplier_ref",
+  "col_b_ref",
+  "ai_parsed",
+  "ai_confidence",
+  "source_document",
+  "section_items",
+  "items",
+  "section_notes",
+  "notes",
+  "workflow_state"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "SOC-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Supplier",
+   "options": "Supplier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Purchase Order",
+   "options": "Purchase Order",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_b_hdr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "confirmation_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Confirmation Date"
+  },
+  {
+   "fieldname": "promised_ship_date",
+   "fieldtype": "Date",
+   "label": "Promised Ship Date"
+  },
+  {
+   "fieldname": "source_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Source Type",
+   "options": "\nEmail\nInvoice PDF\nManual\nEDI",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_supplier_ref",
+   "fieldtype": "Section Break",
+   "label": "References"
+  },
+  {
+   "fieldname": "supplier_invoice_no",
+   "fieldtype": "Data",
+   "label": "Supplier Invoice No"
+  },
+  {
+   "fieldname": "supplier_ref",
+   "fieldtype": "Data",
+   "label": "Supplier Ref / Ack No"
+  },
+  {
+   "fieldname": "col_b_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_parsed",
+   "fieldtype": "Check",
+   "label": "AI Parsed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_confidence",
+   "fieldtype": "Percent",
+   "label": "AI Confidence",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_document",
+   "fieldtype": "Attach",
+   "label": "Source Document (Email/PDF)"
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "Confirmation Lines"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Supplier Order Confirmation Item"
+  },
+  {
+   "fieldname": "section_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "workflow_state",
+   "fieldtype": "Data",
+   "label": "Workflow State",
+   "read_only": 1,
+   "print_hide": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-07-17 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Supplier Order Confirmation",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "purchase_order"
+}

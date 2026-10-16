@@ -7,7 +7,13 @@
  "field_order": [
   "validation_apis",
   "section_break_itpt",
-  "item_detail_apis"
+  "item_detail_apis",
+  "section_break_vvap",
+  "variant_validation_apis",
+  "section_break_imgap",
+  "image_apis",
+  "section_break_pdap",
+  "product_detail_apis"
  ],
  "fields": [
   {
@@ -26,13 +32,43 @@
    "fieldtype": "Table",
    "label": "Item Detail APIs (Slugs and Descriptions)",
    "options": "Item Import Validation"
+  },
+  {
+   "fieldname": "section_break_vvap",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "variant_validation_apis",
+   "fieldtype": "Table",
+   "label": "Variant Validation APIs",
+   "options": "Item Import Validation"
+  },
+  {
+   "fieldname": "section_break_imgap",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "image_apis",
+   "fieldtype": "Table",
+   "label": "Product Image APIs",
+   "options": "Item Import Validation"
+  },
+  {
+   "fieldname": "section_break_pdap",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "product_detail_apis",
+   "fieldtype": "Table",
+   "label": "Product Detail APIs",
+   "options": "Item Import Validation"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-13 09:40:45.164276",
+ "modified": "2026-09-22 06:12:15.100317",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Storebuilder Sync Settings",

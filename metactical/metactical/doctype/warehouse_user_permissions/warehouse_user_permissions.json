@@ -17,7 +17,10 @@
   "material_request_target_warehouse_purchase",
   "material_request_target_warehouse",
   "purchase_receipt_tab",
-  "purchase_receipt_accepted_warehouse"
+  "purchase_receipt_accepted_warehouse",
+  "pps_tab",
+  "pps_source_warehouse",
+  "pps_target_warehouse"
  ],
  "fields": [
   {
@@ -93,6 +96,23 @@
    "fieldtype": "Table",
    "label": "Permitted Target Warehouse (Purchase)",
    "options": "Material Request Permitted Warehouse"
+  },
+  {
+   "fieldname": "pps_tab",
+   "fieldtype": "Tab Break",
+   "label": "PPS"
+  },
+  {
+   "fieldname": "pps_source_warehouse",
+   "fieldtype": "Table",
+   "label": "PPS Permitted Source Warehouses",
+   "options": "User Permitted Warehouse"
+  },
+  {
+   "fieldname": "pps_target_warehouse",
+   "fieldtype": "Table",
+   "label": "PPS Permitted Target Warehouses",
+   "options": "User Permitted Warehouse"
   }
  ],
  "links": [],

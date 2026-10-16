@@ -15,6 +15,7 @@
   "column_break_sd5na",
   "deleted",
   "created",
+  "skip_recreate",
   "section_break_qnhhm",
   "deletion_response",
   "creation_response"
@@ -26,7 +27,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Issued\nRe-Created"
+   "options": "Issued\nRe-Created\nDropped"
   },
   {
    "fieldname": "deletion_response",
@@ -85,11 +86,19 @@
    "fieldname": "slug",
    "fieldtype": "Data",
    "label": "Slug"
+  },
+  {
+   "default": "0",
+   "description": "Remove the product from the website without pushing it back. Set by Item Merge when a merge consolidates this product away; the drop confirmation then skips the re-create.",
+   "fieldname": "skip_recreate",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Skip Recreate"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-30 02:10:44.404182",
+ "modified": "2026-09-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Item Drop and Create Log",

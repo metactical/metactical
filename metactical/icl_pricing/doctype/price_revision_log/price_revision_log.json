@@ -1,0 +1,154 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-09-17 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "price_revision",
+  "item_code",
+  "price_list",
+  "currency",
+  "column_break_1",
+  "old_rate",
+  "new_rate",
+  "item_price",
+  "column_break_2",
+  "action",
+  "changed_on",
+  "changed_by",
+  "reverted",
+  "note"
+ ],
+ "fields": [
+  {
+   "fieldname": "price_revision",
+   "fieldtype": "Link",
+   "options": "Price Revision",
+   "label": "Price Revision",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "options": "Item",
+   "label": "Item",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "price_list",
+   "fieldtype": "Link",
+   "options": "Price List",
+   "label": "Price List",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "options": "Currency",
+   "label": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "old_rate",
+   "fieldtype": "Currency",
+   "options": "currency",
+   "label": "Old Rate",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_rate",
+   "fieldtype": "Currency",
+   "options": "currency",
+   "label": "New Rate",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_price",
+   "fieldtype": "Link",
+   "options": "Item Price",
+   "label": "Item Price Row",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "options": "Applied\nReverted\nCreated\nDeleted",
+   "label": "Action",
+   "read_only": 1
+  },
+  {
+   "fieldname": "changed_on",
+   "fieldtype": "Datetime",
+   "label": "Changed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "changed_by",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Changed By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reverted",
+   "fieldtype": "Check",
+   "label": "Reverted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Small Text",
+   "label": "Note"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ICL Pricing",
+ "name": "Price Revision Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "role": "System Manager",
+   "create": 1,
+   "write": 1,
+   "delete": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User"
+  }
+ ],
+ "sort_field": "changed_on",
+ "sort_order": "DESC",
+ "states": []
+}

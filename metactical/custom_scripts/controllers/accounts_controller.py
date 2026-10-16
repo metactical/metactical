@@ -224,13 +224,28 @@ def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, chil
 			date_unchanged = (
 				prev_date == getdate(new_date) if prev_date and new_date else False
 			)  # in case of delivery note etc
+			supplier_part_no_unchanged = (
+				child_item.get("supplier_part_no") == d.get("supplier_part_no")
+				if parent_doctype == "Purchase Order"
+				else True
+			)
 			if (
 				rate_unchanged
 				and qty_unchanged
 				and conversion_factor_unchanged
 				and uom_unchanged
 				and date_unchanged
+				and supplier_part_no_unchanged
 			):
+				try:
+					# Metactical Customization: Backfill barcode from Item Barcode when the
+					# row doesn't already have one (mirrors Purchase Receipt's validate_barcodes).
+					if not child_item.get("barcode"):
+						barcode = frappe.db.get_value("Item Barcode", {"parent": child_item.item_code}, "barcode")
+						if barcode and child_item.doctype == 'Sales Order Item':
+							frappe.db.set_value(child_item.doctype, child_item.name, "barcode", barcode)
+				except Exception as e:
+					frappe.log_error(title="Error backfilling barcode in update_child_qty_rate", message=frappe.get_traceback())
 				continue
 
 		validate_quantity(child_item, d)
@@ -276,6 +291,9 @@ def update_child_qty_rate(parent_doctype, trans_items, parent_doctype_name, chil
 
 		if d.get("schedule_date") and parent_doctype == "Purchase Order":
 			child_item.schedule_date = d.get("schedule_date")
+
+		if d.get("supplier_part_no") is not None and parent_doctype == "Purchase Order":
+			child_item.supplier_part_no = d.get("supplier_part_no")
 
 		if flt(child_item.price_list_rate):
 			if flt(child_item.rate) > flt(child_item.price_list_rate):

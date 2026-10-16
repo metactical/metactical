@@ -24,7 +24,7 @@ def get_sites():
 	"""Selectable sites: Lead Sources that have a Lead Source Domain set."""
 	return frappe.get_all(
 		"Lead Source",
-		filters={"lead_source_domain": ["!=", ""]},
+		filters={"lead_source_domain": ["is", "set"]},
 		fields=["name"],
 		order_by="name",
 	)

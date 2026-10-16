@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:item_code",
+ "creation": "2026-09-20 09:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "template",
+  "column_break_lwp1",
+  "status",
+  "section_break_lwp2",
+  "websites"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "label": "Legacy Item Code",
+   "description": "The item these Storebuilder products belong to. It stops existing once the merge deletes it, which is why this register is kept outside the Item.",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "template",
+   "fieldtype": "Data",
+   "label": "Captured Under Template",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lwp1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "options": "Captured\nNot Published\nDropped",
+   "default": "Captured",
+   "label": "Status",
+   "description": "Not Published means the operator recorded that this item has no Storebuilder product at all.",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_lwp2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "websites",
+   "fieldtype": "Table",
+   "options": "Legacy Website Product Slug",
+   "label": "Storebuilder Products",
+   "description": "One row per website this item is live on. Three websites is three rows on this one record, not three records.",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-09-20 13:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "Legacy Website Product",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Item Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "item_code",
+ "track_changes": 1
+}

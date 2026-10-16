@@ -26,8 +26,8 @@ add_to_apps_screen = [
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css"]
-app_include_js = ["metactical.bundle.js"]
+app_include_css = ["metactical.bundle.scss", "/assets/metactical/css/metactical_task.css", "metactical_price_grid.bundle.css"]
+app_include_js = ["metactical.bundle.js", "metactical_price_grid.bundle.js"]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/metactical/css/metactical.css"
@@ -66,7 +66,9 @@ doctype_js = {
 	"Packing Slip": "custom_scripts/packing_slip/packing_slip.js",
 	"Email Campaign": "custom_scripts/email_campaign/email_campaign.js",
 	"BOM" : "custom_scripts/bom/bom.js",
-	"Operation": "custom_scripts/bom_operation/bom_operation.js"
+	"Operation": "custom_scripts/bom_operation/bom_operation.js",
+	# Adds the "Revise Prices" button that opens the ICL Pricing grid (merged from the icl_pricing app).
+	"Supplier Order Confirmation V3": "public/js/price_grid_supplier_order_confirmation_v3.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -105,6 +107,7 @@ home_page = "login"
 
 # before_install = "metactical.install.before_install"
 # after_install = "metactical.install.after_install"
+after_install = "metactical.pricing.icl_pricing_setup.after_install"
 
 # Desk Notifications
 # ------------------
@@ -165,6 +168,9 @@ doc_events = {
 	# }, 
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+	},
+	"Repost Item Valuation": {
+		"before_validate": "metactical.custom_scripts.repost_item_valuation.repost_item_valuation.clamp_repost_to_open_period"
 	},
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert"
@@ -228,6 +234,8 @@ scheduler_events = {
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		], "*/1 * * * *": [
 			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
+		], "*/10 * * * *": [
+			"metactical.time_tracker.reminders.run"
 		]
 	}
 }
@@ -244,6 +252,10 @@ after_migrate = "metactical.migrate.after_migrate"
 # ------------------------------
 #
 override_whitelisted_methods = {
+	# Procurement V3 APIs moved from Server Scripts to code. The aliases keep
+	# the original /api/method/<name> endpoints working for external callers.
+	"v3_create_po_from_buylist": "metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.v3_create_po_from_buylist",
+	"v3_soc_bulk_status": "metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3.v3_soc_bulk_status",
 	"erpnext.selling.doctype.sales_order.sales_order.create_pick_list": "metactical.custom_scripts.pick_list.pick_list.create_pick_list",
 	"frappe.utils.print_format.download_pdf": "metactical.print_format.download_pdf",
 	"erpnext.stock.doctype.pick_list.pick_list.create_delivery_note": "metactical.custom_scripts.pick_list.pick_list.create_delivery_note",
@@ -257,7 +269,8 @@ override_whitelisted_methods = {
 	"frappe.core.doctype.scheduled_job_type.scheduled_job_type.execute_event": "metactical.custom_scripts.scheduled_job_type.scheduled_job_type.execute_event",
 	"frappe.model.rename_doc.update_document_title": "metactical.utils.rename_doc.update_document_title",
 	"erpnext.accounts.doctype.sales_invoice.sales_invoice.make_sales_return": "metactical.custom_scripts.sales_invoice.sales_invoice.make_sales_return",
-	"erpnext.stock.dashboard.item_dashboard.get_data": "metactical.custom_scripts.item_dashboard.item_dashboard.get_data"
+	"erpnext.stock.dashboard.item_dashboard.get_data": "metactical.custom_scripts.item_dashboard.item_dashboard.get_data",
+	"preview_item_details": "metactical.custom_scripts.item.item.preview_item_details"
 }
 #
 # each overriding function accepts a `data` argument;
@@ -271,6 +284,21 @@ override_whitelisted_methods = {
 fixtures = [{
 		"dt": "Custom Field",
 		"filters": [["name", "in", [
+			'Bank Account-zoho_section',
+			'Bank Account-zoho_account_id',
+			'Bank Account-zoho_account_code',
+			'Bank Account-zoho_account_sub_type',
+			'Bank Account-zoho_currency',
+			'Bank Account-zoho_col_break_1',
+			'Bank Account-zoho_book_balance',
+			'Bank Account-zoho_bank_balance',
+			'Bank Account-zoho_balance_difference',
+			'Bank Account-zoho_section_feed',
+			'Bank Account-zoho_uncategorized_transactions',
+			'Bank Account-zoho_feed_status',
+			'Bank Account-zoho_col_break_2',
+			'Bank Account-zoho_feeds_last_refresh_date',
+			'Bank Account-zoho_last_synced_on',
 			'Sales Invoice-section_esr',
 			'Sales Invoice-esr_reference',
 			'Sales Invoice-column_esr',
@@ -952,6 +980,26 @@ fixtures = [{
 			"Item-custom_column_break_jbo41",
 			"Item-custom_tax",
 			"Item-custom_column_break_zxgjb",
+			"Sales Order Item-barcode",
+			"Warehouse-warehouse_role",
+			"Warehouse-root_warehouse",
+			"Supplier-custom_tracking_url_template",
+			"Purchase Order-custom_po3_status",
+			"Supplier Claim V3-workflow_state",
+			"Inbound Shipment V3-workflow_state",
+			"Purchase Receipt V3-workflow_state",
+			"Supplier Order Confirmation V3-workflow_state",
+			"Purchase Order V3-workflow_state",
+			"Purchase Order-custom_purchase_order_v3",
+			"Supplier-po3_print_format",
+			"Supplier-po3_cc_email",
+			"Supplier-po3_order_email",
+			"Supplier-po3_section",
+			"Supplier-section_break_e11nr",
+			"Supplier-custom_column_break_duesj",
+			"Supplier-custom_sender_address",
+			"Supplier-custom_sender_email",
+			"Supplier-po3_section"
 		]]]
 	},
 	{
@@ -1546,6 +1594,7 @@ fixtures = [{
 			"Item-stock_uom-depends_on",
 			"Item-country_of_origin-depends_on",
 			"Item-customs_tariff_number-depends_on",
+			"Supplier-main-field_order",
 		]]]
 	},
   	{
@@ -1553,6 +1602,72 @@ fixtures = [{
 	},
 	{
 		"dt": "City Symbol"
+	},
+	{
+		"dt": "Workflow State",
+		"filters": [["name", "in", [
+			"Acknowledged",
+			"Approved",
+			"Awaiting Supplier",
+			"Cancelled",
+			"Closed",
+			"Closed Short",
+			"Confirmed",
+			"Counting",
+			"Discrepancy Hold",
+			"Draft",
+			"In Transit",
+			"Open",
+			"Partially Received",
+			"Pending",
+			"Pending Approval",
+			"Pending L1 Approval",
+			"Pending L2 Approval",
+			"Pending Review",
+			"Posted",
+			"Ready to Post",
+			"Received",
+			"Rejected",
+			"Resolved",
+			"Sent to Supplier",
+			"Variance Review",
+		]]]
+	},
+	{
+		"dt": "Workflow Action Master",
+		"filters": [["name", "in", [
+			"Accept Variances",
+			"Approve",
+			"Await Supplier",
+			"Cancel",
+			"Close",
+			"Close Short",
+			"Finish Counting",
+			"Mark Acknowledged",
+			"Mark Resolved",
+			"Mark Sent",
+			"Open Claim",
+			"Post",
+			"Post to Stock",
+			"Reject",
+			"Reject Delivery",
+			"Reopen",
+			"Resolve",
+			"Return for Rework",
+			"Review",
+			"Start Count",
+			"Supplier Cancelled",
+		]]]
+	},
+	{
+		"dt": "Workflow",
+		"filters": [["name", "in", [
+			"Purchase Receipt V3 Flow",
+			"Inbound Shipment V3 Flow",
+			"Purchase Order V3 Flow",
+			"Supplier Claim V3 Flow",
+			"Supplier Order Confirmation V3 Flow",
+		]]]
 	},
 	{
 		"dt": "Email Template",
@@ -1577,6 +1692,8 @@ jinja = {
 		"metactical.custom_scripts.utils.metactical_utils.custom_parse_json",
 		"metactical.custom_scripts.utils.metactical_utils.get_refund_details_for_print",
 		"metactical.metactical.page.s3_uploader.s3_uploader.s3_product_payload",
+		"metactical.custom_scripts.utils.pps_order_config.get_order_warehouse_bin_config",
+		"metactical.custom_scripts.utils.pps_user_access.get_user_access_sync_payload",
 	]
 }
 

@@ -11,6 +11,7 @@ try:
 except ImportError:
 	pass
 
+
 def check_app_permission():
 	import frappe
 	from frappe.utils.user import is_website_user
