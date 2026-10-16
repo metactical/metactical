@@ -1837,6 +1837,19 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
     """, {"item_codes": item_codes, "warehouses": all_warehouses}, as_dict=True)
     last_reconciliation_map = {(row.item_code, row.warehouse): row.last_reconciliation for row in recon_rows}
 
+    # Most recent SOC V3 line per item (line_status, backorder_eta, eta_tbd)
+    soc_rows = frappe.db.sql("""
+        SELECT s.item_code, s.line_status, s.backorder_eta, s.eta_tbd
+        FROM `tabSupplier Order Confirmation V3 Item` s
+        INNER JOIN (
+            SELECT item_code, MAX(modified) AS max_modified
+            FROM `tabSupplier Order Confirmation V3 Item`
+            WHERE item_code IN %(item_codes)s
+            GROUP BY item_code
+        ) latest ON s.item_code = latest.item_code AND s.modified = latest.max_modified
+    """, {"item_codes": item_codes}, as_dict=True)
+    soc_map = {row.item_code: row for row in soc_rows}
+
     # Attach inventory and pricing data
     for item in items:
         item.branches = {}
@@ -1911,6 +1924,7 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
         on_order = get_on_order_quantity(item.item_code, branch_warehouse)
         cost = get_item_cost(item.item_code) if can_see_item_cost else "-"
 
+        soc = soc_map.get(item.item_code, {})
         item_details.append({
             "Sku": item.item_code,
             "ItemName": item.item_name,
@@ -1935,7 +1949,10 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
             "Tags": item.tags,
-            "Branches": item.branches
+            "Branches": item.branches,
+            "SocLineStatus": soc.get("line_status") or "",
+            "SocBackorderEta": str(soc.get("backorder_eta") or ""),
+            "SocEtaTbd": bool(soc.get("eta_tbd"))
         })
 
     frappe.response.update({
