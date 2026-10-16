@@ -298,7 +298,7 @@ class CustomItem(Item):
         if not frappe.flags.get("item_from_excel"):
             frappe.flags.in_import = False
 
-        self.description = self.item_name
+        # self.description = self.item_name
             
         if self.request_ai_suggestion and self.drop_and_create_in_websites:
             frappe.throw("You cannot 'Drop and Create in Websites' while requesting AI Suggestion. Please uncheck one of these options or wait until the AI Suggestion is completed.")
