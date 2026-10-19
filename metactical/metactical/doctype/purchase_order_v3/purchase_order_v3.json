@@ -28,6 +28,7 @@
   "billing_address_display",
   "cb_shipto",
   "sender_email_account",
+  "disable_sending_email",
   "sender_email",
   "supplier_email",
   "cc_email",
@@ -457,13 +458,18 @@
    "label": "Get Items from Open Material Requests"
   },
   {
-   "description": "Taken from the Sender Email Account.",
-   "fetch_from": "sender_email_account.email_id",
+   "description": "From the Supplier; can be overridden. The PO email is sent from this address.",
    "fieldname": "sender_email",
    "fieldtype": "Data",
    "label": "Sender Email Address",
-   "options": "Email",
-   "read_only": 1
+   "options": "Email"
+  },
+  {
+   "default": "0",
+   "description": "When checked, approving this PO does not email it to the supplier.",
+   "fieldname": "disable_sending_email",
+   "fieldtype": "Check",
+   "label": "Disable Sending Email"
   },
   {
    "description": "From Supplier master; the account the PO email is sent from.",
@@ -500,7 +506,7 @@
    "link_fieldname": "purchase_order_v3"
   }
  ],
- "modified": "2026-09-24 15:41:00.308286",
+ "modified": "2026-10-19 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3",

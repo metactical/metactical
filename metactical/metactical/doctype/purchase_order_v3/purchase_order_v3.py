@@ -293,12 +293,12 @@ def validate(doc):
 		if not doc.sender_email_account:
 			doc.sender_email_account = frappe.db.get_value(
 				"Supplier", doc.supplier, "nat_sender_email_account")
-
-	# sender_email is read-only and derived, so keep it tied to the account. The
-	# field's fetch_from resolves before validate runs, which misses an account
-	# defaulted from the supplier just above.
-	doc.sender_email = frappe.db.get_value("Email Account", doc.sender_email_account, "email_id") \
-		if doc.sender_email_account else None
+		# Sender Email Address defaults from the supplier but stays editable, so a
+		# user's override is never replaced here -- only a blank one is filled.
+		if not doc.sender_email:
+			doc.sender_email = frappe.db.get_value("Supplier", doc.supplier, "nat_sender_email") \
+				or (frappe.db.get_value("Email Account", doc.sender_email_account, "email_id")
+					if doc.sender_email_account else None)
 
 	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
 
@@ -448,7 +448,8 @@ def resolve_currency(doc):
 #
 # On approval: syncs the final lines onto the native PO twin and submits it
 # (gated by Procurement Settings V3.posting_enabled), then emails the order to
-# the supplier and flips the state to Sent to Supplier when that succeeds.
+# the supplier and flips the state to Sent to Supplier when that succeeds --
+# unless Disable Sending Email is checked on the order.
 # ---------------------------------------------------------------------------
 def auto_send_on_approve(doc):
 	posting = frappe.db.get_single_value("Procurement Settings V3", "posting_enabled")
@@ -523,7 +524,27 @@ def auto_send_on_approve(doc):
 				frappe.msgprint("<b>Native PO " + npo.name + " was NOT submitted.</b><br>"
 					+ err + "<br><br>Fix the cause, then use <b>Retry Native PO</b> on this order.")
 
-	if doc.workflow_state == "Approved" and doc.supplier_email:
+	# Disable Sending Email: the order stays Approved / Not Sent, to be sent by hand.
+	if doc.workflow_state == "Approved" and doc.supplier_email and not doc.disable_sending_email:
+		# Only send from the PO's own Sender Email Account, as an address that has
+		# an outgoing Email Account behind it. Never fall back to the default
+		# outgoing account: with no sender, or one Frappe can't match, it would
+		# quietly send the PO over the default account's server instead.
+		why = None
+		if not doc.sender_email_account:
+			why = "No Sender Email Account is set on this PO."
+		elif not doc.sender_email:
+			why = "No Sender Email Address is set on this PO."
+		elif not frappe.db.exists("Email Account",
+				{"email_id": doc.sender_email, "enable_outgoing": 1}):
+			why = ("No Email Account with Enable Outgoing uses the Sender Email Address <b>"
+				+ doc.sender_email + "</b>.")
+		if why:
+			frappe.db.set_value(doc.doctype, doc.name, {"send_status": "Failed"})
+			frappe.msgprint("<b>PO email was NOT sent.</b> " + why + " Fix the sender, "
+				"then send the PO to the supplier manually.", indicator="red")
+			mirror_po3_status(doc.name)
+			return
 		pdf = None
 		try:
 			# PO print formats are written against native Purchase Order fields
@@ -545,11 +566,10 @@ def auto_send_on_approve(doc):
 		try:
 			frappe.sendmail(
 				recipients=[doc.supplier_email],
-				# Sender Address -> Sender Email Address, so each order can go out
-				# from the address it belongs to. Frappe matches this against an
-				# outgoing Email Account (EmailAccount.find_outgoing); with no
-				# match it still sends, but over the default account's server.
-				sender=doc.sender_email or None,
+				# Sender Email Address (from the supplier, or overridden on the PO),
+				# checked above to match an outgoing Email Account, so Frappe's
+				# EmailAccount.find_outgoing picks that account and not the default.
+				sender=doc.sender_email,
 				cc=[doc.cc_email] if doc.cc_email else None,
 				bcc=[doc.bcc_email] if doc.bcc_email else None,
 				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),

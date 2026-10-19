@@ -324,11 +324,21 @@ frappe.ui.form.on('Purchase Order V3', {
             }
         });
     },
+    sender_email_account: function(frm) {
+        // picking an account resets the address to it; the address can still be
+        // overridden by hand afterwards
+        if (!frm.doc.sender_email_account) return;
+        frappe.db.get_value('Email Account', frm.doc.sender_email_account, 'email_id')
+            .then(function(r) {
+                var email = (r.message || {}).email_id;
+                if (email) frm.set_value('sender_email', email);
+            });
+    },
     supplier: function(frm) {
         if (!frm.doc.supplier) return;
         frappe.db.get_value('Supplier', frm.doc.supplier,
             ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'po3_print_format',
-             'nat_sender_email_account', 'nat_shipping_address', 'nat_billing_address'])
+             'nat_sender_email_account', 'nat_sender_email', 'nat_shipping_address', 'nat_billing_address'])
             .then(function(r) {
                 var v = r.message || {};
                 frm.set_value('buying_price_list', v.default_price_list || null);
@@ -340,8 +350,8 @@ frappe.ui.form.on('Purchase Order V3', {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);
                     frm.set_value('po_print_format', v.po3_print_format || null);
-                    // sender_email follows via fetch_from on sender_email_account
                     frm.set_value('sender_email_account', v.nat_sender_email_account || null);
+                    frm.set_value('sender_email', v.nat_sender_email || null);
                 }
                 if (!v.default_price_list) {
                     frappe.show_alert({ message: __('This supplier has no Default Price List - pick one manually.'), indicator: 'orange' });
