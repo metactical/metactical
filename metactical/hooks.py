@@ -168,6 +168,8 @@ doc_events = {
 	# }, 
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+		# stop Pending Purchase MRs once their items are back in stock
+		"on_submit": "metactical.custom_scripts.material_request.auto_close.on_sle_submit",
 	},
 	"Repost Item Valuation": {
 		"before_validate": "metactical.custom_scripts.repost_item_valuation.repost_item_valuation.clamp_repost_to_open_period"

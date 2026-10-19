@@ -8,6 +8,7 @@ class CustomMaterialRequest(MaterialRequest):
 		# Metactical Customization: reomve automatic loading of price list
 		self.buying_price_list = None
 		validate_target_warehouse(self)
+		validate_purchase_items(self)
 
 def before_save(self, method):
 	self.set_status(update=True)	
@@ -146,3 +147,85 @@ def get_qoh(filters):
 		})
 
 	return updated_qty
+
+# ---------------------------------------------------------------------------
+# A Purchase MR may not ask for an item that
+#   - is discontinued (Item.ifw_discontinued) or disabled, or
+#   - is already on a Purchase Order still in progress -- Draft, On Hold, To
+#     Receive and Bill, To Receive -- for the same warehouse, with some of the
+#     line still to be received. Every PO3 has a native twin, so this covers PO3.
+# A Closed, Completed or Cancelled PO, or one fully received (To Bill), does not
+# count: once it is done the item may well need restocking again.
+#
+# A person is stopped with the reason. ERPNext's auto-reorder puts many items
+# on one MR (created with flags.ignore_mandatory, outside a web request), so for
+# that the offending lines are dropped instead -- one bad line must not cost
+# the whole reorder.
+# ---------------------------------------------------------------------------
+IN_PROGRESS_PO = ("Draft", "On Hold", "To Receive and Bill", "To Receive")
+
+
+def validate_purchase_items(doc):
+	if doc.material_request_type != "Purchase":
+		return
+	auto_reorder = bool(doc.flags.ignore_mandatory) and not frappe.request
+
+	blocked = [d for d in doc.items if d.item_code and any(frappe.utils.cint(v) for v in
+		frappe.get_cached_value("Item", d.item_code, ["disabled", "ifw_discontinued"]) or [])]
+	on_po = in_progress_po_lines(doc)
+
+	if auto_reorder:
+		drop = {d.name for d in blocked} | {r.mr_row for r in on_po}
+		if drop:
+			doc.set("items", [d for d in doc.items if d.name not in drop])
+			if not doc.items:
+				frappe.throw("Every item on this reorder is discontinued, disabled or already on a "
+					"Purchase Order in progress.")
+		return
+
+	if blocked:
+		frappe.throw("These items are discontinued or disabled and can't be requested:<br>"
+			+ "<br>".join("Row {0}: <b>{1}</b>{2}".format(d.idx, d.item_code,
+				" (disabled)" if frappe.get_cached_value("Item", d.item_code, "disabled") else " (discontinued)")
+				for d in blocked),
+			title="Item not available")
+
+	if on_po:
+		rows = "".join(
+			"<tr><td>{po}</td><td>{status}</td><td>{item}</td><td>{wh}</td>"
+			"<td style='text-align:right'>{qty:g}</td><td style='text-align:right'>{rec:g}</td></tr>".format(
+				po=frappe.utils.get_link_to_form("Purchase Order", r.po)
+					+ (" / " + frappe.utils.get_link_to_form("Purchase Order V3", r.po3) if r.po3 else ""),
+				status=r.status, item="Row " + str(r.idx) + ": <b>" + r.item_code + "</b>", wh=r.warehouse,
+				qty=frappe.utils.flt(r.qty), rec=frappe.utils.flt(r.received_qty))
+			for r in on_po)
+		frappe.throw("These items are already on a Purchase Order in progress for the same warehouse, "
+			"so they can't be requested again until it is received or closed:"
+			"<table class='table table-bordered' style='margin-top:8px'><tr><th>Purchase Order</th>"
+			"<th>Status</th><th>Item</th><th>Warehouse</th><th>Ordered</th><th>Received</th></tr>"
+			+ rows + "</table>", title="Already on order")
+
+
+def in_progress_po_lines(doc):
+	"""The in-progress PO lines that cover this MR's lines: same item, same
+	warehouse, not yet fully received. Lines ordered off this very MR do not
+	count. No company filter: the warehouse already belongs to one company, and
+	an MR's company can differ from its warehouse's."""
+	pairs = [(d.item_code, d.warehouse) for d in doc.items if d.item_code and d.warehouse]
+	if not pairs:
+		return []
+	cond = " or ".join(["(poi.item_code = %s and poi.warehouse = %s)"] * len(pairs))
+	lines = frappe.db.sql("""select po.name po, po.status, po.custom_purchase_order_v3 po3,
+			poi.item_code, poi.warehouse, poi.qty, poi.received_qty
+		from `tabPurchase Order Item` poi join `tabPurchase Order` po on po.name = poi.parent
+		where po.docstatus < 2 and po.status in %s
+			and poi.received_qty < poi.qty and ifnull(poi.material_request, '') != %s
+			and ({cond})
+		order by po.name, poi.idx""".format(cond=cond),
+		[IN_PROGRESS_PO, doc.name or ""] + [v for p in pairs for v in p], as_dict=True)
+	out = []
+	for d in doc.items:
+		for l in lines:
+			if l.item_code == d.item_code and l.warehouse == d.warehouse:
+				out.append(frappe._dict(l, idx=d.idx, mr_row=d.name))
+	return out
