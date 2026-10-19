@@ -5,6 +5,7 @@
  "creation": "2026-08-26 07:16:08.743696",
  "doctype": "DocType",
  "editable_grid": 1,
+ "default_print_format": "Custom Purchase Order V6 - PO3",
  "engine": "InnoDB",
  "field_order": [
   "sec_main",
@@ -223,7 +224,7 @@
    "fieldname": "po_print_format",
    "fieldtype": "Link",
    "label": "PO Print Format",
-   "link_filters": "[[\"Print Format\",\"doc_type\",\"=\",\"Purchase Order\"]]",
+   "link_filters": "[[\"Print Format\",\"doc_type\",\"=\",\"Purchase Order V3\"]]",
    "options": "Print Format"
   },
   {
@@ -506,7 +507,7 @@
    "link_fieldname": "purchase_order_v3"
   }
  ],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-19 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3",
