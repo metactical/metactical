@@ -63,11 +63,14 @@ def prepare_tax_rows(doc):
 		t.add_deduct_tax = t.add_deduct_tax or "Add"
 
 
-def set_v3_totals(doc, lines):
+def set_v3_totals(doc, lines, rows=None):
 	"""Work out taxes and totals for `doc` (PO3 or SOC3) over `lines`, a list of
 	(item_code, qty, rate) -- the quantities that count towards the order.
 
-	Sets doc.total too, and the computed amounts on each of doc.taxes."""
+	Sets doc.total too, and the computed amounts on each of doc.taxes. `rows`,
+	the child rows `lines` came from (same order), get net_rate / net_amount:
+	the line after the additional discount, rounding included, as on the native
+	PO."""
 	prepare_tax_rows(doc)
 	npo = frappe.new_doc("Purchase Order")
 	npo.company = doc.company
@@ -91,6 +94,9 @@ def set_v3_totals(doc, lines):
 	for mine, calc in zip(doc.get("taxes") or [], npo.taxes):
 		for f in TAX_ROW_TOTALS:
 			mine.set(f, calc.get(f))
+	for row, calc in zip(rows or [], npo.items):
+		row.net_rate = calc.net_rate
+		row.net_amount = calc.net_amount
 
 
 def copy_taxes_to_native(npo, doc):

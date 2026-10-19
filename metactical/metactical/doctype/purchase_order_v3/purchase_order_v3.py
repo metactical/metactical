@@ -6,7 +6,8 @@ import re
 
 import frappe
 from frappe.model.document import Document
-from frappe.contacts.doctype.address.address import render_address
+from frappe.contacts.doctype.address.address import get_company_address, get_default_address, render_address
+from frappe.utils import cint
 
 from metactical.procurement_v3.taxes import (
 	copy_taxes_to_native,
@@ -36,6 +37,9 @@ class PurchaseOrderV3(Document):
 
 	def validate(self):
 		validate(self)
+
+	def before_print(self, settings=None):
+		po3_before_print(self)
 
 	def on_submit(self):
 		auto_send_on_approve(self)
@@ -284,8 +288,8 @@ def validate(doc):
 	# native twin will work them out -- see procurement_v3/taxes.py. The
 	# approval tier below goes by base_grand_total, so taxes count towards it.
 	fill_taxes_from_template(doc)
-	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate)
-		for d in doc.items if d.item_code])
+	rows = [d for d in doc.items if d.item_code]
+	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate) for d in rows], rows)
 
 	if doc.base_grand_total >= 50000:
 		doc.approval_tier = "L3 (Abdul) - over 50k"
@@ -343,20 +347,51 @@ def validate(doc):
 # survives, and it runs from before_insert too because the twin is built there,
 # ahead of validate.
 # ---------------------------------------------------------------------------
+# The native PO prints Total and the Taxes table through ERPNext's own templates
+# (AccountsController.before_print): Total as a plain label, and the taxes as one
+# "description ... amount" line each with the additional discount, not as a grid.
+# Same here, so the PO3 print formats come out like the native ones.
+def po3_before_print(doc):
+	doc.flags.show_inclusive_tax_in_print = bool(
+		cint(frappe.db.get_single_value("Accounts Settings", "show_inclusive_tax_in_print"))
+		and any(t.included_in_print_rate for t in doc.get("taxes") or []))
+	doc.print_templates = {"total": "templates/print_formats/includes/total.html"}
+	if not cint(frappe.db.get_single_value("Accounts Settings", "show_taxes_as_table_in_print")):
+		doc.print_templates["taxes"] = "templates/print_formats/includes/taxes.html"
+
+
 def resolve_addresses(doc):
+	# the supplier's own address: its default one, and never another supplier's
+	# (left behind when the supplier on the order is changed)
+	if doc.supplier_address and not frappe.db.exists("Dynamic Link", {"parenttype": "Address",
+			"parent": doc.supplier_address, "link_doctype": "Supplier", "link_name": doc.supplier}):
+		doc.supplier_address = None
+	if doc.supplier and not doc.supplier_address:
+		doc.supplier_address = get_default_address("Supplier", doc.supplier)
+	doc.address_display = render_address(doc.supplier_address, check_permissions=False) if doc.supplier_address else None
+
 	if doc.supplier and not (doc.shipping_address and doc.billing_address):
 		shipping, billing = frappe.db.get_value("Supplier", doc.supplier,
 			["nat_shipping_address", "nat_billing_address"]) or (None, None)
 		doc.shipping_address = doc.shipping_address or shipping
 		doc.billing_address = doc.billing_address or billing
+	# then as ERPNext fills a native PO (accounts.party.set_address_details): bill
+	# to the company's own address, and ship there too unless told otherwise
+	if doc.company and not doc.billing_address:
+		doc.billing_address = get_company_address(doc.company).get("company_address")
+	if not doc.shipping_address:
+		doc.shipping_address = doc.billing_address
 
 	doc.shipping_address_display = render_address(doc.shipping_address, check_permissions=False) if doc.shipping_address else None
 	doc.billing_address_display = render_address(doc.billing_address, check_permissions=False) if doc.billing_address else None
 
 
-# Blank on the PO3 leaves the native PO's own default (the company address)
+# Blank on the PO3 (no company address either) leaves the native PO's own value
 # alone rather than wiping it -- shipping_address is mandatory on Purchase Order.
 def set_native_addresses(npo, doc):
+	if doc.supplier_address:
+		npo.supplier_address = doc.supplier_address
+		npo.address_display = doc.address_display
 	if doc.shipping_address:
 		npo.shipping_address = doc.shipping_address
 		npo.shipping_address_display = doc.shipping_address_display

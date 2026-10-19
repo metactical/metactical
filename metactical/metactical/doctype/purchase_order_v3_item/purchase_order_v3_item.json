@@ -18,6 +18,8 @@
   "uom",
   "rate",
   "amount",
+  "net_rate",
+  "net_amount",
   "last_purchase_rate",
   "cb_qty",
   "warehouse",
@@ -281,13 +283,30 @@
    "print_hide": 1,
    "hidden": 1,
    "search_index": 1
+  },
+  {
+   "description": "Rate after the order's additional discount, as ERPNext works it out.",
+   "fieldname": "net_rate",
+   "fieldtype": "Currency",
+   "label": "Net Rate",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-02 14:00:00.000000",
+ "modified": "2026-10-19 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3 Item",

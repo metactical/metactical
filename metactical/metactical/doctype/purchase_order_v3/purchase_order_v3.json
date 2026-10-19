@@ -20,6 +20,10 @@
   "conversion_rate",
   "buying_price_list",
   "approval_tier",
+  "sec_supplier_address",
+  "supplier_address",
+  "cb_supplier_address",
+  "address_display",
   "sec_shipto",
   "set_warehouse",
   "ship_to_display",
@@ -710,6 +714,28 @@
    "fieldtype": "Currency",
    "label": "Additional Discount Amount",
    "options": "currency"
+  },
+  {
+   "fieldname": "sec_supplier_address",
+   "fieldtype": "Section Break",
+   "label": "Supplier Address"
+  },
+  {
+   "description": "Defaults from the Supplier's default address. Carried onto the native PO.",
+   "fieldname": "supplier_address",
+   "fieldtype": "Link",
+   "label": "Supplier Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "cb_supplier_address",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "address_display",
+   "fieldtype": "Small Text",
+   "label": "Supplier Address Details",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -738,7 +764,7 @@
    "link_fieldname": "purchase_order_v3"
   }
  ],
- "modified": "2026-10-19 14:00:00.000000",
+ "modified": "2026-10-19 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3",

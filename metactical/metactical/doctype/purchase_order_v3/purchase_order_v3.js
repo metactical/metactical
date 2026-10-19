@@ -345,6 +345,12 @@ frappe.ui.form.on('Purchase Order V3', {
                 frm.set_value('buying_price_list', v.default_price_list || null);
                 if (v.default_currency) frm.set_value('currency', v.default_currency);
                 // a different supplier ships and bills under its own addresses
+                // the new supplier's own default address
+                frappe.call({
+                    method: 'frappe.contacts.doctype.address.address.get_default_address',
+                    args: { doctype: 'Supplier', name: frm.doc.supplier },
+                    callback: function(a) { frm.set_value('supplier_address', a.message || null); }
+                });
                 frm.set_value('shipping_address', v.nat_shipping_address || null);
                 frm.set_value('billing_address', v.nat_billing_address || null);
                 if (frm.is_new()) {
@@ -359,6 +365,9 @@ frappe.ui.form.on('Purchase Order V3', {
                     frappe.show_alert({ message: __('This supplier has no Default Price List - pick one manually.'), indicator: 'orange' });
                 }
             });
+    },
+    supplier_address: function(frm) {
+        po3_render_address(frm, 'supplier_address', 'address_display');
     },
     shipping_address: function(frm) {
         po3_render_address(frm, 'shipping_address', 'shipping_address_display');
@@ -517,6 +526,12 @@ frappe.ui.form.on('Purchase Order V3', {
 // (metactical/procurement_v3/taxes.py).
 frappe.ui.form.on('Purchase Order V3', {
     setup: function(frm) {
+        frm.set_query('supplier_address', function() {
+            return {
+                query: 'frappe.contacts.doctype.address.address.address_query',
+                filters: { link_doctype: 'Supplier', link_name: frm.doc.supplier }
+            };
+        });
         frm.set_query('taxes_and_charges', function() {
             return { filters: { company: frm.doc.company, disabled: 0 } };
         });
