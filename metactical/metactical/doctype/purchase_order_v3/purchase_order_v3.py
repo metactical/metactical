@@ -451,6 +451,44 @@ def resolve_currency(doc):
 # the supplier and flips the state to Sent to Supplier when that succeeds --
 # unless Disable Sending Email is checked on the order.
 # ---------------------------------------------------------------------------
+# PO Print Format may hold a "<format> - PO3" copy, which only prints a PO3.
+# The email prints the native twin, so use the native format it was copied from.
+# Anything that is not a Purchase Order format falls back to Purchase Order's
+# default (None).
+def native_po_print_format(print_format):
+	if not print_format:
+		return None
+	if frappe.db.get_value("Print Format", print_format, "doc_type") == "Purchase Order":
+		return print_format
+	native = print_format[:-len(" - PO3")] if print_format.endswith(" - PO3") else None
+	if native and frappe.db.get_value("Print Format", native, "doc_type") == "Purchase Order":
+		return native
+	return None
+
+
+# The signature for an approved-PO email, by the domain of the address it is
+# sent from (Procurement Settings V3 > Email Signatures): orders sent from a
+# metactical.com address sign off as Metactical, camo.ca ones as Camo, and so on.
+# No row for the domain means no signature.
+def po_email_signature(sender_email):
+	domain = (sender_email or "").rpartition("@")[2].strip().lower()
+	if not domain:
+		return ""
+	return frappe.db.get_value("Procurement Email Signature V3",
+		{"parent": "Procurement Settings V3", "parenttype": "Procurement Settings V3",
+			"domain": domain}, "signature") or ""
+
+
+def po_email_message(doc):
+	return ("<p>Hello,</p>"
+		"<p>Please find attached our new Purchase Order #" + (doc.erp_purchase_order or doc.name) + ".</p>"
+		"<p>Could you please let us know if any items are out of stock or discontinued and provide "
+		"the expected arrival dates (ETAs) for any items that are currently unavailable?</p>"
+		"<p>Once the order has been reviewed, please send us the order confirmation for our review.</p>"
+		"<p>Thank you in advance.</p>"
+		"<p>Best regards,</p>" + po_email_signature(doc.sender_email))
+
+
 def auto_send_on_approve(doc):
 	posting = frappe.db.get_single_value("Procurement Settings V3", "posting_enabled")
 
@@ -547,15 +585,26 @@ def auto_send_on_approve(doc):
 			return
 		pdf = None
 		try:
-			# The PO3 itself, with its own "<format> - PO3" print format (or the
-			# doctype's default). Those render the PO3 as a Purchase Order, with
-			# taxes, contact and terms from the native twin: see
-			# metactical/procurement_v3/print_format.py
-			pdf = frappe.attach_print(doc.doctype, doc.name, doc=doc,
-				print_format=doc.po_print_format or None,
-				file_name=doc.erp_purchase_order or doc.name)
+			# The native twin, printed with the native version of the chosen PO
+			# Print Format: same order, in the field names the PO formats are
+			# written against. A "<format> - PO3" choice maps back to "<format>".
+			if doc.erp_purchase_order:
+				pdf = frappe.attach_print("Purchase Order", doc.erp_purchase_order,
+					print_format=native_po_print_format(doc.po_print_format),
+					file_name=doc.erp_purchase_order)
 		except Exception:
 			pdf = None
+		# The PDF is the order itself: never send the email without it.
+		if not pdf:
+			frappe.db.set_value(doc.doctype, doc.name, {"send_status": "Failed"})
+			frappe.msgprint("<b>PO email was NOT sent.</b> "
+				+ ("The PO PDF could not be printed from native PO " + doc.erp_purchase_order
+					+ " with print format <b>" + (native_po_print_format(doc.po_print_format)
+						or "(Purchase Order default)") + "</b>."
+					if doc.erp_purchase_order else "This PO has no native Purchase Order to print.")
+				+ " Fix the cause, then send the PO to the supplier manually.", indicator="red")
+			mirror_po3_status(doc.name)
+			return
 		ok = False
 		try:
 			frappe.sendmail(
@@ -567,11 +616,8 @@ def auto_send_on_approve(doc):
 				cc=[doc.cc_email] if doc.cc_email else None,
 				bcc=[doc.bcc_email] if doc.bcc_email else None,
 				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),
-				message="Please find attached purchase order " + (doc.erp_purchase_order or doc.name)
-					+ ".<br>Ship to: " + (doc.ship_to_display or "")
-					+ (("<br><br>" + doc.notes_to_supplier) if doc.notes_to_supplier else "")
-					+ "<br><br>Please reply with your order confirmation.",
-				attachments=[pdf] if pdf else None,
+				message=po_email_message(doc),
+				attachments=[pdf],
 				reference_doctype=doc.doctype, reference_name=doc.name)
 			ok = True
 		except Exception:

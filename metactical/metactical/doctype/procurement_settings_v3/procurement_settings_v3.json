@@ -10,7 +10,9 @@
   "bcc_email",
   "col_ps1",
   "default_rejected_warehouse",
-  "claims_warehouse"
+  "claims_warehouse",
+  "sec_email_signatures",
+  "email_signatures"
  ],
  "fields": [
   {
@@ -42,13 +44,25 @@
    "fieldtype": "Link",
    "label": "Claims Holding Warehouse",
    "options": "Warehouse"
+  },
+  {
+   "fieldname": "sec_email_signatures",
+   "fieldtype": "Section Break",
+   "label": "Email Signatures"
+  },
+  {
+   "description": "Signature added to approved-PO emails, picked by the domain of the PO's Sender Email Address.",
+   "fieldname": "email_signatures",
+   "fieldtype": "Table",
+   "label": "Signatures By Sender Domain",
+   "options": "Procurement Email Signature V3"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-23 22:44:43.359988",
+ "modified": "2026-10-19 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Procurement Settings V3",
