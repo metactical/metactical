@@ -19,6 +19,8 @@
   "eta_tbd",
   "substitute_item_code",
   "confirmed_rate",
+  "net_rate",
+  "net_amount",
   "rate_variance_pct",
   "remarks"
  ],
@@ -135,13 +137,30 @@
    "fieldname": "remarks",
    "fieldtype": "Data",
    "label": "Remarks"
+  },
+  {
+   "description": "Confirmed rate after the additional discount, as ERPNext works it out.",
+   "fieldname": "net_rate",
+   "fieldtype": "Currency",
+   "label": "Net Rate",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-02 12:00:00.000000",
+ "modified": "2026-10-19 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Order Confirmation V3 Item",

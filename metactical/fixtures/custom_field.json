@@ -11089,7 +11089,7 @@
   "is_virtual": 0,
   "label": "PO Print Format",
   "length": 0,
-  "link_filters": null,
+  "link_filters": "[[\"Print Format\", \"doc_type\", \"=\", \"Purchase Order V3\"]]",
   "mandatory_depends_on": null,
   "modified": "2026-08-12 13:02:24.294541",
   "module": null,

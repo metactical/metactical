@@ -16,6 +16,14 @@ frappe.ui.form.on('Material Request', {
 		frm.events.apply_filter_to_warehouse(frm);
 	},
 	apply_filter_to_warehouse: function(frm) {
+		// ERPNext's own item search, minus discontinued items on a purchase request
+		// (disabled ones it already leaves out); saving enforces the same
+		frm.set_query("item_code", "items", function() {
+			return {
+				query: "erpnext.controllers.queries.item_query",
+				filters: frm.doc.material_request_type == "Purchase" ? { "ifw_discontinued": 0, "disabled": 0 } : {}
+			};
+		});
 		if (frm.doc.material_request_type == "Purchase" ) {
 			frm.set_query("set_warehouse", function(doc){
 				return {
