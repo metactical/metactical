@@ -72,11 +72,12 @@ def v3_recalc_totals(po3_name):
 	needed when it was placed, which is a fact about the past; a later stock-out
 	does not retroactively make it a smaller decision.
 	"""
-	rate = F(frappe.db.get_value("Purchase Order V3", po3_name, "conversion_rate")) or 1.0
+	from metactical.procurement_v3.taxes import save_v3_totals, set_v3_totals
+
+	doc = frappe.get_doc("Purchase Order V3", po3_name)
 	total_qty = 0.0
-	total = 0.0
-	for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": po3_name},
-			fields=["name", "qty", "rate", "short_qty", "amount"], limit_page_length=0):
+	lines = []
+	for r in doc.items:
 		qty = billable_qty(r.qty, r.short_qty)
 		amount = qty * F(r.rate)
 		if F(r.amount) != amount:
@@ -85,12 +86,14 @@ def v3_recalc_totals(po3_name):
 			frappe.db.set_value("Purchase Order V3 Item", r.name, "amount", amount,
 				update_modified=False)
 		total_qty += qty
-		total += amount
+		if r.item_code:
+			lines.append((r.item_code, qty, r.rate))
 
-	frappe.db.set_value("Purchase Order V3", po3_name, {
-		"total_qty": total_qty,
-		"total": total,
-		"base_grand_total": total * rate}, update_modified=False)
+	# taxes on a smaller order are smaller too: work them out again with the
+	# grand totals (procurement_v3/taxes.py)
+	set_v3_totals(doc, lines)
+	frappe.db.set_value("Purchase Order V3", po3_name, "total_qty", total_qty, update_modified=False)
+	save_v3_totals(doc)
 
 
 def mirror_po3_status(po3_name):

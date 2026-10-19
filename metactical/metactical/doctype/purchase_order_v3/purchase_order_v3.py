@@ -8,6 +8,11 @@ import frappe
 from frappe.model.document import Document
 from frappe.contacts.doctype.address.address import render_address
 
+from metactical.procurement_v3.taxes import (
+	copy_taxes_to_native,
+	fill_taxes_from_template,
+	set_v3_totals,
+)
 from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
@@ -137,6 +142,8 @@ def shared_series_naming(doc):
 		npo.supplier = doc.supplier
 		npo.company = doc.company
 		set_native_addresses(npo, doc)
+		fill_taxes_from_template(doc)
+		copy_taxes_to_native(npo, doc)
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
 		# PO3 has one date field, and it is a CANCEL date -- the point after which
 		# unfilled lines get dropped. It belongs in ais_cancel_date, which is what the
@@ -273,8 +280,12 @@ def validate(doc):
 			d.variant_attributes = ", ".join([(a.attribute + ": " + (a.attribute_value or "")) for a in attrs])
 
 	doc.total_qty = total_qty
-	doc.total = total
-	doc.base_grand_total = total * (F(doc.conversion_rate) or 1.0)
+	# Taxes and Charges, Additional Discount and the grand totals, the way the
+	# native twin will work them out -- see procurement_v3/taxes.py. The
+	# approval tier below goes by base_grand_total, so taxes count towards it.
+	fill_taxes_from_template(doc)
+	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate)
+		for d in doc.items if d.item_code])
 
 	if doc.base_grand_total >= 50000:
 		doc.approval_tier = "L3 (Abdul) - over 50k"
@@ -293,6 +304,8 @@ def validate(doc):
 		if not doc.sender_email_account:
 			doc.sender_email_account = frappe.db.get_value(
 				"Supplier", doc.supplier, "nat_sender_email_account")
+		if not doc.tax_category:
+			doc.tax_category = frappe.db.get_value("Supplier", doc.supplier, "tax_category")
 		# Sender Email Address defaults from the supplier but stays editable, so a
 		# user's override is never replaced here -- only a blank one is filled.
 		if not doc.sender_email:
@@ -506,6 +519,7 @@ def auto_send_on_approve(doc):
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
 			set_native_addresses(npo, doc)
+			copy_taxes_to_native(npo, doc)
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.
@@ -660,6 +674,7 @@ def submitted_updates(doc):
 			npo.buying_price_list = doc.buying_price_list
 			npo.set_warehouse = doc.set_warehouse
 			set_native_addresses(npo, doc)
+			copy_taxes_to_native(npo, doc)
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.

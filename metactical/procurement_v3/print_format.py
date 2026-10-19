@@ -7,8 +7,8 @@ Every PO print format is written against native Purchase Order fields -- taxes,
 grand_total, contact_person, terms, transaction_date, ... -- which PO3 does not
 have. Each "<format> - PO3" print format is a copy of a native one that renders
 against po3_print_doc(doc) instead of the PO3 itself: an UNSAVED Purchase Order
-whose header and lines come from the PO3, and whose taxes, contact, terms and
-the rest come from the PO3's native twin (erp_purchase_order). Nothing here
+whose header, lines, taxes and discount come from the PO3, and whose contact,
+terms and the rest come from the PO3's native twin (erp_purchase_order). Nothing here
 writes to the database.
 
     Jinja formats    {%- set doc = po3_print_doc(doc) -%} + the native template
@@ -23,6 +23,7 @@ import frappe
 from frappe.www.printview import make_layout, set_link_titles, standard_format
 from markupsafe import Markup
 
+from metactical.procurement_v3.taxes import copy_taxes_to_native
 from metactical.procurement_v3.utils import F
 
 
@@ -64,6 +65,7 @@ def po3_print_doc(doc):
 	npo.set_warehouse = doc.set_warehouse
 	npo.custom_purchase_order_v3 = doc.name
 	set_native_addresses(npo, doc)
+	copy_taxes_to_native(npo, doc)
 	if doc.notes_to_supplier:
 		npo.drop_ship_notes = doc.notes_to_supplier
 
@@ -106,8 +108,8 @@ def po3_print_doc(doc):
 		r.barcode = r.barcode or barcode
 		r.supplier_part_no = r.supplier_part_no or part_no
 
-	# The twin's taxes and totals belong to whatever lines it had when it was
-	# last synced (approval), so work them out again for the PO3's lines.
+	# Taxes are the PO3's own (copy_taxes_to_native above); work them and the
+	# totals out for the PO3's lines.
 	try:
 		npo.calculate_taxes_and_totals()
 		npo.set_total_in_words()
