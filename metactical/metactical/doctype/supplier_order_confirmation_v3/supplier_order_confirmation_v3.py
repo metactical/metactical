@@ -12,6 +12,7 @@ from metactical.procurement_v3.taxes import (
 	save_v3_totals,
 	set_v3_totals,
 	tax_rows,
+	v3_before_print,
 )
 from metactical.procurement_v3.utils import (
 	F,
@@ -26,6 +27,9 @@ class SupplierOrderConfirmationV3(Document):
 	def validate(self):
 		validate(self)
 
+	def before_print(self, settings=None):
+		v3_before_print(self)
+
 	def on_submit(self):
 		mirror_to_po3(self)
 
@@ -37,7 +41,7 @@ class SupplierOrderConfirmationV3(Document):
 			"total_ordered_qty": self.total_ordered_qty,
 			"total_qty": self.total_qty,
 			"total_backorder_qty": self.total_backorder_qty}, update_modified=False)
-		save_v3_totals(self)
+		save_v3_totals(self, [d for d in self.items if d.item_code])
 
 	def before_cancel(self):
 		cancel_guard(self)
@@ -354,8 +358,8 @@ def set_totals(doc):
 	doc.total_backorder_qty = backordered
 	# total, taxes, discount and grand totals over the confirmed lines -- see
 	# procurement_v3/taxes.py
-	set_v3_totals(doc, [(d.item_code, d.confirmed_qty, d.confirmed_rate)
-		for d in (doc.items or []) if d.item_code])
+	rows = [d for d in (doc.items or []) if d.item_code]
+	set_v3_totals(doc, [(d.item_code, d.confirmed_qty, d.confirmed_rate) for d in rows], rows)
 
 
 # ---------------------------------------------------------------------------

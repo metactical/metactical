@@ -14,6 +14,7 @@ the additional discount and rounding. Nothing here writes to the database.
 
 import frappe
 from erpnext.controllers.accounts_controller import get_taxes_and_charges
+from frappe.utils import cint
 from erpnext.controllers.taxes_and_totals import calculate_taxes_and_totals
 
 from metactical.procurement_v3.utils import F
@@ -108,11 +109,29 @@ def copy_taxes_to_native(npo, doc):
 		for t in tax_rows(doc)])
 
 
-def save_v3_totals(doc):
+def save_v3_totals(doc, rows=None):
 	"""For a submitted doc whose totals were just recomputed: write the header
-	totals and each tax row's amounts straight to the database."""
+	totals, each tax row's amounts and each of `rows`' net figures straight to
+	the database."""
 	frappe.db.set_value(doc.doctype, doc.name, {f: doc.get(f) for f in ("total",) + TOTAL_FIELDS},
 		update_modified=False)
 	for t in doc.get("taxes") or []:
 		frappe.db.set_value(t.doctype, t.name, {f: t.get(f) for f in TAX_ROW_TOTALS},
 			update_modified=False)
+	for r in rows or []:
+		frappe.db.set_value(r.doctype, r.name, {"net_rate": r.net_rate, "net_amount": r.net_amount},
+			update_modified=False)
+
+
+def v3_before_print(doc):
+	"""The native PO prints Total and the Taxes table through ERPNext's own
+	templates (AccountsController.before_print): Total as a plain label, and the
+	taxes as one "description ... amount" line each with the additional
+	discount, not as a grid. Same for PO3 and SOC3, so their print formats come
+	out like the native ones."""
+	doc.flags.show_inclusive_tax_in_print = bool(
+		cint(frappe.db.get_single_value("Accounts Settings", "show_inclusive_tax_in_print"))
+		and any(t.included_in_print_rate for t in doc.get("taxes") or []))
+	doc.print_templates = {"total": "templates/print_formats/includes/total.html"}
+	if not cint(frappe.db.get_single_value("Accounts Settings", "show_taxes_as_table_in_print")):
+		doc.print_templates["taxes"] = "templates/print_formats/includes/taxes.html"

@@ -94,10 +94,7 @@ def v3_recalc_totals(po3_name):
 	# grand totals (procurement_v3/taxes.py)
 	set_v3_totals(doc, lines, rows)
 	frappe.db.set_value("Purchase Order V3", po3_name, "total_qty", total_qty, update_modified=False)
-	save_v3_totals(doc)
-	for r in rows:
-		frappe.db.set_value(r.doctype, r.name, {"net_rate": r.net_rate, "net_amount": r.net_amount},
-			update_modified=False)
+	save_v3_totals(doc, rows)
 
 
 def mirror_po3_status(po3_name):
