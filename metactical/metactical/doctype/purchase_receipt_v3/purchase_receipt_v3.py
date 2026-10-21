@@ -434,6 +434,7 @@ def post_to_po3(doc):
 					frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "To Receive and Bill")
 				frappe.msgprint("Native PO " + po.erp_purchase_order
 					+ " was Closed - reopened so this receipt could post.")
+			po = make_room_on_native_po(doc, po)
 			# the draft kept in step while counting, now with the final count
 			pr = draft_native_pr(doc) or frappe.new_doc("Purchase Receipt")
 			fill_native_pr(pr, doc, po, final=True)
@@ -497,6 +498,22 @@ def post_to_po3(doc):
 # lines not counted yet at zero (allow_zero_qty) so it reads like the count
 # sheet; the final fill drops them, as ERPNext will not post a zero line.
 # ---------------------------------------------------------------------------
+# Back-ordered quantity only goes onto the native PO when it arrives (see
+# grow_native_po_for_receipt): before the final receipt is built, every PO3 line
+# this count receives gets a native row with room for it. Returns the PO3
+# reloaded, since its lines may now point at new native rows.
+def make_room_on_native_po(doc, po):
+	from metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3 \
+		import grow_native_po_for_receipt
+
+	incoming = {}
+	for d in doc.items:
+		if d.po3_item and d.received_item_code and d.received_item_code == d.expected_item_code:
+			incoming[d.po3_item] = incoming.get(d.po3_item, 0) + F(d.accepted_qty) + F(d.rejected_qty)
+	grow_native_po_for_receipt(po.name, incoming)
+	return frappe.get_doc("Purchase Order V3", po.name)
+
+
 def fill_native_pr(pr, doc, po, final):
 	rows = {}
 	for r in po.items:
@@ -795,6 +812,7 @@ def v3_retry_gr3_posting(gr3=None):
 				frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "To Receive and Bill")
 			frappe.msgprint("Native PO " + po.erp_purchase_order
 				+ " was Closed - reopened so this receipt could post.")
+		po = make_room_on_native_po(doc, po)
 		pr = frappe.new_doc("Purchase Receipt")
 		fill_native_pr(pr, doc, po, final=True)
 		pr.insert()
