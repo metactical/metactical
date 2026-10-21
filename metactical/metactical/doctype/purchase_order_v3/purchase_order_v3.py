@@ -22,9 +22,12 @@ from metactical.procurement_v3.taxes import (
 from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
+	clean_email_list,
+	email_list,
 	item_supplier_part_no,
 	item_unavailable,
 	mirror_po3_status,
+	require_email_signature,
 	throw_unavailable,
 	v3_may_close_native,
 	v3_open_bo,
@@ -352,6 +355,10 @@ def validate(doc):
 			doc.supplier_email = frappe.db.get_value("Supplier", doc.supplier, "po3_order_email")
 		if not doc.cc_email:
 			doc.cc_email = frappe.db.get_value("Supplier", doc.supplier, "po3_cc_email")
+		if not doc.bcc_email:
+			doc.bcc_email = frappe.db.get_value("Supplier", doc.supplier, "nat_po3_bcc_email")
+		if not doc.signature_user:
+			doc.signature_user = frappe.db.get_value("Supplier", doc.supplier, "nat_po3_signature_user")
 		if not doc.po_print_format:
 			doc.po_print_format = frappe.db.get_value("Supplier", doc.supplier, "po3_print_format")
 		if not doc.sender_email_account:
@@ -366,7 +373,10 @@ def validate(doc):
 				or (frappe.db.get_value("Email Account", doc.sender_email_account, "email_id")
 					if doc.sender_email_account else None)
 
-	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
+	clean_email_list(doc, "cc_email")
+	clean_email_list(doc, "bcc_email")
+	if doc.docstatus == 0:
+		require_email_signature(doc, "signature_user")
 
 	if doc.set_warehouse:
 		w = frappe.db.get_value("Warehouse", doc.set_warehouse,
@@ -592,17 +602,16 @@ def native_po_print_format(print_format):
 	return None
 
 
-# The signature for an approved-PO email, by the domain of the address it is
-# sent from (Procurement Settings V3 > Email Signatures): orders sent from a
-# metactical.com address sign off as Metactical, camo.ca ones as Camo, and so on.
-# No row for the domain means no signature.
-def po_email_signature(sender_email):
-	domain = (sender_email or "").rpartition("@")[2].strip().lower()
-	if not domain:
-		return ""
-	return frappe.db.get_value("Procurement Email Signature V3",
-		{"parent": "Procurement Settings V3", "parenttype": "Procurement Settings V3",
-			"domain": domain}, "signature") or ""
+# The signature for an approved-PO email: the Email Signature on the User picked
+# as the PO's Main Signature (from the Supplier's, or changed on the PO). No user,
+# or a user with no signature, means no signature. A plain-text signature keeps
+# its line breaks, as Frappe's own email composer does.
+def po_email_signature(doc):
+	user = doc.signature_user or frappe.db.get_value("Supplier", doc.supplier, "nat_po3_signature_user")
+	sig = (frappe.db.get_value("User", user, "email_signature") or "").strip() if user else ""
+	if sig and not re.search(r"<[a-z][^>]*>", sig, re.I):
+		sig = sig.replace("\n", "<br>")
+	return sig
 
 
 def po_email_message(doc):
@@ -612,7 +621,7 @@ def po_email_message(doc):
 		"the expected arrival dates (ETAs) for any items that are currently unavailable?</p>"
 		"<p>Once the order has been reviewed, please send us the order confirmation for our review.</p>"
 		"<p>Thank you in advance.</p>"
-		"<p>Best regards,</p>" + po_email_signature(doc.sender_email))
+		"<p>Best regards,</p>" + po_email_signature(doc))
 
 
 def auto_send_on_approve(doc):
@@ -738,8 +747,8 @@ def auto_send_on_approve(doc):
 				# checked above to match an outgoing Email Account, so Frappe's
 				# EmailAccount.find_outgoing picks that account and not the default.
 				sender=doc.sender_email,
-				cc=[doc.cc_email] if doc.cc_email else None,
-				bcc=[doc.bcc_email] if doc.bcc_email else None,
+				cc=email_list(doc.cc_email) or None,
+				bcc=email_list(doc.bcc_email) or None,
 				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),
 				message=po_email_message(doc),
 				attachments=[pdf],

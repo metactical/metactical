@@ -69,6 +69,7 @@ doctype_js = {
 	"Operation": "custom_scripts/bom_operation/bom_operation.js",
 	# Adds the "Revise Prices" button that opens the ICL Pricing grid (merged from the icl_pricing app).
 	"Supplier Order Confirmation V3": "public/js/price_grid_supplier_order_confirmation_v3.js",
+	"Supplier": "custom_scripts/supplier/supplier.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -139,6 +140,9 @@ has_permission = {
 # Hook on document methods and events
 
 doc_events = {
+	"Supplier": {
+		"validate": "metactical.procurement_v3.utils.validate_supplier_po_emails",
+	},
 	"Purchase Order": {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
@@ -1001,6 +1005,9 @@ fixtures = [{
 			"Supplier-custom_column_break_duesj",
 			"Supplier-custom_sender_address",
 			"Supplier-custom_sender_email",
+			"Supplier-nat_po3_bcc_email",
+			"Supplier-nat_po3_signature_user",
+			"Supplier-nat_po3_signature",
 			"Supplier-po3_section"
 		]]]
 	},

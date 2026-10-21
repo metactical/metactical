@@ -44,6 +44,54 @@ def item_supplier_part_no(item_code, supplier=None):
 	return rows[0].supplier_part_no
 
 
+def email_list(value):
+	"""A CC / BCC field's addresses as a list. The fields hold them comma-separated
+	(the form shows each as a pill); older values may use ; or new lines."""
+	import re
+	return [e for e in (x.strip() for x in re.split(r"[,;\n]+", value or "")) if e]
+
+
+def clean_email_list(doc, fieldname):
+	"""Validate every address in a CC / BCC field and store them tidied:
+	comma-separated, duplicates dropped."""
+	from frappe.utils import validate_email_address
+
+	seen, bad = [], []
+	for e in email_list(doc.get(fieldname)):
+		if not validate_email_address(e):
+			bad.append(e)
+		elif e.lower() not in [x.lower() for x in seen]:
+			seen.append(e)
+	if bad:
+		frappe.throw("{0}: not a valid email address: <b>{1}</b>".format(
+			doc.meta.get_label(fieldname), ", ".join(bad)), frappe.InvalidEmailAddressError)
+	doc.set(fieldname, ", ".join(seen) or None)
+
+
+def require_email_signature(doc, fieldname):
+	"""A Main Signature is optional, but a user picked for it must have an Email
+	Signature: PO emails are signed with it, and an empty one would send them
+	out unsigned without anyone noticing."""
+	user = doc.get(fieldname)
+	if not user:
+		return
+	full_name, signature = frappe.db.get_value("User", user, ["full_name", "email_signature"]) or (None, None)
+	if not (signature or "").strip():
+		frappe.throw("<b>{0}</b> has no Email Signature, so they can't be the {1}. Add one on their "
+			"User record (Settings tab, Email section), or pick another user.".format(
+				full_name or user, doc.meta.get_label(fieldname)), title="No email signature")
+
+
+def validate_supplier_po_emails(doc, method=None):
+	"""Supplier validate hook (hooks.py): the PO V3 Ordering CC / BCC addresses
+	and Main Signature."""
+	for f in ("po3_cc_email", "nat_po3_bcc_email"):
+		if doc.meta.has_field(f):
+			clean_email_list(doc, f)
+	if doc.meta.has_field("nat_po3_signature_user"):
+		require_email_signature(doc, "nat_po3_signature_user")
+
+
 def item_unavailable(item_code):
 	"""Why an item may not go on a new order or receipt: "disabled",
 	"discontinued" (Item.ifw_discontinued), or None when it may."""

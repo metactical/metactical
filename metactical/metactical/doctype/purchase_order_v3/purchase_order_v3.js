@@ -354,7 +354,8 @@ frappe.ui.form.on('Purchase Order V3', {
     supplier: function(frm) {
         if (!frm.doc.supplier) return;
         frappe.db.get_value('Supplier', frm.doc.supplier,
-            ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'po3_print_format',
+            ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'nat_po3_bcc_email',
+             'nat_po3_signature_user', 'po3_print_format',
              'nat_sender_email_account', 'nat_sender_email', 'nat_shipping_address', 'nat_billing_address',
              'tax_category'])
             .then(function(r) {
@@ -385,6 +386,8 @@ frappe.ui.form.on('Purchase Order V3', {
                 if (frm.is_new()) {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);
+                    frm.set_value('bcc_email', v.nat_po3_bcc_email || null);
+                    frm.set_value('signature_user', v.nat_po3_signature_user || null);
                     frm.set_value('po_print_format', v.po3_print_format || null);
                     frm.set_value('sender_email_account', v.nat_sender_email_account || null);
                     frm.set_value('sender_email', v.nat_sender_email || null);
@@ -409,8 +412,13 @@ frappe.ui.form.on('Purchase Order V3', {
             if (!d.rate) po3_pull_rate(frm, d.doctype, d.name);
         });
     },
+    cc_email: function(frm) { metactical.email_pills.render(frm, 'cc_email'); },
+    bcc_email: function(frm) { metactical.email_pills.render(frm, 'bcc_email'); },
+    signature_user: function(frm) { metactical.utils.show_user_full_name(frm, 'signature_user'); },
     refresh: function(frm) {
         po3_fx_editable(frm);
+        ['cc_email', 'bcc_email'].forEach(function(f) { metactical.email_pills.render(frm, f); });
+        metactical.utils.show_user_full_name(frm, 'signature_user');
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭱ Paste Items'), function() { po3_paste_items(frm); });
         }

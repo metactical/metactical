@@ -54,3 +54,18 @@ metactical.utils.update_web_specification_description_options = function (frm, d
 
     frm.refresh_field("neb_website_specifications");
 };
+// A Link to User shows the user's full name rather than their email (User is not
+// set to show its title in links site-wide, so this is per field). The value
+// stored is still the user id. Call it from refresh and from the field's change.
+metactical.utils.show_user_full_name = function (frm, fieldname) {
+	const field = frm.fields_dict[fieldname];
+	if (!field) return;
+	field.is_title_link = () => true;
+	const user = frm.doc[fieldname];
+	if (!user) return;
+	frappe.db.get_value("User", user, "full_name").then((r) => {
+		if (frm.doc[fieldname] !== user) return;
+		frappe.utils.add_link_title("User", user, (r.message && r.message.full_name) || user);
+		field.set_formatted_input(user);
+	});
+};
