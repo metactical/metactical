@@ -44,7 +44,7 @@ def item_supplier_part_no(item_code, supplier=None):
 	return rows[0].supplier_part_no
 
 
-def billable_qty(qty, short_qty):
+def billable_qty(qty, short_qty, over_qty=0):
 	"""How much of a line is still expected to cost us.
 
 	short_qty is the quantity that will never arrive, and every part of the flow
@@ -55,9 +55,12 @@ def billable_qty(qty, short_qty):
 	back-order, or a partial receipt still expecting the rest -- leaves it at 0.
 
 	So the ordered quantity minus that is what the order is still worth, and no
-	status list has to be kept in step here to work it out.
+	status list has to be kept in step here to work it out. over_qty is the
+	other way round: received beyond the order (a receipt sets it), and kept --
+	the order is worth what actually arrived, as the native PO and its receipt
+	are.
 	"""
-	return max(F(qty) - F(short_qty), 0.0)
+	return max(F(qty) - F(short_qty) + F(over_qty), 0.0)
 
 
 def v3_recalc_totals(po3_name):
@@ -72,13 +75,18 @@ def v3_recalc_totals(po3_name):
 	needed when it was placed, which is a fact about the past; a later stock-out
 	does not retroactively make it a smaller decision.
 	"""
+	from metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3 \
+		import open_backorder_qty
 	from metactical.procurement_v3.taxes import save_v3_totals, set_v3_totals
 
 	doc = frappe.get_doc("Purchase Order V3", po3_name)
+	# a back-ordered balance is not part of the order's value until it arrives --
+	# the same rule the native PO follows (sync_native_po), so the two agree
+	backordered = open_backorder_qty(po3_name)
 	total_qty = 0.0
 	lines, rows = [], []
 	for r in doc.items:
-		qty = billable_qty(r.qty, r.short_qty)
+		qty = max(billable_qty(r.qty, r.short_qty, r.over_qty) - backordered.get(r.name, 0), 0)
 		amount = qty * F(r.rate)
 		if F(r.amount) != amount:
 			# keep the grid adding up to the header - a column that does not sum

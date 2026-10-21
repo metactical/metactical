@@ -620,7 +620,7 @@ def sync_native_po(po3_name, new_lines):
 	def coming_now(r):
 		# what this confirmation ships: the back-ordered balance is left off the
 		# native PO until it is received (grow_native_po_for_receipt)
-		return max(billable_qty(r.qty, r.short_qty) - backordered.get(r.name, 0), 0)
+		return max(billable_qty(r.qty, r.short_qty, r.over_qty) - backordered.get(r.name, 0), 0)
 
 	for r in po3.items:
 		n = native.get(r.erp_po_item)
@@ -744,8 +744,6 @@ def copy_native_identifiers(po3_name):
 # against a native PO that cannot take it.
 # ---------------------------------------------------------------------------
 def grow_native_po_for_receipt(po3_name, incoming):
-	from erpnext.controllers.accounts_controller import update_child_qty_rate
-
 	erp_po = frappe.db.get_value("Purchase Order V3", po3_name, "erp_purchase_order")
 	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
 		return
@@ -781,17 +779,52 @@ def grow_native_po_for_receipt(po3_name, incoming):
 	for i, t in enumerate(trans, start=1):
 		t["idx"] = i
 
-	# Update Items checks the user's create / write / delete rights on Purchase
-	# Order, which a receiver usually does not have; the receipt is what
-	# authorises this, so it runs as Administrator and switches straight back
+	update_items_as_admin(erp_po, trans)
+	link_added_rows(erp_po, set(native), added_lines)
+	copy_native_identifiers(po3_name)
+
+
+# ---------------------------------------------------------------------------
+# After a receipt: a native row still ordering more than its PO3 line is now
+# worth -- the line was short-closed, so the rest is never coming -- comes down
+# to that, never below what was received against it. Only ever lowers a row:
+# an open back-order is off the native PO on purpose until it arrives.
+# Brings the native PO's totals to what the PO3 and the receipts say.
+# ---------------------------------------------------------------------------
+def fit_native_po_to_po3(po3_name):
+	erp_po = frappe.db.get_value("Purchase Order V3", po3_name, "erp_purchase_order")
+	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
+		return
+	po3 = frappe.get_doc("Purchase Order V3", po3_name)
+	npo = frappe.get_doc("Purchase Order", erp_po)
+	worth = {r.erp_po_item: billable_qty(r.qty, r.short_qty, r.over_qty) for r in po3.items if r.erp_po_item}
+
+	trans, lowered = [], False
+	for n in npo.items:
+		qty = F(n.qty)
+		if n.name in worth:
+			target = max(min(qty, worth[n.name]), F(n.received_qty))
+			if target < qty:
+				qty, lowered = target, True
+		trans.append({"docname": n.name, "item_code": n.item_code, "qty": qty, "rate": F(n.rate),
+			"uom": n.uom, "conversion_factor": n.conversion_factor, "schedule_date": str(n.schedule_date),
+			"idx": n.idx})
+	if lowered:
+		update_items_as_admin(erp_po, trans)
+
+
+# Update Items checks the user's create / write / delete rights on Purchase
+# Order, which a receiver usually does not have; the receipt is what authorises
+# these changes, so they run as Administrator and switch straight back.
+def update_items_as_admin(erp_po, trans):
+	from erpnext.controllers.accounts_controller import update_child_qty_rate
+
 	user = frappe.session.user
 	frappe.set_user("Administrator")
 	try:
 		update_child_qty_rate("Purchase Order", json.dumps(trans), erp_po)
 	finally:
 		frappe.set_user(user)
-	link_added_rows(erp_po, set(native), added_lines)
-	copy_native_identifiers(po3_name)
 
 
 # ---------------------------------------------------------------------------

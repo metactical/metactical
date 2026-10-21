@@ -13,6 +13,7 @@ from metactical.procurement_v3.taxes import (
 	TOTAL_FIELDS,
 	copy_taxes_to_native,
 	fill_taxes_from_template,
+	prepare_tax_rows,
 	set_v3_totals,
 	v3_before_print,
 )
@@ -149,6 +150,9 @@ def shared_series_naming(doc):
 		npo.company = doc.company
 		set_native_addresses(npo, doc)
 		fill_taxes_from_template(doc)
+		# validate (which fills a blank Description from the account) has not run
+		# yet, and Description is mandatory on the twin's tax rows
+		prepare_tax_rows(doc)
 		copy_taxes_to_native(npo, doc)
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
 		# PO3 has one date field, and it is a CANCEL date -- the point after which
@@ -309,7 +313,7 @@ def validate(doc):
 				d.rate = price
 		# a line the supplier will never fill is worth nothing to this order, so
 		# it drops out of the totals - see billable_qty
-		billable = billable_qty(d.qty, d.short_qty)
+		billable = billable_qty(d.qty, d.short_qty, d.over_qty)
 		d.amount = billable * F(d.rate)
 		total_qty += billable
 		total += d.amount
@@ -454,7 +458,7 @@ def get_item_identifiers(item_code, supplier=None):
 # ---------------------------------------------------------------------------
 def set_tax_totals(doc):
 	rows = [d for d in doc.items if d.item_code]
-	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate) for d in rows], rows)
+	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty, d.over_qty), d.rate) for d in rows], rows)
 
 
 # Nothing is written. Answers the header totals, each tax row's amounts (in row
