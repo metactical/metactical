@@ -9,6 +9,8 @@ from frappe.model.document import Document
 from frappe.contacts.doctype.address.address import get_company_address, get_default_address, render_address
 
 from metactical.procurement_v3.taxes import (
+	TAX_ROW_TOTALS,
+	TOTAL_FIELDS,
 	copy_taxes_to_native,
 	fill_taxes_from_template,
 	set_v3_totals,
@@ -288,8 +290,7 @@ def validate(doc):
 	# native twin will work them out -- see procurement_v3/taxes.py. The
 	# approval tier below goes by base_grand_total, so taxes count towards it.
 	fill_taxes_from_template(doc)
-	rows = [d for d in doc.items if d.item_code]
-	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate) for d in rows], rows)
+	set_tax_totals(doc)
 
 	if doc.base_grand_total >= 50000:
 		doc.approval_tier = "L3 (Abdul) - over 50k"
@@ -407,6 +408,33 @@ def item_identifiers(item_code, supplier=None):
 @frappe.whitelist()
 def get_item_identifiers(item_code, supplier=None):
 	return item_identifiers(item_code, supplier)
+
+
+# ---------------------------------------------------------------------------
+# Taxes, Additional Discount and the grand totals over the billable lines --
+# see procurement_v3/taxes.py. validate() runs it on save; preview_totals runs
+# it on the form as it stands, so the numbers move while taxes, discount or
+# lines are being keyed in, as they do on the native PO.
+# ---------------------------------------------------------------------------
+def set_tax_totals(doc):
+	rows = [d for d in doc.items if d.item_code]
+	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate) for d in rows], rows)
+
+
+# Nothing is written. Answers the header totals, each tax row's amounts (in row
+# order) and each line's net figures (in line order).
+@frappe.whitelist()
+def preview_totals(doc):
+	if isinstance(doc, str):
+		doc = json.loads(doc)
+	frappe.has_permission("Purchase Order V3", "write", throw=True)
+	doc = frappe.get_doc(doc)
+	set_tax_totals(doc)
+	return {
+		"totals": {f: doc.get(f) for f in ("total",) + TOTAL_FIELDS},
+		"taxes": [{f: t.get(f) for f in ("description",) + TAX_ROW_TOTALS} for t in doc.get("taxes") or []],
+		"items": [{"net_rate": d.get("net_rate"), "net_amount": d.get("net_amount")} for d in doc.items or []],
+	}
 
 
 # The native twin's lines are built from item_code/qty/rate alone, leaving
