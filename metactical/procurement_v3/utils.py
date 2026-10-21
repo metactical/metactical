@@ -44,7 +44,29 @@ def item_supplier_part_no(item_code, supplier=None):
 	return rows[0].supplier_part_no
 
 
-def billable_qty(qty, short_qty):
+def item_unavailable(item_code):
+	"""Why an item may not go on a new order or receipt: "disabled",
+	"discontinued" (Item.ifw_discontinued), or None when it may."""
+	if not item_code:
+		return None
+	disabled, discontinued = frappe.get_cached_value("Item", item_code, ["disabled", "ifw_discontinued"]) or (0, 0)
+	if frappe.utils.cint(disabled):
+		return "disabled"
+	if frappe.utils.cint(discontinued):
+		return "discontinued"
+	return None
+
+
+def throw_unavailable(bad, action):
+	"""bad: [(row idx, item_code, why)] -> one message listing every row.
+	action: what the items can't be, e.g. "ordered"."""
+	if bad:
+		frappe.throw("These items are discontinued or disabled and can't be {0}:<br>".format(action)
+			+ "<br>".join("Row {0}: <b>{1}</b> ({2})".format(idx, code, why) for idx, code, why in bad),
+			title="Item not available")
+
+
+def billable_qty(qty, short_qty, over_qty=0):
 	"""How much of a line is still expected to cost us.
 
 	short_qty is the quantity that will never arrive, and every part of the flow
@@ -55,9 +77,12 @@ def billable_qty(qty, short_qty):
 	back-order, or a partial receipt still expecting the rest -- leaves it at 0.
 
 	So the ordered quantity minus that is what the order is still worth, and no
-	status list has to be kept in step here to work it out.
+	status list has to be kept in step here to work it out. over_qty is the
+	other way round: received beyond the order (a receipt sets it), and kept --
+	the order is worth what actually arrived, as the native PO and its receipt
+	are.
 	"""
-	return max(F(qty) - F(short_qty), 0.0)
+	return max(F(qty) - F(short_qty) + F(over_qty), 0.0)
 
 
 def v3_recalc_totals(po3_name):
@@ -72,19 +97,26 @@ def v3_recalc_totals(po3_name):
 	needed when it was placed, which is a fact about the past; a later stock-out
 	does not retroactively make it a smaller decision.
 	"""
+	from metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3 \
+		import open_backorder_qty
 	from metactical.procurement_v3.taxes import save_v3_totals, set_v3_totals
 
 	doc = frappe.get_doc("Purchase Order V3", po3_name)
+	# a back-ordered balance is not part of the order's value until it arrives --
+	# the same rule the native PO follows (sync_native_po), so the two agree
+	backordered = open_backorder_qty(po3_name)
 	total_qty = 0.0
 	lines, rows = [], []
 	for r in doc.items:
-		qty = billable_qty(r.qty, r.short_qty)
+		qty = max(billable_qty(r.qty, r.short_qty, r.over_qty) - backordered.get(r.name, 0), 0)
 		amount = qty * F(r.rate)
-		if F(r.amount) != amount:
+		if F(r.amount) != amount or F(r.expected_qty) != qty:
 			# keep the grid adding up to the header - a column that does not sum
-			# to the total printed under it is the thing people query
-			frappe.db.set_value("Purchase Order V3 Item", r.name, "amount", amount,
-				update_modified=False)
+			# to the total printed under it is the thing people query. Qty stays
+			# what was ordered (short_qty and the back-orders are measured from
+			# it); expected_qty is what the line comes to now, as on the native PO
+			frappe.db.set_value("Purchase Order V3 Item", r.name,
+				{"amount": amount, "expected_qty": qty}, update_modified=False)
 		total_qty += qty
 		if r.item_code:
 			lines.append((r.item_code, qty, r.rate))

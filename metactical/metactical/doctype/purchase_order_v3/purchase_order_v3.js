@@ -353,6 +353,18 @@ frappe.ui.form.on('Purchase Order V3', {
                 });
                 frm.set_value('shipping_address', v.nat_shipping_address || null);
                 frm.set_value('billing_address', v.nat_billing_address || null);
+                // never a fallback address: ask for what the supplier lacks
+                var missing = [];
+                if (!v.nat_shipping_address) missing.push(__('Shipping Address'));
+                if (!v.nat_billing_address) missing.push(__('Billing Address'));
+                if (missing.length) {
+                    frappe.msgprint({
+                        title: __('Address missing'),
+                        indicator: 'orange',
+                        message: __('Supplier {0} has no {1} set. Please select it on this order before sending it for approval, or set it on the Supplier so new orders fill it in.',
+                                    [frm.doc.supplier.bold(), missing.join(__(' and '))])
+                    });
+                }
                 if (frm.is_new()) {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);
@@ -522,10 +534,66 @@ frappe.ui.form.on('Purchase Order V3', {
 });
 
 // Taxes and Charges -- the native Purchase Order's own fields and child table.
-// Totals, taxes and discount are worked out on save, by ERPNext's own engine
-// (metactical/procurement_v3/taxes.py).
+// Totals, taxes and discount are worked out by ERPNext's own engine
+// (metactical/procurement_v3/taxes.py): on save, and while the form is being
+// keyed in through preview_totals, so they move as they do on the native PO.
+
+// The native PO's own tax-grid behaviour: Rate editable and required, Amount
+// read-only -- the other way round for "Actual" -- the account query and the
+// row checks.
+erpnext.accounts.taxes.setup_tax_validations('Purchase Order V3');
+
+var PO3_TOTAL_FIELDS = ['total', 'base_total', 'net_total', 'base_net_total',
+    'taxes_and_charges_added', 'base_taxes_and_charges_added',
+    'taxes_and_charges_deducted', 'base_taxes_and_charges_deducted',
+    'total_taxes_and_charges', 'base_total_taxes_and_charges',
+    'discount_amount', 'base_discount_amount', 'grand_total', 'base_grand_total',
+    'rounding_adjustment', 'base_rounding_adjustment', 'rounded_total', 'base_rounded_total'];
+
+// Debounced: a burst of edits (a template's rows, a pasted item list) makes
+// one call, and an answer to an older call is dropped.
+function po3_calc_taxes(frm) {
+    if (frm.doc.docstatus !== 0) return;
+    clearTimeout(frm._po3_calc_timer);
+    frm._po3_calc_timer = setTimeout(function() {
+        var seq = frm._po3_calc_seq = (frm._po3_calc_seq || 0) + 1;
+        frappe.call({
+            method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.preview_totals',
+            args: { doc: frm.doc },
+            callback: function(r) {
+                if (seq !== frm._po3_calc_seq || !r.message) return;
+                // assigned rather than set_value: display copies of what save
+                // recomputes, and set_value would fire these handlers again
+                PO3_TOTAL_FIELDS.forEach(function(f) {
+                    if (f in r.message.totals) frm.doc[f] = r.message.totals[f];
+                });
+                (frm.doc.taxes || []).forEach(function(t, i) {
+                    var calc = r.message.taxes[i] || {};
+                    Object.keys(calc).forEach(function(f) {
+                        // an Actual row's amount is what the user typed
+                        if (f === 'tax_amount' && t.charge_type === 'Actual') return;
+                        if (f === 'description' && t.description) return;
+                        t[f] = calc[f];
+                    });
+                });
+                (frm.doc.items || []).forEach(function(d, i) {
+                    var calc = r.message.items[i] || {};
+                    d.net_rate = calc.net_rate;
+                    d.net_amount = calc.net_amount;
+                });
+                PO3_TOTAL_FIELDS.forEach(function(f) { frm.refresh_field(f); });
+                frm.refresh_field('taxes');
+            }
+        });
+    }, 300);
+}
+
 frappe.ui.form.on('Purchase Order V3', {
     setup: function(frm) {
+        // discontinued and disabled items can't be ordered (validate refuses them)
+        frm.set_query('item_code', 'items', function() {
+            return { filters: { ifw_discontinued: 0, disabled: 0 } };
+        });
         frm.set_query('supplier_address', function() {
             return {
                 query: 'frappe.contacts.doctype.address.address.address_query',
@@ -534,9 +602,6 @@ frappe.ui.form.on('Purchase Order V3', {
         });
         frm.set_query('taxes_and_charges', function() {
             return { filters: { company: frm.doc.company, disabled: 0 } };
-        });
-        frm.set_query('account_head', 'taxes', function() {
-            return { filters: { company: frm.doc.company, is_group: 0 } };
         });
         frm.set_query('cost_center', 'taxes', function() {
             return { filters: { company: frm.doc.company, is_group: 0 } };
@@ -551,7 +616,95 @@ frappe.ui.form.on('Purchase Order V3', {
                 frm.clear_table('taxes');
                 (r.message || []).forEach(function(t) { frm.add_child('taxes', t); });
                 frm.refresh_field('taxes');
+                po3_calc_taxes(frm);
             }
         });
+    },
+    apply_discount_on: function(frm) { po3_calc_taxes(frm); },
+    additional_discount_percentage: function(frm) { po3_calc_taxes(frm); },
+    discount_amount: function(frm) { po3_calc_taxes(frm); },
+    disable_rounded_total: function(frm) { po3_calc_taxes(frm); },
+    taxes_remove: function(frm) { po3_calc_taxes(frm); },
+    // Description is mandatory on ERPNext's tax row, but picking the account
+    // is all that is needed: fill it from the account, as the native PO does,
+    // and let the row through either way -- save fills it too (prepare_tax_rows).
+    validate: function(frm) {
+        (frm.doc.taxes || []).forEach(function(t) {
+            if (t.account_head && !t.description) {
+                t.description = t.account_head.split(' - ').slice(0, -1).join(' - ') || t.account_head;
+            }
+            // this row's own copy of the field, so the native PO is unaffected
+            var df = frappe.meta.get_docfield(t.doctype, 'description', t.name);
+            if (df) df.reqd = 0;
+        });
+        frm.refresh_field('taxes');
+    }
+});
+
+// The same line changes that move the line amounts move the taxes too.
+frappe.ui.form.on('Purchase Order V3 Item', {
+    qty: function(frm) { po3_calc_taxes(frm); },
+    rate: function(frm) { po3_calc_taxes(frm); },
+    short_qty: function(frm) { po3_calc_taxes(frm); },
+    items_remove: function(frm) { po3_calc_taxes(frm); }
+});
+
+// The tax row itself. Purchase Taxes and Charges is shared with the native PO
+// and SOC3, so these only act on a PO3. Picking an account fills Rate and
+// Description as the native PO does (erpnext accounts.js, account_head).
+frappe.ui.form.on('Purchase Taxes and Charges', {
+    account_head: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        var d = locals[cdt][cdn];
+        if (d.docstatus == 1) return;
+        if (!d.charge_type && d.account_head) {
+            frappe.msgprint(__('Please select Charge Type first'));
+            frappe.model.set_value(cdt, cdn, 'account_head', '');
+        } else if (d.account_head) {
+            frappe.call({
+                type: 'GET',
+                method: 'erpnext.controllers.accounts_controller.get_tax_rate',
+                args: { account_head: d.account_head },
+                callback: function(r) {
+                    var acc = r.message || {};
+                    if (d.charge_type !== 'Actual') {
+                        frappe.model.set_value(cdt, cdn, 'rate', acc.tax_rate || 0);
+                    }
+                    frappe.model.set_value(cdt, cdn, 'description', acc.account_name);
+                    po3_calc_taxes(frm);
+                }
+            });
+        }
+    },
+    charge_type: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        var row = frm.open_grid_row() || frm.get_field('taxes').grid.get_row(cdn);
+        erpnext.accounts.taxes.set_conditional_mandatory_rate_or_amount(row);
+        po3_calc_taxes(frm);
+    },
+    rate: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        po3_calc_taxes(frm);
+    },
+    tax_amount: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        po3_calc_taxes(frm);
+    },
+    row_id: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        po3_calc_taxes(frm);
+    },
+    add_deduct_tax: function(frm) {
+        if (frm.doctype === 'Purchase Order V3') po3_calc_taxes(frm);
+    },
+    category: function(frm) {
+        if (frm.doctype === 'Purchase Order V3') po3_calc_taxes(frm);
+    },
+    included_in_print_rate: function(frm) {
+        if (frm.doctype === 'Purchase Order V3') po3_calc_taxes(frm);
     }
 });

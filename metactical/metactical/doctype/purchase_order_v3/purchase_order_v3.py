@@ -6,11 +6,14 @@ import re
 
 import frappe
 from frappe.model.document import Document
-from frappe.contacts.doctype.address.address import get_company_address, get_default_address, render_address
+from frappe.contacts.doctype.address.address import get_default_address, render_address
 
 from metactical.procurement_v3.taxes import (
+	TAX_ROW_TOTALS,
+	TOTAL_FIELDS,
 	copy_taxes_to_native,
 	fill_taxes_from_template,
+	prepare_tax_rows,
 	set_v3_totals,
 	v3_before_print,
 )
@@ -18,7 +21,9 @@ from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
 	item_supplier_part_no,
+	item_unavailable,
 	mirror_po3_status,
+	throw_unavailable,
 	v3_may_close_native,
 	v3_open_bo,
 	v3_recalc_totals,
@@ -147,6 +152,9 @@ def shared_series_naming(doc):
 		npo.company = doc.company
 		set_native_addresses(npo, doc)
 		fill_taxes_from_template(doc)
+		# validate (which fills a blank Description from the account) has not run
+		# yet, and Description is mandatory on the twin's tax rows
+		prepare_tax_rows(doc)
 		copy_taxes_to_native(npo, doc)
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
 		# PO3 has one date field, and it is a CANCEL date -- the point after which
@@ -187,6 +195,12 @@ def shared_series_naming(doc):
 			# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
 			# see copy_line_identifiers
 			copy_line_identifiers(r, d)
+		# shipping_address is mandatory on Purchase Order, but a PO3 draft may
+		# not have one yet (require_addresses asks for it before approval, and
+		# approval copies it onto this twin before submitting it). Everything
+		# else mandatory is set above; submit checks mandatory again regardless.
+		if not doc.shipping_address:
+			npo.flags.ignore_mandatory = True
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -236,6 +250,36 @@ def require_cancel_date(doc):
 		title="Required By (Cancel Date) is required")
 
 
+# ---------------------------------------------------------------------------
+# Shipping and Billing Address: optional on a draft, required on the way to
+# approval -- like Required By above, but on every move out of Draft and every
+# later transition (Approve included), since approval submits the native PO and
+# shipping_address is mandatory there. Nothing falls back to the company's
+# address any more (resolve_addresses), so a supplier with none configured
+# leaves them for the buyer to pick.
+# ---------------------------------------------------------------------------
+def require_addresses(doc):
+	missing = [label for label, value in (("Shipping Address", doc.shipping_address),
+		("Billing Address", doc.billing_address)) if not value]
+	if not missing:
+		return
+
+	now = doc.workflow_state or "Draft"
+	if now == "Draft":
+		return
+	was = (frappe.db.get_value(doc.doctype, doc.name, "workflow_state")
+		if not doc.is_new() else None) or "Draft"
+	if now == was:
+		return
+
+	it = "them" if len(missing) > 1 else "it"
+	frappe.throw("<b>{0} {1} required.</b><br><br>"
+		"Select {2} on this order before sending it for approval. Supplier {3} has none "
+		"set - you can also set {2} on the Supplier, and new orders will then fill {2} in.".format(
+			" and ".join(missing), "are" if len(missing) > 1 else "is", it, frappe.bold(doc.supplier or "")),
+		title="Address required")
+
+
 def mirror_status_now(erp_po, state):
 	# Before Save: the new state is only on the in-memory doc, not yet in the DB
 	if erp_po:
@@ -245,9 +289,14 @@ def mirror_status_now(erp_po, state):
 
 def validate(doc):
 	require_cancel_date(doc)
+	# a discontinued or disabled item can't be ordered -- checked on every draft
+	# save and again on approval, in case it was discontinued in between
+	throw_unavailable([(d.idx, d.item_code, why) for d in doc.items
+		for why in [item_unavailable(d.item_code)] if why], "ordered")
 
 	resolve_currency(doc)
 	resolve_addresses(doc)
+	require_addresses(doc)
 	fill_item_identifiers(doc)
 
 	# Changing the Ship To Warehouse has to take the lines with it. Filling only
@@ -270,8 +319,9 @@ def validate(doc):
 				d.rate = price
 		# a line the supplier will never fill is worth nothing to this order, so
 		# it drops out of the totals - see billable_qty
-		billable = billable_qty(d.qty, d.short_qty)
+		billable = billable_qty(d.qty, d.short_qty, d.over_qty)
 		d.amount = billable * F(d.rate)
+		d.expected_qty = billable
 		total_qty += billable
 		total += d.amount
 		if not d.warehouse or moved_warehouse:
@@ -288,8 +338,7 @@ def validate(doc):
 	# native twin will work them out -- see procurement_v3/taxes.py. The
 	# approval tier below goes by base_grand_total, so taxes count towards it.
 	fill_taxes_from_template(doc)
-	rows = [d for d in doc.items if d.item_code]
-	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty), d.rate) for d in rows], rows)
+	set_tax_totals(doc)
 
 	if doc.base_grand_total >= 50000:
 		doc.approval_tier = "L3 (Abdul) - over 50k"
@@ -362,12 +411,11 @@ def resolve_addresses(doc):
 			["nat_shipping_address", "nat_billing_address"]) or (None, None)
 		doc.shipping_address = doc.shipping_address or shipping
 		doc.billing_address = doc.billing_address or billing
-	# then as ERPNext fills a native PO (accounts.party.set_address_details): bill
-	# to the company's own address, and ship there too unless told otherwise
-	if doc.company and not doc.billing_address:
-		doc.billing_address = get_company_address(doc.company).get("company_address")
-	if not doc.shipping_address:
-		doc.shipping_address = doc.billing_address
+	# Only ever the supplier's configured addresses or the buyer's own pick. No
+	# fallback to the company's default address: that put an unrelated address
+	# (e.g. "Camo TO East York - Shipping") on orders whose supplier had none
+	# set. Blank is fine on a draft; require_addresses asks for them on the way
+	# to approval.
 
 	doc.shipping_address_display = render_address(doc.shipping_address, check_permissions=False) if doc.shipping_address else None
 	doc.billing_address_display = render_address(doc.billing_address, check_permissions=False) if doc.billing_address else None
@@ -407,6 +455,33 @@ def item_identifiers(item_code, supplier=None):
 @frappe.whitelist()
 def get_item_identifiers(item_code, supplier=None):
 	return item_identifiers(item_code, supplier)
+
+
+# ---------------------------------------------------------------------------
+# Taxes, Additional Discount and the grand totals over the billable lines --
+# see procurement_v3/taxes.py. validate() runs it on save; preview_totals runs
+# it on the form as it stands, so the numbers move while taxes, discount or
+# lines are being keyed in, as they do on the native PO.
+# ---------------------------------------------------------------------------
+def set_tax_totals(doc):
+	rows = [d for d in doc.items if d.item_code]
+	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty, d.over_qty), d.rate) for d in rows], rows)
+
+
+# Nothing is written. Answers the header totals, each tax row's amounts (in row
+# order) and each line's net figures (in line order).
+@frappe.whitelist()
+def preview_totals(doc):
+	if isinstance(doc, str):
+		doc = json.loads(doc)
+	frappe.has_permission("Purchase Order V3", "write", throw=True)
+	doc = frappe.get_doc(doc)
+	set_tax_totals(doc)
+	return {
+		"totals": {f: doc.get(f) for f in ("total",) + TOTAL_FIELDS},
+		"taxes": [{f: t.get(f) for f in ("description",) + TAX_ROW_TOTALS} for t in doc.get("taxes") or []],
+		"items": [{"net_rate": d.get("net_rate"), "net_amount": d.get("net_amount")} for d in doc.items or []],
+	}
 
 
 # The native twin's lines are built from item_code/qty/rate alone, leaving
@@ -1113,6 +1188,9 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 
 	count = 0
 	skipped = []
+	# discontinued / disabled items are left off rather than failing the whole
+	# list on save (validate would refuse them); the caller is told which
+	unavailable = []
 	for it in raw_items:
 		qty = float(it.get("qty") or 0)
 		if qty <= 0:
@@ -1121,6 +1199,10 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 		if not code:
 			skipped.append(str(it.get("item_code")).strip())
 			continue
+		why = item_unavailable(code)
+		if why:
+			unavailable.append(code + " (" + why + ")")
+			continue
 		row = doc.append("items", {})
 		row.item_code = code
 		row.qty = qty
@@ -1128,7 +1210,8 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 			row.rate = float(it.get("rate"))
 		count += 1
 	if not count:
-		frappe.throw("No usable lines - every item was unknown or qty 0. Unknown: " + ", ".join(skipped))
+		frappe.throw("No usable lines - every item was unknown, discontinued, disabled or qty 0. Unknown: "
+			+ ", ".join(skipped) + (". Not available: " + ", ".join(unavailable) if unavailable else ""))
 
 	doc.insert()
 
@@ -1138,7 +1221,7 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 		frappe.response["location"] = url
 	else:
 		frappe.response["message"] = {"po3": doc.name, "url": url, "lines": count,
-			"skipped": skipped, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
+			"skipped": skipped, "not_available": unavailable, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
 
 
 # ---------------------------------------------------------------------------

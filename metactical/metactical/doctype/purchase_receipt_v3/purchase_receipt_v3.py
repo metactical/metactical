@@ -4,10 +4,17 @@
 import frappe
 from frappe.model.document import Document
 
+from metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3 import (
+	fit_native_po_to_po3,
+	grow_native_po_for_receipt,
+)
+from metactical.procurement_v3.taxes import copy_taxes_to_native
 from metactical.procurement_v3.utils import (
 	F,
 	item_supplier_part_no,
+	item_unavailable,
 	mirror_po3_status,
+	throw_unavailable,
 	v3_may_close_native,
 	v3_open_bo,
 	v3_recalc_totals,
@@ -207,6 +214,13 @@ def validate(doc):
 		d.barcode = ii["bc"]
 		d.supplier_part_no = ii["sp"]
 
+	# a discontinued or disabled item can't be received. Only rows that actually
+	# counted something: lines laid out from the order at zero are left alone,
+	# so a receipt can still be opened against an order that has one
+	throw_unavailable([(d.idx, d.received_item_code, why) for d in doc.items
+		if F(d.received_qty) or F(d.accepted_qty) or F(d.rejected_qty)
+		for why in [item_unavailable(d.received_item_code)] if why], "received")
+
 	strict = doc.workflow_state not in (None, "", "Draft", "Counting")
 	var_count = 0
 	any_rejected = False
@@ -341,7 +355,6 @@ def post_to_po3(doc):
 		rows[r.name] = r
 
 	open_bo_before = v3_open_bo(po.name)
-	short_changed = False
 	for d in doc.items:
 		if not d.po3_item:
 			continue
@@ -368,7 +381,6 @@ def post_to_po3(doc):
 			upd["line_status"] = "Closed Short"
 			upd["short_qty"] = F(r.qty) - rec
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
-		short_changed = short_changed or "short_qty" in upd
 
 	# write receipts back onto the confirmation's Back Orders rows
 	for d in doc.items:
@@ -417,9 +429,9 @@ def post_to_po3(doc):
 			hdr["workflow_state"] = "Partially Received"
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
 
-	if short_changed:
-		# a line was short-closed, so the order will never be worth what it says
-		v3_recalc_totals(po.name)
+	# the order is now worth what arrived: a short-closed line drops what never
+	# came, an over-received one counts the extra (billable_qty)
+	v3_recalc_totals(po.name)
 
 	frappe.db.set_value(doc.doctype, doc.name, {
 		"posted_on": frappe.utils.now_datetime(), "posted_by": frappe.session.user})
@@ -434,6 +446,7 @@ def post_to_po3(doc):
 					frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "To Receive and Bill")
 				frappe.msgprint("Native PO " + po.erp_purchase_order
 					+ " was Closed - reopened so this receipt could post.")
+			po = make_room_on_native_po(doc, po)
 			# the draft kept in step while counting, now with the final count
 			pr = draft_native_pr(doc) or frappe.new_doc("Purchase Receipt")
 			fill_native_pr(pr, doc, po, final=True)
@@ -472,6 +485,10 @@ def post_to_po3(doc):
 
 	v3_reconcile(po.name)
 
+	# the native PO follows: short-closed rows come down to what was received
+	if frappe.db.get_single_value("Procurement Settings V3", "posting_enabled"):
+		fit_native_po_to_po3(po.name)
+
 	# now that the receipt has posted, the order really is finished
 	if close_native_after and po.erp_purchase_order:
 		gate = v3_may_close_native(po.erp_purchase_order)
@@ -497,6 +514,20 @@ def post_to_po3(doc):
 # lines not counted yet at zero (allow_zero_qty) so it reads like the count
 # sheet; the final fill drops them, as ERPNext will not post a zero line.
 # ---------------------------------------------------------------------------
+# Back-ordered quantity only goes onto the native PO when it arrives (see
+# grow_native_po_for_receipt): before the final receipt is built, every PO3 line
+# this count receives gets a native row with room for it. Returns the PO3
+# reloaded, since its lines may now point at new native rows.
+def make_room_on_native_po(doc, po):
+
+	incoming = {}
+	for d in doc.items:
+		if d.po3_item and d.received_item_code and d.received_item_code == d.expected_item_code:
+			incoming[d.po3_item] = incoming.get(d.po3_item, 0) + F(d.accepted_qty) + F(d.rejected_qty)
+	grow_native_po_for_receipt(po.name, incoming)
+	return frappe.get_doc("Purchase Order V3", po.name)
+
+
 def fill_native_pr(pr, doc, po, final):
 	rows = {}
 	for r in po.items:
@@ -534,6 +565,10 @@ def fill_native_pr(pr, doc, po, final):
 		row.neb_source_name = doc.name
 		row.neb_source_detail = d.name
 		row.neb_box_no = doc.box_no
+	# the order's taxes and discount, as ERPNext's own PO -> Purchase Receipt
+	# carries them (its mapper copies the tax rows and these settings): without
+	# them the receipt, and an invoice made from it, came out without GST
+	copy_taxes_to_native(pr, frappe.get_doc("Purchase Order", po.erp_purchase_order))
 	pr.flags.allow_zero_qty = not final
 
 
@@ -795,6 +830,7 @@ def v3_retry_gr3_posting(gr3=None):
 				frappe.db.set_value("Purchase Order", po.erp_purchase_order, "status", "To Receive and Bill")
 			frappe.msgprint("Native PO " + po.erp_purchase_order
 				+ " was Closed - reopened so this receipt could post.")
+		po = make_room_on_native_po(doc, po)
 		pr = frappe.new_doc("Purchase Receipt")
 		fill_native_pr(pr, doc, po, final=True)
 		pr.insert()
