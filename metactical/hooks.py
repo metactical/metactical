@@ -140,9 +140,6 @@ has_permission = {
 # Hook on document methods and events
 
 doc_events = {
-	"Supplier": {
-		"validate": "metactical.procurement_v3.utils.validate_supplier_po_emails",
-	},
 	"Purchase Order": {
 		"after_insert": "metactical.barcode_generator.generate",
 		"validate": "metactical.barcode_generator.po_validate",
@@ -195,6 +192,7 @@ override_doctype_class = {
 	"Packing Slip": "metactical.custom_scripts.packing_slip.packing_slip.CustomPackingSlip",
 	"Stock Reconciliation": "metactical.custom_scripts.stock_reconciliation.stock_reconciliation.CustomStockReconciliation",
 	"Purchase Order": "metactical.custom_scripts.purchase_order.purchase_order.CustomPurchaseOrder",
+	"Supplier": "metactical.custom_scripts.supplier.supplier.CustomSupplier",
 	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",

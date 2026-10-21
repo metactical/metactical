@@ -82,9 +82,9 @@ def require_email_signature(doc, fieldname):
 				full_name or user, doc.meta.get_label(fieldname)), title="No email signature")
 
 
-def validate_supplier_po_emails(doc, method=None):
-	"""Supplier validate hook (hooks.py): the PO V3 Ordering CC / BCC addresses
-	and Main Signature."""
+def validate_supplier_po_emails(doc):
+	"""Run from Supplier's validate (custom_scripts/supplier/supplier.py): the
+	PO V3 Ordering CC / BCC addresses and Main Signature."""
 	for f in ("po3_cc_email", "nat_po3_bcc_email"):
 		if doc.meta.has_field(f):
 			clean_email_list(doc, f)
