@@ -44,6 +44,28 @@ def item_supplier_part_no(item_code, supplier=None):
 	return rows[0].supplier_part_no
 
 
+def item_unavailable(item_code):
+	"""Why an item may not go on a new order or receipt: "disabled",
+	"discontinued" (Item.ifw_discontinued), or None when it may."""
+	if not item_code:
+		return None
+	disabled, discontinued = frappe.get_cached_value("Item", item_code, ["disabled", "ifw_discontinued"]) or (0, 0)
+	if frappe.utils.cint(disabled):
+		return "disabled"
+	if frappe.utils.cint(discontinued):
+		return "discontinued"
+	return None
+
+
+def throw_unavailable(bad, action):
+	"""bad: [(row idx, item_code, why)] -> one message listing every row.
+	action: what the items can't be, e.g. "ordered"."""
+	if bad:
+		frappe.throw("These items are discontinued or disabled and can't be {0}:<br>".format(action)
+			+ "<br>".join("Row {0}: <b>{1}</b> ({2})".format(idx, code, why) for idx, code, why in bad),
+			title="Item not available")
+
+
 def billable_qty(qty, short_qty, over_qty=0):
 	"""How much of a line is still expected to cost us.
 

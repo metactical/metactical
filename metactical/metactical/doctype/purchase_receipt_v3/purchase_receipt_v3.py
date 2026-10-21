@@ -12,7 +12,9 @@ from metactical.procurement_v3.taxes import copy_taxes_to_native
 from metactical.procurement_v3.utils import (
 	F,
 	item_supplier_part_no,
+	item_unavailable,
 	mirror_po3_status,
+	throw_unavailable,
 	v3_may_close_native,
 	v3_open_bo,
 	v3_recalc_totals,
@@ -211,6 +213,13 @@ def validate(doc):
 		d.retail_sku_suffix = ii["rs"]
 		d.barcode = ii["bc"]
 		d.supplier_part_no = ii["sp"]
+
+	# a discontinued or disabled item can't be received. Only rows that actually
+	# counted something: lines laid out from the order at zero are left alone,
+	# so a receipt can still be opened against an order that has one
+	throw_unavailable([(d.idx, d.received_item_code, why) for d in doc.items
+		if F(d.received_qty) or F(d.accepted_qty) or F(d.rejected_qty)
+		for why in [item_unavailable(d.received_item_code)] if why], "received")
 
 	strict = doc.workflow_state not in (None, "", "Draft", "Counting")
 	var_count = 0

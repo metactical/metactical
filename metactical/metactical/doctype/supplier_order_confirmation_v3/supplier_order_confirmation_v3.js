@@ -525,6 +525,13 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
         frm.set_query('taxes_and_charges', function() {
             return { filters: { company: frm.doc.company, disabled: 0 } };
         });
+        // an item added to the order, or sent as a substitute, can't be a
+        // discontinued or disabled one (validate refuses them)
+        ['item_code', 'substitute_item_code'].forEach(function(f) {
+            frm.set_query(f, 'items', function() {
+                return { filters: { ifw_discontinued: 0, disabled: 0 } };
+            });
+        });
         frm.set_query('cost_center', 'taxes', function() {
             return { filters: { company: frm.doc.company, is_group: 0 } };
         });

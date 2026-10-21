@@ -590,6 +590,10 @@ function po3_calc_taxes(frm) {
 
 frappe.ui.form.on('Purchase Order V3', {
     setup: function(frm) {
+        // discontinued and disabled items can't be ordered (validate refuses them)
+        frm.set_query('item_code', 'items', function() {
+            return { filters: { ifw_discontinued: 0, disabled: 0 } };
+        });
         frm.set_query('supplier_address', function() {
             return {
                 query: 'frappe.contacts.doctype.address.address.address_query',

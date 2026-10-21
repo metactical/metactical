@@ -20,7 +20,9 @@ from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
 	item_supplier_part_no,
+	item_unavailable,
 	mirror_po3_status,
+	throw_unavailable,
 	v3_recalc_totals,
 )
 
@@ -264,6 +266,13 @@ def validate(doc):
 		# a real date beats "to be determined"
 		if d.backorder_eta:
 			d.eta_tbd = 0
+
+	# an item new to the order -- one the supplier adds, or sends in place of
+	# another -- may not be one we have discontinued or disabled
+	added = [(d.idx, d.item_code if d.line_status == NEW_ITEM else d.substitute_item_code) for d in doc.items
+		if d.line_status in (NEW_ITEM, "Substituted")]
+	throw_unavailable([(idx, code, why) for idx, code in added
+		for why in [item_unavailable(code)] if why], "added to this order")
 	no_eta = [d for d in doc.items
 		if d.line_status in ETA_REQUIRED_STATUSES and not d.backorder_eta and not d.eta_tbd]
 	if no_eta:

@@ -21,7 +21,9 @@ from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
 	item_supplier_part_no,
+	item_unavailable,
 	mirror_po3_status,
+	throw_unavailable,
 	v3_may_close_native,
 	v3_open_bo,
 	v3_recalc_totals,
@@ -287,6 +289,10 @@ def mirror_status_now(erp_po, state):
 
 def validate(doc):
 	require_cancel_date(doc)
+	# a discontinued or disabled item can't be ordered -- checked on every draft
+	# save and again on approval, in case it was discontinued in between
+	throw_unavailable([(d.idx, d.item_code, why) for d in doc.items
+		for why in [item_unavailable(d.item_code)] if why], "ordered")
 
 	resolve_currency(doc)
 	resolve_addresses(doc)
@@ -1181,6 +1187,9 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 
 	count = 0
 	skipped = []
+	# discontinued / disabled items are left off rather than failing the whole
+	# list on save (validate would refuse them); the caller is told which
+	unavailable = []
 	for it in raw_items:
 		qty = float(it.get("qty") or 0)
 		if qty <= 0:
@@ -1189,6 +1198,10 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 		if not code:
 			skipped.append(str(it.get("item_code")).strip())
 			continue
+		why = item_unavailable(code)
+		if why:
+			unavailable.append(code + " (" + why + ")")
+			continue
 		row = doc.append("items", {})
 		row.item_code = code
 		row.qty = qty
@@ -1196,7 +1209,8 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 			row.rate = float(it.get("rate"))
 		count += 1
 	if not count:
-		frappe.throw("No usable lines - every item was unknown or qty 0. Unknown: " + ", ".join(skipped))
+		frappe.throw("No usable lines - every item was unknown, discontinued, disabled or qty 0. Unknown: "
+			+ ", ".join(skipped) + (". Not available: " + ", ".join(unavailable) if unavailable else ""))
 
 	doc.insert()
 
@@ -1206,7 +1220,7 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 		frappe.response["location"] = url
 	else:
 		frappe.response["message"] = {"po3": doc.name, "url": url, "lines": count,
-			"skipped": skipped, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
+			"skipped": skipped, "not_available": unavailable, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
 
 
 # ---------------------------------------------------------------------------
