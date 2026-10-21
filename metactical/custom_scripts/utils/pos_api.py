@@ -1837,6 +1837,19 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
     """, {"item_codes": item_codes, "warehouses": all_warehouses}, as_dict=True)
     last_reconciliation_map = {(row.item_code, row.warehouse): row.last_reconciliation for row in recon_rows}
 
+    # All SOC V3 lines per item, one row per SOC V3 document, newest first
+    soc_rows = frappe.db.sql("""
+        SELECT s.item_code, s.line_status, s.backorder_eta, s.eta_tbd,
+               s.parent AS soc_name, p.confirmation_date
+        FROM `tabSupplier Order Confirmation V3 Item` s
+        JOIN `tabSupplier Order Confirmation V3` p ON p.name = s.parent
+        WHERE s.item_code IN %(item_codes)s
+        ORDER BY s.modified DESC
+    """, {"item_codes": item_codes}, as_dict=True)
+    soc_map = {}
+    for row in soc_rows:
+        soc_map.setdefault(row.item_code, []).append(row)
+
     # Attach inventory and pricing data
     for item in items:
         item.branches = {}
@@ -1911,6 +1924,16 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
         on_order = get_on_order_quantity(item.item_code, branch_warehouse)
         cost = get_item_cost(item.item_code) if can_see_item_cost else "-"
 
+        soc_lines = [
+            {
+                "SocName": row.soc_name,
+                "SocDate": str(row.confirmation_date or ""),
+                "SocLineStatus": row.line_status or "",
+                "SocBackorderEta": str(row.backorder_eta or ""),
+                "SocEtaTbd": bool(row.eta_tbd),
+            }
+            for row in soc_map.get(item.item_code, [])
+        ]
         item_details.append({
             "Sku": item.item_code,
             "ItemName": item.item_name,
@@ -1935,7 +1958,8 @@ def get_item_by_retail_sku(retail_sku, branch, user, page_size=10, page=1, wareh
             "DiscountExpiryDate": discount.get("discount_expiry_date"),
             "DiscountStartDate": discount.get("discount_start_date"),
             "Tags": item.tags,
-            "Branches": item.branches
+            "Branches": item.branches,
+            "SocLines": soc_lines,
         })
 
     frappe.response.update({

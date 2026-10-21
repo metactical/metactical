@@ -69,13 +69,14 @@
    "label": "Tracking No"
   },
   {
-   "description": "Built from the carrier\u2019s tracking URL template.",
+   "description": "Built from the carrier’s tracking URL template.",
    "fieldname": "tracking_url",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Track",
    "options": "URL",
-   "read_only": 1
+   "read_only": 1,
+   "length": 1000
   },
   {
    "allow_on_submit": 1,
@@ -124,7 +125,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:45.426209",
+ "modified": "2026-10-19 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Inbound Shipment V3 Box",

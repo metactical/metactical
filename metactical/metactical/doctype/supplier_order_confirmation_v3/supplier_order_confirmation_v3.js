@@ -106,6 +106,7 @@ function soc3_pull(frm, po, claimed) {
         d.confirmed_rate = r.rate;
     });
     frm.refresh_field('items');
+    soc3_copy_taxes(frm, po);
     soc3_totals(frm);
     soc3_fill_blanks(frm);
     var n = (frm.doc.items || []).length;
@@ -114,6 +115,29 @@ function soc3_pull(frm, po, claimed) {
                    : __('Nothing outstanding on {0}', [po.name]),
         indicator: n ? 'green' : 'orange'
     });
+}
+
+// The order's taxes and discount, for the supplier's confirmation to start
+// from. Assigned rather than set_value so taxes_and_charges does not fire and
+// replace the order's rows with the template's. Amounts are redone on save.
+var SOC3_TAX_SETTINGS = ['tax_category', 'taxes_and_charges', 'apply_discount_on',
+    'additional_discount_percentage', 'discount_amount', 'disable_rounded_total'];
+var SOC3_ROW_SKIP = ['name', 'parent', 'parenttype', 'parentfield', 'idx', 'doctype', 'owner',
+    'creation', 'modified', 'modified_by', 'docstatus'];
+
+function soc3_copy_taxes(frm, po) {
+    if ((frm.doc.taxes || []).length) return;
+    SOC3_TAX_SETTINGS.forEach(function(f) {
+        frm.doc[f] = po[f];
+        frm.refresh_field(f);
+    });
+    (po.taxes || []).forEach(function(t) {
+        var row = frm.add_child('taxes');
+        Object.keys(t).forEach(function(k) {
+            if (SOC3_ROW_SKIP.indexOf(k) === -1 && k.indexOf('__') !== 0) row[k] = t[k];
+        });
+    });
+    frm.refresh_field('taxes');
 }
 
 // Header totals, mirroring set_totals() in the controller so the numbers move
@@ -434,6 +458,35 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
                     reject();
                 })
                 .catch(function() { resolve(); });   // never block on a lookup failure
+        });
+    }
+});
+
+// Taxes and Charges -- the native Purchase Order's own fields and child table.
+// Totals, taxes and discount are worked out on save, by ERPNext's own engine
+// (metactical/procurement_v3/taxes.py).
+frappe.ui.form.on('Supplier Order Confirmation V3', {
+    setup: function(frm) {
+        frm.set_query('taxes_and_charges', function() {
+            return { filters: { company: frm.doc.company, disabled: 0 } };
+        });
+        frm.set_query('account_head', 'taxes', function() {
+            return { filters: { company: frm.doc.company, is_group: 0 } };
+        });
+        frm.set_query('cost_center', 'taxes', function() {
+            return { filters: { company: frm.doc.company, is_group: 0 } };
+        });
+    },
+    taxes_and_charges: function(frm) {
+        if (!frm.doc.taxes_and_charges) return;
+        frappe.call({
+            method: 'erpnext.controllers.accounts_controller.get_taxes_and_charges',
+            args: { master_doctype: 'Purchase Taxes and Charges Template', master_name: frm.doc.taxes_and_charges },
+            callback: function(r) {
+                frm.clear_table('taxes');
+                (r.message || []).forEach(function(t) { frm.add_child('taxes', t); });
+                frm.refresh_field('taxes');
+            }
         });
     }
 });
