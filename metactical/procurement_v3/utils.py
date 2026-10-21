@@ -110,11 +110,13 @@ def v3_recalc_totals(po3_name):
 	for r in doc.items:
 		qty = max(billable_qty(r.qty, r.short_qty, r.over_qty) - backordered.get(r.name, 0), 0)
 		amount = qty * F(r.rate)
-		if F(r.amount) != amount:
+		if F(r.amount) != amount or F(r.expected_qty) != qty:
 			# keep the grid adding up to the header - a column that does not sum
-			# to the total printed under it is the thing people query
-			frappe.db.set_value("Purchase Order V3 Item", r.name, "amount", amount,
-				update_modified=False)
+			# to the total printed under it is the thing people query. Qty stays
+			# what was ordered (short_qty and the back-orders are measured from
+			# it); expected_qty is what the line comes to now, as on the native PO
+			frappe.db.set_value("Purchase Order V3 Item", r.name,
+				{"amount": amount, "expected_qty": qty}, update_modified=False)
 		total_qty += qty
 		if r.item_code:
 			lines.append((r.item_code, qty, r.rate))

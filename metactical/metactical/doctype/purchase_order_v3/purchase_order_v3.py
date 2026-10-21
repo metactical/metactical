@@ -321,6 +321,7 @@ def validate(doc):
 		# it drops out of the totals - see billable_qty
 		billable = billable_qty(d.qty, d.short_qty, d.over_qty)
 		d.amount = billable * F(d.rate)
+		d.expected_qty = billable
 		total_qty += billable
 		total += d.amount
 		if not d.warehouse or moved_warehouse:
