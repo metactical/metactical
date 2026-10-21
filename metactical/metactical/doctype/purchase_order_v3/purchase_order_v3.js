@@ -353,6 +353,18 @@ frappe.ui.form.on('Purchase Order V3', {
                 });
                 frm.set_value('shipping_address', v.nat_shipping_address || null);
                 frm.set_value('billing_address', v.nat_billing_address || null);
+                // never a fallback address: ask for what the supplier lacks
+                var missing = [];
+                if (!v.nat_shipping_address) missing.push(__('Shipping Address'));
+                if (!v.nat_billing_address) missing.push(__('Billing Address'));
+                if (missing.length) {
+                    frappe.msgprint({
+                        title: __('Address missing'),
+                        indicator: 'orange',
+                        message: __('Supplier {0} has no {1} set. Please select it on this order before sending it for approval, or set it on the Supplier so new orders fill it in.',
+                                    [frm.doc.supplier.bold(), missing.join(__(' and '))])
+                    });
+                }
                 if (frm.is_new()) {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);

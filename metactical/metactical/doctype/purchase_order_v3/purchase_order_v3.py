@@ -6,7 +6,7 @@ import re
 
 import frappe
 from frappe.model.document import Document
-from frappe.contacts.doctype.address.address import get_company_address, get_default_address, render_address
+from frappe.contacts.doctype.address.address import get_default_address, render_address
 
 from metactical.procurement_v3.taxes import (
 	TAX_ROW_TOTALS,
@@ -189,6 +189,12 @@ def shared_series_naming(doc):
 			# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
 			# see copy_line_identifiers
 			copy_line_identifiers(r, d)
+		# shipping_address is mandatory on Purchase Order, but a PO3 draft may
+		# not have one yet (require_addresses asks for it before approval, and
+		# approval copies it onto this twin before submitting it). Everything
+		# else mandatory is set above; submit checks mandatory again regardless.
+		if not doc.shipping_address:
+			npo.flags.ignore_mandatory = True
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -238,6 +244,36 @@ def require_cancel_date(doc):
 		title="Required By (Cancel Date) is required")
 
 
+# ---------------------------------------------------------------------------
+# Shipping and Billing Address: optional on a draft, required on the way to
+# approval -- like Required By above, but on every move out of Draft and every
+# later transition (Approve included), since approval submits the native PO and
+# shipping_address is mandatory there. Nothing falls back to the company's
+# address any more (resolve_addresses), so a supplier with none configured
+# leaves them for the buyer to pick.
+# ---------------------------------------------------------------------------
+def require_addresses(doc):
+	missing = [label for label, value in (("Shipping Address", doc.shipping_address),
+		("Billing Address", doc.billing_address)) if not value]
+	if not missing:
+		return
+
+	now = doc.workflow_state or "Draft"
+	if now == "Draft":
+		return
+	was = (frappe.db.get_value(doc.doctype, doc.name, "workflow_state")
+		if not doc.is_new() else None) or "Draft"
+	if now == was:
+		return
+
+	it = "them" if len(missing) > 1 else "it"
+	frappe.throw("<b>{0} {1} required.</b><br><br>"
+		"Select {2} on this order before sending it for approval. Supplier {3} has none "
+		"set - you can also set {2} on the Supplier, and new orders will then fill {2} in.".format(
+			" and ".join(missing), "are" if len(missing) > 1 else "is", it, frappe.bold(doc.supplier or "")),
+		title="Address required")
+
+
 def mirror_status_now(erp_po, state):
 	# Before Save: the new state is only on the in-memory doc, not yet in the DB
 	if erp_po:
@@ -250,6 +286,7 @@ def validate(doc):
 
 	resolve_currency(doc)
 	resolve_addresses(doc)
+	require_addresses(doc)
 	fill_item_identifiers(doc)
 
 	# Changing the Ship To Warehouse has to take the lines with it. Filling only
@@ -363,12 +400,11 @@ def resolve_addresses(doc):
 			["nat_shipping_address", "nat_billing_address"]) or (None, None)
 		doc.shipping_address = doc.shipping_address or shipping
 		doc.billing_address = doc.billing_address or billing
-	# then as ERPNext fills a native PO (accounts.party.set_address_details): bill
-	# to the company's own address, and ship there too unless told otherwise
-	if doc.company and not doc.billing_address:
-		doc.billing_address = get_company_address(doc.company).get("company_address")
-	if not doc.shipping_address:
-		doc.shipping_address = doc.billing_address
+	# Only ever the supplier's configured addresses or the buyer's own pick. No
+	# fallback to the company's default address: that put an unrelated address
+	# (e.g. "Camo TO East York - Shipping") on orders whose supplier had none
+	# set. Blank is fine on a draft; require_addresses asks for them on the way
+	# to approval.
 
 	doc.shipping_address_display = render_address(doc.shipping_address, check_permissions=False) if doc.shipping_address else None
 	doc.billing_address_display = render_address(doc.billing_address, check_permissions=False) if doc.billing_address else None
