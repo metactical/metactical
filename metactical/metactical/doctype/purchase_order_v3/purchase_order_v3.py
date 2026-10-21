@@ -7,6 +7,8 @@ import re
 import frappe
 from frappe.model.document import Document
 from frappe.contacts.doctype.address.address import get_default_address, render_address
+from erpnext.controllers.accounts_controller import validate_conversion_rate
+from erpnext.setup.utils import get_exchange_rate
 
 from metactical.procurement_v3.taxes import (
 	TAX_ROW_TOTALS,
@@ -174,9 +176,7 @@ def shared_series_naming(doc):
 		# would be replaced by whatever lead time the items carry.
 		npo.schedule_date = po_ship_date(doc)
 		npo.ais_cancel_date = doc.required_by
-		npo.currency = doc.currency
-		npo.conversion_rate = F(doc.conversion_rate) or 1
-		npo.buying_price_list = doc.buying_price_list
+		set_native_currency(npo, doc)
 		npo.set_warehouse = doc.set_warehouse
 		if doc.notes_to_supplier:
 			npo.drop_ship_notes = doc.notes_to_supplier
@@ -508,6 +508,23 @@ def fill_item_identifiers(doc):
 		d.supplier_part_no = d.supplier_part_no or ids["supplier_part_no"]
 
 
+# The twin is priced at the PO3's rate. Its price list rate has to be given too:
+# left blank, ERPNext looks one up -- once for the order and again for every line
+# -- at the order date, and for a future-dated order there is no rate to find,
+# so the user got one "Unable to find exchange rate" message per line.
+def set_native_currency(npo, doc):
+	npo.currency = doc.currency
+	npo.conversion_rate = F(doc.conversion_rate) or 1
+	npo.buying_price_list = doc.buying_price_list
+	plc = frappe.db.get_value("Price List", doc.buying_price_list, "currency") if doc.buying_price_list else None
+	if not plc or plc == doc.currency:
+		npo.price_list_currency = doc.currency
+		npo.plc_conversion_rate = npo.conversion_rate
+	elif plc == frappe.get_cached_value("Company", doc.company, "default_currency"):
+		npo.price_list_currency = plc
+		npo.plc_conversion_rate = 1
+
+
 # ---------------------------------------------------------------------------
 # Currency, price list and the FX rate behind base_grand_total.
 #
@@ -536,20 +553,19 @@ def resolve_currency(doc):
 			doc.currency = sup.default_currency
 	if not doc.currency:
 		doc.currency = company_currency
-	if doc.currency and doc.currency != company_currency and F(doc.conversion_rate) in (0.0, 1.0):
-		rate = frappe.db.get_value("Currency Exchange",
-			{"from_currency": doc.currency, "to_currency": company_currency},
-			"exchange_rate", order_by="date desc")
-		if not rate:
-			try:
-				rate = frappe.call("erpnext.setup.utils.get_exchange_rate",
-					from_currency=doc.currency, to_currency=company_currency)
-			except Exception:
-				rate = None
-		if rate:
-			doc.conversion_rate = rate
-	if F(doc.conversion_rate) == 0:
+	# The rate as the native PO gets it (AccountsController.set_price_list_currency):
+	# the buying rate on the order date, by Accounts Settings' stale-rate rules.
+	# The field defaults to 1, so 1 on a foreign order means "not looked up yet",
+	# as get_item_details takes it. No rate is an error, as on the native PO -- not
+	# the latest one on file whatever its date, and never a silent 1.
+	if doc.currency == company_currency:
 		doc.conversion_rate = 1
+	else:
+		if F(doc.conversion_rate) in (0.0, 1.0):
+			doc.conversion_rate = get_exchange_rate(doc.currency, company_currency,
+				doc.order_date, "for_buying")
+		validate_conversion_rate(doc.currency, doc.conversion_rate,
+			doc.meta.get_label("conversion_rate"), doc.company)
 
 
 # ---------------------------------------------------------------------------
@@ -611,9 +627,7 @@ def auto_send_on_approve(doc):
 			npo.transaction_date = doc.order_date
 			npo.schedule_date = po_ship_date(doc)
 			npo.ais_cancel_date = doc.required_by
-			npo.currency = doc.currency
-			npo.conversion_rate = F(doc.conversion_rate) or 1
-			npo.buying_price_list = doc.buying_price_list
+			set_native_currency(npo, doc)
 			npo.set_warehouse = doc.set_warehouse
 			set_native_addresses(npo, doc)
 			copy_taxes_to_native(npo, doc)
@@ -766,9 +780,7 @@ def submitted_updates(doc):
 			npo.transaction_date = doc.order_date
 			npo.schedule_date = po_ship_date(doc)
 			npo.ais_cancel_date = doc.required_by
-			npo.currency = doc.currency
-			npo.conversion_rate = F(doc.conversion_rate) or 1
-			npo.buying_price_list = doc.buying_price_list
+			set_native_currency(npo, doc)
 			npo.set_warehouse = doc.set_warehouse
 			set_native_addresses(npo, doc)
 			copy_taxes_to_native(npo, doc)

@@ -28,19 +28,35 @@ function po3_amount(frm, cdt, cdn) {
     frappe.model.set_value(cdt, cdn, 'amount', flt(row.qty) * flt(row.rate));
 }
 
+// As the native PO does (erpnext transaction.js currency / transaction_date):
+// the rate is the buying rate on the order date, fetched again whenever the
+// currency or the order date changes. When there is none, ERPNext says so and
+// the rate is left at 0, and saving asks for it.
 function po3_fx(frm) {
-    if (!frm.doc.currency || !frm.doc.company) return;
+    if (frm.doc.docstatus !== 0 || !frm.doc.currency || !frm.doc.company) return;
     frappe.db.get_value('Company', frm.doc.company, 'default_currency').then(function(r) {
         var cc = (r.message || {}).default_currency;
         if (!cc || frm.doc.currency === cc) { frm.set_value('conversion_rate', 1); return; }
+        if (!frm.doc.order_date) return;
         frappe.call({
             method: 'erpnext.setup.utils.get_exchange_rate',
-            args: { from_currency: frm.doc.currency, to_currency: cc },
+            args: { transaction_date: frm.doc.order_date, from_currency: frm.doc.currency,
+                to_currency: cc, args: 'for_buying' },
+            freeze: true,
+            freeze_message: __('Fetching exchange rates ...'),
             callback: function(res) {
-                if (res.message) frm.set_value('conversion_rate', res.message);
+                if (flt(res.message) !== flt(frm.doc.conversion_rate)) {
+                    frm.set_value('conversion_rate', flt(res.message));
+                }
             }
         });
     });
+}
+
+// the native PO only lets the rate be typed in when Accounts Settings allows
+// stale rates; otherwise it has to come from a Currency Exchange record
+function po3_fx_editable(frm) {
+    frm.set_df_property('conversion_rate', 'read_only', erpnext.stale_rate_allowed() ? 0 : 1);
 }
 
 function po3_split(line, sep) {
@@ -309,6 +325,7 @@ frappe.ui.form.on('Purchase Order V3', {
     },
 
     currency: po3_fx,
+    order_date: po3_fx,
 
     // A new destination has to take the lines with it.
     set_warehouse: function(frm) {
@@ -393,6 +410,7 @@ frappe.ui.form.on('Purchase Order V3', {
         });
     },
     refresh: function(frm) {
+        po3_fx_editable(frm);
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭱ Paste Items'), function() { po3_paste_items(frm); });
         }
