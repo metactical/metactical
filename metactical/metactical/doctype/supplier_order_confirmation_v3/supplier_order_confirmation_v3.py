@@ -7,7 +7,9 @@ import frappe
 from frappe.model.document import Document
 
 from metactical.procurement_v3.taxes import (
+	TAX_ROW_TOTALS,
 	TAX_SETTINGS,
+	TOTAL_FIELDS,
 	copy_taxes_to_native,
 	save_v3_totals,
 	set_v3_totals,
@@ -758,6 +760,29 @@ def line_details(lines, supplier=None):
 			if ln.get("po3_item") else 0
 		out.append(d)
 	return out
+
+
+# ---------------------------------------------------------------------------
+# Taxes and totals for the form as it stands, unsaved -- the same set_totals()
+# that runs on save, so the numbers the form shows while taxes, discount or
+# lines are being keyed in are exactly the ones save will store, as they are on
+# the native PO. Nothing is written.
+#
+# Answers the header totals, each tax row's amounts (in row order) and each
+# line's net figures (in line order).
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def preview_totals(doc):
+	if isinstance(doc, str):
+		doc = json.loads(doc)
+	frappe.has_permission("Supplier Order Confirmation V3", "write", throw=True)
+	doc = frappe.get_doc(doc)
+	set_totals(doc)
+	return {
+		"totals": {f: doc.get(f) for f in ("total",) + TOTAL_FIELDS},
+		"taxes": [{f: t.get(f) for f in ("description",) + TAX_ROW_TOTALS} for t in doc.get("taxes") or []],
+		"items": [{"net_rate": d.get("net_rate"), "net_amount": d.get("net_amount")} for d in doc.items or []],
+	}
 
 
 # ---------------------------------------------------------------------------
