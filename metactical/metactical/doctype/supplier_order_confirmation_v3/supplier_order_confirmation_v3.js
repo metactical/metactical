@@ -546,8 +546,24 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
     additional_discount_percentage: function(frm) { soc3_calc_taxes(frm); },
     discount_amount: function(frm) { soc3_calc_taxes(frm); },
     disable_rounded_total: function(frm) { soc3_calc_taxes(frm); },
-    taxes_remove: function(frm) { soc3_calc_taxes(frm); }
+    taxes_remove: function(frm) { soc3_calc_taxes(frm); },
+    // Description is mandatory on ERPNext's tax row, but picking the account
+    // is all that is needed: fill it from the account, as the native PO does,
+    // and let the row through either way -- save fills it too (prepare_tax_rows).
+    validate: function(frm) { v3_tax_descriptions(frm); }
 });
+
+function v3_tax_descriptions(frm) {
+    (frm.doc.taxes || []).forEach(function(t) {
+        if (t.account_head && !t.description) {
+            t.description = t.account_head.split(' - ').slice(0, -1).join(' - ') || t.account_head;
+        }
+        // this row's own copy of the field, so the native PO is unaffected
+        var df = frappe.meta.get_docfield(t.doctype, 'description', t.name);
+        if (df) df.reqd = 0;
+    });
+    frm.refresh_field('taxes');
+}
 
 // The same lines' changes that move soc3_totals move the taxes too.
 frappe.ui.form.on('Supplier Order Confirmation V3 Item', {
