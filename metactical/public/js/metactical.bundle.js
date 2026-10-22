@@ -7,3 +7,4 @@ import "./shipment_rate.js";
 import "./utils.js";
 import "./item_dashboard.js";
 import "./time_clock.js";
+import "./email_pills.js";
