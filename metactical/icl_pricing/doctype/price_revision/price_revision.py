@@ -590,7 +590,6 @@ class PriceWriter:
 		self.now = now_datetime()
 		self.user = frappe.session.user
 		self.logs = []
-		self.updates = []
 		self.existing = {}
 		codes = sorted({c for c, _pl in pairs})
 		lists = sorted({pl for _c, pl in pairs})
@@ -610,8 +609,11 @@ class PriceWriter:
 		if ex:
 			if flt(ex.price_list_rate) == flt(rate):
 				return 0
-			self.updates.append((ex.name, flt(rate)))
+			ip_doc = frappe.get_doc("Item Price", ex.name)
+			ip_doc.price_list_rate = flt(rate)
+			ip_doc.save(ignore_permissions=True)
 			self._log(item_code, price_list, currency, ex.price_list_rate, rate, ex.name, "Applied")
+			ex.price_list_rate = flt(rate)
 		else:
 			ip = frappe.get_doc({
 				"doctype": "Item Price",
@@ -641,8 +643,6 @@ class PriceWriter:
 		])
 
 	def flush(self):
-		set_rates(self.updates, self.now, self.user)
-		self.updates = []
 		if self.logs:
 			insert_rows("Price Revision Log", self.LOG_FIELDS, self.logs)
 			self.logs = []
