@@ -1575,6 +1575,10 @@ fixtures = [{
 			"Item-item_group-in_list_view",
 			"Item-weight_uom-default",
 			"Supplier-main-field_order",
+			"Sales Invoice-status-length",
+			"Sales Invoice-is_opening-length",
+			"Sales Invoice-apply_discount_on-length",
+			"Sales Invoice-language-length",
 		]]]
 	},
   	{
