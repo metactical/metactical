@@ -1602,6 +1602,10 @@ fixtures = [{
 			"Item-country_of_origin-depends_on",
 			"Item-customs_tariff_number-depends_on",
 			"Supplier-main-field_order",
+			"Sales Invoice-status-length",
+			"Sales Invoice-is_opening-length",
+			"Sales Invoice-apply_discount_on-length",
+			"Sales Invoice-language-length",
 		]]]
 	},
   	{
