@@ -150,8 +150,7 @@ def v3_recalc_totals(po3_name):
 	from metactical.procurement_v3.taxes import save_v3_totals, set_v3_totals
 
 	doc = frappe.get_doc("Purchase Order V3", po3_name)
-	# a back-ordered balance is not part of the order's value until it arrives --
-	# the same rule the native PO follows (sync_native_po), so the two agree
+	# a back-ordered balance is not part of the order's value until it arrives
 	backordered = open_backorder_qty(po3_name)
 	total_qty = 0.0
 	lines, rows = [], []
