@@ -42,3 +42,4 @@ metactical.patches.remove_old_time_clock_report
 metactical.patches.icl_pricing.default_settings
 metactical.patches.icl_pricing.column_order
 metactical.patches.icl_pricing.batching_defaults
+metactical.patches.gearstock.upsert_items
