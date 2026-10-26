@@ -3,9 +3,6 @@ pipeline {
 
     environment {
         APP_ENV = "${env.JOB_NAME.endsWith('-prod') ? 'prod' : 'dev'}"
-
-        // Apps to pull on the remote bench — space-separated.
-        CUSTOM_APPS = "metactical"
     }
 
     stages {
@@ -39,12 +36,9 @@ pipeline {
                             "set -e
                             cd $BENCH_DIR
 
-                            echo '--- Pulling custom apps ---'
-                            for app in $CUSTOM_APPS; do
-                                echo \"Pulling \$app...\"
-                                git -C apps/\$app fetch upstream
-                                git -C apps/\$app reset --hard upstream/version-15-develop
-                            done
+                            echo '--- Pulling metactical ---'
+                            git -C apps/metactical fetch upstream
+                            git -C apps/metactical reset --hard upstream/version-15-develop
 
                             echo '--- Running migrations ---'
                             bench --site $SITE_NAME migrate
