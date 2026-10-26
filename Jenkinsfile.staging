@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_ENV = "${env.JOB_NAME.endsWith('-prod') ? 'prod' : 'dev'}"
+
+        // Apps to pull on the remote bench — space-separated.
+        CUSTOM_APPS = "metactical"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Deploying APP_ENV=${APP_ENV} build #${env.BUILD_NUMBER} to ${DEVERP_REMOTE_HOST}"
+                checkout scm
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                withCredentials([
+                    usernamePassword(credentialsId: 'deverp-server-creds',
+                                     usernameVariable: 'USER', passwordVariable: 'PASS'),
+                ]) {
+                    sh '''
+                        ASKPASS="$(mktemp)"
+                        printf '#!/bin/sh\\necho "$PASS"\\n' > "$ASKPASS"
+                        chmod 700 "$ASKPASS"
+
+                        export SSH_ASKPASS="$ASKPASS"
+                        export SSH_ASKPASS_REQUIRE=force
+                        export DISPLAY=:0
+
+                        setsid -w ssh -o StrictHostKeyChecking=no \
+                            -o PreferredAuthentications=keyboard-interactive,password \
+                            -o PubkeyAuthentication=no \
+                            -o NumberOfPasswordPrompts=1 \
+                            -p $PORT "$USER@$DEVERP_REMOTE_HOST" \
+                            "set -e
+                            cd $BENCH_DIR
+
+                            echo '--- Pulling custom apps ---'
+                            for app in $CUSTOM_APPS; do
+                                echo \"Pulling \$app...\"
+                                git -C apps/\$app fetch upstream
+                                git -C apps/\$app reset --hard upstream/version-15-develop
+                            done
+
+                            echo '--- Running migrations ---'
+                            bench --site $SITE_NAME migrate
+
+                            echo '--- Clearing cache ---'
+                            bench --site $SITE_NAME clear-cache
+
+                            echo '--- Restarting bench ---'
+                            echo '$PASS' | sudo -S supervisorctl restart all
+                            "
+                        RC=$?
+
+                        rm -f "$ASKPASS"
+                        exit $RC
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Deployment to ${APP_ENV} complete."
+        }
+        failure {
+            echo "Deployment failed — check the logs above."
+        }
+    }
+}
