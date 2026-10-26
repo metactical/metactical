@@ -20,6 +20,14 @@ pipeline {
                                      usernameVariable: 'USER', passwordVariable: 'PASS'),
                 ]) {
                     sh '''
+                        # Check for doctype changes locally — Jenkins already has the repo.
+                        CHANGED=$(git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -c "[.]json" || echo 0)
+                        if [ "$CHANGED" -gt 0 ]; then
+                            MIGRATE_CMD="echo '$CHANGED doctype file(s) changed — running migrate in background'; nohup bench --site $SITE_NAME migrate > logs/migrate.log 2>&1 & echo Migration PID $!"
+                        else
+                            MIGRATE_CMD="echo 'No doctype changes — skipping migrate'"
+                        fi
+
                         ASKPASS="$(mktemp)"
                         printf '#!/bin/sh\\necho "$PASS"\\n' > "$ASKPASS"
                         chmod 700 "$ASKPASS"
@@ -40,15 +48,8 @@ pipeline {
                             git -C apps/metactical fetch upstream
                             git -C apps/metactical reset --hard upstream/version-15-develop
 
-                            echo '--- Checking for schema changes ---'
-                            CHANGED=\$(git -C apps/metactical diff HEAD@{1} HEAD --name-only | grep -c \"[.]json\" || true)
-                            if [ \"\$CHANGED\" -gt 0 ]; then
-                                echo \"\$CHANGED doctype file(s) changed — running migrate in background\"
-                                nohup bench --site $SITE_NAME migrate > logs/migrate.log 2>&1 &
-                                echo \"Migration running in background (PID: \$!). Tail logs/migrate.log to follow.\"
-                            else
-                                echo 'No doctype changes — skipping migrate'
-                            fi
+                            echo '--- Migrate check ---'
+                            $MIGRATE_CMD
 
                             echo '--- Clearing cache ---'
                             bench --site $SITE_NAME clear-cache
