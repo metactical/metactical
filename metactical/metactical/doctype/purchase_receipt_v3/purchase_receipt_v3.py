@@ -102,16 +102,17 @@ def soc3_expected(po, exclude=None):
 			fields=["name", "po3_item", "item_code", "substitute_item_code", "line_status",
 				"confirmed_qty", "confirmed_rate"], order_by="idx"):
 		item = ln.substitute_item_code if ln.line_status == "Substituted" else ln.item_code
-		qty = F(ln.confirmed_qty)
-		if item == ln.item_code:
-			qty += balance.get(ln.po3_item, 0)
 		r = rows.get(ln.po3_item)
+		qty = F(ln.confirmed_qty)
+		# a back-order cancelled on the PO3 line is not coming either
+		if item == ln.item_code and not (r and r.backorder_status == "Cancelled"):
+			qty += balance.get(ln.po3_item, 0)
 		# the PO3 line already counts every receipt of its own item, including
 		# ones from before receipts were linked to the confirmation
 		got = F(r.received_qty) if r and r.item_code == item else got_on_soc.get(ln.name, 0)
 		out[ln.name] = frappe._dict(soc3_item=ln.name, po3_item=ln.po3_item or None, item_code=item,
 			qty=qty, received=got, rate=F(ln.confirmed_rate) or (F(r.rate) if r else 0),
-			closed=bool(r and r.line_status == "Closed Short")
+			closed=bool(r and r.item_code == item and r.line_status in ("Closed Short", "Cancelled"))
 				or (ln.name in closed_on_soc and ln.po3_item not in open_bo))
 	return out
 
@@ -510,13 +511,20 @@ def post_to_po3(doc):
 	all_terminal = bool(fresh)
 	any_short = False
 	for r in fresh:
-		if r.line_status not in ("Received", "Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued"):
+		# a Substituted line is done with: its item is never coming, and what is
+		# coming instead is followed on the confirmation (below)
+		if r.line_status not in ("Received", "Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued",
+				"Substituted"):
 			all_terminal = False
 		elif r.name in open_bo_now:
 			# goods are still owed on this line - nothing here is finished
 			all_terminal = False
-		if r.line_status in ("Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued"):
+		if r.line_status in ("Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued", "Substituted"):
 			any_short = True
+	# substitutes and new items still to come keep the order open
+	if all_terminal and any(not ln.closed and ln.qty - ln.received > 0
+			for ln in soc3_expected(frappe.get_doc("Purchase Order V3", po.name)).values()):
+		all_terminal = False
 
 	close_native_after = 0
 	hdr = {}
