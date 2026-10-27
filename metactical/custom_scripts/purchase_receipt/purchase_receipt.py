@@ -3,7 +3,7 @@ from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseRece
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime, cint
 from frappe import _, msgprint, is_whitelisted
 from metactical.custom_scripts.utils.metactical_utils import queue_action, post_to_rocket_chat
-from metactical.procurement_v3.utils import F, mirror_po3_status, v3_reconcile
+from metactical.procurement_v3.utils import F, mirror_po3_status, v3_reconcile, validate_rate_except_v3
 from frappe.model.docstatus import DocStatus
 
 class CustomPurchaseReceipt(PurchaseReceipt):
@@ -15,6 +15,12 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 
 		self.validate_barcodes()
 		self.validate_accepted_warehouse_permission()
+
+	def validate_rate_with_reference_doc(self, ref_details):
+		# a Purchase Receipt V3 posts the rate the supplier confirmed, not the PO's
+		validate_rate_except_v3(self, ref_details,
+			[d for d in self.items if d.get("neb_source_doctype") == "Purchase Receipt V3"],
+			"purchase_order_item")
 
 	def validate_accepted_warehouse_permission(self):
 		# Metactical Customization: Validate that user has permission to use the accepted warehouse

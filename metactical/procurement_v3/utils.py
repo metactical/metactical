@@ -270,3 +270,20 @@ def v3_reconcile(po3_name):
 					+ " - marked <b>Received</b>, since its goods have all been receipted.")
 			except Exception:
 				pass
+
+
+def validate_rate_except_v3(doc, ref_details, v3_rows, link_field):
+	"""ERPNext's "Maintain Same Rate" check, minus the rows a Purchase Receipt V3
+	posted. Those carry the supplier's confirmed rate (SOC3), which the PO --
+	the record of what was ordered -- never takes, so they may differ from it.
+	Their link to the PO line is hidden only while the check runs."""
+	from erpnext.utilities.transaction_base import TransactionBase
+
+	hidden = [(d, d.get(link_field)) for d in v3_rows if d.get(link_field)]
+	for d, _ in hidden:
+		d.set(link_field, None)
+	try:
+		TransactionBase.validate_rate_with_reference_doc(doc, ref_details)
+	finally:
+		for d, value in hidden:
+			d.set(link_field, value)
