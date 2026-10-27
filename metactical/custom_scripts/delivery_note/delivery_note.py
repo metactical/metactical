@@ -119,6 +119,7 @@ class DeliveryNoteCustom(DeliveryNote):
 					sales_invoice.save()
 					sales_invoice.submit()
 					frappe.db.commit()
+					break
 
 
 	def create_shipment(self):
