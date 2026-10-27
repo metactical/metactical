@@ -11,6 +11,13 @@ try:
 except ImportError:
 	pass
 
+try:
+	from frappe.database.schema import DbColumn
+	from metactical.custom_scripts.frappe.schema import default_changed_for_decimal
+	DbColumn.default_changed_for_decimal = default_changed_for_decimal
+except ImportError:
+	pass
+
 
 def check_app_permission():
 	import frappe

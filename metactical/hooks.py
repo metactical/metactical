@@ -1579,6 +1579,7 @@ fixtures = [{
 			"Sales Invoice-is_opening-length",
 			"Sales Invoice-apply_discount_on-length",
 			"Sales Invoice-language-length",
+			"Sales Order Item-warehouse-search_index",
 		]]]
 	},
   	{
