@@ -125,7 +125,7 @@
    "fieldtype": "Select",
    "label": "Reject Reason",
    "mandatory_depends_on": "eval:!in_list(['Draft', 'Counting'], parent.workflow_state) && doc.variance_type == 'Short'",
-   "options": "\nShort Shipped\nDamaged\nDefective\nExpired\nWrong Labelling\nOther"
+   "options": "\nShort Shipped\nPartially Received\nDamaged\nDefective\nExpired\nWrong Labelling\nOther"
   },
   {
    "fieldname": "cb_split",
@@ -171,7 +171,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-26 19:54:47.676949",
+ "modified": "2026-10-27 11:54:42.969304",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3 Item",

@@ -47,6 +47,12 @@ class PurchaseReceiptV3(Document):
 # lines is one expected line: the substitute when Substituted, its confirmed
 # qty plus any back-ordered balance, less what has already been received.
 # ---------------------------------------------------------------------------
+# The reject reason for a short line whose balance is still coming: the line
+# stays open and the next receipt expects the rest. Any other reason on a short
+# line closes it.
+PARTIALLY_RECEIVED = "Partially Received"
+
+
 def live_confirmation(po3_name):
 	socs = frappe.get_all("Supplier Order Confirmation V3",
 		filters={"purchase_order_v3": po3_name, "docstatus": 1},
@@ -81,6 +87,16 @@ def soc3_expected(po, exclude=None):
 			(po.name, exclude or ""), as_dict=True):
 		got_on_soc[gi.soc3_item] = got_on_soc.get(gi.soc3_item, 0) + F(gi.received_qty)
 
+	# a line that came in short is finished, unless the receiver said the rest
+	# is still coming (Partially Received) - or it has an open back-order, which
+	# stays expected until it is received or cancelled on the Back Orders tab
+	open_bo = v3_open_bo(po.name)
+	closed_on_soc = set(frappe.db.sql_list("""select distinct gi.soc3_item
+			from `tabPurchase Receipt V3 Item` gi join `tabPurchase Receipt V3` g on g.name = gi.parent
+			where g.docstatus = 1 and g.purchase_order_v3 = %s and g.name != %s
+			and ifnull(gi.soc3_item, '') != '' and gi.variance_type = 'Short'
+			and ifnull(gi.reject_reason, '') != %s""", (po.name, exclude or "", PARTIALLY_RECEIVED)))
+
 	out = {}
 	for ln in frappe.get_all("Supplier Order Confirmation V3 Item", filters={"parent": soc},
 			fields=["name", "po3_item", "item_code", "substitute_item_code", "line_status",
@@ -95,7 +111,8 @@ def soc3_expected(po, exclude=None):
 		got = F(r.received_qty) if r and r.item_code == item else got_on_soc.get(ln.name, 0)
 		out[ln.name] = frappe._dict(soc3_item=ln.name, po3_item=ln.po3_item or None, item_code=item,
 			qty=qty, received=got, rate=F(ln.confirmed_rate) or (F(r.rate) if r else 0),
-			closed=bool(r and r.line_status == "Closed Short"))
+			closed=bool(r and r.line_status == "Closed Short")
+				or (ln.name in closed_on_soc and ln.po3_item not in open_bo))
 	return out
 
 
@@ -441,6 +458,7 @@ def post_to_po3(doc):
 		rows[r.name] = r
 
 	open_bo_before = v3_open_bo(po.name)
+	still_coming = {d.po3_item for d in doc.items if d.reject_reason == PARTIALLY_RECEIVED}
 	for d in doc.items:
 		if not d.po3_item:
 			continue
@@ -463,6 +481,9 @@ def post_to_po3(doc):
 			# the confirmation still shows this balance outstanding, so the line
 			# is not finished even if the mirrored flag says otherwise
 			upd["line_status"] = "Back-ordered"
+		elif d.po3_item in still_coming:
+			# the rest is still coming - the next receipt expects it
+			upd["line_status"] = "Partial"
 		else:
 			upd["line_status"] = "Closed Short"
 			upd["short_qty"] = F(r.qty) - rec

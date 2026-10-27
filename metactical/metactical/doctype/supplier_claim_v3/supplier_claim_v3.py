@@ -100,6 +100,9 @@ def validate(doc):
 							"rejected_qty", "reject_reason", "variance_type", "variance_qty",
 							"overage_billed", "photo", "remarks"],
 					order_by="idx", limit_page_length=0):
+				# a shortfall marked Partially Received is still coming, not owed
+				if d.reject_reason == "Partially Received" and not F(d.rejected_qty):
+					continue
 				qty = claimable(F(d.rejected_qty), d.variance_type,
 					F(d.variance_qty), d.overage_billed)
 				qty = qty - claimed.get(d.name, 0)
