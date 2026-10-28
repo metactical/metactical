@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "nat_bucket_name",
+  "nat_swash_bucket_name",
   "nat_region",
   "nat_aws_access_key_id",
   "nat_aws_secret_access_key",
@@ -17,6 +18,12 @@
    "fieldname": "nat_bucket_name",
    "fieldtype": "Data",
    "label": "Bucket Name"
+  },
+  {
+   "description": "Bucket for the Swash Images on Website Specification Label descriptions. Uses the same region and credentials.",
+   "fieldname": "nat_swash_bucket_name",
+   "fieldtype": "Data",
+   "label": "Swash Image Bucket Name"
   },
   {
    "default": "us-west-2",
@@ -45,7 +52,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-03 05:47:51.126645",
+ "modified": "2026-10-28 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Settings",

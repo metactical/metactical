@@ -42,6 +42,26 @@ class S3Settings(Document):
 			return ""
 		return f"https://{self.nat_bucket_name}.s3.{self.nat_region}.amazonaws.com"
 
+	def upload_swash_image(self, key, body, content_type=None):
+		"""Put a swash image in its own bucket and return the image's public URL."""
+		if not self.nat_swash_bucket_name:
+			frappe.throw("S3 Settings has no Swash Image Bucket Name. Set it before uploading swash images.")
+
+		client = self.get_client()
+		put_args = {"Bucket": self.nat_swash_bucket_name, "Key": key, "Body": body}
+		if content_type:
+			put_args["ContentType"] = content_type
+
+		try:
+			client.put_object(**put_args)
+		except Exception as e:
+			# Imported here: the uploader page imports this module.
+			from metactical.metactical.page.s3_uploader.s3_uploader import _friendly_s3_error
+
+			frappe.throw(_friendly_s3_error(e, self.nat_swash_bucket_name, self.nat_region))
+
+		return f"https://{self.nat_swash_bucket_name}.s3.{self.nat_region}.amazonaws.com/{key}"
+
 	def get_public_config(self):
 		"""Return only non-secret config for the frontend (never the secret key)."""
 		return {
