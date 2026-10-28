@@ -33,7 +33,8 @@ app_include_js = ["metactical.bundle.js", "metactical_price_grid.bundle.js"]
 # web_include_css = "/assets/metactical/css/metactical.css"
 web_include_css = [
 	"/assets/metactical/node_modules/intl-tel-input/build/css/intlTelInput.css", 
-	"/assets/metactical/css/metactical_time_tracker.css"
+	"/assets/metactical/css/metactical_time_tracker.css",
+	"/assets/metactical/css/metactical_login.css",
 ]
 # web_include_js = "/assets/metactical/js/metactical.js"
 web_include_js = "/assets/metactical/node_modules/intl-tel-input/build/js/intlTelInput.js"
