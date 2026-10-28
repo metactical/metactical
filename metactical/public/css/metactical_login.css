@@ -1,0 +1,8 @@
+/* Constrain social login provider icons (e.g. authentik) on the login page */
+.social-logins .btn-login-option img {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+	vertical-align: middle;
+	margin-right: 6px;
+}
