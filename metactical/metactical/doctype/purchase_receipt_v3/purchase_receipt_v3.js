@@ -83,6 +83,8 @@ function gr3_load_scan_map(frm) {
         callback: function (r) {
             var m = r.message || {};
             frm._scan = { po: frm.doc.purchase_order_v3, map: m.map || {}, names: m.names || {} };
+            // the order's items and the confirmation's (substitutes, new items)
+            frm._po3_items = Object.keys(frm._scan.names);
         }
     });
 }
@@ -196,6 +198,7 @@ function gr3_fetch_lines(frm) {
             frm.clear_table('items');
             (m.rows || []).forEach(function (x) {
                 var d = frm.add_child('items');
+                d.soc3_item = x.soc3_item;
                 d.po3_item = x.po3_item;
                 d.expected_item_code = x.expected_item_code;
                 d.received_item_code = x.received_item_code;
@@ -315,9 +318,6 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 return { filters: { name: ['in',
                     (frm._po3_items || []).length ? frm._po3_items : ['__none__']] } };
             });
-            frappe.db.get_doc('Purchase Order V3', frm.doc.purchase_order_v3).then(function(po) {
-                frm._po3_items = (po.items || []).map(function(r) { return r.item_code; });
-            });
         }
         if (frm.doc.workflow_state === 'Posted') {
             frappe.db.get_value('Purchase Receipt', frm.doc.erp_purchase_receipt || '__none__', 'docstatus')
@@ -351,12 +351,16 @@ frappe.ui.form.on('Purchase Receipt V3', {
         }
     }
 });
+// A new Received count starts the row over as all accepted, nothing rejected -
+// otherwise Accepted keeps the old figure and Finish Counting refuses it. What
+// the user then types into Accepted / Rejected is left as they set it.
 frappe.ui.form.on('Purchase Receipt V3 Item', {
     received_qty: function(frm, cdt, cdn) {
         var row = locals[cdt][cdn];
-        if (!flt(row.accepted_qty) && !flt(row.rejected_qty)) {
-            frappe.model.set_value(cdt, cdn, 'accepted_qty', flt(row.received_qty));
-        }
+        frappe.model.set_value(cdt, cdn, {
+            accepted_qty: flt(row.received_qty),
+            rejected_qty: 0
+        });
     }
 });
 
