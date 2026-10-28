@@ -10,7 +10,6 @@ from metactical.procurement_v3.taxes import (
 	TAX_ROW_TOTALS,
 	TAX_SETTINGS,
 	TOTAL_FIELDS,
-	copy_taxes_to_native,
 	save_v3_totals,
 	set_v3_totals,
 	tax_rows,
@@ -18,12 +17,10 @@ from metactical.procurement_v3.taxes import (
 )
 from metactical.procurement_v3.utils import (
 	F,
-	billable_qty,
 	item_supplier_part_no,
 	item_unavailable,
 	mirror_po3_status,
 	throw_unavailable,
-	v3_recalc_totals,
 )
 
 
@@ -75,9 +72,10 @@ ETA_REQUIRED_STATUSES = ("Back-ordered", "Supplier Stock Out")
 
 # The supplier is sending MORE than the order asked for:
 #   Qty Increased  - more of a line that is on the order; Confirmed Qty is above
-#                    the outstanding qty and the PO3 line grows to match
+#                    the outstanding qty. The PO3 line keeps its qty; the extra
+#                    arrives as Over on the receipt
 #   New Item Added - an item that is not on the order at all; the row has no PO3
-#                    line until submit, when one is added to the order for it
+#                    line, and nothing is added to the order for it
 QTY_INCREASED = "Qty Increased"
 NEW_ITEM = "New Item Added"
 
@@ -184,7 +182,7 @@ def validate(doc):
 			if not code:
 				frappe.throw("Row " + str(d.idx) + ": no item matches '" + str(d.item_code) + "'.")
 			d.item_code = code
-			# not on the order, so there is no PO line to match - submit adds one
+			# not on the order, so there is no PO line to match
 			if d.line_status == NEW_ITEM:
 				continue
 			match = None
@@ -380,29 +378,31 @@ def set_totals(doc):
 # Migrated from Server Script "SOC3 Mirror To PO3"
 # (DocType Event / After Submit on Supplier Order Confirmation V3).
 #
-# Pushes each confirmed line back onto its PO3 line (confirmed qty, line status,
-# shortfall, backorder ETA, confirmed rate), copies the confirmation number and
-# the confirmed taxes and discount onto the header, moves the order to
-# Acknowledged once the supplier has replied -- and then brings the native PO
-# into line with the PO3 (sync_native_po).
+# Records the supplier's answer on each PO3 line (confirmed qty, line status,
+# shortfall, backorder ETA, remarks), copies the confirmation number onto the
+# header and moves the order to Acknowledged once the supplier has replied.
+#
+# The PO is the source of truth for the order: a confirmation never changes
+# its items, quantities, rates, taxes or totals, on the PO3 or the native PO.
+# What the supplier sends beyond the order -- Qty Increased, New Item Added,
+# Substituted -- stays on the confirmation and arrives as Over / Unordered /
+# Wrong Item on the receipt, for a supplier claim.
 # ---------------------------------------------------------------------------
 def mirror_to_po3(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	discontinued_items = []
-	# the PO3 lines added for new items: the native PO has no row for them yet
-	native_new = []
 
 	for d in doc.items:
 		s = d.line_status
 		if s == NEW_ITEM:
-			native_new.append(add_po3_line(po, d))
 			continue
 		prev = frappe.db.get_value("Purchase Order V3 Item", d.po3_item,
-			["line_status", "confirmed_qty"], as_dict=True)
+			["line_status", "confirmed_qty", "remarks"], as_dict=True)
 		total = F(d.confirmed_qty)
 		if prev and prev.line_status == "Back-ordered":
 			total = total + F(prev.confirmed_qty)
 		upd = {"confirmed_qty": total}
+		remarks = prev.remarks if prev else None
 		if s == "Confirmed":
 			upd["line_status"] = "Confirmed"
 		elif s == "Partial - Balance Cancelled":
@@ -435,25 +435,24 @@ def mirror_to_po3(doc):
 			upd["line_status"] = "Cancelled"
 			upd["short_qty"] = F(d.ordered_qty)
 		elif s == "Substituted":
+			# the ordered item is not coming; the substitute is not on the order
 			upd["line_status"] = "Substituted"
-			upd.update(substitute_line(doc, d))
+			upd["confirmed_qty"] = total - F(d.confirmed_qty)
+			upd["short_qty"] = F(d.ordered_qty)
+			remarks = add_remark(remarks, "Supplier is sending " + (d.substitute_item_code or "")
+				+ " instead (" + fmt_qty(d.confirmed_qty) + ") - Supplier Order Confirmation V3 "
+				+ doc.name + ". Not added to the order.")
 		elif s == QTY_INCREASED:
-			# the order grows by whatever the supplier is sending over the balance
-			extra = F(d.confirmed_qty) - F(d.ordered_qty)
-			line = frappe.db.get_value("Purchase Order V3 Item", d.po3_item,
-				["qty", "remarks"], as_dict=True)
+			# the order's quantity is all the PO3 confirms; the extra is over the order
 			upd["line_status"] = "Confirmed"
-			upd["qty"] = F(line.qty) + extra
-			upd["remarks"] = add_remark(line.remarks, "Qty increased from "
-				+ fmt_qty(line.qty) + " to " + fmt_qty(upd["qty"])
-				+ " by Supplier Order Confirmation V3 " + doc.name + ".")
-		# the price the supplier confirmed is what the order now costs
-		if F(d.confirmed_rate) > 0:
-			upd["rate"] = F(d.confirmed_rate)
+			upd["confirmed_qty"] = total - F(d.confirmed_qty) + F(d.ordered_qty)
+			remarks = add_remark(remarks, "Supplier confirmed " + fmt_qty(d.confirmed_qty)
+				+ " against " + fmt_qty(d.ordered_qty) + " ordered - Supplier Order Confirmation V3 "
+				+ doc.name + ". The extra is not added to the order.")
 		if d.remarks:
-			upd["remarks"] = add_remark(upd.get("remarks")
-				or frappe.db.get_value("Purchase Order V3 Item", d.po3_item, "remarks"),
-				"Supplier (" + doc.name + "): " + d.remarks)
+			remarks = add_remark(remarks, "Supplier (" + doc.name + "): " + d.remarks)
+		if remarks != (prev.remarks if prev else None):
+			upd["remarks"] = remarks
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
 
 	if discontinued_items:
@@ -482,94 +481,32 @@ def mirror_to_po3(doc):
 		hdr["workflow_state"] = "Acknowledged"
 
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
-	replace_po3_taxes(po.name, doc)
 
-	# lines just went dead (stock out, discontinued, cancelled, partial) and the
-	# order is long since submitted, so nothing else will re-add the header up
-	v3_recalc_totals(po.name)
-
-	sync_native_po(po.name, native_new)
+	mirror_to_native_po(po.name)
 
 	mirror_po3_status(po.name)
 
 
-# The taxes and discount the supplier confirmed replace the order's. Both docs
-# are submitted, so the rows are rewritten directly; v3_recalc_totals then works
-# out their amounts and the grand totals.
-def replace_po3_taxes(po3_name, soc):
-	frappe.db.set_value("Purchase Order V3", po3_name, {f: soc.get(f) for f in TAX_SETTINGS},
-		update_modified=False)
-	frappe.db.delete("Purchase Taxes and Charges",
-		{"parenttype": "Purchase Order V3", "parent": po3_name})
-	for i, t in enumerate(tax_rows(soc), start=1):
-		row = frappe.get_doc(dict(t, doctype="Purchase Taxes and Charges", parent=po3_name,
-			parenttype="Purchase Order V3", parentfield="taxes", idx=i))
-		row.docstatus = 1
-		row.db_insert()
+# The native PO only takes the confirmation number and each back-ordered
+# line's ETA as its Expected Delivery Date -- never its items, quantities,
+# rates or taxes.
+def mirror_to_native_po(po3_name):
+	po3 = frappe.get_doc("Purchase Order V3", po3_name)
+	erp_po = po3.erp_purchase_order
+	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
+		return
+	if po3.confirmation_no:
+		frappe.db.set_value("Purchase Order", erp_po, {
+			"order_confirmation_no": po3.confirmation_no,
+			"order_confirmation_date": po3.confirmation_date}, update_modified=False)
+	for r in po3.items:
+		if r.backorder_eta and r.erp_po_item:
+			frappe.db.set_value("Purchase Order Item", r.erp_po_item, "expected_delivery_date",
+				r.backorder_eta, update_modified=False)
 
 
-# ---------------------------------------------------------------------------
-# Puts a New Item Added line onto the submitted PO3, already Confirmed, and
-# points the confirmation row at it -- from here on shipments, receipts and
-# claims treat it like any other line on the order.
-# ---------------------------------------------------------------------------
-def add_po3_line(po, d):
-	r = po.append("items", {
-		"item_code": d.item_code,
-		"item_name": d.item_name,
-		"retail_sku_suffix": d.retail_sku_suffix,
-		"supplier_part_no": d.supplier_part_no,
-		"barcode": d.barcode,
-		"variant_of": frappe.db.get_value("Item", d.item_code, "variant_of"),
-		"uom": frappe.db.get_value("Item", d.item_code, "stock_uom"),
-		"qty": F(d.confirmed_qty),
-		"rate": F(d.confirmed_rate),
-		"amount": F(d.confirmed_qty) * F(d.confirmed_rate),
-		"warehouse": po.set_warehouse,
-		"required_by": po.required_by,
-		"line_status": "Confirmed",
-		"confirmed_qty": F(d.confirmed_qty),
-		"remarks": "New item added by Supplier Order Confirmation V3 " + d.parent + ".",
-	})
-	r.docstatus = 1
-	r.db_insert()
-	frappe.db.set_value(d.doctype, d.name, "po3_item", r.name)
-	d.po3_item = r.name
-	return r.name
-
-
-# A Substituted line: the supplier sends substitute_item_code instead. The PO3
-# line becomes that item -- identifiers, UOM and variant details with it -- so
-# shipments and receipts expect what is actually coming; sync_native_po then
-# swaps the native row too. The original item is kept in the line's remarks.
-def substitute_line(doc, d):
-	from metactical.metactical.doctype.purchase_order_v3.purchase_order_v3 import item_identifiers
-
-	sub = d.substitute_item_code
-	item = frappe.db.get_value("Item", sub, ["item_name", "stock_uom", "variant_of", "ifw_retailskusuffix"],
-		as_dict=True)
-	ids = item_identifiers(sub, doc.supplier)
-	attrs = frappe.get_all("Item Variant Attribute", filters={"parent": sub},
-		fields=["attribute", "attribute_value"], order_by="idx") if item.variant_of else []
-	line = frappe.db.get_value("Purchase Order V3 Item", d.po3_item, ["item_code", "remarks"], as_dict=True)
-	return {
-		"item_code": sub,
-		"item_name": item.item_name,
-		"uom": item.stock_uom,
-		"variant_of": item.variant_of,
-		"variant_attributes": ", ".join(a.attribute + ": " + (a.attribute_value or "") for a in attrs) or None,
-		"retail_sku_suffix": item.ifw_retailskusuffix,
-		"barcode": ids["barcode"],
-		"supplier_part_no": ids["supplier_part_no"],
-		# what the supplier sends of the substitute; the rest of the order line is not coming
-		"short_qty": max(F(d.ordered_qty) - F(d.confirmed_qty), 0),
-		"remarks": add_remark(line.remarks, "Substituted for " + (line.item_code or "") + " by Supplier Order "
-			+ "Confirmation V3 " + doc.name + "."),
-	}
-
-
-# The PO3 line's remarks keep every change a confirmation made to it, so a
-# second increase is appended rather than overwriting the first.
+# The PO3 line's remarks keep every note a confirmation made on it, so a
+# second one is appended rather than overwriting the first.
 def add_remark(existing, note):
 	return (existing + "\n" + note) if existing else note
 
@@ -577,123 +514,6 @@ def add_remark(existing, note):
 def fmt_qty(q):
 	q = F(q)
 	return str(int(q)) if q == int(q) else str(q)
-
-
-# ---------------------------------------------------------------------------
-# Carries what the confirmation changed on the PO3 onto the native Purchase
-# Order -- taxes, short / increased / new lines, rates -- through ERPNext's own
-# "Update Items" so its per-received / billing figures stay right. The native
-# PR can only receive what its PO line holds, and the invoice is matched
-# against its rates, so without this the two orders drift apart.
-#
-# A twin still in draft is skipped: approval rebuilds it from the PO3 lines.
-# A failure is reported rather than raised -- the supplier has confirmed, and
-# the native PO can still be fixed by hand with Update Items.
-# ---------------------------------------------------------------------------
-def sync_native_po(po3_name, new_lines):
-	"""Bring a submitted native PO into line with its PO3 after a confirmation:
-	the PO3's taxes and discount, every line's qty and rate -- short lines cut
-	to what will come, lines with nothing coming now removed (a back-ordered
-	balance is added back when it is received: grow_native_po_for_receipt),
-	increases, new items and substitutes added (a substitute replacing the
-	original row), each line's barcode and supplier part no -- each back-ordered
-	line's ETA as its Expected Delivery Date, and the confirmation number.
-
-	Lines go through ERPNext's own Update Items (update_child_qty_rate), which
-	also redoes the totals, payment schedule, ordered qty in the Bin, Material
-	Request status and the Item's last purchase rate. It keeps the native PO's
-	tax rows as they are, so those are replaced first.
-
-	All or nothing: if ERPNext refuses any of it, the native PO is left exactly
-	as it was and the user is told what to fix."""
-	from erpnext.controllers.accounts_controller import update_child_qty_rate
-
-	erp_po = frappe.db.get_value("Purchase Order V3", po3_name, "erp_purchase_order")
-	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
-		return
-	po3 = frappe.get_doc("Purchase Order V3", po3_name)
-	npo = frappe.get_doc("Purchase Order", erp_po)
-	native = {r.name: r for r in npo.items}
-	backordered = open_backorder_qty(po3_name)
-
-	trans, linked, dropped, added_lines = [], set(), [], []
-	before = set(native)
-
-	def row(r, qty, rate, uom, cf, schedule_date, docname=None):
-		t = {"item_code": r.item_code, "idx": len(trans) + 1, "qty": qty, "rate": rate, "uom": uom,
-			"conversion_factor": cf, "schedule_date": str(schedule_date)}
-		if docname:
-			t["docname"] = docname
-		trans.append(t)
-
-	def coming_now(r):
-		# what this confirmation ships: the back-ordered balance is left off the
-		# native PO until it is received (grow_native_po_for_receipt)
-		return max(billable_qty(r.qty, r.short_qty, r.over_qty) - backordered.get(r.name, 0), 0)
-
-	for r in po3.items:
-		n = native.get(r.erp_po_item)
-		if n and n.item_code != r.item_code:
-			# substituted: the original row goes (it is left out of trans), a row for the
-			# substitute takes its place
-			linked.add(n.name)
-			if coming_now(r) > 0:
-				added_lines.append(r)
-				row(r, coming_now(r), F(r.rate), r.uom, 1, n.schedule_date)
-			else:
-				dropped.append(r.name)
-			continue
-		if n:
-			linked.add(n.name)
-			# never below what has already landed against the native line
-			qty = max(coming_now(r), F(n.received_qty))
-			if qty <= 0:
-				dropped.append(r.name)
-				continue
-			row(n, qty, F(r.rate), n.uom, n.conversion_factor, n.schedule_date, n.name)
-		elif coming_now(r) > 0:
-			# a new item, or a line dropped earlier that is coming after all
-			added_lines.append(r)
-			row(r, coming_now(r), F(r.rate), r.uom, 1, npo.schedule_date)
-	# native rows no PO3 line points at are left as they are
-	for n in npo.items:
-		if n.name not in linked:
-			row(n, F(n.qty), F(n.rate), n.uom, n.conversion_factor, n.schedule_date, n.name)
-
-	frappe.db.savepoint("v3_native_sync")
-	try:
-		npo.flags.ignore_validate_update_after_submit = True
-		npo.flags.ignore_permissions = True
-		copy_taxes_to_native(npo, po3)
-		npo.order_confirmation_no = po3.confirmation_no or npo.order_confirmation_no
-		npo.order_confirmation_date = po3.confirmation_date or npo.order_confirmation_date
-		npo.calculate_taxes_and_totals()
-		npo.save()
-		if trans:
-			update_child_qty_rate("Purchase Order", json.dumps(trans), erp_po)
-	except Exception as e:
-		frappe.db.rollback(save_point="v3_native_sync")
-		frappe.clear_last_message()
-		frappe.msgprint("<b>Native PO " + erp_po + " was NOT updated</b> from this confirmation:<br>"
-			+ str(e)[:300] + "<br><br>The PO3 is updated. Bring " + erp_po + " in line with it by "
-			+ "hand (taxes, and <b>Update Items</b> for quantities and rates), or the receipt and "
-			+ "invoice will not match.", indicator="orange")
-		return
-
-	# a back-ordered line's ETA is when its goods are now expected
-	for r in po3.items:
-		if r.backorder_eta and r.erp_po_item in native and r.name not in dropped \
-				and r not in added_lines:
-			frappe.db.set_value("Purchase Order Item", r.erp_po_item, "expected_delivery_date",
-				r.backorder_eta, update_modified=False)
-
-	# lines with nothing coming no longer have a native row
-	for name in dropped:
-		frappe.db.set_value("Purchase Order V3 Item", name, "erp_po_item", None, update_modified=False)
-	link_added_rows(erp_po, before, added_lines)
-	copy_native_identifiers(po3_name)
-	frappe.msgprint("Native PO " + erp_po + " updated: taxes, quantities and rates now match the "
-		+ "confirmation. Back-ordered quantities are added to it when they are received.")
 
 
 # The back-ordered balance still owed on each PO3 line, from the latest
@@ -711,129 +531,6 @@ def open_backorder_qty(po3_name):
 			out[b.po3_item] = max(F(b.balance_qty) - max(F(b.received_qty) - F(b.shipping_now), 0), 0) \
 				if b.status in ("Open", "Shipped") else 0
 	return out
-
-
-# Link each PO3 line in `lines` to the native row Update Items just made for it
-# (every row of erp_po not in `before`), so the receipt can post against it.
-def link_added_rows(erp_po, before, lines):
-	added = [r for r in frappe.get_all("Purchase Order Item", filters={"parent": erp_po},
-		fields=["name", "item_code"], order_by="idx", limit_page_length=0) if r.name not in before]
-	for r in lines:
-		for i, n in enumerate(added):
-			if n.item_code == r.item_code:
-				frappe.db.set_value("Purchase Order V3 Item", r.name, "erp_po_item", n.name)
-				if r.backorder_eta:
-					frappe.db.set_value("Purchase Order Item", n.name, "expected_delivery_date",
-						r.backorder_eta, update_modified=False)
-				added.pop(i)
-				break
-
-
-# Update Items fills a new native row through get_item_details, which only sets
-# the barcode when the item has exactly one, and the supplier part no from the
-# Item's supplier table. The PO3 line's own values are the ones the supplier
-# confirmed and the print formats show, so they win on every linked row.
-def copy_native_identifiers(po3_name):
-	for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": po3_name},
-			fields=["erp_po_item", "barcode", "supplier_part_no"]):
-		if not r.erp_po_item:
-			continue
-		upd = {f: r[f] for f in ("barcode", "supplier_part_no") if r[f]}
-		if upd:
-			frappe.db.set_value("Purchase Order Item", r.erp_po_item, upd, update_modified=False)
-
-
-# ---------------------------------------------------------------------------
-# Back-ordered quantity is not on the native PO (sync_native_po) until it
-# arrives. Before a GR3 posts its native Purchase Receipt, every PO3 line it
-# receives gets a native row big enough for what has already been received
-# plus `incoming` ({po3_item: qty}) -- added back or increased through Update
-# Items, linked, and given the PO3's identifiers. Rows that already have room
-# are left alone. Raises if ERPNext refuses, so the receipt is not posted
-# against a native PO that cannot take it.
-# ---------------------------------------------------------------------------
-def grow_native_po_for_receipt(po3_name, incoming):
-	erp_po = frappe.db.get_value("Purchase Order V3", po3_name, "erp_purchase_order")
-	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
-		return
-	po3 = frappe.get_doc("Purchase Order V3", po3_name)
-	npo = frappe.get_doc("Purchase Order", erp_po)
-	native = {r.name: r for r in npo.items}
-
-	trans, linked, added_lines, grown = [], set(), [], False
-	for r in po3.items:
-		n = native.get(r.erp_po_item)
-		need = F(incoming.get(r.name))
-		if n:
-			linked.add(n.name)
-			qty = F(n.qty)
-			if need and F(n.received_qty) + need > qty:
-				qty, grown = F(n.received_qty) + need, True
-			trans.append({"docname": n.name, "item_code": n.item_code, "qty": qty, "rate": F(n.rate),
-				"uom": n.uom, "conversion_factor": n.conversion_factor,
-				"schedule_date": str(n.schedule_date)})
-		elif need > 0:
-			added_lines.append(r)
-			grown = True
-			trans.append({"item_code": r.item_code, "qty": need, "rate": F(r.rate), "uom": r.uom,
-				"conversion_factor": 1, "schedule_date": str(r.backorder_eta or npo.schedule_date)})
-	if not grown:
-		return
-	# Update Items deletes any row it is not given, so the rest go through unchanged
-	for n in npo.items:
-		if n.name not in linked:
-			trans.append({"docname": n.name, "item_code": n.item_code, "qty": F(n.qty), "rate": F(n.rate),
-				"uom": n.uom, "conversion_factor": n.conversion_factor,
-				"schedule_date": str(n.schedule_date)})
-	for i, t in enumerate(trans, start=1):
-		t["idx"] = i
-
-	update_items_as_admin(erp_po, trans)
-	link_added_rows(erp_po, set(native), added_lines)
-	copy_native_identifiers(po3_name)
-
-
-# ---------------------------------------------------------------------------
-# After a receipt: a native row still ordering more than its PO3 line is now
-# worth -- the line was short-closed, so the rest is never coming -- comes down
-# to that, never below what was received against it. Only ever lowers a row:
-# an open back-order is off the native PO on purpose until it arrives.
-# Brings the native PO's totals to what the PO3 and the receipts say.
-# ---------------------------------------------------------------------------
-def fit_native_po_to_po3(po3_name):
-	erp_po = frappe.db.get_value("Purchase Order V3", po3_name, "erp_purchase_order")
-	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
-		return
-	po3 = frappe.get_doc("Purchase Order V3", po3_name)
-	npo = frappe.get_doc("Purchase Order", erp_po)
-	worth = {r.erp_po_item: billable_qty(r.qty, r.short_qty, r.over_qty) for r in po3.items if r.erp_po_item}
-
-	trans, lowered = [], False
-	for n in npo.items:
-		qty = F(n.qty)
-		if n.name in worth:
-			target = max(min(qty, worth[n.name]), F(n.received_qty))
-			if target < qty:
-				qty, lowered = target, True
-		trans.append({"docname": n.name, "item_code": n.item_code, "qty": qty, "rate": F(n.rate),
-			"uom": n.uom, "conversion_factor": n.conversion_factor, "schedule_date": str(n.schedule_date),
-			"idx": n.idx})
-	if lowered:
-		update_items_as_admin(erp_po, trans)
-
-
-# Update Items checks the user's create / write / delete rights on Purchase
-# Order, which a receiver usually does not have; the receipt is what authorises
-# these changes, so they run as Administrator and switch straight back.
-def update_items_as_admin(erp_po, trans):
-	from erpnext.controllers.accounts_controller import update_child_qty_rate
-
-	user = frappe.session.user
-	frappe.set_user("Administrator")
-	try:
-		update_child_qty_rate("Purchase Order", json.dumps(trans), erp_po)
-	finally:
-		frappe.set_user(user)
 
 
 # ---------------------------------------------------------------------------

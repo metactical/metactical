@@ -39,18 +39,30 @@ def get_bench_path():
 		current = os.path.dirname(current)
 	return None
   
+@frappe.whitelist()
 def process_rmq_data(parsedContent):
 	try:
+		if isinstance(parsedContent, str):
+			parsedContent = json.loads(parsedContent)
 		frappe.set_user("rmqorders@metactical.com")
+
+		if parsedContent.get("replay"):
+			existing = frappe.db.exists("Sales Order", {"po_no": parsedContent["orderNumber"], "docstatus": 1})
+			if existing:
+				logger.error(f"Skipping replay of order {parsedContent['orderNumber']}: {existing} already exists.")
+				return
+
 		rmq_log = create_rmq_log(parsedContent)
-		
+
 		logger.error("\n\n")
 		logger.error(f"Received RMQ data: Order Number: {parsedContent['orderNumber']}, Publisher Site: {parsedContent['publisher_site']}")
 
-		# Assign the shipping province and country based on the parsed content.
-		# If not provided, default to "Alberta" for the province and "Canada" for the country.
-		province = parsedContent['shippingRegion']['name'] if parsedContent.get("shippingRegion") else "Alberta"
-		country = parsedContent['shippingCountry']['name'] if parsedContent.get("shippingCountry") else "Canada"
+		if not parsedContent.get("shippingRegion"):
+			frappe.throw(f"Order {parsedContent['orderNumber']}: missing shippingRegion in payload.")
+		if not parsedContent.get("shippingCountry"):
+			frappe.throw(f"Order {parsedContent['orderNumber']}: missing shippingCountry in payload.")
+		province = parsedContent['shippingRegion']['name']
+		country = parsedContent['shippingCountry']['name']
 		frappe.form_dict["account"] = ""
 
 		# Retrieve the default company name from the Global Defaults doctype in Frappe.
@@ -134,8 +146,8 @@ def continue_to_payment(order, payment_detail):
 
 	# If the payment gateway is not "interacetransfer", create a payment document with payment details.
 	try:
-		if "paymentGatewayAlias" not in succesfull_transaction:
-			logger.error(f"No paymentGatewayAlias found in the successful transaction for order {order.name}.")
+		if not succesfull_transaction or "paymentGatewayAlias" not in succesfull_transaction:
+			logger.error(f"No actionable transaction found for order {order.name}. Skipping payment creation.")
 			return
 
 		if payment_detail['transactions'] and succesfull_transaction["paymentGatewayAlias"] != "interacetransfer":
@@ -158,26 +170,24 @@ def continue_to_payment(order, payment_detail):
 
 def get_payment_detail(parsedContent):
 	payment_detail = {}
+	succesfull_transaction = None
 
 	if parsedContent.get("transactions"):
 		for transaction in parsedContent['transactions']:
 			if transaction.get("orderTransactionState") == 3:
-				# If the transaction state is 3, it indicates a successful transaction.
 				succesfull_transaction = transaction
 			elif transaction.get("orderTransactionState") == 1:
-				if "paymentGatewayAlias" in transaction and transaction["paymentGatewayAlias"] == "paypalexpress":
-					# If the transaction state is 1 and the payment gateway is PayPal Express, consider it successful.
+				alias = transaction.get("paymentGatewayAlias", "")
+				if alias == "paypalexpress":
 					succesfull_transaction = transaction
+				elif alias == "calltoorder":
+					# Call-to-order: payment is collected manually; no automated entry.
+					succesfull_transaction = None
 
-		payment_detail = {
-			"transactions": succesfull_transaction,
-			"billingCountry": parsedContent['billingCountry']
-		}
-	else:
-		payment_detail = {
-			"transactions": None,
-			"billingCountry": parsedContent['billingCountry']
-		}
+	payment_detail = {
+		"transactions": succesfull_transaction,
+		"billingCountry": parsedContent['billingCountry']
+	}
 
 	return payment_detail
 
@@ -263,24 +273,34 @@ def get_address_and_customer(parsedContent, billing_address_detail, shipping_add
 
 # extract order details from the parsed content
 def get_order_detail(parsedContent, province, country, company, shipping_item, far_distance_shipping_item, is_billing_cp_verified):
+	currency_conversion = parsedContent.get("CurrencyConversion")
+	if currency_conversion:
+		currency = currency_conversion["SourceCurrency"]
+		conversion_rate = currency_conversion["Rate"]
+	else:
+		currency = parsedContent['grandTotalAmount']['Currency']["isoCode"]
+		conversion_rate = None
+
 	return {
 		"order_id": parsedContent['orderNumber'],
-		"order_date": parsedContent['orderDate'], 
+		"order_date": parsedContent['orderDate'],
 		"items": parsedContent['items'],
 		"discounts": parsedContent['Discounts'],
-		"total_value": parsedContent['totalValueAmount'], 
+		"total_value": parsedContent['totalValueAmount'],
 		"total_shipping_amount": parsedContent['totalShippingAmount'] if "totalShippingAmount" in parsedContent else 0.0,
 		"total_discount_amount": parsedContent['TotalDiscount'] if "TotalDiscount" in parsedContent else 0.0,
 		"source": parsedContent['publisher_site'],
 		"taxes_and_charges": get_taxes_and_charges(province, country, company, parsedContent['publisher_site']),
-		"currency": parsedContent['grandTotalAmount']['Currency']["isoCode"],
+		"currency": currency,
+		"conversion_rate": conversion_rate,
 		"grand_total": parsedContent['grandTotal'],
 		"company": company,
 		"shipping_item": shipping_item,
 		"far_distance_shipping_item": far_distance_shipping_item,
 		"signifyd": parsedContent.get("SignifyD", None) if "SignifyD" in parsedContent else None,
 		"is_cp_verified": is_billing_cp_verified,
-		"ifw_store_pickup": parsedContent["PickInLocation"]
+		"ifw_store_pickup": parsedContent["PickInLocation"],
+		"notes_from_customer": parsedContent.get("NotesFromCustomer")
 	}
 
 # extract billing address details from the parsed content
@@ -331,9 +351,9 @@ def get_shipping_item(shipping_quote, total, is_far_distance_shipping=False):
 	if is_far_distance_shipping:
 		shipping_item = "Far Distance Charge"
 	else:
-		if shipping_quote == "Flat Rate Shipping - Standard Shipping" or shipping_quote == "Flat Rate Shipping - Standard":
+		if shipping_quote in ("Flat Rate Shipping - Standard Shipping", "Flat Rate Shipping - Standard", "Standard Shipping"):
 			shipping_item = "Shipping"
-		elif shipping_quote == "Flat Rate Shipping - Express Shipping":
+		elif shipping_quote in ("Flat Rate Shipping - Express Shipping", "Express Shipping"):
 			shipping_item = "Express Shipping"
 
 	if not shipping_item:
@@ -424,6 +444,7 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 		"total_shipping_amount": order_detail['total_shipping_amount'],
 		"total_discount_amount": order_detail['total_discount_amount'],
 		"currency": order_detail['currency'],
+		"conversion_rate": order_detail['conversion_rate'] or 1.0,
 		"transaction_date": remove_tz_from_date(order_detail['order_date']),
 		"company": order_detail['company'],
 		"company_address": frappe.db.get_value("Lead Source", order_detail['source'], "neb_company_address"),
@@ -468,6 +489,10 @@ def create_order(order_detail, customer, shipping_address_doc, billing_address_d
 	frappe.db.commit()
  
 	logger.error(f"Order {new_order.name} Submitted. Shipping Address: {shipping_address_doc.name}, Billing Address: {billing_address_doc.name}")
+
+	if order_detail.get("notes_from_customer"):
+		new_order.add_comment("Comment", text=f"Note from customer: {order_detail['notes_from_customer']}")
+		frappe.db.commit()
 
 	order = frappe.get_doc("Sales Order", new_order.name)
 	if order.shipping_address_name != shipping_address_doc.name:
