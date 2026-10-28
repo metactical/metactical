@@ -167,6 +167,26 @@ def expected_rows(po, ship, exclude=None):
 	return out
 
 
+def pick_shipment(po, exclude=None):
+	"""The shipment a new receipt is most likely counting: the oldest one that still
+	has something expected on it. A shipment whose leftovers were closed short has
+	nothing more to bring, so it must not keep getting picked over a later one."""
+	best, best_key = None, None
+	for cand in frappe.get_all("Inbound Shipment V3",
+			filters={"purchase_order_v3": po.name,
+					"workflow_state": ("in", ["In Transit", "Received"]),
+					"docstatus": ("<", 2)},
+			fields=["name", "ship_date", "creation"], limit_page_length=0):
+		if not expected_rows(po, cand.name, exclude):
+			continue
+		# oldest first; a shipment with no ship date falls back to when it was made,
+		# and on the same ship date the one made first, so the pick does not depend on row order
+		key = (str(cand.ship_date or cand.creation), str(cand.creation))
+		if best_key is None or key < best_key:
+			best_key, best = key, cand.name
+	return best
+
+
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "GR3 Validate And Classify"
 # (DocType Event / Before Save on Purchase Receipt V3).
@@ -219,32 +239,7 @@ def validate(doc):
 	# order: the confirmation already told us the back-ordered balance is
 	# not coming yet, and the shipment carries that forward.
 	if not doc.inbound_shipment_v3:
-		best_ship = None
-		best_ship_key = None
-		for cand in frappe.get_all("Inbound Shipment V3",
-				filters={"purchase_order_v3": doc.purchase_order_v3,
-						"workflow_state": ("in", ["In Transit", "Received"]),
-						"docstatus": ("<", 2)},
-				fields=["name", "ship_date", "creation"], limit_page_length=0):
-			onboard = 0.0
-			for si in frappe.get_all("Inbound Shipment V3 Item",
-					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
-				onboard = onboard + float(si.qty or 0)
-			taken = 0.0
-			for prior in frappe.get_all("Purchase Receipt V3",
-					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
-					fields=["name"], limit_page_length=0):
-				for gi in frappe.get_all("Purchase Receipt V3 Item",
-						filters={"parent": prior.name}, fields=["received_qty"],
-						limit_page_length=0):
-					taken = taken + float(gi.received_qty or 0)
-			if onboard - taken <= 0:
-				continue                       # everything on it is already booked in
-			# oldest first; a shipment with no ship date falls back to when it was made
-			key = str(cand.ship_date or cand.creation)
-			if best_ship_key is None or key < best_ship_key:
-				best_ship_key = key
-				best_ship = cand.name
+		best_ship = pick_shipment(po, doc.name)
 		if best_ship:
 			doc.inbound_shipment_v3 = best_ship
 
@@ -290,6 +285,10 @@ def validate(doc):
 			d.received_qty = 0
 			d.accepted_qty = 0
 			d.rejected_qty = 0
+		if not doc.items:
+			frappe.throw("Nothing is left to receive on " + po.name + (" from " + doc.inbound_shipment_v3
+				if doc.inbound_shipment_v3 else "") + ": everything the supplier confirmed has been "
+				"received, closed short or cancelled.")
 
 	# scanned / pasted rows: resolve identifiers, then link to the confirmation
 	# line expecting that item -- or, failing that, an open PO line for it
@@ -837,34 +836,7 @@ def v3_gr3_prefill_preview(po3=None, shipment=None):
 	po = frappe.get_doc("Purchase Order V3", po3)
 
 	# pick the shipment exactly as GR3 Validate And Classify does
-	ship = shipment
-	if not ship:
-		best = None
-		best_key = None
-		for cand in frappe.get_all("Inbound Shipment V3",
-				filters={"purchase_order_v3": po3,
-						"workflow_state": ("in", ["In Transit", "Received"]),
-						"docstatus": ("<", 2)},
-				fields=["name", "ship_date", "creation"], limit_page_length=0):
-			onboard = 0.0
-			for si in frappe.get_all("Inbound Shipment V3 Item",
-					filters={"parent": cand.name}, fields=["qty"], limit_page_length=0):
-				onboard = onboard + float(si.qty or 0)
-			taken = 0.0
-			for prior in frappe.get_all("Purchase Receipt V3",
-					filters={"inbound_shipment_v3": cand.name, "docstatus": 1},
-					fields=["name"], limit_page_length=0):
-				for gi in frappe.get_all("Purchase Receipt V3 Item",
-						filters={"parent": prior.name}, fields=["received_qty"],
-						limit_page_length=0):
-					taken = taken + float(gi.received_qty or 0)
-			if onboard - taken <= 0:
-				continue
-			key = str(cand.ship_date or cand.creation)
-			if best_key is None or key < best_key:
-				best_key = key
-				best = cand.name
-		ship = best
+	ship = shipment or pick_shipment(po)
 
 	rows = []
 	for x in expected_rows(po, ship):

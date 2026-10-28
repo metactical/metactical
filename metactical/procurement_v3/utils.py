@@ -94,14 +94,18 @@ def validate_supplier_po_emails(doc):
 
 def item_unavailable(item_code):
 	"""Why an item may not go on a new order or receipt: "disabled",
-	"discontinued" (Item.ifw_discontinued), or None when it may."""
+	"discontinued" (Item.ifw_discontinued), a template (only its variants can be
+	bought or received), or None when it may."""
 	if not item_code:
 		return None
-	disabled, discontinued = frappe.get_cached_value("Item", item_code, ["disabled", "ifw_discontinued"]) or (0, 0)
+	disabled, discontinued, has_variants = frappe.get_cached_value("Item", item_code,
+		["disabled", "ifw_discontinued", "has_variants"]) or (0, 0, 0)
 	if frappe.utils.cint(disabled):
 		return "disabled"
 	if frappe.utils.cint(discontinued):
 		return "discontinued"
+	if frappe.utils.cint(has_variants):
+		return "a template - pick one of its variants"
 	return None
 
 
@@ -109,7 +113,7 @@ def throw_unavailable(bad, action):
 	"""bad: [(row idx, item_code, why)] -> one message listing every row.
 	action: what the items can't be, e.g. "ordered"."""
 	if bad:
-		frappe.throw("These items are discontinued or disabled and can't be {0}:<br>".format(action)
+		frappe.throw("These items can't be {0}:<br>".format(action)
 			+ "<br>".join("Row {0}: <b>{1}</b> ({2})".format(idx, code, why) for idx, code, why in bad),
 			title="Item not available")
 
