@@ -11,7 +11,7 @@
   "sb_tag",
   "color",
   "short_name",
-  "nat_swash_image"
+  "nat_swatch_image"
  ],
  "fields": [
   {
@@ -21,6 +21,7 @@
    "label": "Description"
   },
   {
+   "columns": 1,
    "fieldname": "sort_order",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -40,23 +41,24 @@
    "label": "Short Name"
   },
   {
+   "columns": 1,
    "fieldname": "color",
    "fieldtype": "Color",
    "in_list_view": 1
   },
   {
-   "description": "Uploaded to the swash image bucket in S3 Settings when the label is saved.",
-   "fieldname": "nat_swash_image",
+   "description": "Uploaded to the swatch image bucket in S3 Settings when the label is saved.",
+   "fieldname": "nat_swatch_image",
    "fieldtype": "Attach Image",
    "in_list_view": 1,
-   "label": "Swash Image"
+   "label": "Swatch Image"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-28 10:00:00.000000",
+ "modified": "2026-10-29 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Spec Label Descriptions",

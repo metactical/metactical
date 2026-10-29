@@ -6,7 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "nat_bucket_name",
-  "nat_swash_bucket_name",
+  "nat_swatch_bucket_name",
   "nat_region",
   "nat_aws_access_key_id",
   "nat_aws_secret_access_key",
@@ -20,10 +20,10 @@
    "label": "Bucket Name"
   },
   {
-   "description": "Bucket for the Swash Images on Website Specification Label descriptions. Uses the same region and credentials.",
-   "fieldname": "nat_swash_bucket_name",
+   "description": "Bucket for the Swatch Images on Website Specification Label descriptions. Uses the same region and credentials.",
+   "fieldname": "nat_swatch_bucket_name",
    "fieldtype": "Data",
-   "label": "Swash Image Bucket Name"
+   "label": "Swatch Image Bucket Name"
   },
   {
    "default": "us-west-2",
