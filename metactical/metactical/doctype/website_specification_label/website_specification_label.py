@@ -33,12 +33,19 @@ class WebsiteSpecificationLabel(Document):
 		self.flags.uploaded_swatch_files = []
 		for row in rows:
 			file = frappe.get_doc("File", {"file_url": row.nat_swatch_image})
-			# The content hash keeps two different images with the same file name apart;
-			# anything but letters, digits, dots and dashes would need escaping in the URL
-			# The folder is the label as a slug: "Items - Filter - Colour" -> items-filter-colour
-			key = "{0}/{1}-{2}".format(re.sub(r"[^a-z0-9]+", "-", self.name.lower()).strip("-"),
+			# One folder per label and, inside it, one per description, so "Camo" and
+			# "Camo Woodland" under item-actual-color never share a folder:
+			# item-actual-color/camo-woodland/<hash>-<file>. The content hash keeps two
+			# different images with the same file name apart; anything but letters,
+			# digits, dots and dashes would need escaping in the URL.
+			key = "{0}/{1}/{2}-{3}".format(slug(self.name), slug(row.description) or row.name,
 				(file.content_hash or frappe.generate_hash(length=10))[:10],
 				re.sub(r"[^\w.\-]+", "-", file.file_name))
 			row.nat_swatch_image = settings.upload_swatch_image(key, file.get_content(),
 				mimetypes.guess_type(file.file_name)[0])
 			self.flags.uploaded_swatch_files.append(file.name)
+
+
+def slug(text):
+	"""'Items - Filter - Colour' -> 'items-filter-colour'"""
+	return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
