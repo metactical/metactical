@@ -45,7 +45,7 @@ def run(start=0):
 	with open(DATA_FILE) as f:
 		rows = json.load(f)
 
-	counts = frappe._dict(saved=0, missing=0, price_created=0, slug_added=0, failed=0)
+	counts = frappe._dict(saved=0, missing=0, price_created=0, slug_added=0, fields_updated=0, failed=0)
 	missing, failed = [], []
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
@@ -81,6 +81,9 @@ def upsert_item(row, counts, missing, failed):
 		if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
 			counts.price_created += 1
 
+		if update_item_fields(item, row):
+			counts.fields_updated += 1
+
 		# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
 		# and supplier rows onto every variant.
 		item.flags.dont_update_variants = True
@@ -91,6 +94,17 @@ def upsert_item(row, counts, missing, failed):
 		counts.failed += 1
 		failed.append(item_code)
 		frappe.log_error(title=f"GearStock item upsert failed: {item_code}", message=frappe.get_traceback())
+
+
+def update_item_fields(item, row):
+	"""Overwrite item_group, brand, retail_sku from the catalogue. Returns True when any value was set."""
+	changed = False
+	for field in ("item_group", "brand", "retail_sku"):
+		value = row.get(field)
+		if value:
+			item.set(field, value)
+			changed = True
+	return changed
 
 
 def add_item_detail(item, slug):
