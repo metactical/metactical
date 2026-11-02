@@ -1,10 +1,20 @@
 # Copyright (c) 2026, Storebuilder Commerce Inc and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.taxes import copy_taxes_to_native
+from metactical.procurement_v3.taxes import (
+	TAX_ROW_TOTALS,
+	TAX_SETTINGS,
+	TOTAL_FIELDS,
+	copy_taxes_to_native,
+	set_v3_totals,
+	tax_rows,
+	v3_before_print,
+)
 from metactical.procurement_v3.utils import (
 	F,
 	item_supplier_part_no,
@@ -20,6 +30,9 @@ from metactical.procurement_v3.utils import (
 class PurchaseReceiptV3(Document):
 	def validate(self):
 		validate(self)
+
+	def before_print(self, settings=None):
+		v3_before_print(self)
 
 	def on_update(self):
 		sync_native_pr(self)
@@ -234,6 +247,13 @@ def validate(doc):
 		rows[r.name] = r
 	expected = soc3_expected(po, doc.name)
 
+	# the receipt is priced in whatever the order was placed in
+	doc.company = po.company
+	doc.currency = po.currency
+	doc.conversion_rate = F(po.conversion_rate) or 1.0
+	if doc.is_new() and not doc.get("taxes"):
+		copy_taxes_from_confirmation(doc, po)
+
 	# ---- inbound shipment drives the receipt -------------------------
 	# What is on the truck is a better expectation than what is open on the
 	# order: the confirmation already told us the back-ordered balance is
@@ -399,6 +419,9 @@ def validate(doc):
 	doc.has_variance = 1 if var_count else 0
 	doc.variance_count = var_count
 
+	set_line_rates(doc, po, expected, rows)
+	set_totals(doc)
+
 	if any_rejected and not doc.rejected_warehouse:
 		doc.rejected_warehouse = frappe.db.get_single_value("Procurement Settings V3", "default_rejected_warehouse")
 		if strict and not doc.rejected_warehouse:
@@ -436,6 +459,90 @@ def validate(doc):
 				+ "<br><br>If the supplier genuinely sent extra, carry on. If the count "
 				+ "is wrong, correct it now - after "
 				+ "posting it becomes an over-receipt on the order.")
+
+
+# ---------------------------------------------------------------------------
+# Taxes and Charges, Totals and Additional Discount -- the native Purchase
+# Receipt's own fields and child table, as on PO3 and SOC3 (see
+# procurement_v3/taxes.py).
+#
+# A new receipt starts from what the supplier confirmed: the live SOC3's taxes
+# and discount, or the order's when there is no confirmation to take them from.
+# From then on they are the receipt's own -- they can be changed here and are
+# what the native Purchase Receipt is given. Totals run over the accepted
+# quantities at each line's confirmed rate, which is what goes into stock.
+# ---------------------------------------------------------------------------
+def copy_taxes_from_confirmation(doc, po):
+	soc = live_confirmation(po.name)
+	src = frappe.get_doc("Supplier Order Confirmation V3", soc) if soc else po
+	for f in TAX_SETTINGS:
+		doc.set(f, src.get(f))
+	doc.set("taxes", tax_rows(src))
+
+
+def line_rate(d, expected, rows):
+	"""The price the supplier confirmed, else the order line's for the ordered
+	item. Substitutes, new and wrong items with no confirmed price have none."""
+	ln = expected.get(d.soc3_item) if d.soc3_item else None
+	if ln and ln.rate:
+		return F(ln.rate)
+	r = rows.get(d.po3_item)
+	if r and r.item_code == d.received_item_code:
+		return F(r.rate)
+	return 0.0
+
+
+def set_line_rates(doc, po, expected, rows):
+	"""Each counted line's rate. A line with no confirmed or ordered price gets
+	what ERPNext gives the native receipt's row when it is left without one --
+	the buying price list, after pricing rules -- so the two total the same."""
+	from erpnext.stock.get_item_details import get_item_details
+
+	for d in doc.items:
+		d.rate = line_rate(d, expected, rows) if d.received_item_code else 0.0
+		if d.rate or not d.received_item_code:
+			continue
+		out = get_item_details({"item_code": d.received_item_code, "doctype": "Purchase Receipt",
+			"company": po.company, "supplier": doc.supplier, "currency": po.currency,
+			"conversion_rate": F(po.conversion_rate) or 1, "price_list": po.buying_price_list,
+			"transaction_date": doc.receipt_date or frappe.utils.nowdate(),
+			"qty": F(d.accepted_qty) or 1, "conversion_factor": 1})
+		d.rate = F(out.get("rate"))
+		# as taxes_and_totals fills a blank rate on the native row
+		if not d.rate and F(out.get("discount_percentage")) != 100:
+			d.rate = F(out.get("price_list_rate")) * (1.0 - F(out.get("discount_percentage")) / 100.0)
+
+
+def set_totals(doc):
+	"""Priced as the native receipt is: the accepted quantity, plus the rejected
+	when Buying Settings bills rejected quantity on a Purchase Receipt."""
+	bill_rejected = frappe.db.get_single_value("Buying Settings",
+		"bill_for_rejected_quantity_in_purchase_invoice")
+	lines = [d for d in (doc.items or []) if d.received_item_code]
+	billed = []
+	for d in lines:
+		qty = F(d.accepted_qty) + (F(d.rejected_qty) if bill_rejected else 0)
+		d.amount = F(d.rate) * qty
+		billed.append(qty)
+	doc.total_qty = sum(billed)
+	set_v3_totals(doc, [(d.received_item_code, q, d.rate) for d, q in zip(lines, billed)], lines)
+
+
+# Taxes and totals for the form as it stands, unsaved -- the same set_totals()
+# that runs on save, over the rates the last save set. Nothing is written.
+@frappe.whitelist()
+def preview_totals(doc):
+	if isinstance(doc, str):
+		doc = json.loads(doc)
+	frappe.has_permission("Purchase Receipt V3", "write", throw=True)
+	doc = frappe.get_doc(doc)
+	set_totals(doc)
+	return {
+		"totals": {f: doc.get(f) for f in ("total", "total_qty") + TOTAL_FIELDS},
+		"taxes": [{f: t.get(f) for f in ("description",) + TAX_ROW_TOTALS} for t in doc.get("taxes") or []],
+		"items": [{"amount": d.get("amount"), "net_rate": d.get("net_rate"), "net_amount": d.get("net_amount")}
+			for d in doc.items or []],
+	}
 
 
 # ---------------------------------------------------------------------------
@@ -632,7 +739,7 @@ def fill_native_pr(pr, doc, po, final):
 	pr.buying_price_list = npo.buying_price_list
 	pr.purchase_order = po.erp_purchase_order
 	pr.set("items", [])
-	rate = {k: ln.rate for k, ln in soc3_expected(po, doc.name).items()}
+	expected = soc3_expected(po, doc.name)
 	# what each native PO line can still take: the PO is never grown, so the
 	# rest of an increased quantity goes on a row of its own
 	room = {n.name: F(n.qty) - F(n.received_qty) for n in frappe.get_all("Purchase Order Item",
@@ -651,11 +758,11 @@ def fill_native_pr(pr, doc, po, final):
 		if po_item:
 			row.purchase_order = po.erp_purchase_order
 			row.purchase_order_item = po_item
-		# the price the supplier confirmed, on the order's lines and off them
-		if d.soc3_item and rate.get(d.soc3_item):
-			row.rate = rate[d.soc3_item]
-		elif po_item:
-			row.rate = F(rows[d.po3_item].rate)
+		# the price the supplier confirmed, on the order's lines and off them --
+		# the same rate the receipt's own totals are worked out at
+		rate = line_rate(d, expected, rows)
+		if rate:
+			row.rate = rate
 		row.neb_source_doctype = doc.doctype
 		row.neb_source_name = doc.name
 		row.neb_source_detail = d.name
@@ -681,10 +788,10 @@ def fill_native_pr(pr, doc, po, final):
 			add_row(d, on_acc, on_rej, po_item)
 		if acc - on_acc > 0 or rej - on_rej > 0:
 			add_row(d, acc - on_acc, rej - on_rej)
-	# the order's taxes and discount, as ERPNext's own PO -> Purchase Receipt
-	# carries them (its mapper copies the tax rows and these settings): without
-	# them the receipt, and an invoice made from it, came out without GST
-	copy_taxes_to_native(pr, frappe.get_doc("Purchase Order", po.erp_purchase_order))
+	# the receipt's own taxes and discount, as ERPNext's own PO -> Purchase
+	# Receipt mapper carries the order's: without them the receipt, and an
+	# invoice made from it, came out without GST
+	copy_taxes_to_native(pr, doc)
 	pr.flags.allow_zero_qty = not final
 
 

@@ -391,3 +391,176 @@ frappe.ui.form.on('Purchase Receipt V3', {
         });
     }
 });
+
+// ---------------------------------------------------------------------------
+// Taxes and Charges -- the native Purchase Receipt's own fields and child
+// table, as on PO3 and SOC3. A new receipt starts with the live confirmation's
+// taxes and discount (copied on its first save); totals are worked out by
+// ERPNext's own engine (metactical/procurement_v3/taxes.py) on save, and while
+// the form is being edited through preview_totals.
+// ---------------------------------------------------------------------------
+
+// The native form's tax-grid behaviour: Rate editable and required, Amount
+// read-only -- the other way round for "Actual" -- the account query and the
+// row checks.
+erpnext.accounts.taxes.setup_tax_validations('Purchase Receipt V3');
+
+var GR3_TOTAL_FIELDS = ['total', 'total_qty', 'base_total', 'net_total', 'base_net_total',
+    'taxes_and_charges_added', 'base_taxes_and_charges_added',
+    'taxes_and_charges_deducted', 'base_taxes_and_charges_deducted',
+    'total_taxes_and_charges', 'base_total_taxes_and_charges',
+    'discount_amount', 'base_discount_amount', 'grand_total', 'base_grand_total',
+    'rounding_adjustment', 'base_rounding_adjustment', 'rounded_total', 'base_rounded_total'];
+
+// Debounced: a burst of edits (a template's rows, a run of scans) makes one
+// call, and an answer to an older call is dropped. Nothing to work out on a
+// receipt that has never been saved: its lines have no rate until then.
+function gr3_calc_taxes(frm) {
+    if (frm.doc.docstatus !== 0 || frm.is_new()) return;
+    clearTimeout(frm._gr3_calc_timer);
+    frm._gr3_calc_timer = setTimeout(function() {
+        var seq = frm._gr3_calc_seq = (frm._gr3_calc_seq || 0) + 1;
+        frappe.call({
+            method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.preview_totals',
+            args: { doc: frm.doc },
+            callback: function(r) {
+                if (seq !== frm._gr3_calc_seq || !r.message) return;
+                // assigned rather than set_value: display copies of what save
+                // recomputes, and set_value would fire these handlers again
+                GR3_TOTAL_FIELDS.forEach(function(f) {
+                    if (f in r.message.totals) frm.doc[f] = r.message.totals[f];
+                });
+                (frm.doc.taxes || []).forEach(function(t, i) {
+                    var calc = r.message.taxes[i] || {};
+                    Object.keys(calc).forEach(function(f) {
+                        // an Actual row's amount is what the user typed
+                        if (f === 'tax_amount' && t.charge_type === 'Actual') return;
+                        if (f === 'description' && t.description) return;
+                        t[f] = calc[f];
+                    });
+                });
+                (frm.doc.items || []).forEach(function(d, i) {
+                    var calc = r.message.items[i] || {};
+                    d.amount = calc.amount;
+                    d.net_rate = calc.net_rate;
+                    d.net_amount = calc.net_amount;
+                });
+                GR3_TOTAL_FIELDS.forEach(function(f) { frm.refresh_field(f); });
+                frm.refresh_field('taxes');
+            }
+        });
+    }, 300);
+}
+
+frappe.ui.form.on('Purchase Receipt V3', {
+    setup: function(frm) {
+        frm.set_query('taxes_and_charges', function() {
+            return { filters: { company: frm.doc.company, disabled: 0 } };
+        });
+        frm.set_query('cost_center', 'taxes', function() {
+            return { filters: { company: frm.doc.company, is_group: 0 } };
+        });
+    },
+    taxes_and_charges: function(frm) {
+        if (!frm.doc.taxes_and_charges) return;
+        frappe.call({
+            method: 'erpnext.controllers.accounts_controller.get_taxes_and_charges',
+            args: { master_doctype: 'Purchase Taxes and Charges Template', master_name: frm.doc.taxes_and_charges },
+            callback: function(r) {
+                frm.clear_table('taxes');
+                (r.message || []).forEach(function(t) { frm.add_child('taxes', t); });
+                frm.refresh_field('taxes');
+                gr3_calc_taxes(frm);
+            }
+        });
+    },
+    apply_discount_on: function(frm) { gr3_calc_taxes(frm); },
+    additional_discount_percentage: function(frm) { gr3_calc_taxes(frm); },
+    discount_amount: function(frm) { gr3_calc_taxes(frm); },
+    disable_rounded_total: function(frm) { gr3_calc_taxes(frm); },
+    taxes_remove: function(frm) { gr3_calc_taxes(frm); },
+    // Description is mandatory on ERPNext's tax row, but picking the account
+    // is all that is needed: fill it from the account, as the native form
+    // does -- save fills it too (prepare_tax_rows).
+    validate: function(frm) { gr3_tax_descriptions(frm); }
+});
+
+function gr3_tax_descriptions(frm) {
+    (frm.doc.taxes || []).forEach(function(t) {
+        if (t.account_head && !t.description) {
+            t.description = t.account_head.split(' - ').slice(0, -1).join(' - ') || t.account_head;
+        }
+        // this row's own copy of the field, so the native forms are unaffected
+        var df = frappe.meta.get_docfield(t.doctype, 'description', t.name);
+        if (df) df.reqd = 0;
+    });
+    frm.refresh_field('taxes');
+}
+
+// What is counted is what is priced, so a change to the count moves the taxes.
+frappe.ui.form.on('Purchase Receipt V3 Item', {
+    accepted_qty: function(frm) { gr3_calc_taxes(frm); },
+    rejected_qty: function(frm) { gr3_calc_taxes(frm); },
+    received_qty: function(frm) { gr3_calc_taxes(frm); },
+    items_remove: function(frm) { gr3_calc_taxes(frm); }
+});
+
+// The tax row itself. Purchase Taxes and Charges is shared with the native
+// forms, PO3 and SOC3, so these only act on a receipt. Picking an account
+// fills Rate and Description as the native form does (erpnext accounts.js).
+frappe.ui.form.on('Purchase Taxes and Charges', {
+    account_head: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        var d = locals[cdt][cdn];
+        if (d.docstatus == 1) return;
+        if (!d.charge_type && d.account_head) {
+            frappe.msgprint(__('Please select Charge Type first'));
+            frappe.model.set_value(cdt, cdn, 'account_head', '');
+        } else if (d.account_head) {
+            frappe.call({
+                type: 'GET',
+                method: 'erpnext.controllers.accounts_controller.get_tax_rate',
+                args: { account_head: d.account_head },
+                callback: function(r) {
+                    var acc = r.message || {};
+                    if (d.charge_type !== 'Actual') {
+                        frappe.model.set_value(cdt, cdn, 'rate', acc.tax_rate || 0);
+                    }
+                    frappe.model.set_value(cdt, cdn, 'description', acc.account_name);
+                    gr3_calc_taxes(frm);
+                }
+            });
+        }
+    },
+    charge_type: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        var row = frm.open_grid_row() || frm.get_field('taxes').grid.get_row(cdn);
+        erpnext.accounts.taxes.set_conditional_mandatory_rate_or_amount(row);
+        gr3_calc_taxes(frm);
+    },
+    rate: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        gr3_calc_taxes(frm);
+    },
+    tax_amount: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        gr3_calc_taxes(frm);
+    },
+    row_id: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        gr3_calc_taxes(frm);
+    },
+    add_deduct_tax: function(frm) {
+        if (frm.doctype === 'Purchase Receipt V3') gr3_calc_taxes(frm);
+    },
+    category: function(frm) {
+        if (frm.doctype === 'Purchase Receipt V3') gr3_calc_taxes(frm);
+    },
+    included_in_print_rate: function(frm) {
+        if (frm.doctype === 'Purchase Receipt V3') gr3_calc_taxes(frm);
+    }
+});
