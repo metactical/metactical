@@ -23,6 +23,10 @@
   "cb_split",
   "variance_type",
   "variance_qty",
+  "rate",
+  "amount",
+  "net_rate",
+  "net_amount",
   "overage_billed",
   "photo",
   "remarks"
@@ -164,13 +168,45 @@
    "fieldtype": "Small Text",
    "label": "Remarks",
    "mandatory_depends_on": "eval:doc.reject_reason == 'Other'"
+  },
+  {
+   "description": "The rate the supplier confirmed, else the order's.",
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Rate",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "description": "Confirmed rate after the additional discount, as ERPNext works it out.",
+   "fieldname": "net_rate",
+   "fieldtype": "Currency",
+   "label": "Net Rate",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-11-02 17:30:00.000000",
+ "modified": "2026-11-02 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3 Item",
