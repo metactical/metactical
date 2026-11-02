@@ -4,7 +4,9 @@ The items already exist, so Item From Excel skips them and nothing reaches the w
 row this adds what is missing and saves the item, which fires the Item / Item Price webhooks:
   - Template / Standalone: the RET - GearStock - USD Item Detail row carrying the slug.
   - Variant / Standalone: the RET - GearStock - USD Item Price, if there is none yet.
-Items that are not in the system are skipped. Nothing that already exists is overwritten.
+Items that are not in the system are skipped and listed in gearstock_items_not_in_erp.csv, next to
+the JSON file. Nothing that already exists is overwritten. Progress goes to the "gearstock" log
+(sites/<site>/logs/gearstock.log).
 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
 in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. It goes in
@@ -13,6 +15,7 @@ batches with a pause between them so the websites are not flooded with requests.
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items.run
 """
 
+import csv
 import json
 import os
 import time
@@ -24,6 +27,8 @@ PRICE_LIST = "RET - GearStock - USD"
 BATCH_SIZE = 1000
 BATCH_DELAY = 15  # seconds between batches
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
+MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
+MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"
 
 
@@ -42,33 +47,48 @@ def execute():
 
 
 def run(start=0):
+	logger = frappe.logger("gearstock", allow_site=True)
+
 	with open(DATA_FILE) as f:
 		rows = json.load(f)
 
 	counts = frappe._dict(saved=0, missing=0, price_created=0, slug_added=0, failed=0)
 	missing, failed = [], []
+	logger.info(f"GearStock upsert: starting at {start} of {len(rows)} row(s)")
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
 		for row in rows[offset : offset + BATCH_SIZE]:
 			upsert_item(row, counts, missing, failed)
 
 		frappe.db.commit()
-		print(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
+		logger.info(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
 
 		if offset + BATCH_SIZE < len(rows):
 			time.sleep(BATCH_DELAY)
 
+	write_missing(missing)
+	logger.info(f"GearStock upsert finished: {dict(counts)}, failed: {failed}, missing items in {MISSING_FILE}")
 	frappe.log_error(
 		title="GearStock item upsert finished",
-		message=json.dumps({"counts": counts, "missing": missing, "failed": failed}, indent=1),
+		message=json.dumps(
+			{"counts": counts, "missing": [row["item_code"] for row in missing], "failed": failed}, indent=1
+		),
 	)
+
+
+def write_missing(rows):
+	"""The catalogue rows whose item is not in ERPNext, for someone to create or correct."""
+	with open(MISSING_FILE, "w", newline="") as f:
+		writer = csv.DictWriter(f, fieldnames=MISSING_COLUMNS, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(rows)
 
 
 def upsert_item(row, counts, missing, failed):
 	item_code = row["item_code"]
 	if not frappe.db.exists("Item", item_code):
 		counts.missing += 1
-		missing.append(item_code)
+		missing.append(row)
 		return
 
 	frappe.db.savepoint("gearstock_upsert")
