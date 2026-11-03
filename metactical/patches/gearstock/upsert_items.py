@@ -72,7 +72,7 @@ def run(start=0, queue_images=True):
 			upsert_item(row, counts, missing, failed)
 
 		logger.info(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
-		time.sleep(1)
+		time.sleep(10)
 	write_missing(missing)
 	webhook_queue.restore(JOB_ID)
 
