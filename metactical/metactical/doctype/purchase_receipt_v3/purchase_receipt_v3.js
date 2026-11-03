@@ -76,13 +76,14 @@ function clm3_new_from(field, value) {
 // enough that the latency does not matter.
 function gr3_load_scan_map(frm) {
     if (!frm.doc.purchase_order_v3) { frm._scan = null; return; }
-    if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3) return;
+    var soc = frm.doc.supplier_order_confirmation_v3 || '';
+    if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3 && frm._scan.soc === soc) return;
     frappe.call({
         method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_scan_map',
-        args: { po3: frm.doc.purchase_order_v3 },
+        args: { po3: frm.doc.purchase_order_v3, soc: soc },
         callback: function (r) {
             var m = r.message || {};
-            frm._scan = { po: frm.doc.purchase_order_v3, map: m.map || {}, names: m.names || {} };
+            frm._scan = { po: frm.doc.purchase_order_v3, soc: soc, map: m.map || {}, names: m.names || {} };
             // the order's items and the confirmation's (substitutes, new items)
             frm._po3_items = Object.keys(frm._scan.names);
         }
@@ -192,7 +193,8 @@ function gr3_fetch_lines(frm) {
     if (filled.length) return;
     frappe.call({
         method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_prefill_preview',
-        args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '' },
+        args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '',
+                soc: frm.doc.supplier_order_confirmation_v3 || '' },
         callback: function (r) {
             var m = (r.message || {});
             frm.clear_table('items');
@@ -225,6 +227,17 @@ frappe.ui.form.on('Purchase Receipt V3', {
     purchase_order_v3: function (frm) {
         gr3_load_scan_map(frm);
         gr3_fetch_lines(frm);
+    },
+    // a different confirmation expects different lines: re-pull them while
+    // nothing has been counted yet
+    supplier_order_confirmation_v3: function (frm) {
+        gr3_load_scan_map(frm);
+        var counted = (frm.doc.items || []).some(function (d) { return flt(d.received_qty); });
+        if (frm.doc.docstatus === 0 && !counted) {
+            frm.clear_table('items');
+            frm.refresh_field('items');
+            gr3_fetch_lines(frm);
+        }
     },
     refresh: function(frm) {
         // Print the native twin with Purchase Receipt's own print formats, as

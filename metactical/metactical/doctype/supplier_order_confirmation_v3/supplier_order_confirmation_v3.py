@@ -557,15 +557,20 @@ def cancel_guard(doc):
 		blockers.append("shipment " + s.name + " (" + str(s.workflow_state)
 			+ ") was built from this confirmation")
 
-	if doc.purchase_order_v3:
+	# A PO can have several confirmations, so only goods received against this
+	# confirmation's own lines block it - not receipts against another one.
+	soc_lines = [d.name for d in doc.items if d.name]
+	if soc_lines:
 		got = 0.0
-		for r in frappe.get_all("Purchase Order V3 Item",
-				filters={"parent": doc.purchase_order_v3},
-				fields=["received_qty"], limit_page_length=0):
-			got = got + float(r.received_qty or 0)
+		receipts = set()
+		for gi in frappe.db.sql("""select g.name, gi.received_qty
+				from `tabPurchase Receipt V3 Item` gi join `tabPurchase Receipt V3` g on g.name = gi.parent
+				where g.docstatus = 1 and gi.soc3_item in %(lines)s""", {"lines": soc_lines}, as_dict=True):
+			got = got + float(gi.received_qty or 0)
+			receipts.add(gi.name)
 		if got > 0:
-			blockers.append("goods have already been received against "
-				+ doc.purchase_order_v3 + " (" + str(got) + " units)")
+			blockers.append("goods have already been received against this confirmation on "
+				+ ", ".join(sorted(receipts)) + " (" + str(got) + " units)")
 
 	if blockers:
 		frappe.throw("<b>" + doc.name + " cannot be cancelled.</b><br><br>"
