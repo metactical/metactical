@@ -94,14 +94,18 @@ def validate_supplier_po_emails(doc):
 
 def item_unavailable(item_code):
 	"""Why an item may not go on a new order or receipt: "disabled",
-	"discontinued" (Item.ifw_discontinued), or None when it may."""
+	"discontinued" (Item.ifw_discontinued), a template (only its variants can be
+	bought or received), or None when it may."""
 	if not item_code:
 		return None
-	disabled, discontinued = frappe.get_cached_value("Item", item_code, ["disabled", "ifw_discontinued"]) or (0, 0)
+	disabled, discontinued, has_variants = frappe.get_cached_value("Item", item_code,
+		["disabled", "ifw_discontinued", "has_variants"]) or (0, 0, 0)
 	if frappe.utils.cint(disabled):
 		return "disabled"
 	if frappe.utils.cint(discontinued):
 		return "discontinued"
+	if frappe.utils.cint(has_variants):
+		return "a template - pick one of its variants"
 	return None
 
 
@@ -109,7 +113,7 @@ def throw_unavailable(bad, action):
 	"""bad: [(row idx, item_code, why)] -> one message listing every row.
 	action: what the items can't be, e.g. "ordered"."""
 	if bad:
-		frappe.throw("These items are discontinued or disabled and can't be {0}:<br>".format(action)
+		frappe.throw("These items can't be {0}:<br>".format(action)
 			+ "<br>".join("Row {0}: <b>{1}</b> ({2})".format(idx, code, why) for idx, code, why in bad),
 			title="Item not available")
 
@@ -150,8 +154,7 @@ def v3_recalc_totals(po3_name):
 	from metactical.procurement_v3.taxes import save_v3_totals, set_v3_totals
 
 	doc = frappe.get_doc("Purchase Order V3", po3_name)
-	# a back-ordered balance is not part of the order's value until it arrives --
-	# the same rule the native PO follows (sync_native_po), so the two agree
+	# a back-ordered balance is not part of the order's value until it arrives
 	backordered = open_backorder_qty(po3_name)
 	total_qty = 0.0
 	lines, rows = [], []
@@ -271,3 +274,20 @@ def v3_reconcile(po3_name):
 					+ " - marked <b>Received</b>, since its goods have all been receipted.")
 			except Exception:
 				pass
+
+
+def validate_rate_except_v3(doc, ref_details, v3_rows, link_field):
+	"""ERPNext's "Maintain Same Rate" check, minus the rows a Purchase Receipt V3
+	posted. Those carry the supplier's confirmed rate (SOC3), which the PO --
+	the record of what was ordered -- never takes, so they may differ from it.
+	Their link to the PO line is hidden only while the check runs."""
+	from erpnext.utilities.transaction_base import TransactionBase
+
+	hidden = [(d, d.get(link_field)) for d in v3_rows if d.get(link_field)]
+	for d, _ in hidden:
+		d.set(link_field, None)
+	try:
+		TransactionBase.validate_rate_with_reference_doc(doc, ref_details)
+	finally:
+		for d, value in hidden:
+			d.set(link_field, value)

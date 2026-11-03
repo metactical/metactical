@@ -504,6 +504,10 @@ def remove_tz_from_date(date):
 	# '%Y-%m-%dT%H:%M:%S.%fZ'  check if the date has this format
 	# if not, add the missing part
  
+	# Strip +HH:MM or -HH:MM timezone offset (e.g. +00:00) before length-based processing
+	if len(date) > 6 and date[-6] in ('+', '-') and date[-3] == ':':
+		date = date[:-6]
+
 	date_str_fixed = date
 	if len(date) == 19:
 		date_str_fixed = date + ".000000Z"

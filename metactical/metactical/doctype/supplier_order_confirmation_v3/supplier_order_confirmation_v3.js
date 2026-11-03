@@ -422,6 +422,17 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
                 frappe.set_route('Form', 'Purchase Order V3', frm.doc.purchase_order_v3);
             }, __('View'));
         }
+        // The receipt is counted against this confirmation, so it can be raised
+        // from here as it is from the PO3.
+        if (frm.doc.docstatus === 1 && frm.doc.purchase_order_v3) {
+            frm.add_custom_button(__('Purchase Receipt V3'), function() {
+                frappe.model.with_doctype('Purchase Receipt V3', function() {
+                    var doc = frappe.model.get_new_doc('Purchase Receipt V3');
+                    doc.purchase_order_v3 = frm.doc.purchase_order_v3;
+                    frappe.set_route('Form', 'Purchase Receipt V3', doc.name);
+                });
+            }, __('Create'));
+        }
         // Same actions on the Lines grid, where an operator is actually working.
         if (frm.fields_dict.items && frm.fields_dict.items.grid) {
             var grid = frm.fields_dict.items.grid;
@@ -526,10 +537,10 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
             return { filters: { company: frm.doc.company, disabled: 0 } };
         });
         // an item added to the order, or sent as a substitute, can't be a
-        // discontinued or disabled one (validate refuses them)
+        // discontinued or disabled one, or a template (validate refuses them)
         ['item_code', 'substitute_item_code'].forEach(function(f) {
             frm.set_query(f, 'items', function() {
-                return { filters: { ifw_discontinued: 0, disabled: 0 } };
+                return { filters: { ifw_discontinued: 0, disabled: 0, has_variants: 0 } };
             });
         });
         frm.set_query('cost_center', 'taxes', function() {
