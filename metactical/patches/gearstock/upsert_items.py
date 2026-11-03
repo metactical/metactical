@@ -120,6 +120,8 @@ def upsert_item(row, counts, missing, failed):
 		if update_item_fields(item, row):
 			counts.fields_updated += 1
 
+		add_website_deduct_qty(item)
+
 		# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
 		# and supplier rows onto every variant.
 		item.flags.dont_update_variants = True
@@ -150,6 +152,16 @@ def update_item_fields(item, row):
 			item.set(field, value)
 			changed = True
 	return changed
+
+
+def add_website_deduct_qty(item):
+	"""Add the Website - GearStock row to Website Deduct Qty with qty 0, if it is not there yet."""
+	for row in item.get("custom_neb_website_deduct_qty") or []:
+		if row.lead_source == "Website - GearStock":
+			return False
+
+	item.append("custom_neb_website_deduct_qty", {"lead_source": "Website - GearStock", "qty": 0})
+	return True
 
 
 def add_item_detail(item, slug):

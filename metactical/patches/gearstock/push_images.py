@@ -54,7 +54,7 @@ IMAGE_SOURCES = (
 )
 BATCH_SIZE = 1000
 BATCH_TIMEOUT = 6 * 60 * 60  # seconds; one batch of 1000 runs about 1-2 hours
-SITE_DELAY = 1  # seconds after each website image load
+SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
 WEBHOOK_DOCTYPES = ("S3 Product Image Meta Data",)
