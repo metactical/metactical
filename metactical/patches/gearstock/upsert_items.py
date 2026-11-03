@@ -10,7 +10,12 @@ the JSON file. Nothing that already exists is overwritten. Progress goes to the 
 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
 in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. It goes in
-batches with a pause between them so the websites are not flooded with requests.
+batches of 1000, committing and logging progress after each. The webhooks are background jobs, so
+how fast they reach the websites is set by the workers, not by this loop. For the run, the Item
+and Item Price webhooks are moved to the long queue so they do not hold up the default queue;
+they are put back when it finishes (see webhook_queue.py).
+
+When it finishes it queues push_images (pass queue_images=False to skip that).
 
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items.run
 """
@@ -18,18 +23,19 @@ Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock
 import csv
 import json
 import os
-import time
 
 import frappe
 from frappe.integrations.doctype.webhook import run_webhooks
 
+from metactical.patches.gearstock import webhook_queue
+
 PRICE_LIST = "RET - GearStock - USD"
 BATCH_SIZE = 1000
-BATCH_DELAY = 15  # seconds between batches
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"
+WEBHOOK_DOCTYPES = ("Item", "Item Price")
 
 
 def execute():
@@ -46,11 +52,15 @@ def execute():
 	)
 
 
-def run(start=0):
+def run(start=0, queue_images=True):
 	logger = frappe.logger("gearstock", allow_site=True)
 
 	with open(DATA_FILE) as f:
 		rows = json.load(f)
+
+	# Off the default queue for the run, so its webhook jobs do not hold up everything else.
+	webhook_queue.move_to_long(WEBHOOK_DOCTYPES, JOB_ID)
+	frappe.db.commit()
 
 	counts = frappe._dict(saved=0, missing=0, price_created=0, slug_added=0, fields_updated=0, failed=0)
 	missing, failed = [], []
@@ -63,10 +73,16 @@ def run(start=0):
 		frappe.db.commit()
 		logger.info(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
 
-		if offset + BATCH_SIZE < len(rows):
-			time.sleep(BATCH_DELAY)
-
 	write_missing(missing)
+	webhook_queue.restore(JOB_ID)
+
+	if queue_images:
+		# Queued now, not from patches.txt, so it lands behind every webhook and S3 rename job this
+		# run queued: GearStock has the products and the SKUs are final before images go out.
+		from metactical.patches.gearstock import push_images
+
+		push_images.start()
+	frappe.db.commit()
 	logger.info(f"GearStock upsert finished: {dict(counts)}, failed: {failed}, missing items in {MISSING_FILE}")
 	frappe.log_error(
 		title="GearStock item upsert finished",
@@ -116,12 +132,21 @@ def upsert_item(row, counts, missing, failed):
 		frappe.log_error(title=f"GearStock item upsert failed: {item_code}", message=frappe.get_traceback())
 
 
+# catalogue column -> Item field. The retail SKU lives in ifw_retailskusuffix; Item has no
+# retail_sku field, so setting that would be silently dropped on save.
+ITEM_FIELDS = {"item_group": "item_group", "brand": "brand", "retail_sku": "ifw_retailskusuffix"}
+
+
 def update_item_fields(item, row):
-	"""Overwrite item_group, brand, retail_sku from the catalogue. Returns True when any value was set."""
+	"""Set item_group, brand and the retail SKU from the catalogue where they differ.
+
+	Blank catalogue values leave the item alone. Returns True when any value changed. A changed
+	retail SKU makes Item.on_update queue the S3 image rename for it (queue_retail_sku_change).
+	"""
 	changed = False
-	for field in ("item_group", "brand", "retail_sku"):
-		value = row.get(field)
-		if value:
+	for column, field in ITEM_FIELDS.items():
+		value = (row.get(column) or "").strip()
+		if value and value != (item.get(field) or "").strip():
 			item.set(field, value)
 			changed = True
 	return changed
