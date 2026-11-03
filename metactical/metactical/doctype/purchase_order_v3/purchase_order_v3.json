@@ -751,7 +751,6 @@
  "links": [
   {
    "group": "Fulfilment",
-   "hidden": 1,
    "link_doctype": "Supplier Order Confirmation V3",
    "link_fieldname": "purchase_order_v3"
   },

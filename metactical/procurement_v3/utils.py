@@ -211,12 +211,13 @@ def v3_may_close_native(po_name):
 
 def v3_open_bo(po3_name):
 	open_items = {}
-	soc = frappe.db.get_value("Supplier Order Confirmation V3",
-		{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
-	if not soc:
+	# a PO can have several confirmations, each with its own back orders
+	socs = frappe.get_all("Supplier Order Confirmation V3",
+		filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, pluck="name")
+	if not socs:
 		return open_items
 	for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-			filters={"parent": soc}, fields=["po3_item", "status"], limit_page_length=0):
+			filters={"parent": ("in", socs)}, fields=["po3_item", "status"], limit_page_length=0):
 		if b.po3_item and b.status not in ("Received", "Cancelled"):
 			open_items[b.po3_item] = 1
 	return open_items
@@ -228,11 +229,11 @@ def v3_open_bo(po3_name):
 
 def v3_reconcile(po3_name):
 	# --- confirmation back-order rows ---
-	soc = frappe.db.get_value("Supplier Order Confirmation V3",
-		{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
-	if soc:
+	socs = frappe.get_all("Supplier Order Confirmation V3",
+		filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, pluck="name")
+	if socs:
 		for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-				filters={"parent": soc}, fields=["name", "po3_item", "status"]):
+				filters={"parent": ("in", socs)}, fields=["name", "po3_item", "status"]):
 			line = frappe.db.get_value("Purchase Order V3 Item", b.po3_item,
 				["received_qty", "qty"], as_dict=True)
 			if not line:

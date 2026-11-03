@@ -111,17 +111,6 @@ def validate(doc):
 	for r in po.items:
 		rows[r.name] = r
 
-	# ONE confirmation per PO. Back-order balances live on this document's
-	# Back Orders tab; later supplier documents go on the Documents tab.
-	if doc.is_new() and not doc.supersedes:
-		prior = frappe.get_all("Supplier Order Confirmation V3",
-			filters={"purchase_order_v3": doc.purchase_order_v3, "name": ("!=", doc.name), "docstatus": ("<", 2)},
-			fields=["name"], limit_page_length=1)
-		if prior:
-			frappe.throw(po.name + " is already confirmed on " + prior[0].name
-				+ ". Track back-order balances on its Back Orders tab and attach later supplier "
-				+ "documents on its Documents tab. To replace it outright, set Supersedes.")
-
 	# Which PO3 lines are already spoken for by another confirmation?
 	# A back-ordered line is deliberately re-openable: that is how the supplier
 	# confirms the balance shipment later.

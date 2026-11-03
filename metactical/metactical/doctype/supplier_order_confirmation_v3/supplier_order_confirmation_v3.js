@@ -12,39 +12,7 @@ function soc3_maybe_autopull(frm) {
     if (!frm.is_new() || !frm.doc.purchase_order_v3) return;
     if ((frm.doc.items || []).some(function(d) { return d.item_code; })) return;
     frm._soc3_autopull = true;
-    soc3_guard(frm, function() { soc3_fetch_lines(frm); });
-}
-
-function soc3_guard(frm, then) {
-    if (!frm.doc.purchase_order_v3 || frm.doc.supersedes) { then(); return; }
-    frappe.call({
-        method: 'frappe.client.get_list',
-        args: {
-            doctype: 'Supplier Order Confirmation V3',
-            filters: { purchase_order_v3: frm.doc.purchase_order_v3,
-                       name: ['!=', frm.doc.name || ''], docstatus: ['<', 2] },
-            fields: ['name'], limit_page_length: 1
-        },
-        callback: function(r) {
-            var existing = (r.message || [])[0];
-            if (!existing) { then(); return; }
-            frappe.msgprint({
-                title: __('Already confirmed'),
-                indicator: 'orange',
-                message: __('{0} is already confirmed on {1}.<br><br>Track back-order balances on its Back Orders section and attach later supplier documents on its Documents tab — no second confirmation is needed.',
-                            [frm.doc.purchase_order_v3,
-                             '<b><a href="/app/supplier-order-confirmation-v3/' + existing.name + '">'
-                             + existing.name + '</a></b>']),
-                primary_action: {
-                    label: __('Open {0}', [existing.name]),
-                    action: function() {
-                        frappe.msg_dialog.hide();
-                        frappe.set_route('Form', 'Supplier Order Confirmation V3', existing.name);
-                    }
-                }
-            });
-        }
-    });
+    soc3_fetch_lines(frm);
 }
 
 function soc3_fetch_lines(frm) {
@@ -397,7 +365,7 @@ frappe.ui.form.on('Supplier Order Confirmation V3 Item', {
 frappe.ui.form.on('Supplier Order Confirmation V3', {
     purchase_order_v3: function(frm) {
         frm._soc3_autopull = true;
-        soc3_guard(frm, function() { soc3_fetch_lines(frm); });
+        soc3_fetch_lines(frm);
     },
     onload_post_render: function(frm) { soc3_maybe_autopull(frm); },
     refresh: function(frm) {
