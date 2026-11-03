@@ -1,0 +1,103 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-11-03 00:00:00.000000",
+ "default_sort_field": "creation",
+ "default_sort_order": "DESC",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "operation",
+  "status",
+  "column_break_head",
+  "records_processed",
+  "records_created",
+  "records_updated",
+  "section_break_detail",
+  "error",
+  "notes"
+ ],
+ "fields": [
+  {
+   "description": "What was synced, e.g. Bills, Attachments.",
+   "fieldname": "operation",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Operation",
+   "reqd": 1
+  },
+  {
+   "default": "Success",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Success\nFailed\nPartial"
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "records_processed",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Records Processed"
+  },
+  {
+   "fieldname": "records_created",
+   "fieldtype": "Int",
+   "label": "Created"
+  },
+  {
+   "fieldname": "records_updated",
+   "fieldtype": "Int",
+   "label": "Updated"
+  },
+  {
+   "fieldname": "section_break_detail",
+   "fieldtype": "Section Break",
+   "label": "Detail"
+  },
+  {
+   "depends_on": "eval:doc.status != \"Success\"",
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "QBO Sync Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "operation"
+}
