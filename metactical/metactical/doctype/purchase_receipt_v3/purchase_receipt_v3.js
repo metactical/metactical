@@ -252,6 +252,11 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 + __('Draft Purchase Receipt {0} is out of date.', [frm.doc.erp_purchase_receipt || ''])
                 + '</b> ' + frappe.utils.escape_html(frm.doc.post_error) + '</span>');
         }
+        frm.set_query('supplier_order_confirmation_v3', function () {
+            var f = { docstatus: 1 };
+            if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
+            return { filters: f };
+        });
         frm.set_query('inbound_shipment_v3', function () {
             var f = { workflow_state: ['in', ['In Transit', 'Received']] };
             if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;

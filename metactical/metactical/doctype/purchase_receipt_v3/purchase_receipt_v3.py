@@ -58,7 +58,8 @@ class PurchaseReceiptV3(Document):
 #
 # A PO3 has one live confirmation (a later one supersedes it). Each of its
 # lines is one expected line: the substitute when Substituted, its confirmed
-# qty plus any back-ordered balance, less what has already been received.
+# qty less what has already been received. A back-ordered balance is not
+# expected, the same as a cancelled one.
 # ---------------------------------------------------------------------------
 # The reject reason for a short line whose balance is still coming: the line
 # stays open and the next receipt expects the rest. Any other reason on a short
@@ -84,11 +85,6 @@ def soc3_expected(po, exclude=None):
 		frappe.throw("Submit the Supplier Order Confirmation V3 for " + po.name
 			+ " first - the receipt is counted against what the supplier confirmed.")
 	rows = {r.name: r for r in po.items}
-	balance = {}
-	for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-			filters={"parent": soc, "status": ("!=", "Cancelled")},
-			fields=["po3_item", "balance_qty"]):
-		balance[b.po3_item] = balance.get(b.po3_item, 0) + F(b.balance_qty)
 
 	# goods the PO3 line does not track (substitutes, new items) are counted
 	# off the earlier receipts made against the confirmation line
@@ -116,10 +112,11 @@ def soc3_expected(po, exclude=None):
 				"confirmed_qty", "confirmed_rate"], order_by="idx"):
 		item = ln.substitute_item_code if ln.line_status == "Substituted" else ln.item_code
 		r = rows.get(ln.po3_item)
+		# Only what the supplier confirmed is expected. A back-ordered balance is
+		# treated like a cancelled one: a Back-ordered line (confirmed 0) drops out of
+		# the receipt, and a Partial - Balance Back-ordered line expects just its
+		# confirmed qty (ordered 10, confirmed 5 -> expect 5).
 		qty = F(ln.confirmed_qty)
-		# a back-order cancelled on the PO3 line is not coming either
-		if item == ln.item_code and not (r and r.backorder_status == "Cancelled"):
-			qty += balance.get(ln.po3_item, 0)
 		# the PO3 line already counts every receipt of its own item, including
 		# ones from before receipts were linked to the confirmation
 		got = F(r.received_qty) if r and r.item_code == item else got_on_soc.get(ln.name, 0)
@@ -242,6 +239,20 @@ def validate(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	if po.docstatus != 1:
 		frappe.throw("Purchase Order V3 " + po.name + " is not submitted/approved yet.")
+
+	# the confirmation this receipt is for: it must be one of this PO's, and is
+	# filled in when the PO has only one submitted confirmation
+	if doc.supplier_order_confirmation_v3:
+		if frappe.db.get_value("Supplier Order Confirmation V3", doc.supplier_order_confirmation_v3,
+				"purchase_order_v3") != po.name:
+			frappe.throw("Supplier Order Confirmation V3 " + doc.supplier_order_confirmation_v3
+				+ " is not for " + po.name + ".")
+	else:
+		socs = frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": po.name, "docstatus": 1}, pluck="name", limit_page_length=2)
+		if len(socs) == 1:
+			doc.supplier_order_confirmation_v3 = socs[0]
+
 	rows = {}
 	for r in po.items:
 		rows[r.name] = r

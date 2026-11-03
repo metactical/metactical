@@ -115,6 +115,8 @@ def validate(doc):
 	# A back-ordered line is deliberately re-openable: that is how the supplier
 	# confirms the balance shipment later.
 	claimed = {}
+	# what the other confirmations confirmed to ship now, per PO3 line
+	confirmed_elsewhere = {}
 	for other in frappe.get_all("Supplier Order Confirmation V3",
 			filters={"purchase_order_v3": po.name, "name": ("!=", doc.name), "docstatus": ("<", 2)},
 			fields=["name"]):
@@ -122,16 +124,19 @@ def validate(doc):
 		if doc.supersedes and other.name == doc.supersedes:
 			continue
 		for ln in frappe.get_all("Supplier Order Confirmation V3 Item",
-				filters={"parent": other.name}, fields=["po3_item"]):
+				filters={"parent": other.name}, fields=["po3_item", "confirmed_qty"]):
 			claimed[ln.po3_item] = other.name
+			confirmed_elsewhere[ln.po3_item] = confirmed_elsewhere.get(ln.po3_item, 0) + float(ln.confirmed_qty or 0)
 
 	TERMINAL = ("Received", "Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued")
 
 	# helpers cannot see script-level locals in this sandbox - pass everything in
-	def balance_qty(r, claimed_map):
-		# a re-opened back-ordered line offers only what has not been promised yet
+	def balance_qty(r, claimed_map, confirmed_map):
+		# a re-opened back-ordered line offers only what has not been confirmed yet.
+		# Counted off the other confirmations' lines, not the PO3 line's confirmed_qty:
+		# a Back-ordered line writes the whole ordered qty there as "still due later".
 		if r.line_status == "Back-ordered" and r.name in claimed_map:
-			done = float(r.confirmed_qty or 0)
+			done = float(confirmed_map.get(r.name, 0))
 			if float(r.received_qty or 0) > done:
 				done = float(r.received_qty or 0)
 			return float(r.qty or 0) - done
@@ -152,7 +157,7 @@ def validate(doc):
 			d = doc.append("items", {})
 			d.po3_item = r.name
 			d.item_code = r.item_code
-			d.ordered_qty = balance_qty(r, claimed)
+			d.ordered_qty = balance_qty(r, claimed, confirmed_elsewhere)
 			d.confirmed_qty = d.ordered_qty
 			d.line_status = "Confirmed"
 			d.confirmed_rate = r.rate
@@ -209,7 +214,7 @@ def validate(doc):
 				+ "): already covered by " + claimed[d.po3_item] + ". Remove the row, or supersede that confirmation.")
 
 		d.item_code = r.item_code
-		d.ordered_qty = balance_qty(r, claimed)
+		d.ordered_qty = balance_qty(r, claimed, confirmed_elsewhere)
 		ii = item_identifiers(d.item_code, doc.supplier)
 		d.item_name = ii["item_name"]
 		d.retail_sku_suffix = ii["retail_sku_suffix"]
@@ -377,6 +382,17 @@ def set_totals(doc):
 # Substituted -- stays on the confirmation and arrives as Over / Unordered /
 # Wrong Item on the receipt, for a supplier claim.
 # ---------------------------------------------------------------------------
+def confirmed_on_other_socs(doc, po3_item):
+	"""Sum of confirmed_qty on this PO3 line across the other submitted confirmations."""
+	others = [s for s in frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": doc.purchase_order_v3, "docstatus": 1, "name": ("!=", doc.name)},
+			pluck="name") if s != doc.supersedes]
+	if not others:
+		return 0
+	return sum(F(q) for q in frappe.get_all("Supplier Order Confirmation V3 Item",
+			filters={"parent": ("in", others), "po3_item": po3_item}, pluck="confirmed_qty"))
+
+
 def mirror_to_po3(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	discontinued_items = []
@@ -389,7 +405,10 @@ def mirror_to_po3(doc):
 			["line_status", "confirmed_qty", "remarks"], as_dict=True)
 		total = F(d.confirmed_qty)
 		if prev and prev.line_status == "Back-ordered":
-			total = total + F(prev.confirmed_qty)
+			# a re-opened back-order: add what the earlier confirmations confirmed,
+			# not the PO3 line's confirmed_qty (a Back-ordered line holds the whole
+			# ordered qty there, which would count it twice)
+			total = total + confirmed_on_other_socs(doc, d.po3_item)
 		upd = {"confirmed_qty": total}
 		remarks = prev.remarks if prev else None
 		if s == "Confirmed":

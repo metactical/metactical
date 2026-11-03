@@ -38,11 +38,14 @@ function soc3_fetch_lines(frm) {
                         args: {
                             doctype: 'Supplier Order Confirmation V3 Item',
                             filters: { parent: ['in', socs] },
-                            fields: ['po3_item'], parent: 'Supplier Order Confirmation V3', limit_page_length: 0
+                            fields: ['po3_item', 'confirmed_qty'], parent: 'Supplier Order Confirmation V3', limit_page_length: 0
                         },
                         callback: function(r3) {
+                            // claimed: PO3 line -> qty the other confirmations already confirmed
                             var claimed = {};
-                            (r3.message || []).forEach(function(x) { claimed[x.po3_item] = 1; });
+                            (r3.message || []).forEach(function(x) {
+                                claimed[x.po3_item] = (claimed[x.po3_item] || 0) + flt(x.confirmed_qty);
+                            });
                             soc3_pull(frm, po, claimed);
                         }
                     });
@@ -58,7 +61,8 @@ function soc3_pull(frm, po, claimed) {
     var skipped = 0;
     (po.items || []).forEach(function(r) {
         if (TERMINAL.indexOf(r.line_status) !== -1) { skipped++; return; }
-        if (claimed[r.name] && r.line_status !== 'Back-ordered') { skipped++; return; }
+        var is_claimed = Object.prototype.hasOwnProperty.call(claimed, r.name);
+        if (is_claimed && r.line_status !== 'Back-ordered') { skipped++; return; }
         var d = frm.add_child('items');
         d.po3_item = r.name;
         d.item_code = r.item_code;
@@ -68,7 +72,11 @@ function soc3_pull(frm, po, claimed) {
         // they read back during keying instead of appearing only after a save
         d.supplier_part_no = r.supplier_part_no;
         d.barcode = r.barcode;
-        d.ordered_qty = flt(r.qty) - flt(r.received_qty);
+        // a re-opened back-order offers only what the other confirmations did not
+        // confirm (same rule as the server's balance_qty)
+        d.ordered_qty = is_claimed
+            ? flt(r.qty) - Math.max(flt(r.received_qty), claimed[r.name])
+            : flt(r.qty) - flt(r.received_qty);
         d.confirmed_qty = d.ordered_qty;
         d.line_status = 'Confirmed';
         d.confirmed_rate = r.rate;
@@ -397,6 +405,7 @@ frappe.ui.form.on('Supplier Order Confirmation V3', {
                 frappe.model.with_doctype('Purchase Receipt V3', function() {
                     var doc = frappe.model.get_new_doc('Purchase Receipt V3');
                     doc.purchase_order_v3 = frm.doc.purchase_order_v3;
+                    doc.supplier_order_confirmation_v3 = frm.doc.name;
                     frappe.set_route('Form', 'Purchase Receipt V3', doc.name);
                 });
             }, __('Create'));
