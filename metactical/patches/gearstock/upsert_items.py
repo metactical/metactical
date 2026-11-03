@@ -37,6 +37,8 @@ MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "p
 JOB_ID = "gearstock_upsert_items"
 WEBHOOK_DOCTYPES = ("Item", "Item Price")
 
+DEV_LIMIT = 2000
+
 
 def execute():
 	if not frappe.db.exists("Price List", PRICE_LIST):
@@ -56,7 +58,7 @@ def run(start=0, queue_images=True):
 	logger = frappe.logger("gearstock", allow_site=True)
 
 	with open(DATA_FILE) as f:
-		rows = json.load(f)
+		rows = json.load(f)[:DEV_LIMIT]
 
 	# Off the default queue for the run, so its webhook jobs do not hold up everything else.
 	webhook_queue.move_to_long(WEBHOOK_DOCTYPES, JOB_ID)
@@ -111,7 +113,7 @@ def upsert_item(row, counts, missing, failed):
 	try:
 		item = frappe.get_doc("Item", item_code)
 
-		if row.get("slug") and add_item_detail(item, row["slug"]):
+		if row.get("slug") and add_item_detail(item, row["slug"], row.get("item_name")):
 			counts.slug_added += 1
 
 		if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
@@ -164,16 +166,18 @@ def add_website_deduct_qty(item):
 	return True
 
 
-def add_item_detail(item, slug):
-	"""Add the GearStock row, or fill its slug if blank. Returns True when something changed."""
+def add_item_detail(item, slug, item_name=None):
+	"""Add the GearStock row with its slug and item name, or fill them in if the slug is blank.
+	Returns True when something changed."""
 	for detail in item.get("item_detail") or []:
 		if detail.price_list == PRICE_LIST:
 			if detail.slug:
 				return False
 			detail.slug = slug
+			detail.item_name = item_name
 			return True
 
-	item.append("item_detail", {"price_list": PRICE_LIST, "slug": slug})
+	item.append("item_detail", {"price_list": PRICE_LIST, "slug": slug, "item_name": item_name})
 	return True
 
 

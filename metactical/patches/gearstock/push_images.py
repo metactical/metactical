@@ -158,8 +158,10 @@ def get_items():
 
 	A variant row stands for its template, since variants share their template's image record.
 	"""
+	from metactical.patches.gearstock.upsert_items import DEV_LIMIT
+
 	with open(DATA_FILE) as f:
-		rows = json.load(f)
+		rows = json.load(f)[:DEV_LIMIT]
 
 	codes = sorted({row.get("template") or row["item_code"] for row in rows})
 	existing = set(frappe.get_all("Item", filters={"name": ["in", codes]}, pluck="name")) if codes else set()
