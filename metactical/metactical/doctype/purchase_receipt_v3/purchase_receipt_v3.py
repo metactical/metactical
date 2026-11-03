@@ -444,6 +444,28 @@ def validate(doc):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): Reject "
 				+ "Reason is Other - write the reason in Remarks.")
 
+	# ---- never receive more than the confirmation expects ---------
+	# Expected is what the supplier confirmed (or what the shipment carries) less
+	# what is already in. Rows of the same line are added up, so splitting a count
+	# into accepted / rejected rows cannot get past it. A wrong item or variant is
+	# a different item and is not counted here.
+	per_line = {}
+	for d in doc.items:
+		if not d.received_item_code or d.received_item_code != d.expected_item_code:
+			continue
+		if not (d.soc3_item or d.po3_item):
+			continue
+		k = d.soc3_item or ("po3", d.po3_item)
+		t = per_line.setdefault(k, frappe._dict(received=0.0, expected=F(d.expected_qty),
+			item=d.received_item_code, rows=[]))
+		t.received += F(d.received_qty)
+		t.rows.append(str(d.idx))
+	for t in per_line.values():
+		if t.received > t.expected + 0.000001:
+			frappe.throw("Row " + ", ".join(t.rows) + " (" + t.item + "): received " + str(t.received)
+				+ " but only " + str(t.expected) + " is expected on the Supplier Order Confirmation. "
+				+ "A receipt cannot take more than the supplier confirmed - correct the count.")
+
 	doc.has_variance = 1 if var_count else 0
 	doc.variance_count = var_count
 
@@ -469,24 +491,6 @@ def validate(doc):
 					+ " marked <b>Received</b> - you are counting it, so it is here.")
 			except Exception:
 				pass
-
-	# ---- counted more than the shipment says it carried ---------------
-	# The variance code alone reads as a quantity, not as a problem. Say it in
-	# words while there is still time to recount, and name the shipment so the
-	# number can be checked against the packing list.
-	if doc.inbound_shipment_v3 and doc.workflow_state in (None, "", "Draft", "Counting"):
-		over_lines = []
-		for d in doc.items:
-			if d.variance_type == "Over" and F(d.variance_qty) > 0:
-				over_lines.append((d.received_item_code or "?") + ": counted "
-					+ str(F(d.received_qty)) + " but " + doc.inbound_shipment_v3
-					+ " carries " + str(F(d.expected_qty)))
-		if over_lines:
-			frappe.msgprint("<b>Counted above what the shipment says it carried.</b><br>"
-				+ "<br>".join(over_lines)
-				+ "<br><br>If the supplier genuinely sent extra, carry on. If the count "
-				+ "is wrong, correct it now - after "
-				+ "posting it becomes an over-receipt on the order.")
 
 
 # ---------------------------------------------------------------------------

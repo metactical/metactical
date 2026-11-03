@@ -108,21 +108,50 @@ function beep_bad() {
     } catch (e) { /* no audio, the red alert is enough */ }
 }
 
+// How much more a row's line can still take: its expected qty less what every
+// row of the same line has counted (a count can be split into accepted and
+// rejected rows). null when the row is a variance line (a wrong or unordered
+// item), which is not capped.
+function gr3_room(frm, row) {
+    if (!row.expected_item_code || row.received_item_code !== row.expected_item_code) return null;
+    var key = row.soc3_item || row.po3_item;
+    var counted = 0;
+    (frm.doc.items || []).forEach(function (d) {
+        if (d.received_item_code !== row.received_item_code) return;
+        if ((d.soc3_item || d.po3_item) !== key) return;
+        counted += flt(d.received_qty);
+    });
+    return flt(row.expected_qty) - counted;
+}
+
 function gr3_apply_scan(frm, item_code, label, qty_override) {
     var step = flt(qty_override) || flt(frm.doc.scan_qty) || 1;
-    var row = null;
+    var row = null, full = null, variance = null;
     (frm.doc.items || []).forEach(function (d) {
-        if (row) return;
         if (d.received_item_code !== item_code) return;
+        var room = gr3_room(frm, d);
+        if (room === null) { if (!variance) variance = d; return; }
         // prefer a line that still has room, so repeat scans roll onto the
         // next line of the same item rather than over-filling the first
-        if (flt(d.received_qty) < flt(d.expected_qty) || !flt(d.expected_qty)) row = d;
+        if (room > 0) { if (!row) row = d; }
+        else if (!full) full = d;
     });
-    if (!row) {
-        (frm.doc.items || []).forEach(function (d) {
-            if (!row && d.received_item_code === item_code) row = d;
-        });
+    // the confirmation is the ceiling: a line that is already at its expected
+    // qty takes no more, and nothing is added for it
+    if (!row && full) {
+        gr3_scan_feedback(frm, false, label + '  ' + flt(full.expected_qty) + ' / '
+            + flt(full.expected_qty) + '  \u2014 already at the expected qty, not counted');
+        return;
     }
+    if (row) {
+        var room = gr3_room(frm, row);
+        if (step > room) {
+            gr3_scan_feedback(frm, false, label + '  only ' + room + ' more expected, scanned '
+                + step + ' \u2014 not counted. Recount and scan the right qty.');
+            return;
+        }
+    }
+    if (!row) row = variance;
     var added = false;
     if (!row) {
         row = frm.add_child('items');
@@ -141,11 +170,9 @@ function gr3_apply_scan(frm, item_code, label, qty_override) {
     frm.refresh_field('items');
     frm.dirty();
 
-    var over = flt(row.expected_qty) && flt(row.received_qty) > flt(row.expected_qty);
     var txt = label + '  ' + flt(row.received_qty)
         + (flt(row.expected_qty) ? ' / ' + flt(row.expected_qty) : '');
     if (added) gr3_scan_feedback(frm, true, txt + '  (not on the order - added as a variance line)');
-    else if (over) gr3_scan_feedback(frm, true, txt + '  \u2014 OVER');
     else gr3_scan_feedback(frm, true, txt);
 }
 
