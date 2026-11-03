@@ -17,7 +17,7 @@ they are put back when it finishes (see webhook_queue.py).
 
 When it finishes it queues push_images (pass queue_images=False to skip that).
 
-Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items.run
+Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v2.run
 """
 
 import csv
@@ -45,7 +45,7 @@ def execute():
 		return
 
 	frappe.enqueue(
-		"metactical.patches.gearstock.upsert_items.run",
+		"metactical.patches.gearstock.upsert_items_v2.run",
 		queue="long",
 		timeout=24 * 60 * 60,
 		job_id=JOB_ID,
