@@ -23,6 +23,7 @@ Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock
 import csv
 import json
 import os
+import time
 
 import frappe
 from frappe.integrations.doctype.webhook import run_webhooks
@@ -30,12 +31,12 @@ from frappe.integrations.doctype.webhook import run_webhooks
 from metactical.patches.gearstock import webhook_queue
 
 PRICE_LIST = "RET - GearStock - USD"
-BATCH_SIZE = 1000
+BATCH_SIZE = 100
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"
-WEBHOOK_DOCTYPES = ("Item", "Item Price")
+WEBHOOK_DOCTYPES = ("Item Price")
 
 
 def execute():
@@ -70,9 +71,8 @@ def run(start=0, queue_images=True):
 		for row in rows[offset : offset + BATCH_SIZE]:
 			upsert_item(row, counts, missing, failed)
 
-		frappe.db.commit()
 		logger.info(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
-
+		time.sleep(10)
 	write_missing(missing)
 	webhook_queue.restore(JOB_ID)
 
@@ -82,6 +82,7 @@ def run(start=0, queue_images=True):
 		from metactical.patches.gearstock import push_images
 
 		push_images.start()
+  
 	frappe.db.commit()
 	logger.info(f"GearStock upsert finished: {dict(counts)}, failed: {failed}, missing items in {MISSING_FILE}")
 	frappe.log_error(
@@ -127,6 +128,7 @@ def upsert_item(row, counts, missing, failed):
 		item.flags.dont_update_variants = True
 		item.save()
 		counts.saved += 1
+		frappe.db.commit()
 	except Exception:
 		frappe.db.rollback(save_point="gearstock_upsert")
 		counts.failed += 1
