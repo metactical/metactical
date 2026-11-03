@@ -167,15 +167,19 @@ def add_website_deduct_qty(item):
 
 
 def add_item_detail(item, slug, item_name=None):
-	"""Add the GearStock row with its slug and item name, or fill them in if the slug is blank.
-	Returns True when something changed."""
+	"""Add the GearStock row with its slug and item name. On an existing row, fill the slug if it
+	is blank, and set the item name whenever it differs from the catalogue, even if the slug is
+	already set. Returns True when something changed."""
 	for detail in item.get("item_detail") or []:
 		if detail.price_list == PRICE_LIST:
-			if detail.slug:
-				return False
-			detail.slug = slug
-			detail.item_name = item_name
-			return True
+			changed = False
+			if not detail.slug:
+				detail.slug = slug
+				changed = True
+			if item_name and detail.item_name != item_name:
+				detail.item_name = item_name
+				changed = True
+			return changed
 
 	item.append("item_detail", {"price_list": PRICE_LIST, "slug": slug, "item_name": item_name})
 	return True
