@@ -200,6 +200,11 @@ def update_item_fields(item, row):
 
 def add_website_deduct_qty(item):
 	"""Add the Website - GearStock row to Website Deduct Qty with qty 0, if it is not there yet."""
+
+	if item.get("custom_neb_website_deduct_qty"):
+		item.custom_neb_website_deduct_qty = []
+		return True
+
 	for row in item.get("custom_neb_website_deduct_qty") or []:
 		if row.lead_source == "Website - GearStock":
 			return False
