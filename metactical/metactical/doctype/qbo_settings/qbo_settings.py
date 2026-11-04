@@ -18,7 +18,7 @@ API_BASE_URLS = {
     "production": "https://quickbooks.api.intuit.com",
     "sandbox": "https://sandbox-quickbooks.api.intuit.com",
 }
-SCOPES = "com.intuit.quickbooks.accounting"
+SCOPES = "com.intuit.quickbooks.accounting com.intuit.quickbooks.accounting.bankfeeds"
 MINOR_VERSION = "75"
 ACCESS_TOKEN_BUFFER_SECONDS = 120
 
@@ -110,14 +110,15 @@ class QBOSettings(Document):
     # ------------------------------------------------------------------
     # QBO API helpers
     # ------------------------------------------------------------------
-    def qbo_get(self, path, params=None):
+    def qbo_get(self, path, params=None, versioned=True):
         """Authenticated GET against the QBO REST API."""
         if not self.realm_id:
             frappe.throw(_("Not connected to QuickBooks."))
 
         url = f"{self.api_base_url}/v3/company/{self.realm_id}/{path.lstrip('/')}"
         params = dict(params or {})
-        params.setdefault("minorversion", MINOR_VERSION)
+        if versioned:
+            params.setdefault("minorversion", MINOR_VERSION)
         headers = {
             "Authorization": f"Bearer {self.get_valid_access_token()}",
             "Accept": "application/json",
@@ -224,9 +225,10 @@ class QBOSettings(Document):
                 break
 
             for acct in batch:
-                if self._sync_bank_account(acct):
+                result = self._sync_bank_account(acct)
+                if result == "created":
                     created += 1
-                else:
+                elif result == "updated":
                     updated += 1
 
             if len(batch) < page_size:
@@ -246,21 +248,21 @@ class QBOSettings(Document):
         return {"created": created, "updated": updated}
 
     def _sync_bank_account(self, acct):
-        """Upsert one ERPNext Bank Account. Returns True if created, False if updated."""
+        """Upsert one ERPNext Bank Account. Returns 'created', 'updated', or None if unchanged."""
         qbo_id = str(acct.get("Id") or "")
         if not qbo_id:
-            return False
+            return None
 
         account_name = acct.get("Name") or qbo_id
         bank_name = _get_or_create_bank("QuickBooks")
         company = self.default_company or frappe.db.get_single_value("Global Defaults", "default_company")
 
+        # last_integration_date is excluded from change detection — it always updates on save
         values = {
             "account_name": account_name,
             "bank": bank_name,
             "bank_account_no": acct.get("AcctNum") or None,
             "integration_id": qbo_id,
-            "last_integration_date": frappe.utils.nowdate(),
             "company": company,
             "disabled": 0 if acct.get("Active", True) else 1,
         }
@@ -268,12 +270,20 @@ class QBOSettings(Document):
         existing = frappe.db.get_value("Bank Account", {"integration_id": qbo_id})
         if existing:
             doc = frappe.get_doc("Bank Account", existing)
+            changed = any(
+                str(doc.get(k) or "") != str(v or "")
+                for k, v in values.items()
+            )
+            if not changed:
+                return None
             doc.update(values)
+            doc.last_integration_date = frappe.utils.nowdate()
             doc.save(ignore_permissions=True)
-            return False
+            return "updated"
 
-        frappe.get_doc({"doctype": "Bank Account", **values}).insert(ignore_permissions=True)
-        return True
+        frappe.get_doc({"doctype": "Bank Account", **values,
+                        "last_integration_date": frappe.utils.nowdate()}).insert(ignore_permissions=True)
+        return "created"
 
     # ------------------------------------------------------------------
     # Bank Transactions
@@ -309,6 +319,11 @@ class QBOSettings(Document):
             c, s = self._fetch_entity_txns(entity, date_field, acct_field, direction, since, acct_map)
             created += c
             skipped += s
+
+        # Pull uncategorized transactions from the bank feeds API
+        fc, fs = self._fetch_bank_feed_txns(since, acct_map)
+        created += fc
+        skipped += fs
 
         self.db_set("bank_txn_last_synced", now_datetime())
 
@@ -347,7 +362,7 @@ class QBOSettings(Document):
                     continue
 
                 txn_id = f"{entity}-{txn['Id']}"
-                if frappe.db.exists("Bank Transaction", {"transaction_id": txn_id}):
+                if frappe.db.exists("Bank Transaction", {"transaction_id": txn_id, "docstatus": ["!=", 2]}):
                     skipped += 1
                     continue
 
@@ -355,7 +370,9 @@ class QBOSettings(Document):
                 currency = frappe.db.get_single_value("Global Defaults", "default_currency")
                 memo = txn.get("PrivateNote") or txn.get("Memo") or ""
                 vendor = ((txn.get("EntityRef") or {}).get("name") or "")
-                description = vendor or memo
+                bank_acct_name = acct_ref.get("name") or ""
+                parts = [p for p in [bank_acct_name, memo or vendor] if p]
+                description = " - ".join(parts)
 
                 doc = frappe.get_doc({
                     "doctype": "Bank Transaction",
@@ -377,6 +394,70 @@ class QBOSettings(Document):
             if len(batch) < page_size:
                 break
             start += page_size
+
+        return created, skipped
+
+    def _fetch_bank_feed_txns(self, since, acct_map):
+        """Pull PENDING (uncategorized) transactions from the QBO bank feeds API for each mapped account."""
+        created = skipped = 0
+        currency = frappe.db.get_single_value("Global Defaults", "default_currency")
+
+        for qbo_acct_id, ba in acct_map.items():
+            start = 1
+            page_size = 100
+
+            while True:
+                path = f"bankaccounts/{qbo_acct_id}/transactions"
+                params = {
+                    "startposition": start,
+                    "maxresults": page_size,
+                    "startdate": since,
+                }
+                try:
+                    body = self.qbo_get(path, params=params, versioned=False)
+                except Exception as e:
+                    # Bank feeds scope not granted or account not connected to feeds — skip silently
+                    title = f"QBO Bank Feed Fetch Failed ({qbo_acct_id})"[:140]
+                    frappe.log_error(message=str(e)[:2000], title=title)
+                    break
+
+                batch = body.get("BankTransaction") or []
+                if not batch:
+                    break
+
+                for txn in batch:
+                    if txn.get("Status") != "PENDING":
+                        skipped += 1
+                        continue
+
+                    txn_id = f"BankFeed-{txn['Id']}"
+                    if frappe.db.exists("Bank Transaction", {"transaction_id": txn_id, "docstatus": ["!=", 2]}):
+                        skipped += 1
+                        continue
+
+                    amount = float(txn.get("Amount") or 0)
+                    description = txn.get("Description") or ""
+
+                    doc = frappe.get_doc({
+                        "doctype": "Bank Transaction",
+                        "bank_account": ba["name"],
+                        "date": txn.get("TxnDate"),
+                        "deposit":    amount if amount > 0 else 0.0,
+                        "withdrawal": abs(amount) if amount < 0 else 0.0,
+                        "description": description,
+                        "transaction_id": txn_id,
+                        "transaction_type": "BankFeed",
+                        "company": ba["company"],
+                        "currency": currency,
+                        "status": "Unreconciled",
+                    })
+                    doc.insert(ignore_permissions=True)
+                    doc.submit()
+                    created += 1
+
+                if len(batch) < page_size:
+                    break
+                start += page_size
 
         return created, skipped
 
