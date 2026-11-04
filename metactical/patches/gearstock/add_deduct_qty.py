@@ -21,6 +21,7 @@ import time
 
 import frappe
 
+from metactical.patches.gearstock import db_retry
 from metactical.patches.gearstock.upsert_items_v3 import load_rows
 
 BATCH_SIZE = 100
@@ -65,22 +66,25 @@ def update_item(item_code, counts, failed):
 		counts.missing += 1
 		return
 
-	frappe.db.savepoint("gearstock_deduct_qty")
 	try:
-		item = frappe.get_doc("Item", item_code)
-		add_website_deduct_qty(item)
-
-		# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
-		# and supplier rows onto every variant.
-		item.flags.dont_update_variants = True
-		item.save()
+		db_retry.run(lambda: save_item(item_code))
 		counts.saved += 1
-		frappe.db.commit()
 	except Exception:
-		frappe.db.rollback(save_point="gearstock_deduct_qty")
+		db_retry.rollback_item()
 		counts.failed += 1
 		failed.append(item_code)
 		frappe.log_error(title=f"GearStock deduct qty failed: {item_code}", message=frappe.get_traceback())
+
+
+def save_item(item_code):
+	item = frappe.get_doc("Item", item_code)
+	add_website_deduct_qty(item)
+
+	# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
+	# and supplier rows onto every variant.
+	item.flags.dont_update_variants = True
+	item.save()
+	frappe.db.commit()
 
 
 def add_website_deduct_qty(item):

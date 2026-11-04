@@ -44,7 +44,7 @@ from metactical.custom_scripts.utils.s3_image_api import (
 	import_website_images,
 	set_image_sync_flag,
 )
-from metactical.patches.gearstock import webhook_queue
+from metactical.patches.gearstock import db_retry, webhook_queue
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 GEARSTOCK = "Website - GearStock"
@@ -179,7 +179,6 @@ def push_item(item_code, logger):
 	if get_image_sync_flag(item_code):
 		return "busy", None
 
-	frappe.db.savepoint("gearstock_push_images")
 	try:
 		# Raised so nobody loads images or changes a SKU on this item mid-run.
 		set_image_sync_flag(item_code, "Administrator", reason="Pushing images to GearStock")
@@ -192,7 +191,7 @@ def push_item(item_code, logger):
 		frappe.log_error(title=f"GearStock image push failed: {item_code}", message=frappe.get_traceback())
 
 	if status == "failed":
-		frappe.db.rollback(save_point="gearstock_push_images")
+		db_retry.rollback_item()
 	return status, source
 
 
