@@ -528,8 +528,14 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-10-19 14:00:00.000000",
+ "links": [
+  {
+   "group": "Fulfilment",
+   "link_doctype": "Purchase Receipt V3",
+   "link_fieldname": "supplier_order_confirmation_v3"
+  }
+ ],
+ "modified": "2026-11-03 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Order Confirmation V3",

@@ -9,6 +9,7 @@
  "field_order": [
   "sec_main",
   "purchase_order_v3",
+  "supplier_order_confirmation_v3",
   "supplier",
   "supplier_name",
   "company",
@@ -89,6 +90,13 @@
    "label": "Purchase Order V3",
    "options": "Purchase Order V3",
    "reqd": 1
+  },
+  {
+   "fieldname": "supplier_order_confirmation_v3",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Supplier Order Confirmation",
+   "options": "Supplier Order Confirmation V3"
   },
   {
    "columns": 2,
@@ -519,7 +527,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-11-02 18:30:00.000000",
+ "modified": "2026-11-03 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3",

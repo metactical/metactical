@@ -58,7 +58,8 @@ class PurchaseReceiptV3(Document):
 #
 # A PO3 has one live confirmation (a later one supersedes it). Each of its
 # lines is one expected line: the substitute when Substituted, its confirmed
-# qty plus any back-ordered balance, less what has already been received.
+# qty less what has already been received. A back-ordered balance is not
+# expected, the same as a cancelled one.
 # ---------------------------------------------------------------------------
 # The reject reason for a short line whose balance is still coming: the line
 # stays open and the next receipt expects the rest. Any other reason on a short
@@ -77,18 +78,14 @@ def live_confirmation(po3_name):
 	return None
 
 
-def soc3_expected(po, exclude=None):
-	"""{soc3_item: line} for the PO3's live confirmation. Throws if there is none."""
-	soc = live_confirmation(po.name)
+def soc3_expected(po, exclude=None, soc=None):
+	"""{soc3_item: line} for the receipt's confirmation (`soc`), or the PO3's live
+	confirmation when none is given. Throws if there is none."""
+	soc = soc or live_confirmation(po.name)
 	if not soc:
 		frappe.throw("Submit the Supplier Order Confirmation V3 for " + po.name
 			+ " first - the receipt is counted against what the supplier confirmed.")
 	rows = {r.name: r for r in po.items}
-	balance = {}
-	for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-			filters={"parent": soc, "status": ("!=", "Cancelled")},
-			fields=["po3_item", "balance_qty"]):
-		balance[b.po3_item] = balance.get(b.po3_item, 0) + F(b.balance_qty)
 
 	# goods the PO3 line does not track (substitutes, new items) are counted
 	# off the earlier receipts made against the confirmation line
@@ -110,19 +107,36 @@ def soc3_expected(po, exclude=None):
 			and ifnull(gi.soc3_item, '') != '' and gi.variance_type = 'Short'
 			and ifnull(gi.reject_reason, '') != %s""", (po.name, exclude or "", PARTIALLY_RECEIVED)))
 
+	# receipts of the PO3 line's own item made against another confirmation's lines
+	got_on_other_socs = {}
+	for gi in frappe.db.sql("""select gi.po3_item, gi.received_qty from `tabPurchase Receipt V3 Item` gi
+			join `tabPurchase Receipt V3` g on g.name = gi.parent
+			join `tabSupplier Order Confirmation V3 Item` si on si.name = gi.soc3_item
+			where g.docstatus = 1 and g.purchase_order_v3 = %s and g.name != %s
+			and si.parent != %s and ifnull(gi.po3_item, '') != ''
+			and gi.received_item_code = gi.expected_item_code""",
+			(po.name, exclude or "", soc), as_dict=True):
+		got_on_other_socs[gi.po3_item] = got_on_other_socs.get(gi.po3_item, 0) + F(gi.received_qty)
+
 	out = {}
 	for ln in frappe.get_all("Supplier Order Confirmation V3 Item", filters={"parent": soc},
 			fields=["name", "po3_item", "item_code", "substitute_item_code", "line_status",
 				"confirmed_qty", "confirmed_rate"], order_by="idx"):
 		item = ln.substitute_item_code if ln.line_status == "Substituted" else ln.item_code
 		r = rows.get(ln.po3_item)
+		# Only what the supplier confirmed is expected. A back-ordered balance is
+		# treated like a cancelled one: a Back-ordered line (confirmed 0) drops out of
+		# the receipt, and a Partial - Balance Back-ordered line expects just its
+		# confirmed qty (ordered 10, confirmed 5 -> expect 5).
 		qty = F(ln.confirmed_qty)
-		# a back-order cancelled on the PO3 line is not coming either
-		if item == ln.item_code and not (r and r.backorder_status == "Cancelled"):
-			qty += balance.get(ln.po3_item, 0)
 		# the PO3 line already counts every receipt of its own item, including
-		# ones from before receipts were linked to the confirmation
-		got = F(r.received_qty) if r and r.item_code == item else got_on_soc.get(ln.name, 0)
+		# ones from before receipts were linked to the confirmation. A PO can have
+		# several confirmations, so what was received against the other ones' lines
+		# is taken off: it does not count towards this confirmation.
+		if r and r.item_code == item:
+			got = max(F(r.received_qty) - got_on_other_socs.get(ln.po3_item, 0), 0)
+		else:
+			got = got_on_soc.get(ln.name, 0)
 		out[ln.name] = frappe._dict(soc3_item=ln.name, po3_item=ln.po3_item or None, item_code=item,
 			qty=qty, received=got, rate=F(ln.confirmed_rate) or (F(r.rate) if r else 0),
 			closed=bool(r and r.item_code == item and r.line_status in ("Closed Short", "Cancelled"))
@@ -162,9 +176,9 @@ def outstanding_on(ln, ship, shipped, taken):
 	return ln.qty - ln.received
 
 
-def expected_rows(po, ship, exclude=None):
+def expected_rows(po, ship, exclude=None, soc=None):
 	"""The grid a new receipt starts from: every confirmation line with something still to come."""
-	expected = soc3_expected(po, exclude)
+	expected = soc3_expected(po, exclude, soc)
 	shipped, taken = shipment_balance(ship, exclude)
 	out = []
 	for ln in expected.values():
@@ -180,7 +194,7 @@ def expected_rows(po, ship, exclude=None):
 	return out
 
 
-def pick_shipment(po, exclude=None):
+def pick_shipment(po, exclude=None, soc=None):
 	"""The shipment a new receipt is most likely counting: the oldest one that still
 	has something expected on it. A shipment whose leftovers were closed short has
 	nothing more to bring, so it must not keep getting picked over a later one."""
@@ -190,7 +204,7 @@ def pick_shipment(po, exclude=None):
 					"workflow_state": ("in", ["In Transit", "Received"]),
 					"docstatus": ("<", 2)},
 			fields=["name", "ship_date", "creation"], limit_page_length=0):
-		if not expected_rows(po, cand.name, exclude):
+		if not expected_rows(po, cand.name, exclude, soc):
 			continue
 		# oldest first; a shipment with no ship date falls back to when it was made,
 		# and on the same ship date the one made first, so the pick does not depend on row order
@@ -242,10 +256,24 @@ def validate(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	if po.docstatus != 1:
 		frappe.throw("Purchase Order V3 " + po.name + " is not submitted/approved yet.")
+
+	# the confirmation this receipt is for: it must be one of this PO's, and is
+	# filled in when the PO has only one submitted confirmation
+	if doc.supplier_order_confirmation_v3:
+		if frappe.db.get_value("Supplier Order Confirmation V3", doc.supplier_order_confirmation_v3,
+				"purchase_order_v3") != po.name:
+			frappe.throw("Supplier Order Confirmation V3 " + doc.supplier_order_confirmation_v3
+				+ " is not for " + po.name + ".")
+	else:
+		socs = frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": po.name, "docstatus": 1}, pluck="name", limit_page_length=2)
+		if len(socs) == 1:
+			doc.supplier_order_confirmation_v3 = socs[0]
+
 	rows = {}
 	for r in po.items:
 		rows[r.name] = r
-	expected = soc3_expected(po, doc.name)
+	expected = soc3_expected(po, doc.name, doc.supplier_order_confirmation_v3)
 
 	# the receipt is priced in whatever the order was placed in
 	doc.company = po.company
@@ -259,7 +287,7 @@ def validate(doc):
 	# order: the confirmation already told us the back-ordered balance is
 	# not coming yet, and the shipment carries that forward.
 	if not doc.inbound_shipment_v3:
-		best_ship = pick_shipment(po, doc.name)
+		best_ship = pick_shipment(po, doc.name, doc.supplier_order_confirmation_v3)
 		if best_ship:
 			doc.inbound_shipment_v3 = best_ship
 
@@ -295,7 +323,7 @@ def validate(doc):
 	# Received is what someone physically counted, so it starts empty and is
 	# counted up. Pre-filling it invites a receipt nobody actually checked.
 	if not doc.items:
-		for x in expected_rows(po, doc.inbound_shipment_v3, doc.name):
+		for x in expected_rows(po, doc.inbound_shipment_v3, doc.name, doc.supplier_order_confirmation_v3):
 			d = doc.append("items", {})
 			d.soc3_item = x.soc3_item
 			d.po3_item = x.po3_item
@@ -416,6 +444,28 @@ def validate(doc):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.received_item_code or "") + "): Reject "
 				+ "Reason is Other - write the reason in Remarks.")
 
+	# ---- never receive more than the confirmation expects ---------
+	# Expected is what the supplier confirmed (or what the shipment carries) less
+	# what is already in. Rows of the same line are added up, so splitting a count
+	# into accepted / rejected rows cannot get past it. A wrong item or variant is
+	# a different item and is not counted here.
+	per_line = {}
+	for d in doc.items:
+		if not d.received_item_code or d.received_item_code != d.expected_item_code:
+			continue
+		if not (d.soc3_item or d.po3_item):
+			continue
+		k = d.soc3_item or ("po3", d.po3_item)
+		t = per_line.setdefault(k, frappe._dict(received=0.0, expected=F(d.expected_qty),
+			item=d.received_item_code, rows=[]))
+		t.received += F(d.received_qty)
+		t.rows.append(str(d.idx))
+	for t in per_line.values():
+		if t.received > t.expected + 0.000001:
+			frappe.throw("Row " + ", ".join(t.rows) + " (" + t.item + "): received " + str(t.received)
+				+ " but only " + str(t.expected) + " is expected on the Supplier Order Confirmation. "
+				+ "A receipt cannot take more than the supplier confirmed - correct the count.")
+
 	doc.has_variance = 1 if var_count else 0
 	doc.variance_count = var_count
 
@@ -442,24 +492,6 @@ def validate(doc):
 			except Exception:
 				pass
 
-	# ---- counted more than the shipment says it carried ---------------
-	# The variance code alone reads as a quantity, not as a problem. Say it in
-	# words while there is still time to recount, and name the shipment so the
-	# number can be checked against the packing list.
-	if doc.inbound_shipment_v3 and doc.workflow_state in (None, "", "Draft", "Counting"):
-		over_lines = []
-		for d in doc.items:
-			if d.variance_type == "Over" and F(d.variance_qty) > 0:
-				over_lines.append((d.received_item_code or "?") + ": counted "
-					+ str(F(d.received_qty)) + " but " + doc.inbound_shipment_v3
-					+ " carries " + str(F(d.expected_qty)))
-		if over_lines:
-			frappe.msgprint("<b>Counted above what the shipment says it carried.</b><br>"
-				+ "<br>".join(over_lines)
-				+ "<br><br>If the supplier genuinely sent extra, carry on. If the count "
-				+ "is wrong, correct it now - after "
-				+ "posting it becomes an over-receipt on the order.")
-
 
 # ---------------------------------------------------------------------------
 # Taxes and Charges, Totals and Additional Discount -- the native Purchase
@@ -473,7 +505,7 @@ def validate(doc):
 # quantities at each line's confirmed rate, which is what goes into stock.
 # ---------------------------------------------------------------------------
 def copy_taxes_from_confirmation(doc, po):
-	soc = live_confirmation(po.name)
+	soc = doc.supplier_order_confirmation_v3 or live_confirmation(po.name)
 	src = frappe.get_doc("Supplier Order Confirmation V3", soc) if soc else po
 	for f in TAX_SETTINGS:
 		doc.set(f, src.get(f))
@@ -739,7 +771,7 @@ def fill_native_pr(pr, doc, po, final):
 	pr.buying_price_list = npo.buying_price_list
 	pr.purchase_order = po.erp_purchase_order
 	pr.set("items", [])
-	expected = soc3_expected(po, doc.name)
+	expected = soc3_expected(po, doc.name, doc.supplier_order_confirmation_v3)
 	# what each native PO line can still take: the PO is never grown, so the
 	# rest of an increased quantity goes on a row of its own
 	room = {n.name: F(n.qty) - F(n.received_qty) for n in frappe.get_all("Purchase Order Item",
@@ -896,13 +928,13 @@ def cancel_guard(doc):
 # this dotted path.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
-def v3_gr3_scan_map(po3=None):
+def v3_gr3_scan_map(po3=None, soc=None):
 	supplier = frappe.db.get_value("Purchase Order V3", po3, "supplier")
 	out = {}
 	names = {}
 	codes = frappe.get_all("Purchase Order V3 Item", filters={"parent": po3},
 		pluck="item_code", limit_page_length=0)
-	soc = live_confirmation(po3)
+	soc = soc or live_confirmation(po3)
 	if soc:
 		for ln in frappe.get_all("Supplier Order Confirmation V3 Item", filters={"parent": soc},
 				fields=["item_code", "substitute_item_code"]):
@@ -939,14 +971,15 @@ def v3_gr3_scan_map(po3=None):
 # No alias in hooks.py: the only caller is purchase_receipt_v3.js, repointed here.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
-def v3_gr3_prefill_preview(po3=None, shipment=None):
+def v3_gr3_prefill_preview(po3=None, shipment=None, soc=None):
 	po = frappe.get_doc("Purchase Order V3", po3)
+	soc = soc or None
 
 	# pick the shipment exactly as GR3 Validate And Classify does
-	ship = shipment or pick_shipment(po)
+	ship = shipment or pick_shipment(po, soc=soc)
 
 	rows = []
-	for x in expected_rows(po, ship):
+	for x in expected_rows(po, ship, soc=soc):
 		rows.append({"soc3_item": x.soc3_item, "po3_item": x.po3_item, "expected_item_code": x.item_code,
 			"received_item_code": x.item_code, "expected_qty": x.expected_qty,
 			"retail_sku_suffix": frappe.db.get_value("Item", x.item_code, "ifw_retailskusuffix")})

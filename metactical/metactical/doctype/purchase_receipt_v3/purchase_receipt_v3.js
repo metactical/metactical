@@ -76,13 +76,14 @@ function clm3_new_from(field, value) {
 // enough that the latency does not matter.
 function gr3_load_scan_map(frm) {
     if (!frm.doc.purchase_order_v3) { frm._scan = null; return; }
-    if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3) return;
+    var soc = frm.doc.supplier_order_confirmation_v3 || '';
+    if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3 && frm._scan.soc === soc) return;
     frappe.call({
         method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_scan_map',
-        args: { po3: frm.doc.purchase_order_v3 },
+        args: { po3: frm.doc.purchase_order_v3, soc: soc },
         callback: function (r) {
             var m = r.message || {};
-            frm._scan = { po: frm.doc.purchase_order_v3, map: m.map || {}, names: m.names || {} };
+            frm._scan = { po: frm.doc.purchase_order_v3, soc: soc, map: m.map || {}, names: m.names || {} };
             // the order's items and the confirmation's (substitutes, new items)
             frm._po3_items = Object.keys(frm._scan.names);
         }
@@ -107,21 +108,50 @@ function beep_bad() {
     } catch (e) { /* no audio, the red alert is enough */ }
 }
 
+// How much more a row's line can still take: its expected qty less what every
+// row of the same line has counted (a count can be split into accepted and
+// rejected rows). null when the row is a variance line (a wrong or unordered
+// item), which is not capped.
+function gr3_room(frm, row) {
+    if (!row.expected_item_code || row.received_item_code !== row.expected_item_code) return null;
+    var key = row.soc3_item || row.po3_item;
+    var counted = 0;
+    (frm.doc.items || []).forEach(function (d) {
+        if (d.received_item_code !== row.received_item_code) return;
+        if ((d.soc3_item || d.po3_item) !== key) return;
+        counted += flt(d.received_qty);
+    });
+    return flt(row.expected_qty) - counted;
+}
+
 function gr3_apply_scan(frm, item_code, label, qty_override) {
     var step = flt(qty_override) || flt(frm.doc.scan_qty) || 1;
-    var row = null;
+    var row = null, full = null, variance = null;
     (frm.doc.items || []).forEach(function (d) {
-        if (row) return;
         if (d.received_item_code !== item_code) return;
+        var room = gr3_room(frm, d);
+        if (room === null) { if (!variance) variance = d; return; }
         // prefer a line that still has room, so repeat scans roll onto the
         // next line of the same item rather than over-filling the first
-        if (flt(d.received_qty) < flt(d.expected_qty) || !flt(d.expected_qty)) row = d;
+        if (room > 0) { if (!row) row = d; }
+        else if (!full) full = d;
     });
-    if (!row) {
-        (frm.doc.items || []).forEach(function (d) {
-            if (!row && d.received_item_code === item_code) row = d;
-        });
+    // the confirmation is the ceiling: a line that is already at its expected
+    // qty takes no more, and nothing is added for it
+    if (!row && full) {
+        gr3_scan_feedback(frm, false, label + '  ' + flt(full.expected_qty) + ' / '
+            + flt(full.expected_qty) + '  \u2014 already at the expected qty, not counted');
+        return;
     }
+    if (row) {
+        var room = gr3_room(frm, row);
+        if (step > room) {
+            gr3_scan_feedback(frm, false, label + '  only ' + room + ' more expected, scanned '
+                + step + ' \u2014 not counted. Recount and scan the right qty.');
+            return;
+        }
+    }
+    if (!row) row = variance;
     var added = false;
     if (!row) {
         row = frm.add_child('items');
@@ -140,11 +170,9 @@ function gr3_apply_scan(frm, item_code, label, qty_override) {
     frm.refresh_field('items');
     frm.dirty();
 
-    var over = flt(row.expected_qty) && flt(row.received_qty) > flt(row.expected_qty);
     var txt = label + '  ' + flt(row.received_qty)
         + (flt(row.expected_qty) ? ' / ' + flt(row.expected_qty) : '');
     if (added) gr3_scan_feedback(frm, true, txt + '  (not on the order - added as a variance line)');
-    else if (over) gr3_scan_feedback(frm, true, txt + '  \u2014 OVER');
     else gr3_scan_feedback(frm, true, txt);
 }
 
@@ -192,7 +220,8 @@ function gr3_fetch_lines(frm) {
     if (filled.length) return;
     frappe.call({
         method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_prefill_preview',
-        args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '' },
+        args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '',
+                soc: frm.doc.supplier_order_confirmation_v3 || '' },
         callback: function (r) {
             var m = (r.message || {});
             frm.clear_table('items');
@@ -226,6 +255,17 @@ frappe.ui.form.on('Purchase Receipt V3', {
         gr3_load_scan_map(frm);
         gr3_fetch_lines(frm);
     },
+    // a different confirmation expects different lines: re-pull them while
+    // nothing has been counted yet
+    supplier_order_confirmation_v3: function (frm) {
+        gr3_load_scan_map(frm);
+        var counted = (frm.doc.items || []).some(function (d) { return flt(d.received_qty); });
+        if (frm.doc.docstatus === 0 && !counted) {
+            frm.clear_table('items');
+            frm.refresh_field('items');
+            gr3_fetch_lines(frm);
+        }
+    },
     refresh: function(frm) {
         // Print the native twin with Purchase Receipt's own print formats, as
         // PO3 does with its native PO, so every PR format works here without a
@@ -252,6 +292,11 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 + __('Draft Purchase Receipt {0} is out of date.', [frm.doc.erp_purchase_receipt || ''])
                 + '</b> ' + frappe.utils.escape_html(frm.doc.post_error) + '</span>');
         }
+        frm.set_query('supplier_order_confirmation_v3', function () {
+            var f = { docstatus: 1 };
+            if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
+            return { filters: f };
+        });
         frm.set_query('inbound_shipment_v3', function () {
             var f = { workflow_state: ['in', ['In Transit', 'Received']] };
             if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
