@@ -1,4 +1,4 @@
-"""Copy every GearStock item's images from Camo (or Gorilla) into S3 and push them to GearStock.
+"""Copy every GearStock item's images from Camo into S3 and push them to GearStock.
 
 Runs over the templates and standalone items in gearstock_items.json, the same catalogue
 upsert_items_v3 loads (variants share their template's record). Items not in ERPNext are skipped
@@ -8,18 +8,18 @@ and listed in the report. For each one:
      S3 Product Image Meta Data record (added or replaced, never removed).
      In the same save, Website - GearStock is added to every image on the record and the push
      is on, which fires the S3 Product Image Meta Data webhook. One save per item.
-  2. Only when Camo gave no images is Gorilla tried, the same way. No other website is read.
-  3. When neither had images, the item is skipped and written to the log and the report.
+  2. Only Camo is read. When it has no images, the item is skipped and written to the log and
+     the report.
 An item whose record would come out the same is not saved, so a re-run pushes nothing.
 
 It is not in patches.txt: upsert_items_v3 queues it as its last step, so the first batch lands in
-the long queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
+the default queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
 Run first, it would push images for products GearStock does not have yet, under SKUs that are
 about to be renamed. Items go in batches of 1000, like upsert_items_v3, each batch its own job that queues
-the next one, so no job runs long enough to time out. There is a 1 second wait after every
-website call so the websites are not flooded. While it runs, the S3 Product Image Meta Data
-webhooks are on the long queue, and they are put back when the last batch is done (see
-webhook_queue.py).
+the next one, so no job runs long enough to time out. There is a SITE_DELAY wait after every
+website call so the websites are not flooded. Everything runs on the default queue, the
+batches and the S3 Product Image Meta Data webhooks they fire. If an earlier run left those
+webhooks on the long queue, they are put back first (see webhook_queue.py).
 
 Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log). When the job finishes,
 gearstock_images_report.csv is written next to gearstock_items.json, listing every item that
@@ -50,14 +50,12 @@ GEARSTOCK = "Website - GearStock"
 # so the Lead Source is named here rather than looked up from the price list.
 IMAGE_SOURCES = (
 	("RET - Camo", "Website - Camo"),
-	("RET - Gorilla", "Website - Gorilla"),
 )
 BATCH_SIZE = 1000
 BATCH_TIMEOUT = 6 * 60 * 60  # seconds; one batch of 1000 runs about 1-2 hours
 SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
-WEBHOOK_DOCTYPES = ("S3 Product Image Meta Data",)
 
 
 def start():
@@ -75,7 +73,7 @@ def enqueue_batch(start, counts=None):
 	comes near a timeout and a stopped run picks up from the batch it was on."""
 	frappe.enqueue(
 		"metactical.patches.gearstock.push_images.run",
-		queue="long",
+		queue="default",
 		timeout=BATCH_TIMEOUT,
 		job_id=f"{JOB_ID}_{start}",
 		deduplicate=True,
@@ -99,8 +97,8 @@ def run(start=0, counts=None, chain=True):
 		logger.error(f"GearStock images: Lead Source not found: {', '.join(missing)}")
 		return
 
-	# Off the default queue until the last batch is done. Repeating it per batch costs one query.
-	webhook_queue.move_to_long(WEBHOOK_DOCTYPES, JOB_ID)
+	# Webhooks stay on their own queue (default). Only undo a long-queue move an earlier run left.
+	webhook_queue.restore(JOB_ID)
 	frappe.db.commit()
 
 	items, not_in_erp = get_items()
@@ -128,7 +126,7 @@ def run(start=0, counts=None, chain=True):
 		if status not in ("pushed", "already_synced"):
 			report.append({"item_code": item_code, "status": status, "image_source": source or ""})
 		if status == "no_images":
-			logger.warning(f"GearStock images: {item_code} skipped, no images on Camo or Gorilla")
+			logger.warning(f"GearStock images: {item_code} skipped, no images on Camo")
 
 		logger.info(
 			f"GearStock images: {index + 1}/{len(items)} {item_code} {status}"

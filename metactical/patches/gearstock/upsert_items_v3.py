@@ -14,9 +14,9 @@ the JSON file. Nothing that already exists is overwritten. Progress goes to the 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
 in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. It goes in
 batches of 1000, committing and logging progress after each. The webhooks are background jobs, so
-how fast they reach the websites is set by the workers, not by this loop. For the run, the Item
-and Item Price webhooks are moved to the long queue so they do not hold up the default queue;
-they are put back when it finishes (see webhook_queue.py).
+how fast they reach the websites is set by the workers, not by this loop. Everything runs on the
+default queue: the job itself and the webhooks it fires. If an earlier run left the webhooks on
+the long queue, they are put back first (see webhook_queue.py).
 
 When it finishes it queues push_images (pass queue_images=False to skip that).
 
@@ -40,7 +40,6 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"
-WEBHOOK_DOCTYPES = ("Item Price")
 
 # DEV ONLY - remove before prod: only the first DEV_TEMPLATES templates that have both a GearStock
 # and a Camo slug (so push_images has a Camo page to load their images from), with all their
@@ -77,7 +76,7 @@ def execute():
 
 	frappe.enqueue(
 		"metactical.patches.gearstock.upsert_items_v3.run",
-		queue="long",
+		queue="default",
 		timeout=24 * 60 * 60,
 		job_id=JOB_ID,
 		deduplicate=True,
@@ -90,8 +89,8 @@ def run(start=0, queue_images=True):
 
 	rows = load_rows()
 
-	# Off the default queue for the run, so its webhook jobs do not hold up everything else.
-	webhook_queue.move_to_long(WEBHOOK_DOCTYPES, JOB_ID)
+	# Webhooks stay on their own queue (default). Only undo a long-queue move an earlier run left.
+	webhook_queue.restore(JOB_ID)
 	frappe.db.commit()
 
 	counts = frappe._dict(
@@ -107,7 +106,6 @@ def run(start=0, queue_images=True):
 		logger.info(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
 		time.sleep(10)
 	write_missing(missing)
-	webhook_queue.restore(JOB_ID)
 
 	if queue_images:
 		# Queued now, not from patches.txt, so it lands behind every webhook and S3 rename job this
