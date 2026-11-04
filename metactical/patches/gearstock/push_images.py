@@ -58,6 +58,7 @@ BATCH_TIMEOUT = 6 * 60 * 60  # seconds; one batch of 1000 runs about 1-2 hours
 SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
+COUNT_KEYS = ("pushed", "already_synced", "no_images", "busy", "failed", "not_in_erp")
 
 
 def start():
@@ -104,7 +105,7 @@ def run(start=0, counts=None, chain=True):
 	frappe.db.commit()
 
 	items, not_in_erp = get_items()
-	counts = frappe._dict(pushed=0, already_synced=0, no_images=0, busy=0, failed=0, not_in_erp=0, **(counts or {}))
+	counts = frappe._dict({**dict.fromkeys(COUNT_KEYS, 0), **(counts or {})})
 	report = []
 
 	if start == 0:
