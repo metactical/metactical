@@ -1,0 +1,22 @@
+{% extends "templates/web.html" %}
+{% block title %}QuickBooks Authorization{% endblock %}
+{% block page_content %}
+<div class="container mt-5" style="max-width:500px">
+  {% if status == "success" %}
+  <div class="alert alert-success" role="alert">
+    <h4 class="alert-heading">{{ _("Connected") }}</h4>
+    <p>{{ message }}</p>
+  </div>
+  <script>
+    if (window.opener) {
+      window.close();
+    }
+  </script>
+  {% else %}
+  <div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">{{ _("Authorization Failed") }}</h4>
+    <p>{{ message }}</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

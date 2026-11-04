@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "po3_item",
+  "soc3_item",
   "expected_item_code",
   "expected_qty",
   "received_item_code",
@@ -22,6 +23,10 @@
   "cb_split",
   "variance_type",
   "variance_qty",
+  "rate",
+  "amount",
+  "net_rate",
+  "net_amount",
   "overage_billed",
   "photo",
   "remarks"
@@ -33,6 +38,14 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "PO3 Line"
+  },
+  {
+   "description": "The Supplier Order Confirmation V3 line this row is counted against: what the supplier said they would send.",
+   "fieldname": "soc3_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "SOC3 Line",
+   "read_only": 1
   },
   {
    "columns": 2,
@@ -111,12 +124,11 @@
    "read_only": 1
   },
   {
+   "description": "Required on a Short line when counting finishes. Other needs the reason written in Remarks.",
    "fieldname": "reject_reason",
    "fieldtype": "Select",
    "label": "Reject Reason",
-   "options": "\nShort Shipped\nDamaged\nDefective\nExpired\nWrong Labelling\nOther",
-   "description": "Required when the line is Short. Other needs the reason written in Remarks.",
-   "mandatory_depends_on": "eval:!in_list(['Draft', 'Counting'], parent.workflow_state) && doc.variance_type == 'Short'"
+   "options": "\nShort Shipped\nPartially Received\nDamaged\nDefective\nExpired\nWrong Labelling\nOther"
   },
   {
    "fieldname": "cb_split",
@@ -156,13 +168,45 @@
    "fieldtype": "Small Text",
    "label": "Remarks",
    "mandatory_depends_on": "eval:doc.reject_reason == 'Other'"
+  },
+  {
+   "description": "The rate the supplier confirmed, else the order's.",
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Rate",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "description": "Confirmed rate after the additional discount, as ERPNext works it out.",
+   "fieldname": "net_rate",
+   "fieldtype": "Currency",
+   "label": "Net Rate",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-02 12:30:00.000000",
+ "modified": "2026-11-02 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Receipt V3 Item",

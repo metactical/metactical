@@ -3,7 +3,7 @@ from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseRece
 from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff, now_datetime, cint
 from frappe import _, msgprint, is_whitelisted
 from metactical.custom_scripts.utils.metactical_utils import queue_action, post_to_rocket_chat
-from metactical.procurement_v3.utils import F, mirror_po3_status, v3_recalc_totals, v3_reconcile
+from metactical.procurement_v3.utils import F, mirror_po3_status, v3_reconcile, validate_rate_except_v3
 from frappe.model.docstatus import DocStatus
 
 class CustomPurchaseReceipt(PurchaseReceipt):
@@ -15,6 +15,12 @@ class CustomPurchaseReceipt(PurchaseReceipt):
 
 		self.validate_barcodes()
 		self.validate_accepted_warehouse_permission()
+
+	def validate_rate_with_reference_doc(self, ref_details):
+		# a Purchase Receipt V3 posts the rate the supplier confirmed, not the PO's
+		validate_rate_except_v3(self, ref_details,
+			[d for d in self.items if d.get("neb_source_doctype") == "Purchase Receipt V3"],
+			"purchase_order_item")
 
 	def validate_accepted_warehouse_permission(self):
 		# Metactical Customization: Validate that user has permission to use the accepted warehouse
@@ -108,7 +114,8 @@ def post_rc_message(doc):
 # (DocType Event / After Submit on Purchase Receipt).
 #
 # A native receipt raised outside the V3 flow (PPS, Desk, anything) still has
-# to land on the PO3 twin. Receipts that a Purchase Receipt V3 created are skipped
+# to land on the PO3 twin -- as what arrived, never as a change to the order's
+# quantities, rates or totals. Receipts that a Purchase Receipt V3 created are skipped
 # here, because GR3 already rolled itself up at Post time.
 # ---------------------------------------------------------------------------
 def v3_sync_to_po3(doc):
@@ -179,11 +186,6 @@ def v3_sync_to_po3(doc):
 		if hdr:
 			frappe.db.set_value("Purchase Order V3", po3_name, hdr)
 
-		# receiving can clear a line's short_qty, which puts its value back into
-		# the order - this path writes the lines directly, so nothing else re-adds
-		# the header up
-		v3_recalc_totals(po3_name)
-
 	mirror_po3_status(po3_name)
 
 	for po_name in po_names:
@@ -251,9 +253,6 @@ def v3_cancel_sync_to_po3(doc):
 		if touched and po3.workflow_state in ("Closed", "Closed Short", "Received"):
 			frappe.db.set_value("Purchase Order V3", po3_name,
 				{"workflow_state": "Partially Received", "receipt_status": "Partially Received"})
-
-		if touched:
-			v3_recalc_totals(po3_name)
 
 	mirror_po3_status(po3_name)
 

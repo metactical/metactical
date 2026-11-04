@@ -1272,11 +1272,12 @@ def v3_reconcile_receiving(po3=None):
 			names.append(p.name)
 
 	def v3_reconcile(po3_name):
-		soc = frappe.db.get_value("Supplier Order Confirmation V3",
-			{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
-		if soc:
+		# a PO can have several confirmations, each with its own back orders
+		socs = frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, pluck="name")
+		if socs:
 			for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-					filters={"parent": soc}, fields=["name", "po3_item", "status"]):
+					filters={"parent": ("in", socs)}, fields=["name", "po3_item", "status"]):
 				line = frappe.db.get_value("Purchase Order V3 Item", b.po3_item,
 					["received_qty", "qty"], as_dict=True)
 				if not line:

@@ -426,41 +426,32 @@ frappe.ui.form.on('Purchase Order V3', {
         var st = frm.doc.workflow_state;
         var closed = ['Closed', 'Closed Short', 'Cancelled'].indexOf(st) !== -1;
 
-        // One confirmation per PO, so its Connections tile is hidden. Look it
-        // up and surface it as a headline + a button that adapts to state.
+        // A PO can have several confirmations: list them in the headline. They
+        // are also on the Connections tab, and new ones come from Create.
         frappe.call({
             method: 'frappe.client.get_list',
             args: {
                 doctype: 'Supplier Order Confirmation V3',
                 filters: { purchase_order_v3: frm.doc.name, docstatus: ['<', 2] },
-                fields: ['name', 'workflow_state'], limit_page_length: 1
+                fields: ['name', 'workflow_state'], order_by: 'creation asc', limit_page_length: 0
             },
             callback: function(r) {
-                var soc = (r.message || [])[0];
+                var socs = r.message || [];
                 var bits = [];
                 if (frm.doc.erp_purchase_order) {
                     bits.push(__('Native PO') + ': <a href="/app/purchase-order/'
                         + frm.doc.erp_purchase_order + '">' + frm.doc.erp_purchase_order + '</a>');
                 }
-                if (soc) {
-                    bits.push(__('Confirmation') + ': <a href="/app/supplier-order-confirmation-v3/'
-                        + soc.name + '">' + soc.name + '</a> <span class="text-muted">('
-                        + __(soc.workflow_state || '') + ')</span>');
+                if (socs.length) {
+                    bits.push(__('Confirmations') + ': ' + socs.map(function(soc) {
+                        return '<a href="/app/supplier-order-confirmation-v3/' + soc.name + '">'
+                            + soc.name + '</a> <span class="text-muted">('
+                            + __(soc.workflow_state || '') + ')</span>';
+                    }).join(', '));
                 } else if (!closed) {
                     bits.push('<span class="text-muted">' + __('No supplier confirmation yet') + '</span>');
                 }
                 if (bits.length) frm.dashboard.set_headline(bits.join(' &nbsp;·&nbsp; '));
-
-                if (closed) return;
-                if (soc) {
-                    frm.add_custom_button(__('Supplier Confirmation {0}', [soc.name]), function() {
-                        frappe.set_route('Form', 'Supplier Order Confirmation V3', soc.name);
-                    });
-                } else {
-                    frm.add_custom_button(__('Create Supplier Confirmation'), function() {
-                        po3_new_linked('Supplier Order Confirmation V3', frm.doc.name);
-                    });
-                }
             }
         });
 
@@ -495,6 +486,7 @@ frappe.ui.form.on('Purchase Order V3', {
                 po3_new_linked(doctype, frm.doc.name);
             }, __('Create'));
         };
+        mk('Supplier Confirmation', 'Supplier Order Confirmation V3');
         mk('Inbound Shipment', 'Inbound Shipment V3');
         mk('Purchase Receipt 3', 'Purchase Receipt V3');
         mk('Supplier Claim', 'Supplier Claim V3');
@@ -616,9 +608,9 @@ function po3_calc_taxes(frm) {
 
 frappe.ui.form.on('Purchase Order V3', {
     setup: function(frm) {
-        // discontinued and disabled items can't be ordered (validate refuses them)
+        // discontinued and disabled items, and templates, can't be ordered (validate refuses them)
         frm.set_query('item_code', 'items', function() {
-            return { filters: { ifw_discontinued: 0, disabled: 0 } };
+            return { filters: { ifw_discontinued: 0, disabled: 0, has_variants: 0 } };
         });
         frm.set_query('supplier_address', function() {
             return {

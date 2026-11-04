@@ -1,0 +1,234 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-11-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "section_break_connection",
+  "environment",
+  "realm_id",
+  "default_company",
+  "column_break_conn",
+  "connection_status",
+  "connected_at",
+  "section_break_creds",
+  "client_id",
+  "client_secret",
+  "column_break_creds",
+  "redirect_uri",
+  "section_break_auth",
+  "connect",
+  "disconnect",
+  "column_break_auth",
+  "access_token",
+  "refresh_token",
+  "access_token_expiry",
+  "refresh_token_expiry",
+  "section_break_bank_accts",
+  "fetch_bank_accounts",
+  "column_break_bank_accts",
+  "bank_accts_last_synced",
+  "section_break_bank_txn",
+  "bank_txn_since",
+  "fetch_bank_transactions",
+  "column_break_bank_txn",
+  "bank_txn_last_synced"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "section_break_connection",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "default": "production",
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "production\nsandbox",
+   "reqd": 1
+  },
+  {
+   "description": "QuickBooks company ID. Set automatically by OAuth or paste from the API Playground.",
+   "fieldname": "realm_id",
+   "fieldtype": "Data",
+   "label": "Company / Realm ID"
+  },
+  {
+   "description": "Used when creating synced Bank Account and Bank Transaction records.",
+   "fieldname": "default_company",
+   "fieldtype": "Link",
+   "label": "Default Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_conn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "connection_status",
+   "fieldtype": "Data",
+   "label": "Connection Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "connected_at",
+   "fieldtype": "Datetime",
+   "label": "Connected At"
+  },
+  {
+   "fieldname": "section_break_creds",
+   "fieldtype": "Section Break",
+   "label": "OAuth Credentials"
+  },
+  {
+   "description": "Client ID from the Intuit Developer Portal (developer.intuit.com).",
+   "fieldname": "client_id",
+   "fieldtype": "Data",
+   "label": "Client ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Client Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_creds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Must exactly match the Redirect URI configured in the Intuit Developer Portal, e.g. https://yoursite.com/qbo-oauth-callback",
+   "fieldname": "redirect_uri",
+   "fieldtype": "Data",
+   "label": "Redirect URI",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_auth",
+   "fieldtype": "Section Break",
+   "label": "Authorization"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal && doc.client_id && doc.client_secret && doc.redirect_uri",
+   "fieldname": "connect",
+   "fieldtype": "Button",
+   "label": "Connect to QuickBooks"
+  },
+  {
+   "depends_on": "eval:doc.realm_id",
+   "fieldname": "disconnect",
+   "fieldtype": "Button",
+   "label": "Disconnect"
+  },
+  {
+   "fieldname": "column_break_auth",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Short-lived token. Set automatically by OAuth or paste from the API Playground.",
+   "fieldname": "access_token",
+   "fieldtype": "Password",
+   "label": "Access Token"
+  },
+  {
+   "description": "Long-lived token used to obtain new access tokens. Paste from the API Playground or set via OAuth.",
+   "fieldname": "refresh_token",
+   "fieldtype": "Password",
+   "label": "Refresh Token"
+  },
+  {
+   "description": "Leave blank if pasting a fresh token from the Playground; it will be set on first auto-refresh.",
+   "fieldname": "access_token_expiry",
+   "fieldtype": "Datetime",
+   "label": "Access Token Expiry"
+  },
+  {
+   "fieldname": "refresh_token_expiry",
+   "fieldtype": "Datetime",
+   "label": "Refresh Token Expiry"
+  },
+  {
+   "fieldname": "section_break_bank_accts",
+   "fieldtype": "Section Break",
+   "label": "Bank Accounts"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal && doc.realm_id && doc.access_token",
+   "fieldname": "fetch_bank_accounts",
+   "fieldtype": "Button",
+   "label": "Fetch Bank Accounts"
+  },
+  {
+   "fieldname": "column_break_bank_accts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bank_accts_last_synced",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_bank_txn",
+   "fieldtype": "Section Break",
+   "label": "Bank Transactions"
+  },
+  {
+   "description": "Only fetch transactions on or after this date. Leave blank to fetch all.",
+   "fieldname": "bank_txn_since",
+   "fieldtype": "Date",
+   "label": "Fetch Since"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal && doc.realm_id && doc.access_token",
+   "fieldname": "fetch_bank_transactions",
+   "fieldtype": "Button",
+   "label": "Fetch Bank Transactions"
+  },
+  {
+   "fieldname": "column_break_bank_txn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "bank_txn_last_synced",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "QBO Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
