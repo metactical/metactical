@@ -3,6 +3,9 @@
 The items already exist, so Item From Excel skips them and nothing reaches the website. For each
 row this adds what is missing and saves the item, which fires the Item / Item Price webhooks:
   - Template / Standalone: the RET - GearStock - USD Item Detail row carrying the slug.
+  - Template / Standalone: the RET - Camo Item Detail row with the Camo slug, item name and
+    description (camo_slug / camo_item_name / camo_description), which push_images loads the
+    images from.
   - Variant / Standalone: the RET - GearStock - USD Item Price, if there is none yet.
 Items that are not in the system are skipped and listed in gearstock_items_not_in_erp.csv, next to
 the JSON file. Nothing that already exists is overwritten. Progress goes to the "gearstock" log
@@ -17,7 +20,7 @@ they are put back when it finishes (see webhook_queue.py).
 
 When it finishes it queues push_images (pass queue_images=False to skip that).
 
-Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v2.run
+Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v3.run
 """
 
 import csv
@@ -31,6 +34,7 @@ from frappe.integrations.doctype.webhook import run_webhooks
 from metactical.patches.gearstock import webhook_queue
 
 PRICE_LIST = "RET - GearStock - USD"
+CAMO_PRICE_LIST = "RET - Camo"
 BATCH_SIZE = 100
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
@@ -38,7 +42,33 @@ MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "p
 JOB_ID = "gearstock_upsert_items"
 WEBHOOK_DOCTYPES = ("Item Price")
 
-DEV_LIMIT = 2000
+# DEV ONLY - remove before prod: only the first DEV_TEMPLATES templates that have both a GearStock
+# and a Camo slug (so push_images has a Camo page to load their images from), with all their
+# variants. Set to None (or 0) to run the whole catalogue.
+DEV_TEMPLATES = 1500
+
+
+def load_rows():
+	"""The catalogue rows to run: all of them, or in dev the first DEV_TEMPLATES templates (in
+	file order) with both slugs, and every variant that belongs to them. Shared with push_images."""
+	with open(DATA_FILE) as f:
+		rows = json.load(f)
+	if not DEV_TEMPLATES:
+		return rows
+
+	templates = []
+	for row in rows:
+		if (
+			row.get("item_type") == "Template"
+			and row.get("slug")
+			and row.get("camo_slug")
+			and row["item_code"] not in templates
+		):
+			templates.append(row["item_code"])
+			if len(templates) == DEV_TEMPLATES:
+				break
+	keep = set(templates)
+	return [row for row in rows if row.get("template") in keep]
 
 
 def execute():
@@ -46,7 +76,7 @@ def execute():
 		return
 
 	frappe.enqueue(
-		"metactical.patches.gearstock.upsert_items_v2.run",
+		"metactical.patches.gearstock.upsert_items_v3.run",
 		queue="long",
 		timeout=24 * 60 * 60,
 		job_id=JOB_ID,
@@ -58,14 +88,15 @@ def execute():
 def run(start=0, queue_images=True):
 	logger = frappe.logger("gearstock", allow_site=True)
 
-	with open(DATA_FILE) as f:
-		rows = json.load(f)[:DEV_LIMIT]
+	rows = load_rows()
 
 	# Off the default queue for the run, so its webhook jobs do not hold up everything else.
 	webhook_queue.move_to_long(WEBHOOK_DOCTYPES, JOB_ID)
 	frappe.db.commit()
 
-	counts = frappe._dict(saved=0, missing=0, price_created=0, slug_added=0, fields_updated=0, failed=0)
+	counts = frappe._dict(
+		saved=0, missing=0, price_created=0, slug_added=0, camo_added=0, fields_updated=0, failed=0
+	)
 	missing, failed = [], []
 	logger.info(f"GearStock upsert: starting at {start} of {len(rows)} row(s)")
 
@@ -114,8 +145,19 @@ def upsert_item(row, counts, missing, failed):
 	try:
 		item = frappe.get_doc("Item", item_code)
 
-		if row.get("slug") and add_item_detail(item, row["slug"], row.get("item_name")):
-			counts.slug_added += 1
+		if row.get("slug"):
+			if add_item_detail(
+				item,
+				row["slug"],
+				row.get("item_name") or row.get("camo_item_name"),
+				row.get("camo_description"),
+			):
+				counts.slug_added += 1
+
+			# Alongside the GearStock row: the Camo row is what the load from SB (push_images)
+			# reads to fetch the images and details from the Camo website.
+			if row.get("camo_slug") and add_camo_detail(item, row):
+				counts.camo_added += 1
 
 		if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
 			counts.price_created += 1
@@ -168,10 +210,12 @@ def add_website_deduct_qty(item):
 	return True
 
 
-def add_item_detail(item, slug, item_name=None):
-	"""Add the GearStock row with its slug and item name. On an existing row, fill the slug if it
-	is blank, and set the item name whenever it differs from the catalogue, even if the slug is
-	already set. Returns True when something changed."""
+def add_item_detail(item, slug, item_name=None, description=None):
+	"""Add the GearStock row with its slug, item name and description. On an existing row, fill
+	the slug if it is blank, set the item name whenever it differs from the catalogue (even if the
+	slug is already set), and fill the description only if it is blank. The caller passes the Camo
+	name when the catalogue has none, and the Camo description. Returns True when something
+	changed."""
 	for detail in item.get("item_detail") or []:
 		if detail.price_list == PRICE_LIST:
 			changed = False
@@ -181,9 +225,37 @@ def add_item_detail(item, slug, item_name=None):
 			if item_name and detail.item_name != item_name:
 				detail.item_name = item_name
 				changed = True
+			if description and not detail.description:
+				detail.description = description
+				changed = True
 			return changed
 
-	item.append("item_detail", {"price_list": PRICE_LIST, "slug": slug, "item_name": item_name})
+	item.append(
+		"item_detail",
+		{"price_list": PRICE_LIST, "slug": slug, "item_name": item_name, "description": description},
+	)
+	return True
+
+
+def add_camo_detail(item, row):
+	"""Add the RET - Camo row with the Camo slug, item name and description. On an existing row,
+	only blank fields are filled: what is already on the item is not overwritten. Returns True
+	when something changed."""
+	values = {
+		"slug": row.get("camo_slug"),
+		"item_name": row.get("camo_item_name"),
+		"description": row.get("camo_description"),
+	}
+	for detail in item.get("item_detail") or []:
+		if detail.price_list == CAMO_PRICE_LIST:
+			changed = False
+			for field, value in values.items():
+				if value and not detail.get(field):
+					detail.set(field, value)
+					changed = True
+			return changed
+
+	item.append("item_detail", {"price_list": CAMO_PRICE_LIST, **values})
 	return True
 
 
