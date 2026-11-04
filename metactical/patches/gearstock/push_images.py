@@ -1,29 +1,31 @@
-"""Copy every GearStock item's images from Camo (or Gorilla) into S3 and push them to GearStock.
+"""Copy every GearStock item's images from Camo into S3 and push them to GearStock.
 
 Runs over the templates and standalone items in gearstock_items.json, the same catalogue
-upsert_items_v2 loads (variants share their template's record). Items not in ERPNext are skipped
+upsert_items_v3 loads (variants share their template's record). Items not in ERPNext are skipped
 and listed in the report. For each one:
   1. Its images are loaded from Camo, the same way Load Data From SB does it: files the S3
      bucket does not have yet are copied in, and the images are merged into the item's existing
      S3 Product Image Meta Data record (added or replaced, never removed).
      In the same save, Website - GearStock is added to every image on the record and the push
      is on, which fires the S3 Product Image Meta Data webhook. One save per item.
-  2. Only when Camo gave no images is Gorilla tried, the same way. No other website is read.
-  3. When neither had images, the item is skipped and written to the log and the report.
+  2. Only Camo is read. When it has no images, the item is skipped and written to the log and
+     the report.
 An item whose record would come out the same is not saved, so a re-run pushes nothing.
 
-It is not in patches.txt: upsert_items_v2 queues it as its last step, so the first batch lands in
-the long queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
+It is not in patches.txt: upsert_items_v3 queues it as its last step, so the first batch lands in
+the default queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
 Run first, it would push images for products GearStock does not have yet, under SKUs that are
-about to be renamed. Items go in batches of 1000, like upsert_items_v2, each batch its own job that queues
-the next one, so no job runs long enough to time out. There is a 1 second wait after every
-website call so the websites are not flooded. While it runs, the S3 Product Image Meta Data
-webhooks are on the long queue, and they are put back when the last batch is done (see
-webhook_queue.py).
+about to be renamed. Items go in batches of 1000, like upsert_items_v3, each batch its own job that queues
+the next one, so no job runs long enough to time out. There is a SITE_DELAY wait after every
+website call so the websites are not flooded. Everything runs on the default queue, the
+batches and the S3 Product Image Meta Data webhooks they fire. If an earlier run left those
+webhooks on the long queue, they are put back first (see webhook_queue.py).
 
 Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log). When the job finishes,
 gearstock_images_report.csv is written next to gearstock_items.json, listing every item that
 did not reach GearStock and why.
+
+When the last batch is done it queues add_deduct_qty, which sends the inventory.
 
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.push_images.run
 To pick up a stopped run, pass the batch start from the log, e.g. --kwargs "{'start': 3000}".
@@ -50,18 +52,16 @@ GEARSTOCK = "Website - GearStock"
 # so the Lead Source is named here rather than looked up from the price list.
 IMAGE_SOURCES = (
 	("RET - Camo", "Website - Camo"),
-	("RET - Gorilla", "Website - Gorilla"),
 )
 BATCH_SIZE = 1000
 BATCH_TIMEOUT = 6 * 60 * 60  # seconds; one batch of 1000 runs about 1-2 hours
 SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
-WEBHOOK_DOCTYPES = ("S3 Product Image Meta Data",)
 
 
 def start():
-	"""Queue the first batch. Called by upsert_items_v2 when it is done, not from patches.txt."""
+	"""Queue the first batch. Called by upsert_items_v3 when it is done, not from patches.txt."""
 	if missing_lead_sources():
 		frappe.logger("gearstock", allow_site=True).error(
 			"GearStock images: not queued, a Lead Source is missing: " + ", ".join(missing_lead_sources())
@@ -75,7 +75,7 @@ def enqueue_batch(start, counts=None):
 	comes near a timeout and a stopped run picks up from the batch it was on."""
 	frappe.enqueue(
 		"metactical.patches.gearstock.push_images.run",
-		queue="long",
+		queue="default",
 		timeout=BATCH_TIMEOUT,
 		job_id=f"{JOB_ID}_{start}",
 		deduplicate=True,
@@ -99,8 +99,8 @@ def run(start=0, counts=None, chain=True):
 		logger.error(f"GearStock images: Lead Source not found: {', '.join(missing)}")
 		return
 
-	# Off the default queue until the last batch is done. Repeating it per batch costs one query.
-	webhook_queue.move_to_long(WEBHOOK_DOCTYPES, JOB_ID)
+	# Webhooks stay on their own queue (default). Only undo a long-queue move an earlier run left.
+	webhook_queue.restore(JOB_ID)
 	frappe.db.commit()
 
 	items, not_in_erp = get_items()
@@ -128,7 +128,7 @@ def run(start=0, counts=None, chain=True):
 		if status not in ("pushed", "already_synced"):
 			report.append({"item_code": item_code, "status": status, "image_source": source or ""})
 		if status == "no_images":
-			logger.warning(f"GearStock images: {item_code} skipped, no images on Camo or Gorilla")
+			logger.warning(f"GearStock images: {item_code} skipped, no images on Camo")
 
 		logger.info(
 			f"GearStock images: {index + 1}/{len(items)} {item_code} {status}"
@@ -145,6 +145,10 @@ def run(start=0, counts=None, chain=True):
 		return
 
 	webhook_queue.restore(JOB_ID)
+	# Last step of the run: adding the deduct qty row is what sends inventory to the website.
+	from metactical.patches.gearstock import add_deduct_qty
+
+	add_deduct_qty.start()
 	frappe.db.commit()
 	logger.info(f"GearStock images finished: {dict(counts)}, report at {REPORT_FILE}")
 	frappe.log_error(
@@ -158,10 +162,9 @@ def get_items():
 
 	A variant row stands for its template, since variants share their template's image record.
 	"""
-	from metactical.patches.gearstock.upsert_items_v2 import DEV_LIMIT
+	from metactical.patches.gearstock.upsert_items_v3 import load_rows
 
-	with open(DATA_FILE) as f:
-		rows = json.load(f)[:DEV_LIMIT]
+	rows = load_rows()
 
 	codes = sorted({row.get("template") or row["item_code"] for row in rows})
 	existing = set(frappe.get_all("Item", filters={"name": ["in", codes]}, pluck="name")) if codes else set()
