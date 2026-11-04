@@ -7,3 +7,4 @@ zeep
 PyMuPDF
 PyPDF2
 boto3
+pytz>=2026.6
