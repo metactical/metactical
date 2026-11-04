@@ -33,35 +33,41 @@ frappe.ui.form.on("QBO Settings", {
 	},
 
 	fetch_bank_accounts(frm) {
-		frm.save().then(() => {
-			frappe.call({
-				method: "metactical.metactical.doctype.qbo_settings.qbo_settings.fetch_bank_accounts",
-				freeze: true,
-				freeze_message: __("Fetching bank accounts from QuickBooks..."),
-				callback(r) {
-					if (!r.exc) {
-						frappe.show_alert({ message: r.message, indicator: "green" });
-						frm.reload_doc();
-					}
-				},
-			});
+		const doFetch = () => frappe.call({
+			method: "metactical.metactical.doctype.qbo_settings.qbo_settings.fetch_bank_accounts",
+			freeze: true,
+			freeze_message: __("Fetching bank accounts from QuickBooks..."),
+			callback(r) {
+				if (!r.exc) {
+					frappe.show_alert({ message: r.message, indicator: "green" });
+					frm.reload_doc();
+				}
+			},
 		});
+		if (frm.is_dirty()) {
+			frm.save().then(doFetch);
+		} else {
+			doFetch();
+		}
 	},
 
 	fetch_bank_transactions(frm) {
-		frm.save().then(() => {
-			frappe.call({
-				method: "metactical.metactical.doctype.qbo_settings.qbo_settings.fetch_bank_transactions",
-				freeze: true,
-				freeze_message: __("Fetching bank transactions from QuickBooks..."),
-				callback(r) {
-					if (!r.exc) {
-						frappe.show_alert({ message: r.message, indicator: "green" });
-						frm.reload_doc();
-					}
-				},
-			});
+		const doFetch = () => frappe.call({
+			method: "metactical.metactical.doctype.qbo_settings.qbo_settings.fetch_bank_transactions",
+			freeze: true,
+			freeze_message: __("Fetching bank transactions from QuickBooks..."),
+			callback(r) {
+				if (!r.exc) {
+					frappe.show_alert({ message: r.message, indicator: "green" });
+					frm.reload_doc();
+				}
+			},
 		});
+		if (frm.is_dirty()) {
+			frm.save().then(doFetch);
+		} else {
+			doFetch();
+		}
 	},
 
 	disconnect(frm) {
