@@ -23,7 +23,7 @@ When it finishes it queues push_images (pass queue_images=False to skip that). W
 is not touched here: add_deduct_qty does it after the images, because changing that table is what
 queues the inventory update.
 
-Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v4.run
+Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v5.run
 """
 
 import csv
@@ -80,7 +80,7 @@ def execute():
 		return
 
 	frappe.enqueue(
-		"metactical.patches.gearstock.upsert_items_v4.run",
+		"metactical.patches.gearstock.upsert_items_v5.run",
 		queue="default",
 		timeout=24 * 60 * 60,
 		job_id=JOB_ID,
