@@ -18,7 +18,9 @@ how fast they reach the websites is set by the workers, not by this loop. Everyt
 default queue: the job itself and the webhooks it fires. If an earlier run left the webhooks on
 the long queue, they are put back first (see webhook_queue.py).
 
-When it finishes it queues push_images (pass queue_images=False to skip that).
+When it finishes it queues push_images (pass queue_images=False to skip that). Website Deduct Qty
+is not touched here: add_deduct_qty does it after the images, because changing that table is what
+queues the inventory update.
 
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v3.run
 """
@@ -163,8 +165,6 @@ def upsert_item(row, counts, missing, failed):
 		if update_item_fields(item, row):
 			counts.fields_updated += 1
 
-		add_website_deduct_qty(item)
-
 		# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
 		# and supplier rows onto every variant.
 		item.flags.dont_update_variants = True
@@ -196,21 +196,6 @@ def update_item_fields(item, row):
 			item.set(field, value)
 			changed = True
 	return changed
-
-
-def add_website_deduct_qty(item):
-	"""Add the Website - GearStock row to Website Deduct Qty with qty 0, if it is not there yet."""
-
-	if item.get("custom_neb_website_deduct_qty"):
-		item.custom_neb_website_deduct_qty = []
-		return True
-
-	for row in item.get("custom_neb_website_deduct_qty") or []:
-		if row.lead_source == "Website - GearStock":
-			return False
-
-	item.append("custom_neb_website_deduct_qty", {"lead_source": "Website - GearStock", "qty": 0})
-	return True
 
 
 def add_item_detail(item, slug, item_name=None, description=None):

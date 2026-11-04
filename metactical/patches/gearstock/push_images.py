@@ -25,6 +25,8 @@ Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log). When the
 gearstock_images_report.csv is written next to gearstock_items.json, listing every item that
 did not reach GearStock and why.
 
+When the last batch is done it queues add_deduct_qty, which sends the inventory.
+
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.push_images.run
 To pick up a stopped run, pass the batch start from the log, e.g. --kwargs "{'start': 3000}".
 """
@@ -143,6 +145,10 @@ def run(start=0, counts=None, chain=True):
 		return
 
 	webhook_queue.restore(JOB_ID)
+	# Last step of the run: adding the deduct qty row is what sends inventory to the website.
+	from metactical.patches.gearstock import add_deduct_qty
+
+	add_deduct_qty.start()
 	frappe.db.commit()
 	logger.info(f"GearStock images finished: {dict(counts)}, report at {REPORT_FILE}")
 	frappe.log_error(
