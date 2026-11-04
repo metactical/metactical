@@ -1,7 +1,7 @@
 """Copy every GearStock item's images from Camo into S3 and push them to GearStock.
 
 Runs over the templates and standalone items in gearstock_items.json, the same catalogue
-upsert_items_v3 loads (variants share their template's record). Items not in ERPNext are skipped
+upsert_items_v4 loads (variants share their template's record). Items not in ERPNext are skipped
 and listed in the report. For each one:
   1. Its images are loaded from Camo, the same way Load Data From SB does it: files the S3
      bucket does not have yet are copied in, and the images are merged into the item's existing
@@ -12,10 +12,10 @@ and listed in the report. For each one:
      the report.
 An item whose record would come out the same is not saved, so a re-run pushes nothing.
 
-It is not in patches.txt: upsert_items_v3 queues it as its last step, so the first batch lands in
+It is not in patches.txt: upsert_items_v4 queues it as its last step, so the first batch lands in
 the default queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
 Run first, it would push images for products GearStock does not have yet, under SKUs that are
-about to be renamed. Items go in batches of 1000, like upsert_items_v3, each batch its own job that queues
+about to be renamed. Items go in batches of 1000, like upsert_items_v4, each batch its own job that queues
 the next one, so no job runs long enough to time out. There is a SITE_DELAY wait after every
 website call so the websites are not flooded. Everything runs on the default queue, the
 batches and the S3 Product Image Meta Data webhooks they fire. If an earlier run left those
@@ -61,7 +61,7 @@ JOB_ID = "gearstock_push_images"
 
 
 def start():
-	"""Queue the first batch. Called by upsert_items_v3 when it is done, not from patches.txt."""
+	"""Queue the first batch. Called by upsert_items_v4 when it is done, not from patches.txt."""
 	if missing_lead_sources():
 		frappe.logger("gearstock", allow_site=True).error(
 			"GearStock images: not queued, a Lead Source is missing: " + ", ".join(missing_lead_sources())
@@ -162,7 +162,7 @@ def get_items():
 
 	A variant row stands for its template, since variants share their template's image record.
 	"""
-	from metactical.patches.gearstock.upsert_items_v3 import load_rows
+	from metactical.patches.gearstock.upsert_items_v4 import load_rows
 
 	rows = load_rows()
 

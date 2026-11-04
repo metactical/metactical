@@ -9,7 +9,7 @@ upsert saves them first, then push_images sends the images, and the last image b
 
 Each save also fires the Item webhook again, so each product is sent a second time.
 
-It covers the same catalogue rows as upsert_items_v3. Items not in ERPNext are skipped; the upsert
+It covers the same catalogue rows as upsert_items_v4. Items not in ERPNext are skipped; the upsert
 already lists them. Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log).
 
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.add_deduct_qty.run
@@ -22,7 +22,7 @@ import time
 import frappe
 
 from metactical.patches.gearstock import db_retry
-from metactical.patches.gearstock.upsert_items_v3 import load_rows
+from metactical.patches.gearstock.upsert_items_v4 import load_rows
 
 BATCH_SIZE = 100
 JOB_ID = "gearstock_add_deduct_qty"
