@@ -12,7 +12,8 @@ the JSON file. Nothing that already exists is overwritten. Progress goes to the 
 (sites/<site>/logs/gearstock.log).
 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
-in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. It goes in
+in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. The job
+waits for the migrate to finish before it starts. It goes in
 batches of 1000, committing and logging progress after each. The webhooks are background jobs, so
 how fast they reach the websites is set by the workers, not by this loop. Everything runs on the
 default queue: the job itself and the webhooks it fires. If an earlier run left the webhooks on
@@ -22,7 +23,7 @@ When it finishes it queues push_images (pass queue_images=False to skip that). W
 is not touched here: add_deduct_qty does it after the images, because changing that table is what
 queues the inventory update.
 
-Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v3.run
+Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v4.run
 """
 
 import csv
@@ -32,8 +33,9 @@ import time
 
 import frappe
 from frappe.integrations.doctype.webhook import run_webhooks
+from frappe.utils.synchronization import filelock
 
-from metactical.patches.gearstock import webhook_queue
+from metactical.patches.gearstock import db_retry, webhook_queue
 
 PRICE_LIST = "RET - GearStock - USD"
 CAMO_PRICE_LIST = "RET - Camo"
@@ -42,6 +44,7 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"
+MIGRATE_WAIT = 60 * 60  # seconds
 
 # DEV ONLY - remove before prod: only the first DEV_TEMPLATES templates that have both a GearStock
 # and a Camo slug (so push_images has a Camo page to load their images from), with all their
@@ -77,7 +80,7 @@ def execute():
 		return
 
 	frappe.enqueue(
-		"metactical.patches.gearstock.upsert_items_v3.run",
+		"metactical.patches.gearstock.upsert_items_v4.run",
 		queue="default",
 		timeout=24 * 60 * 60,
 		job_id=JOB_ID,
@@ -86,8 +89,18 @@ def execute():
 	)
 
 
+def wait_for_migrate():
+	"""Wait until the migrate that queued this job has finished. Migrate holds this lock from start
+	to end. Saving items while it alters tabItem deadlocks, because the save reads the table and
+	then asks for a row lock while the ALTER waits for the read to finish."""
+	with filelock("bench_migrate", timeout=MIGRATE_WAIT):
+		pass
+
+
 def run(start=0, queue_images=True):
 	logger = frappe.logger("gearstock", allow_site=True)
+
+	wait_for_migrate()
 
 	rows = load_rows()
 
@@ -141,41 +154,47 @@ def upsert_item(row, counts, missing, failed):
 		missing.append(row)
 		return
 
-	frappe.db.savepoint("gearstock_upsert")
 	try:
-		item = frappe.get_doc("Item", item_code)
-
-		if row.get("slug"):
-			if add_item_detail(
-				item,
-				row["slug"],
-				row.get("item_name") or row.get("camo_item_name"),
-				row.get("camo_description"),
-			):
-				counts.slug_added += 1
-
-			# Alongside the GearStock row: the Camo row is what the load from SB (push_images)
-			# reads to fetch the images and details from the Camo website.
-			if row.get("camo_slug") and add_camo_detail(item, row):
-				counts.camo_added += 1
-
-		if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
-			counts.price_created += 1
-
-		if update_item_fields(item, row):
-			counts.fields_updated += 1
-
-		# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
-		# and supplier rows onto every variant.
-		item.flags.dont_update_variants = True
-		item.save()
-		counts.saved += 1
-		frappe.db.commit()
+		for key in db_retry.run(lambda: save_row(row)):
+			counts[key] += 1
 	except Exception:
-		frappe.db.rollback(save_point="gearstock_upsert")
+		db_retry.rollback_item()
 		counts.failed += 1
 		failed.append(item_code)
 		frappe.log_error(title=f"GearStock item upsert failed: {item_code}", message=frappe.get_traceback())
+
+
+def save_row(row):
+	"""Apply one catalogue row and commit. Returns the counts to add, once the item is saved."""
+	changes = ["saved"]
+	item = frappe.get_doc("Item", row["item_code"])
+
+	if row.get("slug"):
+		if add_item_detail(
+			item,
+			row["slug"],
+			row.get("item_name") or row.get("camo_item_name"),
+			row.get("camo_description"),
+		):
+			changes.append("slug_added")
+
+		# Alongside the GearStock row: the Camo row is what the load from SB (push_images)
+		# reads to fetch the images and details from the Camo website.
+		if row.get("camo_slug") and add_camo_detail(item, row):
+			changes.append("camo_added")
+
+	if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
+		changes.append("price_created")
+
+	if update_item_fields(item, row):
+		changes.append("fields_updated")
+
+	# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
+	# and supplier rows onto every variant.
+	item.flags.dont_update_variants = True
+	item.save()
+	frappe.db.commit()
+	return changes
 
 
 # catalogue column -> Item field. The retail SKU lives in ifw_retailskusuffix; Item has no
