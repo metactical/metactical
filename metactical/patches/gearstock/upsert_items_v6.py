@@ -23,7 +23,7 @@ When it finishes it queues push_images (pass queue_images=False to skip that). W
 is not touched here: add_deduct_qty does it after the images, because changing that table is what
 queues the inventory update.
 
-Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v5.run
+Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items_v6.run
 """
 
 import csv
@@ -46,33 +46,11 @@ MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "p
 JOB_ID = "gearstock_upsert_items"
 MIGRATE_WAIT = 60 * 60  # seconds
 
-# DEV ONLY - remove before prod: only the first DEV_TEMPLATES templates that have both a GearStock
-# and a Camo slug (so push_images has a Camo page to load their images from), with all their
-# variants. Set to None (or 0) to run the whole catalogue.
-DEV_TEMPLATES = 1500
-
 
 def load_rows():
-	"""The catalogue rows to run: all of them, or in dev the first DEV_TEMPLATES templates (in
-	file order) with both slugs, and every variant that belongs to them. Shared with push_images."""
+	"""All the catalogue rows. Shared with push_images and add_deduct_qty."""
 	with open(DATA_FILE) as f:
-		rows = json.load(f)
-	if not DEV_TEMPLATES:
-		return rows
-
-	templates = []
-	for row in rows:
-		if (
-			row.get("item_type") == "Template"
-			and row.get("slug")
-			and row.get("camo_slug")
-			and row["item_code"] not in templates
-		):
-			templates.append(row["item_code"])
-			if len(templates) == DEV_TEMPLATES:
-				break
-	keep = set(templates)
-	return [row for row in rows if row.get("template") in keep]
+		return json.load(f)
 
 
 def execute():
@@ -80,7 +58,7 @@ def execute():
 		return
 
 	frappe.enqueue(
-		"metactical.patches.gearstock.upsert_items_v5.run",
+		"metactical.patches.gearstock.upsert_items_v6.run",
 		queue="default",
 		timeout=24 * 60 * 60,
 		job_id=JOB_ID,
