@@ -44,7 +44,81 @@ def item_supplier_part_no(item_code, supplier=None):
 	return rows[0].supplier_part_no
 
 
-def billable_qty(qty, short_qty):
+def email_list(value):
+	"""A CC / BCC field's addresses as a list. The fields hold them comma-separated
+	(the form shows each as a pill); older values may use ; or new lines."""
+	import re
+	return [e for e in (x.strip() for x in re.split(r"[,;\n]+", value or "")) if e]
+
+
+def clean_email_list(doc, fieldname):
+	"""Validate every address in a CC / BCC field and store them tidied:
+	comma-separated, duplicates dropped."""
+	from frappe.utils import validate_email_address
+
+	seen, bad = [], []
+	for e in email_list(doc.get(fieldname)):
+		if not validate_email_address(e):
+			bad.append(e)
+		elif e.lower() not in [x.lower() for x in seen]:
+			seen.append(e)
+	if bad:
+		frappe.throw("{0}: not a valid email address: <b>{1}</b>".format(
+			doc.meta.get_label(fieldname), ", ".join(bad)), frappe.InvalidEmailAddressError)
+	doc.set(fieldname, ", ".join(seen) or None)
+
+
+def require_email_signature(doc, fieldname):
+	"""A Main Signature is optional, but a user picked for it must have an Email
+	Signature: PO emails are signed with it, and an empty one would send them
+	out unsigned without anyone noticing."""
+	user = doc.get(fieldname)
+	if not user:
+		return
+	full_name, signature = frappe.db.get_value("User", user, ["full_name", "email_signature"]) or (None, None)
+	if not (signature or "").strip():
+		frappe.throw("<b>{0}</b> has no Email Signature, so they can't be the {1}. Add one on their "
+			"User record (Settings tab, Email section), or pick another user.".format(
+				full_name or user, doc.meta.get_label(fieldname)), title="No email signature")
+
+
+def validate_supplier_po_emails(doc):
+	"""Run from Supplier's validate (custom_scripts/supplier/supplier.py): the
+	PO V3 Ordering CC / BCC addresses and Main Signature."""
+	for f in ("po3_cc_email", "nat_po3_bcc_email"):
+		if doc.meta.has_field(f):
+			clean_email_list(doc, f)
+	if doc.meta.has_field("nat_po3_signature_user"):
+		require_email_signature(doc, "nat_po3_signature_user")
+
+
+def item_unavailable(item_code):
+	"""Why an item may not go on a new order or receipt: "disabled",
+	"discontinued" (Item.ifw_discontinued), a template (only its variants can be
+	bought or received), or None when it may."""
+	if not item_code:
+		return None
+	disabled, discontinued, has_variants = frappe.get_cached_value("Item", item_code,
+		["disabled", "ifw_discontinued", "has_variants"]) or (0, 0, 0)
+	if frappe.utils.cint(disabled):
+		return "disabled"
+	if frappe.utils.cint(discontinued):
+		return "discontinued"
+	if frappe.utils.cint(has_variants):
+		return "a template - pick one of its variants"
+	return None
+
+
+def throw_unavailable(bad, action):
+	"""bad: [(row idx, item_code, why)] -> one message listing every row.
+	action: what the items can't be, e.g. "ordered"."""
+	if bad:
+		frappe.throw("These items can't be {0}:<br>".format(action)
+			+ "<br>".join("Row {0}: <b>{1}</b> ({2})".format(idx, code, why) for idx, code, why in bad),
+			title="Item not available")
+
+
+def billable_qty(qty, short_qty, over_qty=0):
 	"""How much of a line is still expected to cost us.
 
 	short_qty is the quantity that will never arrive, and every part of the flow
@@ -55,9 +129,12 @@ def billable_qty(qty, short_qty):
 	back-order, or a partial receipt still expecting the rest -- leaves it at 0.
 
 	So the ordered quantity minus that is what the order is still worth, and no
-	status list has to be kept in step here to work it out.
+	status list has to be kept in step here to work it out. over_qty is the
+	other way round: received beyond the order (a receipt sets it), and kept --
+	the order is worth what actually arrived, as the native PO and its receipt
+	are.
 	"""
-	return max(F(qty) - F(short_qty), 0.0)
+	return max(F(qty) - F(short_qty) + F(over_qty), 0.0)
 
 
 def v3_recalc_totals(po3_name):
@@ -72,25 +149,35 @@ def v3_recalc_totals(po3_name):
 	needed when it was placed, which is a fact about the past; a later stock-out
 	does not retroactively make it a smaller decision.
 	"""
-	rate = F(frappe.db.get_value("Purchase Order V3", po3_name, "conversion_rate")) or 1.0
-	total_qty = 0.0
-	total = 0.0
-	for r in frappe.get_all("Purchase Order V3 Item", filters={"parent": po3_name},
-			fields=["name", "qty", "rate", "short_qty", "amount"], limit_page_length=0):
-		qty = billable_qty(r.qty, r.short_qty)
-		amount = qty * F(r.rate)
-		if F(r.amount) != amount:
-			# keep the grid adding up to the header - a column that does not sum
-			# to the total printed under it is the thing people query
-			frappe.db.set_value("Purchase Order V3 Item", r.name, "amount", amount,
-				update_modified=False)
-		total_qty += qty
-		total += amount
+	from metactical.metactical.doctype.supplier_order_confirmation_v3.supplier_order_confirmation_v3 \
+		import open_backorder_qty
+	from metactical.procurement_v3.taxes import save_v3_totals, set_v3_totals
 
-	frappe.db.set_value("Purchase Order V3", po3_name, {
-		"total_qty": total_qty,
-		"total": total,
-		"base_grand_total": total * rate}, update_modified=False)
+	doc = frappe.get_doc("Purchase Order V3", po3_name)
+	# a back-ordered balance is not part of the order's value until it arrives
+	backordered = open_backorder_qty(po3_name)
+	total_qty = 0.0
+	lines, rows = [], []
+	for r in doc.items:
+		qty = max(billable_qty(r.qty, r.short_qty, r.over_qty) - backordered.get(r.name, 0), 0)
+		amount = qty * F(r.rate)
+		if F(r.amount) != amount or F(r.expected_qty) != qty:
+			# keep the grid adding up to the header - a column that does not sum
+			# to the total printed under it is the thing people query. Qty stays
+			# what was ordered (short_qty and the back-orders are measured from
+			# it); expected_qty is what the line comes to now, as on the native PO
+			frappe.db.set_value("Purchase Order V3 Item", r.name,
+				{"amount": amount, "expected_qty": qty}, update_modified=False)
+		total_qty += qty
+		if r.item_code:
+			lines.append((r.item_code, qty, r.rate))
+			rows.append(r)
+
+	# taxes on a smaller order are smaller too: work them out again with the
+	# grand totals (procurement_v3/taxes.py)
+	set_v3_totals(doc, lines, rows)
+	frappe.db.set_value("Purchase Order V3", po3_name, "total_qty", total_qty, update_modified=False)
+	save_v3_totals(doc, rows)
 
 
 def mirror_po3_status(po3_name):
@@ -124,12 +211,13 @@ def v3_may_close_native(po_name):
 
 def v3_open_bo(po3_name):
 	open_items = {}
-	soc = frappe.db.get_value("Supplier Order Confirmation V3",
-		{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
-	if not soc:
+	# a PO can have several confirmations, each with its own back orders
+	socs = frappe.get_all("Supplier Order Confirmation V3",
+		filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, pluck="name")
+	if not socs:
 		return open_items
 	for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-			filters={"parent": soc}, fields=["po3_item", "status"], limit_page_length=0):
+			filters={"parent": ("in", socs)}, fields=["po3_item", "status"], limit_page_length=0):
 		if b.po3_item and b.status not in ("Received", "Cancelled"):
 			open_items[b.po3_item] = 1
 	return open_items
@@ -141,11 +229,11 @@ def v3_open_bo(po3_name):
 
 def v3_reconcile(po3_name):
 	# --- confirmation back-order rows ---
-	soc = frappe.db.get_value("Supplier Order Confirmation V3",
-		{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
-	if soc:
+	socs = frappe.get_all("Supplier Order Confirmation V3",
+		filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, pluck="name")
+	if socs:
 		for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-				filters={"parent": soc}, fields=["name", "po3_item", "status"]):
+				filters={"parent": ("in", socs)}, fields=["name", "po3_item", "status"]):
 			line = frappe.db.get_value("Purchase Order V3 Item", b.po3_item,
 				["received_qty", "qty"], as_dict=True)
 			if not line:
@@ -187,3 +275,20 @@ def v3_reconcile(po3_name):
 					+ " - marked <b>Received</b>, since its goods have all been receipted.")
 			except Exception:
 				pass
+
+
+def validate_rate_except_v3(doc, ref_details, v3_rows, link_field):
+	"""ERPNext's "Maintain Same Rate" check, minus the rows a Purchase Receipt V3
+	posted. Those carry the supplier's confirmed rate (SOC3), which the PO --
+	the record of what was ordered -- never takes, so they may differ from it.
+	Their link to the PO line is hidden only while the check runs."""
+	from erpnext.utilities.transaction_base import TransactionBase
+
+	hidden = [(d, d.get(link_field)) for d in v3_rows if d.get(link_field)]
+	for d, _ in hidden:
+		d.set(link_field, None)
+	try:
+		TransactionBase.validate_rate_with_reference_doc(doc, ref_details)
+	finally:
+		for d, value in hidden:
+			d.set(link_field, value)

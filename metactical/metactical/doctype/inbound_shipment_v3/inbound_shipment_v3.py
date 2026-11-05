@@ -38,12 +38,13 @@ def validate(doc):
 	if po.docstatus != 1:
 		frappe.throw("Purchase Order V3 " + po.name + " is not approved yet.")
 
-	# there is exactly one confirmation per PO - attach it rather than asking
+	# A PO can have several confirmations. Attach it only when there is exactly
+	# one; with more, the user picks the one this shipment is for.
 	if not doc.supplier_order_confirmation_v3:
 		hit = frappe.get_all("Supplier Order Confirmation V3",
 			filters={"purchase_order_v3": po.name, "docstatus": ("<", 2)},
-			fields=["name"], order_by="creation desc", limit_page_length=1)
-		if hit:
+			fields=["name"], limit_page_length=2)
+		if len(hit) == 1:
 			doc.supplier_order_confirmation_v3 = hit[0].name
 
 	# what the supplier actually committed to, per PO3 line
@@ -270,18 +271,18 @@ def record_shipment(doc):
 
 
 	# --- mark the Back Orders rows this shipment covers ---
-	soc = doc.supplier_order_confirmation_v3
-	if not soc:
-		soc = frappe.db.get_value("Supplier Order Confirmation V3",
-			{"purchase_order_v3": doc.purchase_order_v3, "docstatus": ("<", 2)}, "name")
-	if soc:
+	# the shipment's own confirmation, or else every confirmation on the PO
+	socs = [doc.supplier_order_confirmation_v3] if doc.supplier_order_confirmation_v3 else \
+		frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": doc.purchase_order_v3, "docstatus": ("<", 2)}, pluck="name")
+	if socs:
 		flagged = []
 		for d in doc.items:
 			if not d.po3_item:
 				continue
 			shipped_so_far = F(frappe.db.get_value("Purchase Order V3 Item", d.po3_item, "shipped_qty"))
 			for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-					filters={"parent": soc, "po3_item": d.po3_item, "status": "Open"},
+					filters={"parent": ("in", socs), "po3_item": d.po3_item, "status": "Open"},
 					fields=["name", "shipping_now"]):
 				# the confirmed-now portion shipping is NOT the back-order shipping
 				if shipped_so_far <= F(b.shipping_now):
@@ -294,7 +295,7 @@ def record_shipment(doc):
 						"Supplier Order Confirmation V3 Backorder", b.name, "eta")})
 				flagged.append(d.item_code or "?")
 		if flagged:
-			frappe.msgprint("Back Orders on " + soc + " marked <b>Shipped</b>: " + ", ".join(flagged))
+			frappe.msgprint("Back Orders on " + ", ".join(socs) + " marked <b>Shipped</b>: " + ", ".join(flagged))
 
 
 # ---------------------------------------------------------------------------
