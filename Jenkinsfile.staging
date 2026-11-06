@@ -39,6 +39,9 @@ pipeline {
                             echo '--- Pulling metactical ---'
                             git -C apps/metactical fetch upstream
                             git -C apps/metactical reset --hard upstream/version-15-develop
+                            
+                            echo '--- Restarting bench ---'
+                            echo '$PASS' | sudo -S supervisorctl restart all
 
                             echo '--- Migrate ---'
                             bench --site $SITE_NAME migrate
@@ -48,9 +51,6 @@ pipeline {
 
                             echo '--- Building assets ---'
                             bench build --app metactical
-
-                            echo '--- Restarting bench ---'
-                            echo '$PASS' | sudo -S supervisorctl restart all
                             "
                         RC=$?
 
