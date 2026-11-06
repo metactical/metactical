@@ -163,7 +163,7 @@ def get_items():
 
 	A variant row stands for its template, since variants share their template's image record.
 	"""
-	from metactical.patches.gearstock.upsert_items_v6 import load_rows
+	from apps.metactical.metactical.patches.gearstock.upsert_items_v7 import load_rows
 
 	rows = load_rows()
 

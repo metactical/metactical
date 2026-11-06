@@ -22,7 +22,7 @@ import time
 import frappe
 
 from metactical.patches.gearstock import db_retry
-from metactical.patches.gearstock.upsert_items_v6 import load_rows
+from apps.metactical.metactical.patches.gearstock.upsert_items_v7 import load_rows
 
 BATCH_SIZE = 100
 JOB_ID = "gearstock_add_deduct_qty"
