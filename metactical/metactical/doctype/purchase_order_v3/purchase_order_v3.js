@@ -28,19 +28,35 @@ function po3_amount(frm, cdt, cdn) {
     frappe.model.set_value(cdt, cdn, 'amount', flt(row.qty) * flt(row.rate));
 }
 
+// As the native PO does (erpnext transaction.js currency / transaction_date):
+// the rate is the buying rate on the order date, fetched again whenever the
+// currency or the order date changes. When there is none, ERPNext says so and
+// the rate is left at 0, and saving asks for it.
 function po3_fx(frm) {
-    if (!frm.doc.currency || !frm.doc.company) return;
+    if (frm.doc.docstatus !== 0 || !frm.doc.currency || !frm.doc.company) return;
     frappe.db.get_value('Company', frm.doc.company, 'default_currency').then(function(r) {
         var cc = (r.message || {}).default_currency;
         if (!cc || frm.doc.currency === cc) { frm.set_value('conversion_rate', 1); return; }
+        if (!frm.doc.order_date) return;
         frappe.call({
             method: 'erpnext.setup.utils.get_exchange_rate',
-            args: { from_currency: frm.doc.currency, to_currency: cc },
+            args: { transaction_date: frm.doc.order_date, from_currency: frm.doc.currency,
+                to_currency: cc, args: 'for_buying' },
+            freeze: true,
+            freeze_message: __('Fetching exchange rates ...'),
             callback: function(res) {
-                if (res.message) frm.set_value('conversion_rate', res.message);
+                if (flt(res.message) !== flt(frm.doc.conversion_rate)) {
+                    frm.set_value('conversion_rate', flt(res.message));
+                }
             }
         });
     });
+}
+
+// the native PO only lets the rate be typed in when Accounts Settings allows
+// stale rates; otherwise it has to come from a Currency Exchange record
+function po3_fx_editable(frm) {
+    frm.set_df_property('conversion_rate', 'read_only', erpnext.stale_rate_allowed() ? 0 : 1);
 }
 
 function po3_split(line, sep) {
@@ -309,6 +325,7 @@ frappe.ui.form.on('Purchase Order V3', {
     },
 
     currency: po3_fx,
+    order_date: po3_fx,
 
     // A new destination has to take the lines with it.
     set_warehouse: function(frm) {
@@ -324,29 +341,65 @@ frappe.ui.form.on('Purchase Order V3', {
             }
         });
     },
+    sender_email_account: function(frm) {
+        // picking an account resets the address to it; the address can still be
+        // overridden by hand afterwards
+        if (!frm.doc.sender_email_account) return;
+        frappe.db.get_value('Email Account', frm.doc.sender_email_account, 'email_id')
+            .then(function(r) {
+                var email = (r.message || {}).email_id;
+                if (email) frm.set_value('sender_email', email);
+            });
+    },
     supplier: function(frm) {
         if (!frm.doc.supplier) return;
         frappe.db.get_value('Supplier', frm.doc.supplier,
-            ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'po3_print_format',
-             'nat_sender_email_account', 'nat_shipping_address', 'nat_billing_address'])
+            ['default_price_list', 'default_currency', 'po3_order_email', 'po3_cc_email', 'nat_po3_bcc_email',
+             'nat_po3_signature_user', 'po3_print_format',
+             'nat_sender_email_account', 'nat_sender_email', 'nat_shipping_address', 'nat_billing_address',
+             'tax_category'])
             .then(function(r) {
                 var v = r.message || {};
                 frm.set_value('buying_price_list', v.default_price_list || null);
                 if (v.default_currency) frm.set_value('currency', v.default_currency);
                 // a different supplier ships and bills under its own addresses
+                // the new supplier's own default address
+                frappe.call({
+                    method: 'frappe.contacts.doctype.address.address.get_default_address',
+                    args: { doctype: 'Supplier', name: frm.doc.supplier },
+                    callback: function(a) { frm.set_value('supplier_address', a.message || null); }
+                });
                 frm.set_value('shipping_address', v.nat_shipping_address || null);
                 frm.set_value('billing_address', v.nat_billing_address || null);
+                // never a fallback address: ask for what the supplier lacks
+                var missing = [];
+                if (!v.nat_shipping_address) missing.push(__('Shipping Address'));
+                if (!v.nat_billing_address) missing.push(__('Billing Address'));
+                if (missing.length) {
+                    frappe.msgprint({
+                        title: __('Address missing'),
+                        indicator: 'orange',
+                        message: __('Supplier {0} has no {1} set. Please select it on this order before sending it for approval, or set it on the Supplier so new orders fill it in.',
+                                    [frm.doc.supplier.bold(), missing.join(__(' and '))])
+                    });
+                }
                 if (frm.is_new()) {
                     frm.set_value('supplier_email', v.po3_order_email || null);
                     frm.set_value('cc_email', v.po3_cc_email || null);
+                    frm.set_value('bcc_email', v.nat_po3_bcc_email || null);
+                    frm.set_value('signature_user', v.nat_po3_signature_user || null);
                     frm.set_value('po_print_format', v.po3_print_format || null);
-                    // sender_email follows via fetch_from on sender_email_account
                     frm.set_value('sender_email_account', v.nat_sender_email_account || null);
+                    frm.set_value('sender_email', v.nat_sender_email || null);
+                    frm.set_value('tax_category', v.tax_category || null);
                 }
                 if (!v.default_price_list) {
                     frappe.show_alert({ message: __('This supplier has no Default Price List - pick one manually.'), indicator: 'orange' });
                 }
             });
+    },
+    supplier_address: function(frm) {
+        po3_render_address(frm, 'supplier_address', 'address_display');
     },
     shipping_address: function(frm) {
         po3_render_address(frm, 'shipping_address', 'shipping_address_display');
@@ -359,18 +412,13 @@ frappe.ui.form.on('Purchase Order V3', {
             if (!d.rate) po3_pull_rate(frm, d.doctype, d.name);
         });
     },
+    cc_email: function(frm) { metactical.email_pills.render(frm, 'cc_email'); },
+    bcc_email: function(frm) { metactical.email_pills.render(frm, 'bcc_email'); },
+    signature_user: function(frm) { metactical.utils.show_user_full_name(frm, 'signature_user'); },
     refresh: function(frm) {
-        // Print the native twin with Purchase Order's own print formats, so every
-        // PO format (existing and future) works here without a PO3 copy. Only once
-        // submitted: until approval the twin's lines are not synced from the PO3,
-        // so a draft still prints from its own doctype.
-        if (frm.doc.docstatus === 1 && frm.doc.erp_purchase_order) {
-            frm.print_doc = function() {
-                frappe.set_route('print', 'Purchase Order', frm.doc.erp_purchase_order);
-            };
-        } else {
-            delete frm.print_doc;
-        }
+        po3_fx_editable(frm);
+        ['cc_email', 'bcc_email'].forEach(function(f) { metactical.email_pills.render(frm, f); });
+        metactical.utils.show_user_full_name(frm, 'signature_user');
         if (frm.doc.docstatus === 0) {
             frm.add_custom_button(__('⭱ Paste Items'), function() { po3_paste_items(frm); });
         }
@@ -378,41 +426,32 @@ frappe.ui.form.on('Purchase Order V3', {
         var st = frm.doc.workflow_state;
         var closed = ['Closed', 'Closed Short', 'Cancelled'].indexOf(st) !== -1;
 
-        // One confirmation per PO, so its Connections tile is hidden. Look it
-        // up and surface it as a headline + a button that adapts to state.
+        // A PO can have several confirmations: list them in the headline. They
+        // are also on the Connections tab, and new ones come from Create.
         frappe.call({
             method: 'frappe.client.get_list',
             args: {
                 doctype: 'Supplier Order Confirmation V3',
                 filters: { purchase_order_v3: frm.doc.name, docstatus: ['<', 2] },
-                fields: ['name', 'workflow_state'], limit_page_length: 1
+                fields: ['name', 'workflow_state'], order_by: 'creation asc', limit_page_length: 0
             },
             callback: function(r) {
-                var soc = (r.message || [])[0];
+                var socs = r.message || [];
                 var bits = [];
                 if (frm.doc.erp_purchase_order) {
                     bits.push(__('Native PO') + ': <a href="/app/purchase-order/'
                         + frm.doc.erp_purchase_order + '">' + frm.doc.erp_purchase_order + '</a>');
                 }
-                if (soc) {
-                    bits.push(__('Confirmation') + ': <a href="/app/supplier-order-confirmation-v3/'
-                        + soc.name + '">' + soc.name + '</a> <span class="text-muted">('
-                        + __(soc.workflow_state || '') + ')</span>');
+                if (socs.length) {
+                    bits.push(__('Confirmations') + ': ' + socs.map(function(soc) {
+                        return '<a href="/app/supplier-order-confirmation-v3/' + soc.name + '">'
+                            + soc.name + '</a> <span class="text-muted">('
+                            + __(soc.workflow_state || '') + ')</span>';
+                    }).join(', '));
                 } else if (!closed) {
                     bits.push('<span class="text-muted">' + __('No supplier confirmation yet') + '</span>');
                 }
                 if (bits.length) frm.dashboard.set_headline(bits.join(' &nbsp;·&nbsp; '));
-
-                if (closed) return;
-                if (soc) {
-                    frm.add_custom_button(__('Supplier Confirmation {0}', [soc.name]), function() {
-                        frappe.set_route('Form', 'Supplier Order Confirmation V3', soc.name);
-                    });
-                } else {
-                    frm.add_custom_button(__('Create Supplier Confirmation'), function() {
-                        po3_new_linked('Supplier Order Confirmation V3', frm.doc.name);
-                    });
-                }
             }
         });
 
@@ -447,6 +486,7 @@ frappe.ui.form.on('Purchase Order V3', {
                 po3_new_linked(doctype, frm.doc.name);
             }, __('Create'));
         };
+        mk('Supplier Confirmation', 'Supplier Order Confirmation V3');
         mk('Inbound Shipment', 'Inbound Shipment V3');
         mk('Purchase Receipt 3', 'Purchase Receipt V3');
         mk('Supplier Claim', 'Supplier Claim V3');
@@ -508,5 +548,181 @@ frappe.ui.form.on('Purchase Order V3', {
                 })
                 .catch(function() { resolve(); });   // never block on a lookup failure
         });
+    }
+});
+
+// Taxes and Charges -- the native Purchase Order's own fields and child table.
+// Totals, taxes and discount are worked out by ERPNext's own engine
+// (metactical/procurement_v3/taxes.py): on save, and while the form is being
+// keyed in through preview_totals, so they move as they do on the native PO.
+
+// The native PO's own tax-grid behaviour: Rate editable and required, Amount
+// read-only -- the other way round for "Actual" -- the account query and the
+// row checks.
+erpnext.accounts.taxes.setup_tax_validations('Purchase Order V3');
+
+var PO3_TOTAL_FIELDS = ['total', 'base_total', 'net_total', 'base_net_total',
+    'taxes_and_charges_added', 'base_taxes_and_charges_added',
+    'taxes_and_charges_deducted', 'base_taxes_and_charges_deducted',
+    'total_taxes_and_charges', 'base_total_taxes_and_charges',
+    'discount_amount', 'base_discount_amount', 'grand_total', 'base_grand_total',
+    'rounding_adjustment', 'base_rounding_adjustment', 'rounded_total', 'base_rounded_total'];
+
+// Debounced: a burst of edits (a template's rows, a pasted item list) makes
+// one call, and an answer to an older call is dropped.
+function po3_calc_taxes(frm) {
+    if (frm.doc.docstatus !== 0) return;
+    clearTimeout(frm._po3_calc_timer);
+    frm._po3_calc_timer = setTimeout(function() {
+        var seq = frm._po3_calc_seq = (frm._po3_calc_seq || 0) + 1;
+        frappe.call({
+            method: 'metactical.metactical.doctype.purchase_order_v3.purchase_order_v3.preview_totals',
+            args: { doc: frm.doc },
+            callback: function(r) {
+                if (seq !== frm._po3_calc_seq || !r.message) return;
+                // assigned rather than set_value: display copies of what save
+                // recomputes, and set_value would fire these handlers again
+                PO3_TOTAL_FIELDS.forEach(function(f) {
+                    if (f in r.message.totals) frm.doc[f] = r.message.totals[f];
+                });
+                (frm.doc.taxes || []).forEach(function(t, i) {
+                    var calc = r.message.taxes[i] || {};
+                    Object.keys(calc).forEach(function(f) {
+                        // an Actual row's amount is what the user typed
+                        if (f === 'tax_amount' && t.charge_type === 'Actual') return;
+                        if (f === 'description' && t.description) return;
+                        t[f] = calc[f];
+                    });
+                });
+                (frm.doc.items || []).forEach(function(d, i) {
+                    var calc = r.message.items[i] || {};
+                    d.net_rate = calc.net_rate;
+                    d.net_amount = calc.net_amount;
+                });
+                PO3_TOTAL_FIELDS.forEach(function(f) { frm.refresh_field(f); });
+                frm.refresh_field('taxes');
+            }
+        });
+    }, 300);
+}
+
+frappe.ui.form.on('Purchase Order V3', {
+    setup: function(frm) {
+        // discontinued and disabled items, and templates, can't be ordered (validate refuses them)
+        frm.set_query('item_code', 'items', function() {
+            return { filters: { ifw_discontinued: 0, disabled: 0, has_variants: 0 } };
+        });
+        frm.set_query('supplier_address', function() {
+            return {
+                query: 'frappe.contacts.doctype.address.address.address_query',
+                filters: { link_doctype: 'Supplier', link_name: frm.doc.supplier }
+            };
+        });
+        frm.set_query('taxes_and_charges', function() {
+            return { filters: { company: frm.doc.company, disabled: 0 } };
+        });
+        frm.set_query('cost_center', 'taxes', function() {
+            return { filters: { company: frm.doc.company, is_group: 0 } };
+        });
+    },
+    taxes_and_charges: function(frm) {
+        if (!frm.doc.taxes_and_charges) return;
+        frappe.call({
+            method: 'erpnext.controllers.accounts_controller.get_taxes_and_charges',
+            args: { master_doctype: 'Purchase Taxes and Charges Template', master_name: frm.doc.taxes_and_charges },
+            callback: function(r) {
+                frm.clear_table('taxes');
+                (r.message || []).forEach(function(t) { frm.add_child('taxes', t); });
+                frm.refresh_field('taxes');
+                po3_calc_taxes(frm);
+            }
+        });
+    },
+    apply_discount_on: function(frm) { po3_calc_taxes(frm); },
+    additional_discount_percentage: function(frm) { po3_calc_taxes(frm); },
+    discount_amount: function(frm) { po3_calc_taxes(frm); },
+    disable_rounded_total: function(frm) { po3_calc_taxes(frm); },
+    taxes_remove: function(frm) { po3_calc_taxes(frm); },
+    // Description is mandatory on ERPNext's tax row, but picking the account
+    // is all that is needed: fill it from the account, as the native PO does,
+    // and let the row through either way -- save fills it too (prepare_tax_rows).
+    validate: function(frm) {
+        (frm.doc.taxes || []).forEach(function(t) {
+            if (t.account_head && !t.description) {
+                t.description = t.account_head.split(' - ').slice(0, -1).join(' - ') || t.account_head;
+            }
+            // this row's own copy of the field, so the native PO is unaffected
+            var df = frappe.meta.get_docfield(t.doctype, 'description', t.name);
+            if (df) df.reqd = 0;
+        });
+        frm.refresh_field('taxes');
+    }
+});
+
+// The same line changes that move the line amounts move the taxes too.
+frappe.ui.form.on('Purchase Order V3 Item', {
+    qty: function(frm) { po3_calc_taxes(frm); },
+    rate: function(frm) { po3_calc_taxes(frm); },
+    short_qty: function(frm) { po3_calc_taxes(frm); },
+    items_remove: function(frm) { po3_calc_taxes(frm); }
+});
+
+// The tax row itself. Purchase Taxes and Charges is shared with the native PO
+// and SOC3, so these only act on a PO3. Picking an account fills Rate and
+// Description as the native PO does (erpnext accounts.js, account_head).
+frappe.ui.form.on('Purchase Taxes and Charges', {
+    account_head: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        var d = locals[cdt][cdn];
+        if (d.docstatus == 1) return;
+        if (!d.charge_type && d.account_head) {
+            frappe.msgprint(__('Please select Charge Type first'));
+            frappe.model.set_value(cdt, cdn, 'account_head', '');
+        } else if (d.account_head) {
+            frappe.call({
+                type: 'GET',
+                method: 'erpnext.controllers.accounts_controller.get_tax_rate',
+                args: { account_head: d.account_head },
+                callback: function(r) {
+                    var acc = r.message || {};
+                    if (d.charge_type !== 'Actual') {
+                        frappe.model.set_value(cdt, cdn, 'rate', acc.tax_rate || 0);
+                    }
+                    frappe.model.set_value(cdt, cdn, 'description', acc.account_name);
+                    po3_calc_taxes(frm);
+                }
+            });
+        }
+    },
+    charge_type: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        var row = frm.open_grid_row() || frm.get_field('taxes').grid.get_row(cdn);
+        erpnext.accounts.taxes.set_conditional_mandatory_rate_or_amount(row);
+        po3_calc_taxes(frm);
+    },
+    rate: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        po3_calc_taxes(frm);
+    },
+    tax_amount: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        po3_calc_taxes(frm);
+    },
+    row_id: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Order V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        po3_calc_taxes(frm);
+    },
+    add_deduct_tax: function(frm) {
+        if (frm.doctype === 'Purchase Order V3') po3_calc_taxes(frm);
+    },
+    category: function(frm) {
+        if (frm.doctype === 'Purchase Order V3') po3_calc_taxes(frm);
+    },
+    included_in_print_rate: function(frm) {
+        if (frm.doctype === 'Purchase Order V3') po3_calc_taxes(frm);
     }
 });

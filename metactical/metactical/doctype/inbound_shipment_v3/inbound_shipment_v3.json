@@ -67,7 +67,7 @@
    "read_only": 1
   },
   {
-   "description": "Filled automatically \u2014 there is one confirmation per PO. It governs what this shipment should contain.",
+   "description": "Filled automatically — there is one confirmation per PO. It governs what this shipment should contain.",
    "fieldname": "supplier_order_confirmation_v3",
    "fieldtype": "Link",
    "label": "Confirmation",
@@ -113,17 +113,18 @@
    "label": "Tracking No"
   },
   {
-   "description": "Built from the carrier\u2019s tracking URL template.",
+   "description": "Built from the carrier’s tracking URL template.",
    "fieldname": "tracking_url",
    "fieldtype": "Data",
    "label": "Track",
    "options": "URL",
-   "read_only": 1
+   "read_only": 1,
+   "length": 1000
   },
   {
    "fieldname": "sec_items",
    "fieldtype": "Section Break",
-   "label": "Packing List \u2014 Items"
+   "label": "Packing List — Items"
   },
   {
    "fieldname": "items",
@@ -135,7 +136,7 @@
   {
    "fieldname": "sec_boxes",
    "fieldtype": "Section Break",
-   "label": "Packing List \u2014 Boxes"
+   "label": "Packing List — Boxes"
   },
   {
    "fieldname": "boxes",
@@ -208,7 +209,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-23 22:42:23.551269",
+ "modified": "2026-10-19 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Inbound Shipment V3",

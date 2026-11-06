@@ -76,13 +76,16 @@ function clm3_new_from(field, value) {
 // enough that the latency does not matter.
 function gr3_load_scan_map(frm) {
     if (!frm.doc.purchase_order_v3) { frm._scan = null; return; }
-    if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3) return;
+    var soc = frm.doc.supplier_order_confirmation_v3 || '';
+    if (frm._scan && frm._scan.po === frm.doc.purchase_order_v3 && frm._scan.soc === soc) return;
     frappe.call({
         method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_scan_map',
-        args: { po3: frm.doc.purchase_order_v3 },
+        args: { po3: frm.doc.purchase_order_v3, soc: soc },
         callback: function (r) {
             var m = r.message || {};
-            frm._scan = { po: frm.doc.purchase_order_v3, map: m.map || {}, names: m.names || {} };
+            frm._scan = { po: frm.doc.purchase_order_v3, soc: soc, map: m.map || {}, names: m.names || {} };
+            // the order's items and the confirmation's (substitutes, new items)
+            frm._po3_items = Object.keys(frm._scan.names);
         }
     });
 }
@@ -105,21 +108,50 @@ function beep_bad() {
     } catch (e) { /* no audio, the red alert is enough */ }
 }
 
+// How much more a row's line can still take: its expected qty less what every
+// row of the same line has counted (a count can be split into accepted and
+// rejected rows). null when the row is a variance line (a wrong or unordered
+// item), which is not capped.
+function gr3_room(frm, row) {
+    if (!row.expected_item_code || row.received_item_code !== row.expected_item_code) return null;
+    var key = row.soc3_item || row.po3_item;
+    var counted = 0;
+    (frm.doc.items || []).forEach(function (d) {
+        if (d.received_item_code !== row.received_item_code) return;
+        if ((d.soc3_item || d.po3_item) !== key) return;
+        counted += flt(d.received_qty);
+    });
+    return flt(row.expected_qty) - counted;
+}
+
 function gr3_apply_scan(frm, item_code, label, qty_override) {
     var step = flt(qty_override) || flt(frm.doc.scan_qty) || 1;
-    var row = null;
+    var row = null, full = null, variance = null;
     (frm.doc.items || []).forEach(function (d) {
-        if (row) return;
         if (d.received_item_code !== item_code) return;
+        var room = gr3_room(frm, d);
+        if (room === null) { if (!variance) variance = d; return; }
         // prefer a line that still has room, so repeat scans roll onto the
         // next line of the same item rather than over-filling the first
-        if (flt(d.received_qty) < flt(d.expected_qty) || !flt(d.expected_qty)) row = d;
+        if (room > 0) { if (!row) row = d; }
+        else if (!full) full = d;
     });
-    if (!row) {
-        (frm.doc.items || []).forEach(function (d) {
-            if (!row && d.received_item_code === item_code) row = d;
-        });
+    // the confirmation is the ceiling: a line that is already at its expected
+    // qty takes no more, and nothing is added for it
+    if (!row && full) {
+        gr3_scan_feedback(frm, false, label + '  ' + flt(full.expected_qty) + ' / '
+            + flt(full.expected_qty) + '  \u2014 already at the expected qty, not counted');
+        return;
     }
+    if (row) {
+        var room = gr3_room(frm, row);
+        if (step > room) {
+            gr3_scan_feedback(frm, false, label + '  only ' + room + ' more expected, scanned '
+                + step + ' \u2014 not counted. Recount and scan the right qty.');
+            return;
+        }
+    }
+    if (!row) row = variance;
     var added = false;
     if (!row) {
         row = frm.add_child('items');
@@ -138,11 +170,9 @@ function gr3_apply_scan(frm, item_code, label, qty_override) {
     frm.refresh_field('items');
     frm.dirty();
 
-    var over = flt(row.expected_qty) && flt(row.received_qty) > flt(row.expected_qty);
     var txt = label + '  ' + flt(row.received_qty)
         + (flt(row.expected_qty) ? ' / ' + flt(row.expected_qty) : '');
     if (added) gr3_scan_feedback(frm, true, txt + '  (not on the order - added as a variance line)');
-    else if (over) gr3_scan_feedback(frm, true, txt + '  \u2014 OVER');
     else gr3_scan_feedback(frm, true, txt);
 }
 
@@ -190,12 +220,14 @@ function gr3_fetch_lines(frm) {
     if (filled.length) return;
     frappe.call({
         method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.v3_gr3_prefill_preview',
-        args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '' },
+        args: { po3: frm.doc.purchase_order_v3, shipment: frm.doc.inbound_shipment_v3 || '',
+                soc: frm.doc.supplier_order_confirmation_v3 || '' },
         callback: function (r) {
             var m = (r.message || {});
             frm.clear_table('items');
             (m.rows || []).forEach(function (x) {
                 var d = frm.add_child('items');
+                d.soc3_item = x.soc3_item;
                 d.po3_item = x.po3_item;
                 d.expected_item_code = x.expected_item_code;
                 d.received_item_code = x.received_item_code;
@@ -223,6 +255,17 @@ frappe.ui.form.on('Purchase Receipt V3', {
         gr3_load_scan_map(frm);
         gr3_fetch_lines(frm);
     },
+    // a different confirmation expects different lines: re-pull them while
+    // nothing has been counted yet
+    supplier_order_confirmation_v3: function (frm) {
+        gr3_load_scan_map(frm);
+        var counted = (frm.doc.items || []).some(function (d) { return flt(d.received_qty); });
+        if (frm.doc.docstatus === 0 && !counted) {
+            frm.clear_table('items');
+            frm.refresh_field('items');
+            gr3_fetch_lines(frm);
+        }
+    },
     refresh: function(frm) {
         // Print the native twin with Purchase Receipt's own print formats, as
         // PO3 does with its native PO, so every PR format works here without a
@@ -249,6 +292,11 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 + __('Draft Purchase Receipt {0} is out of date.', [frm.doc.erp_purchase_receipt || ''])
                 + '</b> ' + frappe.utils.escape_html(frm.doc.post_error) + '</span>');
         }
+        frm.set_query('supplier_order_confirmation_v3', function () {
+            var f = { docstatus: 1 };
+            if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
+            return { filters: f };
+        });
         frm.set_query('inbound_shipment_v3', function () {
             var f = { workflow_state: ['in', ['In Transit', 'Received']] };
             if (frm.doc.purchase_order_v3) f.purchase_order_v3 = frm.doc.purchase_order_v3;
@@ -315,9 +363,6 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 return { filters: { name: ['in',
                     (frm._po3_items || []).length ? frm._po3_items : ['__none__']] } };
             });
-            frappe.db.get_doc('Purchase Order V3', frm.doc.purchase_order_v3).then(function(po) {
-                frm._po3_items = (po.items || []).map(function(r) { return r.item_code; });
-            });
         }
         if (frm.doc.workflow_state === 'Posted') {
             frappe.db.get_value('Purchase Receipt', frm.doc.erp_purchase_receipt || '__none__', 'docstatus')
@@ -351,12 +396,16 @@ frappe.ui.form.on('Purchase Receipt V3', {
         }
     }
 });
+// A new Received count starts the row over as all accepted, nothing rejected -
+// otherwise Accepted keeps the old figure and Finish Counting refuses it. What
+// the user then types into Accepted / Rejected is left as they set it.
 frappe.ui.form.on('Purchase Receipt V3 Item', {
     received_qty: function(frm, cdt, cdn) {
         var row = locals[cdt][cdn];
-        if (!flt(row.accepted_qty) && !flt(row.rejected_qty)) {
-            frappe.model.set_value(cdt, cdn, 'accepted_qty', flt(row.received_qty));
-        }
+        frappe.model.set_value(cdt, cdn, {
+            accepted_qty: flt(row.received_qty),
+            rejected_qty: 0
+        });
     }
 });
 
@@ -385,5 +434,178 @@ frappe.ui.form.on('Purchase Receipt V3', {
                 })
                 .catch(function() { resolve(); });   // never block on a lookup failure
         });
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Taxes and Charges -- the native Purchase Receipt's own fields and child
+// table, as on PO3 and SOC3. A new receipt starts with the live confirmation's
+// taxes and discount (copied on its first save); totals are worked out by
+// ERPNext's own engine (metactical/procurement_v3/taxes.py) on save, and while
+// the form is being edited through preview_totals.
+// ---------------------------------------------------------------------------
+
+// The native form's tax-grid behaviour: Rate editable and required, Amount
+// read-only -- the other way round for "Actual" -- the account query and the
+// row checks.
+erpnext.accounts.taxes.setup_tax_validations('Purchase Receipt V3');
+
+var GR3_TOTAL_FIELDS = ['total', 'total_qty', 'base_total', 'net_total', 'base_net_total',
+    'taxes_and_charges_added', 'base_taxes_and_charges_added',
+    'taxes_and_charges_deducted', 'base_taxes_and_charges_deducted',
+    'total_taxes_and_charges', 'base_total_taxes_and_charges',
+    'discount_amount', 'base_discount_amount', 'grand_total', 'base_grand_total',
+    'rounding_adjustment', 'base_rounding_adjustment', 'rounded_total', 'base_rounded_total'];
+
+// Debounced: a burst of edits (a template's rows, a run of scans) makes one
+// call, and an answer to an older call is dropped. Nothing to work out on a
+// receipt that has never been saved: its lines have no rate until then.
+function gr3_calc_taxes(frm) {
+    if (frm.doc.docstatus !== 0 || frm.is_new()) return;
+    clearTimeout(frm._gr3_calc_timer);
+    frm._gr3_calc_timer = setTimeout(function() {
+        var seq = frm._gr3_calc_seq = (frm._gr3_calc_seq || 0) + 1;
+        frappe.call({
+            method: 'metactical.metactical.doctype.purchase_receipt_v3.purchase_receipt_v3.preview_totals',
+            args: { doc: frm.doc },
+            callback: function(r) {
+                if (seq !== frm._gr3_calc_seq || !r.message) return;
+                // assigned rather than set_value: display copies of what save
+                // recomputes, and set_value would fire these handlers again
+                GR3_TOTAL_FIELDS.forEach(function(f) {
+                    if (f in r.message.totals) frm.doc[f] = r.message.totals[f];
+                });
+                (frm.doc.taxes || []).forEach(function(t, i) {
+                    var calc = r.message.taxes[i] || {};
+                    Object.keys(calc).forEach(function(f) {
+                        // an Actual row's amount is what the user typed
+                        if (f === 'tax_amount' && t.charge_type === 'Actual') return;
+                        if (f === 'description' && t.description) return;
+                        t[f] = calc[f];
+                    });
+                });
+                (frm.doc.items || []).forEach(function(d, i) {
+                    var calc = r.message.items[i] || {};
+                    d.amount = calc.amount;
+                    d.net_rate = calc.net_rate;
+                    d.net_amount = calc.net_amount;
+                });
+                GR3_TOTAL_FIELDS.forEach(function(f) { frm.refresh_field(f); });
+                frm.refresh_field('taxes');
+            }
+        });
+    }, 300);
+}
+
+frappe.ui.form.on('Purchase Receipt V3', {
+    setup: function(frm) {
+        frm.set_query('taxes_and_charges', function() {
+            return { filters: { company: frm.doc.company, disabled: 0 } };
+        });
+        frm.set_query('cost_center', 'taxes', function() {
+            return { filters: { company: frm.doc.company, is_group: 0 } };
+        });
+    },
+    taxes_and_charges: function(frm) {
+        if (!frm.doc.taxes_and_charges) return;
+        frappe.call({
+            method: 'erpnext.controllers.accounts_controller.get_taxes_and_charges',
+            args: { master_doctype: 'Purchase Taxes and Charges Template', master_name: frm.doc.taxes_and_charges },
+            callback: function(r) {
+                frm.clear_table('taxes');
+                (r.message || []).forEach(function(t) { frm.add_child('taxes', t); });
+                frm.refresh_field('taxes');
+                gr3_calc_taxes(frm);
+            }
+        });
+    },
+    apply_discount_on: function(frm) { gr3_calc_taxes(frm); },
+    additional_discount_percentage: function(frm) { gr3_calc_taxes(frm); },
+    discount_amount: function(frm) { gr3_calc_taxes(frm); },
+    disable_rounded_total: function(frm) { gr3_calc_taxes(frm); },
+    taxes_remove: function(frm) { gr3_calc_taxes(frm); },
+    // Description is mandatory on ERPNext's tax row, but picking the account
+    // is all that is needed: fill it from the account, as the native form
+    // does -- save fills it too (prepare_tax_rows).
+    validate: function(frm) { gr3_tax_descriptions(frm); }
+});
+
+function gr3_tax_descriptions(frm) {
+    (frm.doc.taxes || []).forEach(function(t) {
+        if (t.account_head && !t.description) {
+            t.description = t.account_head.split(' - ').slice(0, -1).join(' - ') || t.account_head;
+        }
+        // this row's own copy of the field, so the native forms are unaffected
+        var df = frappe.meta.get_docfield(t.doctype, 'description', t.name);
+        if (df) df.reqd = 0;
+    });
+    frm.refresh_field('taxes');
+}
+
+// What is counted is what is priced, so a change to the count moves the taxes.
+frappe.ui.form.on('Purchase Receipt V3 Item', {
+    accepted_qty: function(frm) { gr3_calc_taxes(frm); },
+    rejected_qty: function(frm) { gr3_calc_taxes(frm); },
+    received_qty: function(frm) { gr3_calc_taxes(frm); },
+    items_remove: function(frm) { gr3_calc_taxes(frm); }
+});
+
+// The tax row itself. Purchase Taxes and Charges is shared with the native
+// forms, PO3 and SOC3, so these only act on a receipt. Picking an account
+// fills Rate and Description as the native form does (erpnext accounts.js).
+frappe.ui.form.on('Purchase Taxes and Charges', {
+    account_head: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        var d = locals[cdt][cdn];
+        if (d.docstatus == 1) return;
+        if (!d.charge_type && d.account_head) {
+            frappe.msgprint(__('Please select Charge Type first'));
+            frappe.model.set_value(cdt, cdn, 'account_head', '');
+        } else if (d.account_head) {
+            frappe.call({
+                type: 'GET',
+                method: 'erpnext.controllers.accounts_controller.get_tax_rate',
+                args: { account_head: d.account_head },
+                callback: function(r) {
+                    var acc = r.message || {};
+                    if (d.charge_type !== 'Actual') {
+                        frappe.model.set_value(cdt, cdn, 'rate', acc.tax_rate || 0);
+                    }
+                    frappe.model.set_value(cdt, cdn, 'description', acc.account_name);
+                    gr3_calc_taxes(frm);
+                }
+            });
+        }
+    },
+    charge_type: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        var row = frm.open_grid_row() || frm.get_field('taxes').grid.get_row(cdn);
+        erpnext.accounts.taxes.set_conditional_mandatory_rate_or_amount(row);
+        gr3_calc_taxes(frm);
+    },
+    rate: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        gr3_calc_taxes(frm);
+    },
+    tax_amount: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        gr3_calc_taxes(frm);
+    },
+    row_id: function(frm, cdt, cdn) {
+        if (frm.doctype !== 'Purchase Receipt V3') return;
+        erpnext.accounts.taxes.validate_taxes_and_charges(cdt, cdn);
+        gr3_calc_taxes(frm);
+    },
+    add_deduct_tax: function(frm) {
+        if (frm.doctype === 'Purchase Receipt V3') gr3_calc_taxes(frm);
+    },
+    category: function(frm) {
+        if (frm.doctype === 'Purchase Receipt V3') gr3_calc_taxes(frm);
+    },
+    included_in_print_rate: function(frm) {
+        if (frm.doctype === 'Purchase Receipt V3') gr3_calc_taxes(frm);
     }
 });

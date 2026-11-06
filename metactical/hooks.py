@@ -69,6 +69,7 @@ doctype_js = {
 	"Operation": "custom_scripts/bom_operation/bom_operation.js",
 	# Adds the "Revise Prices" button that opens the ICL Pricing grid (merged from the icl_pricing app).
 	"Supplier Order Confirmation V3": "public/js/price_grid_supplier_order_confirmation_v3.js",
+	"Supplier": "custom_scripts/supplier/supplier.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -206,6 +207,7 @@ override_doctype_class = {
 	"Material Request": "metactical.custom_scripts.material_request.material_request.CustomMaterialRequest",
 	"Item Group": "metactical.custom_scripts.item_group.item_group.CustomItemGroup",
  	"Tag": "metactical.custom_scripts.tag.tag.CustomTag",
+	"Supplier": "metactical.custom_scripts.supplier.supplier.CustomSupplier",
 }
 
 # Scheduled Tasks
@@ -978,6 +980,10 @@ fixtures = [{
 			"Supplier-custom_column_break_duesj",
 			"Supplier-custom_sender_address",
 			"Supplier-custom_sender_email",
+			"Supplier-section_break_e11nr",
+			"Supplier-nat_po3_bcc_email",
+			"Supplier-nat_po3_signature_user",
+			"Supplier-nat_po3_signature",
 			"Sales Order Item-barcode"
 			"Supplier-po3_section"
 		]]]

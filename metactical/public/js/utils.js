@@ -54,3 +54,36 @@ metactical.utils.update_web_specification_description_options = function (frm, d
 
     frm.refresh_field("neb_website_specifications");
 };
+// A Link to User shows the user's full name rather than their email (User is not
+// set to show its title in links site-wide, so this is per field). The value
+// stored is still the user id. The control's own title lookup is replaced, not
+// raced: Frappe's would answer the email, since User has no title-in-link. Covers
+// the read-only view too (df.formatter). Call it from refresh and from the
+// field's change.
+metactical.utils.show_user_full_name = function (frm, fieldname) {
+	const field = frm.fields_dict[fieldname];
+	if (!field) return;
+	const title = (user) => {
+		const t = frappe.utils.get_link_title("User", user);
+		return t && t !== user ? t : null;
+	};
+	const load = (user) => {
+		if (!user || title(user)) return Promise.resolve();
+		return frappe.db.get_value("User", user, "full_name").then((r) => {
+			frappe.utils.add_link_title("User", user, (r.message && r.message.full_name) || user);
+		});
+	};
+	if (!field.__mt_full_name) {
+		field.__mt_full_name = true;
+		field.is_title_link = () => true;
+		field.set_link_title = function (value) {
+			return load(value).then(() => {
+				if (frm.doc[fieldname] === value) {
+					this.translate_and_set_input_value(title(value) || value, value);
+				}
+			});
+		};
+		field.df.formatter = (value) => frappe.utils.escape_html(title(value) || value || "");
+	}
+	load(frm.doc[fieldname]).then(() => field.refresh());
+};
