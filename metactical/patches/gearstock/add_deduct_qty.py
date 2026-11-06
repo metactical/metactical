@@ -92,5 +92,6 @@ def add_website_deduct_qty(item):
 
 	if item.get("custom_neb_website_deduct_qty"):
 		item.custom_neb_website_deduct_qty = []
+		return
 
 	item.append("custom_neb_website_deduct_qty", {"lead_source": "Website - GearStock", "qty": 0})
