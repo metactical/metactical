@@ -1,0 +1,151 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-05 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "resource",
+  "pos_profile",
+  "qty",
+  "portions",
+  "column_break_1",
+  "stock_entry",
+  "opening_entry",
+  "cooked_by",
+  "cooked_at",
+  "batch_id",
+  "cost"
+ ],
+ "fields": [
+  {
+   "fieldname": "resource",
+   "fieldtype": "Link",
+   "label": "Resource",
+   "options": "FnB Prepared Resource",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "fetch_from": "resource.pos_profile",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Int",
+   "label": "Batches",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "portions",
+   "fieldtype": "Int",
+   "label": "Portions",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Link",
+   "label": "Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "opening_entry",
+   "fieldtype": "Link",
+   "label": "Opening Entry",
+   "options": "POS Opening",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cooked_by",
+   "fieldtype": "Link",
+   "label": "Cooked By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cooked_at",
+   "fieldtype": "Datetime",
+   "label": "Cooked At",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "batch_id",
+   "fieldtype": "Data",
+   "label": "Batch Id",
+   "unique": 1,
+   "read_only": 1,
+   "description": "The till's id of the press; a retry with the same id is not a second batch."
+  },
+  {
+   "fieldname": "cost",
+   "fieldtype": "Currency",
+   "label": "Ingredient Cost",
+   "read_only": 1,
+   "options": "Company:company:default_currency"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB Batch",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash",
+ "description": "One batch cooked on the till (one press of the resource's button): the Stock Entry that issued its ingredients and the portions it produced.",
+ "track_changes": 1,
+ "allow_import": 1
+}

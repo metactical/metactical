@@ -158,19 +158,40 @@ doc_events = {
 		"on_update": "metactical.custom_scripts.project.project.on_update"
 	},
 	"Item Price": {
-		"validate": "metactical.custom_scripts.item_price.item_price.on_validate",
-		"on_update": "metactical.custom_scripts.utils.fnb_sync.item_price_on_update",
-		"on_trash": "metactical.custom_scripts.utils.fnb_sync.item_price_on_trash",
+		"validate": "metactical.custom_scripts.item_price.item_price.on_validate"
 	},
-	# Food and Beverage (restaurant) support: sync to POSWeb + marketing guard
-	"Item": {
-		"on_update": "metactical.custom_scripts.utils.fnb_sync.item_on_update"
-	},
+	# Food and Beverage (restaurant) support. No existing doctype is changed: F&B data lives on the
+	# FnB * doctypes (companions FnB POS Profile, FnB Customer, FnB Address, FnB Order, FnB Opening,
+	# FnB Closing; configuration FnB Menu / Category / Item / Modifier Group / Size / Prepared Resource;
+	# FnB Batch). Changes reach the POS through Frappe Webhook records (fnb_sync.install_fnb_webhooks)
+	# posting to rabbitmq_handler.webhook, so every send is in the Webhook Request Log.
+	# before_insert -> marketing guard; on_trash -> drop the companion row so the original can be deleted.
 	"POS Profile": {
-		"on_update": "metactical.custom_scripts.utils.fnb_sync.pos_profile_on_update"
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original",
 	},
 	"Email Group Member": {
 		"before_insert": "metactical.custom_scripts.utils.fnb_api.guard_email_group_member"
+	},
+	"Customer": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
+	},
+	"Address": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
+	},
+	"Sales Order": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
+	},
+	"Sales Invoice": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
+	},
+	"Journal Entry": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
+	},
+	"End of Day Closing": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
+	},
+	"POS Opening": {
+		"on_trash": "metactical.custom_scripts.utils.fnb_api.on_trash_original"
 	},
 	# "RabbitMQ Config": {
 	# 	"on_update": "metactical.custom_scripts.rabbitmq.integration.config_change_handler"
@@ -287,26 +308,6 @@ override_whitelisted_methods = {
 fixtures = [{
 		"dt": "Custom Field",
 		"filters": [["name", "in", [
-			'POS Profile-neb_food_and_beverage',
-			'POS Profile-neb_fnb_section',
-			'POS Profile-neb_idle_lock_minutes',
-			'POS Profile-neb_fnb_customer_group',
-			'POS Profile-neb_fnb_item_group',
-			'POS Profile-neb_fnb_column',
-			'POS Profile-neb_tips_payable_account',
-			'POS Profile-neb_slice_cost_account',
-			'POS Profile-neb_slices_per_pie',
-			'Sales Order-neb_order_type',
-			'Sales Order-neb_delivery_area',
-			'Sales Order-neb_tip_amount',
-			'Sales Order-neb_cash_rounding',
-			'Sales Invoice-neb_order_type',
-			'Sales Invoice-neb_delivery_area',
-			'Sales Invoice-neb_tip_amount',
-			'Sales Invoice-neb_cash_rounding',
-			'Customer-neb_owned_by_pos_profile',
-			'Address-neb_delivery_area',
-			'Address-neb_delivery_zone',
 			'Sales Invoice-section_esr',
 			'Sales Invoice-esr_reference',
 			'Sales Invoice-column_esr',
@@ -1682,6 +1683,7 @@ fixtures = [{
 #For using in print format
 jinja = {
 	"methods": [
+		"metactical.custom_scripts.utils.fnb_sync.fnb_webhook_body",
 		"metactical.custom_scripts.purchase_order.purchase_order.get_po_items",
 		"metactical.custom_scripts.purchase_receipt.purchase_receipt.get_pr_items",
 		"metactical.barcode_generator.get_barcode",

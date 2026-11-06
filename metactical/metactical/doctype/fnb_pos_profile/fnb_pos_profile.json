@@ -1,0 +1,225 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:pos_profile",
+ "creation": "2026-11-04 12:00:00.000000",
+ "description": "Food and Beverage settings of a POS Profile: which FnB Menu the till shows, order types, tips, discounts, notes and reasons. The POS Profile itself is not changed; a profile is a Food and Beverage branch when it has an enabled row here.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pos_profile",
+  "enabled",
+  "menu",
+  "idle_lock_minutes",
+  "delivery_city",
+  "column_break_1",
+  "customer_group",
+  "tips_payable_account",
+  "section_order_types",
+  "order_types",
+  "section_money",
+  "tip_presets",
+  "discount_presets",
+  "max_discount_percent",
+  "column_break_2",
+  "cash_rounding_to",
+  "variance_warn_portions",
+  "section_lists",
+  "order_notes",
+  "discount_reasons",
+  "column_break_3",
+  "variance_reasons"
+ ],
+ "fields": [
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1,
+   "description": "Off = the profile behaves like a retail branch again (nothing is deleted)."
+  },
+  {
+   "fieldname": "menu",
+   "fieldtype": "Link",
+   "label": "Menu",
+   "options": "FnB Menu",
+   "description": "The till's categories, items, sizes and modifiers. Shared by every profile that links it.",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "idle_lock_minutes",
+   "fieldtype": "Int",
+   "label": "Idle Lock Minutes",
+   "default": "10",
+   "description": "Minutes of inactivity before the till locks (0 = never)."
+  },
+  {
+   "fieldname": "delivery_city",
+   "fieldtype": "Data",
+   "label": "Delivery City",
+   "description": "City written on addresses the till creates (the till only asks for the street)."
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer_group",
+   "fieldtype": "Link",
+   "label": "Customer Group",
+   "options": "Customer Group",
+   "reqd": 1,
+   "description": "Customers created by this branch go here and are never shown to retail branches."
+  },
+  {
+   "fieldname": "tips_payable_account",
+   "fieldtype": "Link",
+   "label": "Tips Payable Account",
+   "options": "Account",
+   "reqd": 1,
+   "description": "Liability account tips are booked to (never revenue)."
+  },
+  {
+   "fieldname": "section_order_types",
+   "fieldtype": "Section Break",
+   "label": "Order Types"
+  },
+  {
+   "fieldname": "order_types",
+   "fieldtype": "Table",
+   "label": "Order Types",
+   "options": "FnB Order Type",
+   "description": "Dine-in / Take-out / Delivery or whatever this concept needs. Flags decide what the till asks for and adds."
+  },
+  {
+   "fieldname": "section_money",
+   "fieldtype": "Section Break",
+   "label": "Tips, discounts and cash"
+  },
+  {
+   "fieldname": "tip_presets",
+   "fieldtype": "Data",
+   "label": "Tip Presets (%)",
+   "default": "10,15,20",
+   "description": "Comma-separated percentages offered at payment."
+  },
+  {
+   "fieldname": "discount_presets",
+   "fieldtype": "Data",
+   "label": "Discount Presets (%)",
+   "default": "10,15,20,25",
+   "description": "Comma-separated percentages; one order-level discount, a reason is mandatory."
+  },
+  {
+   "fieldname": "max_discount_percent",
+   "fieldtype": "Int",
+   "label": "Maximum Discount (%)",
+   "default": "50"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cash_rounding_to",
+   "fieldtype": "Currency",
+   "label": "Cash Rounding To",
+   "default": "0.05",
+   "description": "Cash tenders are rounded to this (0.05 in Canada). 0 = no rounding."
+  },
+  {
+   "fieldname": "variance_warn_portions",
+   "fieldtype": "Int",
+   "label": "Variance Warning (portions)",
+   "default": "2",
+   "description": "The closing warns (never blocks) when a resource is off by more than this."
+  },
+  {
+   "fieldname": "section_lists",
+   "fieldtype": "Section Break",
+   "label": "Notes and reasons"
+  },
+  {
+   "fieldname": "order_notes",
+   "fieldtype": "Table",
+   "label": "Order Note Chips",
+   "options": "FnB Order Note",
+   "description": "One-tap notes on a line (No onions, Extra broth)."
+  },
+  {
+   "fieldname": "discount_reasons",
+   "fieldtype": "Table",
+   "label": "Discount Reasons",
+   "options": "FnB Discount Reason"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "variance_reasons",
+   "fieldtype": "Table",
+   "label": "Variance Reasons",
+   "options": "FnB Variance Reason"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB POS Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "allow_import": 1
+}

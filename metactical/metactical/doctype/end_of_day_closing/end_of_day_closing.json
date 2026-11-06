@@ -35,16 +35,7 @@
   "section_break_chtkt",
   "return_invoices",
   "section_break_q4f2a",
-  "closing_notes",
-  "section_fnb",
-  "neb_opening_slices",
-  "neb_pies_baked",
-  "neb_slices_sold",
-  "column_break_fnb",
-  "neb_slices_counted",
-  "neb_slice_variance",
-  "neb_slice_variance_reason",
-  "neb_tips_collected"
+  "closing_notes"
  ],
  "fields": [
   {
@@ -233,65 +224,12 @@
    "fieldtype": "Link",
    "label": "Opening Entry",
    "options": "POS Opening"
-  },
-  {
-   "collapsible": 1,
-   "depends_on": "eval:doc.neb_pies_baked || doc.neb_slices_counted || doc.neb_tips_collected",
-   "fieldname": "section_fnb",
-   "fieldtype": "Section Break",
-   "label": "Food and Beverage"
-  },
-  {
-   "fieldname": "neb_opening_slices",
-   "fieldtype": "Int",
-   "label": "Opening Slices",
-   "read_only": 1
-  },
-  {
-   "fieldname": "neb_pies_baked",
-   "fieldtype": "Int",
-   "label": "Pies Baked",
-   "read_only": 1
-  },
-  {
-   "fieldname": "neb_slices_sold",
-   "fieldtype": "Int",
-   "label": "Slices Sold",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_fnb",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "neb_slices_counted",
-   "fieldtype": "Int",
-   "label": "Slices Counted",
-   "read_only": 1
-  },
-  {
-   "fieldname": "neb_slice_variance",
-   "fieldtype": "Int",
-   "label": "Slice Variance",
-   "read_only": 1
-  },
-  {
-   "fieldname": "neb_slice_variance_reason",
-   "fieldtype": "Data",
-   "label": "Variance Reason",
-   "read_only": 1
-  },
-  {
-   "fieldname": "neb_tips_collected",
-   "fieldtype": "Currency",
-   "label": "Tips Collected",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-13 12:00:00.000000",
+ "modified": "2025-11-21 12:43:46.098447",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "End of Day Closing",

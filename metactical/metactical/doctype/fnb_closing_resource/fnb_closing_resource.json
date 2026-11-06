@@ -1,0 +1,89 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-05 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "resource",
+  "opening_portions",
+  "batches",
+  "portions_produced",
+  "portions_consumed",
+  "portions_counted",
+  "variance",
+  "variance_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "resource",
+   "fieldtype": "Link",
+   "label": "Resource",
+   "options": "FnB Prepared Resource",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "opening_portions",
+   "fieldtype": "Int",
+   "label": "Opening",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "batches",
+   "fieldtype": "Int",
+   "label": "Batches",
+   "columns": 1
+  },
+  {
+   "fieldname": "portions_produced",
+   "fieldtype": "Int",
+   "label": "Produced",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "portions_consumed",
+   "fieldtype": "Int",
+   "label": "Consumed",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "portions_counted",
+   "fieldtype": "Int",
+   "label": "Counted",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "variance",
+   "fieldtype": "Int",
+   "label": "Variance",
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "counted - (opening + produced - consumed)"
+  },
+  {
+   "fieldname": "variance_reason",
+   "fieldtype": "Data",
+   "label": "Reason",
+   "columns": 2
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB Closing Resource",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1
+}

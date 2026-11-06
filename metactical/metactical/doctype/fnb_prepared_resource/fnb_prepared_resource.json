@@ -1,0 +1,186 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-05 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pos_profile",
+  "label",
+  "action_label",
+  "icon",
+  "disabled",
+  "column_break_1",
+  "portion_noun",
+  "portions_per_batch",
+  "tracking",
+  "section_recipe",
+  "recipe_item",
+  "stock_entry_type",
+  "column_break_2",
+  "cost_account",
+  "section_consumers",
+  "consumers"
+ ],
+ "fields": [
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "action_label",
+   "fieldtype": "Data",
+   "label": "Action Label",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "The till button: Bake Pie, Brew Soup, Refill Salad Bar."
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Attach Image",
+   "label": "Icon"
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled",
+   "default": "0"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "portion_noun",
+   "fieldtype": "Data",
+   "label": "Portion Noun",
+   "reqd": 1,
+   "default": "portion",
+   "description": "Singular: slice, bowl, serving."
+  },
+  {
+   "fieldname": "portions_per_batch",
+   "fieldtype": "Int",
+   "label": "Portions per Batch",
+   "reqd": 1,
+   "default": "1"
+  },
+  {
+   "fieldname": "tracking",
+   "fieldtype": "Select",
+   "label": "Tracking",
+   "options": "Count remaining at close\nProduce only",
+   "default": "Count remaining at close",
+   "in_list_view": 1,
+   "description": "Count remaining: the till asks how many portions are left at opening and closing (hot case, salad bar). Produce only: batches are costed, nothing is counted (a broth pot)."
+  },
+  {
+   "fieldname": "section_recipe",
+   "fieldtype": "Section Break",
+   "label": "Recipe and costing"
+  },
+  {
+   "fieldname": "recipe_item",
+   "fieldtype": "Link",
+   "label": "Recipe Item",
+   "options": "Item",
+   "reqd": 1,
+   "description": "Item with a Product Bundle: one batch issues the bundle's items from the branch warehouse."
+  },
+  {
+   "fieldname": "stock_entry_type",
+   "fieldtype": "Link",
+   "label": "Stock Entry Type",
+   "options": "Stock Entry Type",
+   "reqd": 1,
+   "description": "A Material Issue type (Hot Case Pie Baked, Batch Cooked)."
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cost_account",
+   "fieldtype": "Link",
+   "label": "Cost Account",
+   "options": "Account",
+   "reqd": 1,
+   "description": "Expense account the issued ingredients are booked to."
+  },
+  {
+   "fieldname": "section_consumers",
+   "fieldtype": "Section Break",
+   "label": "Consumed by"
+  },
+  {
+   "fieldname": "consumers",
+   "fieldtype": "Table",
+   "label": "Consumers",
+   "options": "FnB Resource Consumer",
+   "description": "Sold items that draw portions from this resource. Used to compute consumption per shift."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB Prepared Resource",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "format:{pos_profile} - {label}",
+ "description": "Something the kitchen makes in batches from stock and sells off in portions: a pie for the hot case, a pot of broth, a salad bar tray.",
+ "track_changes": 1,
+ "title_field": "label",
+ "allow_import": 1
+}

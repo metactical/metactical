@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:sales_order",
+ "creation": "2026-11-04 12:00:00.000000",
+ "description": "Food and Beverage details of a POS Sales Order (order type, delivery area, tip, cash rounding) and the documents it became.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sales_order",
+  "pos_profile",
+  "order_type",
+  "delivery_area",
+  "column_break_1",
+  "tip_amount",
+  "tip_mode_of_payment",
+  "cash_rounding",
+  "section_links",
+  "sales_invoice",
+  "column_break_2",
+  "tip_journal_entry"
+ ],
+ "fields": [
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "order_type",
+   "fieldtype": "Data",
+   "label": "Order Type",
+   "in_list_view": 1,
+   "description": "Label of the FnB Order Type chosen on the till."
+  },
+  {
+   "fieldname": "delivery_area",
+   "fieldtype": "Link",
+   "label": "Delivery Area",
+   "options": "Delivery Area"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tip_amount",
+   "fieldtype": "Currency",
+   "label": "Tip",
+   "options": "Company:company:default_currency",
+   "description": "Collected with the tenders, booked to Tips Payable, not part of the invoice."
+  },
+  {
+   "fieldname": "tip_mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Tip Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "fieldname": "cash_rounding",
+   "fieldtype": "Currency",
+   "label": "Cash Rounding",
+   "options": "Company:company:default_currency",
+   "description": "Cash collected minus the exact total (5-cent rounding), booked as a Round Off charge row."
+  },
+  {
+   "fieldname": "section_links",
+   "fieldtype": "Section Break",
+   "label": "Documents"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tip_journal_entry",
+   "fieldtype": "Link",
+   "label": "Tip Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB Order",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "allow_import": 1
+}

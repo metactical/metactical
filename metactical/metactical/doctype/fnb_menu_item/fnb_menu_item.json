@@ -1,0 +1,183 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-05 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "menu",
+  "category",
+  "sort_order",
+  "column_break_1",
+  "image",
+  "item",
+  "packaging_item",
+  "made_to_order",
+  "disabled",
+  "section_sizes",
+  "sizes",
+  "section_modifiers",
+  "modifier_groups",
+  "section_choices",
+  "choices"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "menu",
+   "fieldtype": "Link",
+   "label": "Menu",
+   "options": "FnB Menu",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Link",
+   "label": "Category",
+   "options": "FnB Menu Category",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order",
+   "default": "0"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image",
+   "description": "Empty = the Item's image."
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "description": "The sellable item when the menu item has no sizes.",
+   "depends_on": "eval:!(doc.sizes && doc.sizes.length)"
+  },
+  {
+   "fieldname": "packaging_item",
+   "fieldtype": "Link",
+   "label": "Packaging Item",
+   "options": "Item",
+   "description": "Added for order types that add packaging (no-size items).",
+   "depends_on": "eval:!(doc.sizes && doc.sizes.length)"
+  },
+  {
+   "fieldname": "made_to_order",
+   "fieldtype": "Check",
+   "label": "Made to Order",
+   "default": "1",
+   "description": "Prints on the kitchen ticket. Off for ready items (drinks, hot-case portions)."
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled",
+   "default": "0"
+  },
+  {
+   "fieldname": "section_sizes",
+   "fieldtype": "Section Break",
+   "label": "Sizes"
+  },
+  {
+   "fieldname": "sizes",
+   "fieldtype": "Table",
+   "label": "Sizes",
+   "options": "FnB Menu Item Size",
+   "description": "One row per size, each with its own Item (and price in the branch price list)."
+  },
+  {
+   "fieldname": "section_modifiers",
+   "fieldtype": "Section Break",
+   "label": "Modifiers"
+  },
+  {
+   "fieldname": "modifier_groups",
+   "fieldtype": "Table",
+   "label": "Modifier Groups",
+   "options": "FnB Menu Item Modifier Group"
+  },
+  {
+   "fieldname": "section_choices",
+   "fieldtype": "Section Break",
+   "label": "Choices (combo contents)"
+  },
+  {
+   "fieldname": "choices",
+   "fieldtype": "Table",
+   "label": "Choices",
+   "options": "FnB Menu Item Choice",
+   "description": "The customer picks these when ordering (a combo's drink)."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB Menu Item",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "format:{menu} - {title}",
+ "description": "A card on the till: a dish with sizes, a single item, or a combo with choices.",
+ "track_changes": 1,
+ "title_field": "title",
+ "allow_import": 1
+}

@@ -1,4 +1,5 @@
 import frappe
+from metactical.custom_scripts.utils.fnb_api import record_fnb_closing
 
 @frappe.whitelist()
 def create_closing_entry(*args, **kwargs):
@@ -55,19 +56,10 @@ def create_closing_entry(*args, **kwargs):
         end_of_day_closing.expected_cash = expected_data.get("expected_cash", 0)
         end_of_day_closing.opening_entry = form_data.get("OpeningEntry")
 
-        # Food and Beverage branches close the hot case and the tips together with the cash
+        # Food and Beverage branches close the hot case and the tips together with the cash; the figures
+        # live on the FnB Closing companion (the End of Day Closing doctype is unchanged), written once the
+        # closing entry exists
         fnb = form_data.get("FoodAndBeverage") or {}
-        if fnb:
-            end_of_day_closing.neb_opening_slices = int(fnb.get("OpeningSlices") or 0)
-            end_of_day_closing.neb_pies_baked = int(fnb.get("PiesBaked") or 0)
-            end_of_day_closing.neb_slices_sold = int(fnb.get("SlicesSold") or 0)
-            end_of_day_closing.neb_slices_counted = int(fnb.get("SlicesCounted") or 0)
-            end_of_day_closing.neb_slice_variance = (
-                end_of_day_closing.neb_slices_counted
-                - (end_of_day_closing.neb_opening_slices + end_of_day_closing.neb_pies_baked * int(fnb.get("SlicesPerPie") or 8) - end_of_day_closing.neb_slices_sold)
-            )
-            end_of_day_closing.neb_slice_variance_reason = fnb.get("VarianceReason") or ""
-            end_of_day_closing.neb_tips_collected = float(fnb.get("TipsCollected") or 0)
         
         # Process EOD Cash with validations
         cash_denominations = [100, 50, 20, 10, 5, 2, 1, 0.25, 0.10, 0.05, 0.01]
@@ -179,6 +171,8 @@ def create_closing_entry(*args, **kwargs):
         
         # Save the document
         end_of_day_closing.insert(ignore_permissions=True)
+        if fnb:
+            record_fnb_closing(end_of_day_closing.name, fnb)
         end_of_day_closing.submit()
         frappe.db.commit()
         

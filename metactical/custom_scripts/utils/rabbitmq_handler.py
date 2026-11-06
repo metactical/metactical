@@ -72,6 +72,19 @@ def webhook():
     username = data['username']
     password = data['password']
     
+    # A body may carry several messages at once (`messages`: list) - the Food and Beverage webhooks send
+    # the profile, its tax template and the user PINs in one request. An empty list means the webhook
+    # fired for a document the POS does not need (nothing is published, the request is still logged).
+    if 'messages' in data:
+        messages = data['messages']
+        if isinstance(messages, str):
+            messages = json.loads(messages or '[]')
+        if not messages:
+            return {'status': 'Nothing to publish'}
+        for message in messages:
+            publish_to_rabbitmq(server_ip, exchange, exchange_type, routing_key, message, username, password, queue_name)
+        return {'status': f'{len(messages)} message(s) published to RabbitMQ'}
+
     # Create the message dictionary with all other fields except the configuration fields
     message_content = {key: value for key, value in data.items() if key not in config_fields}
     

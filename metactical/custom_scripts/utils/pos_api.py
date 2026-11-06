@@ -12,7 +12,8 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_a
 from frappe.desk.doctype.tag.tag import add_tag
 from datetime import timedelta
 from metactical.custom_scripts.utils.fnb_api import (
-	get_fnb_profile, apply_fnb_invoice_fields, create_tip_entry_safe, is_fnb_customer, cash_rounding_row, ORDER_TYPES,
+	get_fnb_profile, apply_fnb_invoice_fields, create_tip_entry_safe, is_fnb_customer, cash_rounding_row,
+	customer_display_name, record_fnb_customer, set_delivery_area, record_fnb_order, link_fnb_invoice,
 )
 
 @frappe.whitelist()
@@ -519,21 +520,16 @@ def create_sales_order(form_data, customer, company=None):
 
 	fnb = get_fnb_profile(form_data.get('POSProfile'))
 	if fnb:
-		order_type = form_data.get('OrderType') or ''
-		so_data.update({
-			'disable_rounded_total': 1,
-			'neb_order_type': order_type if order_type in ORDER_TYPES else '',
-			'neb_tip_amount': flt(form_data.get('Tip')),
-			'neb_cash_rounding': flt(form_data.get('CashRounding')),
-			'neb_delivery_area': (form_data.get('Customer') or {}).get('DeliveryArea') or None,
-		})
+		# Food and Beverage: never round to the dollar (the 5-cent cash rounding is a charge row, below).
+		# Order type, tip, rounding and delivery area go on the FnB Order companion once the order exists.
+		so_data.update({'disable_rounded_total': 1})
  
 	if form_data.get("Location"):
 		so_data.update({'shipping_address_name': company.company_address})
 	else:
 		customer_data = form_data.get("Customer", {})
 		if customer_data.get("AddressLine1") and customer_data.get("City"):
-			shipping_address = get_shipping_address(form_data, customer)
+			shipping_address = get_shipping_address(form_data, customer, fnb)
 			if shipping_address:
 				so_data.update({'shipping_address_name': shipping_address})
 	
@@ -556,6 +552,8 @@ def create_sales_order(form_data, customer, company=None):
 	try:
 		sales_order.insert(ignore_permissions=True)
 		update_coupon_code_redeemed_in(sales_order, coupon_codes)
+		if fnb:
+			record_fnb_order(sales_order, form_data, fnb)
 	except Exception as e:
 		
 		so_data['items'] = [{
@@ -569,6 +567,12 @@ def create_sales_order(form_data, customer, company=None):
 		sales_order = frappe.get_doc(so_data)
 		
 		sales_order.insert(ignore_permissions=True)
+		if fnb:
+			# keep order type / tip / rounding with the "fix and resubmit" order; never let it mask the error
+			try:
+				record_fnb_order(sales_order, form_data, fnb)
+			except Exception:
+				frappe.log_error(title="FnB Order (error order)", message=frappe.get_traceback())
 		frappe.set_user("Administrator")
 		frappe.db.commit()
 		
@@ -583,7 +587,7 @@ def create_sales_order(form_data, customer, company=None):
 	frappe.db.commit()    
 	return {"success": True, "sales_order": sales_order, "error": ""}
 
-def get_shipping_address(form_data, customer):
+def get_shipping_address(form_data, customer, fnb=None):
 	customer_data = form_data.get("Customer", {})
  
 	phone = customer_data.get("Phone", "")
@@ -608,6 +612,7 @@ def get_shipping_address(form_data, customer):
 							)
 	
 	if address:
+		set_delivery_area(address[0].name, customer_data.get("DeliveryArea"), fnb)
 		return address[0].name
 
 	addr = frappe.get_doc({
@@ -624,7 +629,6 @@ def get_shipping_address(form_data, customer):
 		"pincode": postal_code,
 		"phone": phone,
 		"email_id": email,
-		"neb_delivery_area": customer_data.get("DeliveryArea") or None,
 		"links": [{
 			"link_doctype": "Customer",
 			"link_name": customer["customer"]
@@ -632,6 +636,7 @@ def get_shipping_address(form_data, customer):
 	})
  
 	addr.insert(ignore_permissions=True)
+	set_delivery_area(addr.name, customer_data.get("DeliveryArea"), fnb)
 	return addr.name
 
 def check_coupon_code(sales_order, form_data):
@@ -771,6 +776,7 @@ def submit_sales_order(sales_order, form_data, log):
     sales_invoice = None
     try:
         sales_invoice = create_invoice(sales_order, form_data)
+        link_fnb_invoice(sales_order.name, sales_invoice.name)
         frappe.db.set_value('POS API Log', log, 'sales_invoice', sales_invoice.name)
         frappe.db.commit()
     except Exception as e:
@@ -816,7 +822,7 @@ def submit_sales_order(sales_order, form_data, log):
             add_payment_info_to_sales_order(sales_order, form_data)
             
         if sales_invoice.docstatus == 1:
-            create_tip_entry_safe(sales_invoice, form_data)
+            create_tip_entry_safe(sales_invoice, form_data, sales_order=sales_order.name)
 
         # queue_action(sales_invoice, 'submit')
         frappe.set_user("Administrator")
@@ -1014,9 +1020,8 @@ def get_customer(form_data):
 		fnb = get_fnb_profile(form_data.get('POSProfile'))
 		customer = frappe.get_doc({
 			'doctype': 'Customer',
-			'customer_name': (form_data['Customer']['FirstName'] + ' ' + (form_data['Customer']['LastName'] or '')).strip(),
-			'customer_group': fnb.neb_fnb_customer_group if fnb and fnb.neb_fnb_customer_group else 'Retail',
-			'neb_owned_by_pos_profile': fnb.name if fnb else None,
+			'customer_name': customer_display_name(form_data['Customer'], fnb),
+			'customer_group': fnb.customer_group if fnb and fnb.customer_group else 'Retail',
 			'territory': 'All Territories',
 			'first_name': form_data['Customer']['FirstName'],
 			'last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
@@ -1027,10 +1032,12 @@ def get_customer(form_data):
 		})
 		
 		customer.save(ignore_permissions=True)
+		if fnb:
+			record_fnb_customer(customer.name, fnb)
 		contact = create_contact(form_data, customer)
 		customer_form_data = form_data['Customer']
 		if not customer_form_data.get('Location') and customer_form_data.get('AddressLine1'):
-			address = create_address(form_data, customer)
+			address = create_address(form_data, customer, fnb)
 
 			if address['success']:
 				frappe.db.set_value('Customer', customer.name, 'customer_primary_address', address['address'])
@@ -1047,7 +1054,7 @@ def get_customer(form_data):
 		frappe.log_error(title='Create Customer Error', message=frappe.get_traceback())
 		return {"error": str(e), "success": False, "customer": None}
 	
-def create_address(form_data, customer):
+def create_address(form_data, customer, fnb=None):
 	frappe.set_user(form_data['SalesPerson'])
 	try:
 		phone = form_data['Customer']['Phone'].replace(' ', '') if form_data['Customer']['Phone'] else ""
@@ -1056,8 +1063,7 @@ def create_address(form_data, customer):
 			'address_type': 'Shipping',
 			'ifw_first_name': form_data['Customer']['FirstName'] if form_data['Customer']['FirstName'] else '',
 			'ifw_last_name': form_data['Customer']['LastName'] if form_data['Customer']['LastName'] else '',
-			'address_title': (form_data['Customer']['FirstName'] + ' ' + (form_data['Customer']['LastName'] or '')).strip(),
-			'neb_delivery_area': form_data['Customer'].get('DeliveryArea') or None,
+			'address_title': customer_display_name(form_data['Customer'], fnb),
 			'address_line1': form_data['Customer']['AddressLine1'] if form_data['Customer']['AddressLine1'] else '',
 			'address_line2': form_data['Customer']['AddressLine2'] if form_data['Customer']['AddressLine2'] else '',
 			'city': form_data['Customer']['City'] if form_data['Customer']['City'] else '',
@@ -1072,6 +1078,7 @@ def create_address(form_data, customer):
 
 		address = frappe.get_doc(address_info)
 		address.save(ignore_permissions=True)
+		set_delivery_area(address.name, form_data['Customer'].get('DeliveryArea'), fnb)
 		frappe.db.commit()
 		frappe.set_user("Administrator")
 		return {"address": address.name, "success": True, "message": ""}

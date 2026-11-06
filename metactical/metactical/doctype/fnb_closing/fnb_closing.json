@@ -1,0 +1,91 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:closing_entry",
+ "creation": "2026-11-04 12:00:00.000000",
+ "description": "Prepared resource reconciliation and tips of an End of Day Closing on a Food and Beverage branch. The closing entry itself is not changed.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "closing_entry",
+  "tips_collected",
+  "section_resources",
+  "resources"
+ ],
+ "fields": [
+  {
+   "fieldname": "closing_entry",
+   "fieldtype": "Link",
+   "label": "Closing Entry",
+   "options": "End of Day Closing",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tips_collected",
+   "fieldtype": "Currency",
+   "label": "Tips Collected"
+  },
+  {
+   "fieldname": "section_resources",
+   "fieldtype": "Section Break",
+   "label": "Prepared resources"
+  },
+  {
+   "fieldname": "resources",
+   "fieldtype": "Table",
+   "label": "Resources",
+   "options": "FnB Closing Resource",
+   "description": "Opening, produced (FnB Batch) and consumed (sold items x portions) are computed by the ERP; counted and reason come from the till."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-11-05 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Metactical",
+ "name": "FnB Closing",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "allow_import": 1
+}
