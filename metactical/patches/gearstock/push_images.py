@@ -12,6 +12,11 @@ and listed in the report. For each one:
      the report.
 An item whose record would come out the same is not saved, so a re-run pushes nothing, unless
 force is on (repush_images_v1), which saves and pushes every record again.
+With resave_existing on, an item whose record already has Website - GearStock on its images is
+not loaded from Camo: the record is just saved again with the push on, which fires the webhook.
+Items without such a record are loaded from Camo as usual. It is off by default.
+With load_from_camo off (it is on by default), Camo is never called: items whose record has
+GearStock are saved again as above, and every other item is skipped and listed in the report.
 
 It is not in patches.txt: upsert_items_v7 queues it as its last step, so the first batch lands in
 the default queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
@@ -26,7 +31,8 @@ Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log). When the
 gearstock_images_report.csv is written next to gearstock_items.json, listing every item that
 did not reach GearStock and why.
 
-When the last batch is done it queues add_deduct_qty, which sends the inventory.
+When the last batch is done it queues add_deduct_qty, which sends the inventory, unless
+then_deduct is off.
 
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.push_images.run
 To pick up a stopped run, pass the batch start from the log, e.g. --kwargs "{'start': 3000}".
@@ -59,27 +65,30 @@ BATCH_TIMEOUT = 6 * 60 * 60  # seconds; one batch of 1000 runs about 1-2 hours
 SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
-COUNT_KEYS = ("pushed", "already_synced", "no_images", "busy", "failed", "not_in_erp")
+COUNT_KEYS = ("pushed", "already_synced", "resaved", "no_images", "no_record", "busy", "failed", "not_in_erp")
 # The reason written next to each status in the report.
 REASONS = {
 	"no_images": "No images on Camo",
+	"no_record": "No GearStock image record, Camo not loaded",
 	"not_in_erp": "Not in ERPNext",
 	"busy": "Another image sync was running on the item",
 	"failed": "Failed, see the Error Log",
 }
 
 
-def start(force=False, then_deduct=True):
+def start(force=False, then_deduct=True, resave_existing=False, load_from_camo=True):
 	"""Queue the first batch. Called by upsert_items_v7 when it is done, and by repush_images_v1."""
 	if missing_lead_sources():
 		frappe.logger("gearstock", allow_site=True).error(
 			"GearStock images: not queued, a Lead Source is missing: " + ", ".join(missing_lead_sources())
 		)
 		return
-	enqueue_batch(0, force=force, then_deduct=then_deduct)
+	enqueue_batch(
+		0, force=force, then_deduct=then_deduct, resave_existing=resave_existing, load_from_camo=load_from_camo
+	)
 
 
-def enqueue_batch(start, counts=None, force=False, then_deduct=True):
+def enqueue_batch(start, counts=None, force=False, then_deduct=True, resave_existing=False, load_from_camo=True):
 	"""Queue the job for one batch. Each batch queues the next when it is done, so no single job
 	comes near a timeout and a stopped run picks up from the batch it was on."""
 	frappe.enqueue(
@@ -93,16 +102,23 @@ def enqueue_batch(start, counts=None, force=False, then_deduct=True):
 		counts=counts,
 		force=force,
 		then_deduct=then_deduct,
+		resave_existing=resave_existing,
+		load_from_camo=load_from_camo,
 	)
 
 
-def run(start=0, counts=None, chain=True, force=False, then_deduct=True):
+def run(
+	start=0, counts=None, chain=True, force=False, then_deduct=True, resave_existing=False, load_from_camo=True
+):
 	"""Process the batch of BATCH_SIZE items from `start`, then queue the next one.
 
 	`counts` carries the running totals from the batches before. Pass chain=False to do just
 	this one batch. `force` saves and pushes every item's record even when nothing changed, so
 	images GearStock missed are sent again. Pass then_deduct=False to stop after the images
-	instead of queueing add_deduct_qty.
+	instead of queueing add_deduct_qty. `resave_existing` skips the Camo load for an item whose
+	record already has GearStock on it and just saves that record again, which fires the webhook.
+	Pass load_from_camo=False to never call Camo: only those records are saved again, and every
+	other item is listed in the report as no_record.
 	"""
 	start = int(start)
 	logger = frappe.logger("gearstock", allow_site=True)
@@ -136,13 +152,13 @@ def run(start=0, counts=None, chain=True, force=False, then_deduct=True):
 	logger.info(f"GearStock images: batch {start + 1}-{end} of {len(items)} item(s)")
 
 	for index, item_code in enumerate(items[start:end], start=start):
-		status, source = push_item(item_code, logger, force)
+		status, source = push_item(item_code, logger, force, resave_existing, load_from_camo)
 		counts[status] += 1
 		# Per item rather than per batch: the S3 copies cannot be rolled back anyway, and the
 		# webhook push fires on commit, so a failure later in the batch must not undo it.
 		frappe.db.commit()
 
-		if status not in ("pushed", "already_synced"):
+		if status not in ("pushed", "already_synced", "resaved"):
 			# Written per item, so a batch that dies part way still leaves the items it got through.
 			write_report([report_row(item_code, status, source)])
 		if status == "no_images":
@@ -157,7 +173,14 @@ def run(start=0, counts=None, chain=True, force=False, then_deduct=True):
 
 	if end < len(items):
 		if chain:
-			enqueue_batch(end, dict(counts), force=force, then_deduct=then_deduct)
+			enqueue_batch(
+				end,
+				dict(counts),
+				force=force,
+				then_deduct=then_deduct,
+				resave_existing=resave_existing,
+				load_from_camo=load_from_camo,
+			)
 			frappe.db.commit()
 		return
 
@@ -189,7 +212,7 @@ def get_items():
 	return [code for code in codes if code in existing], [code for code in codes if code not in existing]
 
 
-def push_item(item_code, logger, force=False):
+def push_item(item_code, logger, force=False, resave_existing=False, load_from_camo=True):
 	"""Bring one item's images into S3 and onto GearStock.
 
 	Returns (counts key, Lead Source the images came from or None).
@@ -201,7 +224,15 @@ def push_item(item_code, logger, force=False):
 		# Raised so nobody loads images or changes a SKU on this item mid-run.
 		set_image_sync_flag(item_code, "Administrator", reason="Pushing images to GearStock")
 		try:
-			status, source = load_images(item_code, logger, force)
+			status, source = None, None
+			# Without Camo, saving the existing record again is the only way to push.
+			if resave_existing or not load_from_camo:
+				status = resave_record(item_code, logger)
+			if not status:
+				if load_from_camo:
+					status, source = load_images(item_code, logger, force)
+				else:
+					status = "no_record"
 		finally:
 			clear_image_sync_flag(item_code)
 	except Exception:
@@ -211,6 +242,39 @@ def push_item(item_code, logger, force=False):
 	if status == "failed":
 		db_retry.rollback_item()
 	return status, source
+
+
+def resave_record(item_code, logger):
+	"""Save the item's image record again with the push on, when it already has Website - GearStock
+	on its images, so the webhook sends them to GearStock without loading anything from Camo.
+
+	Returns "resaved", or None when there is no such record and the images should be loaded.
+	"""
+	names = frappe.get_all(
+		"S3 Product Image Meta Data",
+		filters={"nat_product_template": item_code},
+		order_by="creation desc",
+		limit=1,
+		pluck="name",
+	)
+	if not names:
+		return None
+
+	doc = frappe.get_doc("S3 Product Image Meta Data", names[0])
+	if not any(row.nat_site == GEARSTOCK for row in doc.nat_sites):
+		return None
+
+	# A legacy record submitted before it became editable cannot be saved; upsert_upload does the same.
+	if doc.docstatus == 1:
+		doc.docstatus = 0
+	# Cleared, so the webhook condition lets this save through to the website.
+	doc.nat_skip_website_push = 0
+	doc.save(ignore_permissions=True)
+	doc.add_comment(
+		"Comment", "Saved again from the GearStock image patch (push_images) to push the images to GearStock."
+	)
+	logger.info(f"GearStock images: {item_code}: record {doc.name} saved again, Camo not loaded")
+	return "resaved"
 
 
 def load_images(item_code, logger, force=False):
