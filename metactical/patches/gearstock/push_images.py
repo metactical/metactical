@@ -51,7 +51,7 @@ from metactical.custom_scripts.utils.s3_image_api import (
 	import_website_images,
 	set_image_sync_flag,
 )
-from metactical.patches.gearstock import db_retry, webhook_queue
+from metactical.patches.gearstock import db_retry, log, webhook_queue
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 GEARSTOCK = "Website - GearStock"
@@ -74,13 +74,23 @@ REASONS = {
 	"busy": "Another image sync was running on the item",
 	"failed": "Failed, see the Error Log",
 }
+# The result line written to the log for each status.
+LOG_RESULTS = {
+	"pushed": "completed, images loaded from Camo, metadata record saved and webhook triggered",
+	"already_synced": "completed, images loaded from Camo, metadata record unchanged so not saved (no webhook)",
+	"resaved": "completed, existing metadata record saved again without loading from Camo, webhook triggered",
+	"no_images": "skipped, no images found on Camo",
+	"no_record": "skipped, no metadata record with Website - GearStock and loading from Camo is off",
+	"busy": "skipped, another image sync is in progress for this item",
+	"failed": "failed, changes rolled back, see the Error Log",
+}
 
 
 def start(force=False, then_deduct=True, resave_existing=False, load_from_camo=True):
 	"""Queue the first batch. Called by upsert_items_v7 when it is done, and by repush_images_v1."""
 	if missing_lead_sources():
-		frappe.logger("gearstock", allow_site=True).error(
-			"GearStock images: not queued, a Lead Source is missing: " + ", ".join(missing_lead_sources())
+		log.get_logger().error(
+			"[Image Push] Not queued, Lead Source not found: " + ", ".join(missing_lead_sources())
 		)
 		return
 	enqueue_batch(
@@ -121,7 +131,7 @@ def run(
 	other item is listed in the report as no_record.
 	"""
 	start = int(start)
-	logger = frappe.logger("gearstock", allow_site=True)
+	logger = log.get_logger()
 
 	if start == 0:
 		# Queued from a patch, the first batch must not save while migrate is still altering tables.
@@ -131,7 +141,7 @@ def run(
 
 	missing = missing_lead_sources()
 	if missing:
-		logger.error(f"GearStock images: Lead Source not found: {', '.join(missing)}")
+		logger.error(f"[Image Push] Stopped, Lead Source not found: {', '.join(missing)}")
 		return
 
 	# Webhooks stay on their own queue (default). Only undo a long-queue move an earlier run left.
@@ -145,13 +155,19 @@ def run(
 		# A fresh run: the report starts again, with the catalogue items ERPNext does not have.
 		write_report([report_row(item_code, "not_in_erp") for item_code in not_in_erp], fresh=True)
 		counts.not_in_erp = len(not_in_erp)
-		if not_in_erp:
-			logger.warning(f"GearStock images: {len(not_in_erp)} template(s) in {DATA_FILE} are not in ERPNext")
+		logger.info(
+			f"[Image Push] Run started: {len(items)} item(s) in ERPNext, {len(not_in_erp)} not in ERPNext, "
+			f"load_from_camo={load_from_camo}, resave_existing={resave_existing}, force={force}, "
+			f"then_deduct={then_deduct}"
+		)
+		for item_code in not_in_erp:
+			logger.warning(f"[Image Push] {item_code}: skipped, item not found in ERPNext")
 
 	end = min(start + BATCH_SIZE, len(items))
-	logger.info(f"GearStock images: batch {start + 1}-{end} of {len(items)} item(s)")
+	logger.info(f"[Image Push] Batch started: items {start + 1}-{end} of {len(items)}")
 
 	for index, item_code in enumerate(items[start:end], start=start):
+		logger.info(f"[Image Push] {item_code}: started ({index + 1}/{len(items)})")
 		status, source = push_item(item_code, logger, force, resave_existing, load_from_camo)
 		counts[status] += 1
 		# Per item rather than per batch: the S3 copies cannot be rolled back anyway, and the
@@ -161,15 +177,12 @@ def run(
 		if status not in ("pushed", "already_synced", "resaved"):
 			# Written per item, so a batch that dies part way still leaves the items it got through.
 			write_report([report_row(item_code, status, source)])
-		if status == "no_images":
-			logger.warning(f"GearStock images: {item_code} skipped, no images on Camo")
+		level = logger.info if status in ("pushed", "already_synced", "resaved") else logger.warning
+		if status == "failed":
+			level = logger.error
+		level(f"[Image Push] {item_code}: {LOG_RESULTS[status]}")
 
-		logger.info(
-			f"GearStock images: {index + 1}/{len(items)} {item_code} {status}"
-			f"{' from ' + source if source else ''}"
-		)
-
-	logger.info(f"GearStock images: batch done {end}/{len(items)} {dict(counts)}")
+	logger.info(f"[Image Push] Batch completed: {end}/{len(items)} items, totals {dict(counts)}")
 
 	if end < len(items):
 		if chain:
@@ -191,7 +204,10 @@ def run(
 
 		add_deduct_qty.start()
 	frappe.db.commit()
-	logger.info(f"GearStock images finished: {dict(counts)}, report at {REPORT_FILE}")
+	logger.info(
+		f"[Image Push] Completed: totals {dict(counts)}, report at {REPORT_FILE}"
+		+ ("" if then_deduct else ", inventory step skipped (then_deduct is off)")
+	)
 	frappe.log_error(
 		title="GearStock image push finished",
 		message=json.dumps({"counts": counts, "report": REPORT_FILE}, indent=1),
@@ -273,7 +289,7 @@ def resave_record(item_code, logger):
 	doc.add_comment(
 		"Comment", "Saved again from the GearStock image patch (push_images) to push the images to GearStock."
 	)
-	logger.info(f"GearStock images: {item_code}: record {doc.name} saved again, Camo not loaded")
+	logger.info(f"[Image Push] {item_code}: metadata record {doc.name} saved again")
 	return "resaved"
 
 
@@ -292,7 +308,7 @@ def load_images(item_code, logger, force=False):
 			skip_unchanged=not force,
 		)
 		for message in result["messages"]:
-			logger.info(f"GearStock images: {item_code}: {frappe.utils.strip_html(message)}")
+			logger.info(f"[Image Push] {item_code}: {frappe.utils.strip_html(message)}")
 
 		# Only wait when the website was actually called; an item not listed on it costs nothing.
 		if result["requested"]:
