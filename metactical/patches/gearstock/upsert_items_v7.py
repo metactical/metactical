@@ -64,6 +64,18 @@ def execute():
 	if not frappe.db.exists("Price List", PRICE_LIST):
 		return
 
+	# Explicit, so the patch always loads from Camo whatever start()'s default is.
+	start(load_from_camo=True)
+
+
+# TEMPORARY for deverp testing: load_from_camo defaults to False here and in run(), so the image
+# step only saves the existing metadata records. Set both defaults back to True before prod.
+def start(load_from_camo=False):
+	"""Queue the full run (items, then images, then inventory) in a worker.
+
+	`load_from_camo` is passed on to the image push. False skips Camo and just saves the image
+	records that already have Website - GearStock, which fires their webhook (see push_images).
+	"""
 	frappe.enqueue(
 		"metactical.patches.gearstock.upsert_items_v7.run",
 		queue="default",
@@ -71,6 +83,7 @@ def execute():
 		job_id=JOB_ID,
 		deduplicate=True,
 		enqueue_after_commit=True,
+		load_from_camo=load_from_camo,
 	)
 
 
@@ -82,7 +95,9 @@ def wait_for_migrate():
 		pass
 
 
-def run(start=0, queue_images=True):
+def run(start=0, queue_images=True, load_from_camo=False):  # TEMPORARY default, see start()
+	"""Upsert every catalogue row, then queue the image push (unless queue_images is False), which
+	gets `load_from_camo`."""
 	logger = log.get_logger()
 
 	wait_for_migrate()
@@ -97,7 +112,10 @@ def run(start=0, queue_images=True):
 		saved=0, missing=0, price_created=0, slug_added=0, camo_added=0, fields_updated=0, failed=0
 	)
 	missing, failed = [], []
-	logger.info(f"[Item Upsert] Started at row {int(start) + 1} of {len(rows)}")
+	logger.info(
+		f"[Item Upsert] Started at row {int(start) + 1} of {len(rows)}, "
+		f"queue_images={queue_images}, load_from_camo={load_from_camo}"
+	)
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
 		for index, row in enumerate(rows[offset : offset + BATCH_SIZE], start=offset + 1):
@@ -114,8 +132,8 @@ def run(start=0, queue_images=True):
 		# run queued: GearStock has the products and the SKUs are final before images go out.
 		from metactical.patches.gearstock import push_images
 
-		push_images.start()
-  
+		push_images.start(load_from_camo=load_from_camo)
+
 	frappe.db.commit()
 	logger.info(
 		f"[Item Upsert] Completed: totals {dict(counts)}, failed {failed}, items not in ERPNext listed in {MISSING_FILE}"
