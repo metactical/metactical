@@ -24,7 +24,7 @@ import frappe
 from metactical.patches.gearstock import db_retry, log
 from metactical.patches.gearstock.upsert_items_v7 import load_rows
 
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 JOB_ID = "gearstock_add_deduct_qty"
 
 

@@ -14,7 +14,7 @@ the JSON file. Nothing that already exists is overwritten. Progress goes to the 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
 in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. The job
 waits for the migrate to finish before it starts. It goes in
-batches of 1000, committing and logging progress after each. The webhooks are background jobs, so
+batches of 500, committing after each item and logging progress after each batch. The webhooks are background jobs, so
 how fast they reach the websites is set by the workers, not by this loop. Everything runs on the
 default queue: the job itself and the webhooks it fires. If an earlier run left the webhooks on
 the long queue, they are put back first (see webhook_queue.py).
@@ -39,7 +39,7 @@ from metactical.patches.gearstock import db_retry, log, webhook_queue
 
 PRICE_LIST = "RET - GearStock - USD"
 CAMO_PRICE_LIST = "RET - Camo"
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
