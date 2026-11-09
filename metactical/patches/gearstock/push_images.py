@@ -1,7 +1,7 @@
 """Copy every GearStock item's images from Camo into S3 and push them to GearStock.
 
 Runs over the templates and standalone items in gearstock_items.json, the same catalogue
-upsert_items_v6 loads (variants share their template's record). Items not in ERPNext are skipped
+upsert_items_v7 loads (variants share their template's record). Items not in ERPNext are skipped
 and listed in the report. For each one:
   1. Its images are loaded from Camo, the same way Load Data From SB does it: files the S3
      bucket does not have yet are copied in, and the images are merged into the item's existing
@@ -10,12 +10,13 @@ and listed in the report. For each one:
      is on, which fires the S3 Product Image Meta Data webhook. One save per item.
   2. Only Camo is read. When it has no images, the item is skipped and written to the log and
      the report.
-An item whose record would come out the same is not saved, so a re-run pushes nothing.
+An item whose record would come out the same is not saved, so a re-run pushes nothing, unless
+force is on (repush_images_v1), which saves and pushes every record again.
 
-It is not in patches.txt: upsert_items_v6 queues it as its last step, so the first batch lands in
+It is not in patches.txt: upsert_items_v7 queues it as its last step, so the first batch lands in
 the default queue behind every Item / Item Price webhook and retail SKU rename the upsert queued.
 Run first, it would push images for products GearStock does not have yet, under SKUs that are
-about to be renamed. Items go in batches of 1000, like upsert_items_v6, each batch its own job that queues
+about to be renamed. Items go in batches of 1000, like upsert_items_v7, each batch its own job that queues
 the next one, so no job runs long enough to time out. There is a SITE_DELAY wait after every
 website call so the websites are not flooded. Everything runs on the default queue, the
 batches and the S3 Product Image Meta Data webhooks they fire. If an earlier run left those
@@ -59,19 +60,26 @@ SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
 COUNT_KEYS = ("pushed", "already_synced", "no_images", "busy", "failed", "not_in_erp")
+# The reason written next to each status in the report.
+REASONS = {
+	"no_images": "No images on Camo",
+	"not_in_erp": "Not in ERPNext",
+	"busy": "Another image sync was running on the item",
+	"failed": "Failed, see the Error Log",
+}
 
 
-def start():
-	"""Queue the first batch. Called by upsert_items_v6 when it is done, not from patches.txt."""
+def start(force=False, then_deduct=True):
+	"""Queue the first batch. Called by upsert_items_v7 when it is done, and by repush_images_v1."""
 	if missing_lead_sources():
 		frappe.logger("gearstock", allow_site=True).error(
 			"GearStock images: not queued, a Lead Source is missing: " + ", ".join(missing_lead_sources())
 		)
 		return
-	enqueue_batch(0)
+	enqueue_batch(0, force=force, then_deduct=then_deduct)
 
 
-def enqueue_batch(start, counts=None):
+def enqueue_batch(start, counts=None, force=False, then_deduct=True):
 	"""Queue the job for one batch. Each batch queues the next when it is done, so no single job
 	comes near a timeout and a stopped run picks up from the batch it was on."""
 	frappe.enqueue(
@@ -83,17 +91,27 @@ def enqueue_batch(start, counts=None):
 		enqueue_after_commit=True,
 		start=start,
 		counts=counts,
+		force=force,
+		then_deduct=then_deduct,
 	)
 
 
-def run(start=0, counts=None, chain=True):
+def run(start=0, counts=None, chain=True, force=False, then_deduct=True):
 	"""Process the batch of BATCH_SIZE items from `start`, then queue the next one.
 
 	`counts` carries the running totals from the batches before. Pass chain=False to do just
-	this one batch.
+	this one batch. `force` saves and pushes every item's record even when nothing changed, so
+	images GearStock missed are sent again. Pass then_deduct=False to stop after the images
+	instead of queueing add_deduct_qty.
 	"""
 	start = int(start)
 	logger = frappe.logger("gearstock", allow_site=True)
+
+	if start == 0:
+		# Queued from a patch, the first batch must not save while migrate is still altering tables.
+		from metactical.patches.gearstock.upsert_items_v7 import wait_for_migrate
+
+		wait_for_migrate()
 
 	missing = missing_lead_sources()
 	if missing:
@@ -106,13 +124,11 @@ def run(start=0, counts=None, chain=True):
 
 	items, not_in_erp = get_items()
 	counts = frappe._dict({**dict.fromkeys(COUNT_KEYS, 0), **(counts or {})})
-	report = []
 
 	if start == 0:
 		# A fresh run: the report starts again, with the catalogue items ERPNext does not have.
-		write_report([], fresh=True)
+		write_report([report_row(item_code, "not_in_erp") for item_code in not_in_erp], fresh=True)
 		counts.not_in_erp = len(not_in_erp)
-		report = [{"item_code": item_code, "status": "not_in_erp", "image_source": ""} for item_code in not_in_erp]
 		if not_in_erp:
 			logger.warning(f"GearStock images: {len(not_in_erp)} template(s) in {DATA_FILE} are not in ERPNext")
 
@@ -120,14 +136,15 @@ def run(start=0, counts=None, chain=True):
 	logger.info(f"GearStock images: batch {start + 1}-{end} of {len(items)} item(s)")
 
 	for index, item_code in enumerate(items[start:end], start=start):
-		status, source = push_item(item_code, logger)
+		status, source = push_item(item_code, logger, force)
 		counts[status] += 1
 		# Per item rather than per batch: the S3 copies cannot be rolled back anyway, and the
 		# webhook push fires on commit, so a failure later in the batch must not undo it.
 		frappe.db.commit()
 
 		if status not in ("pushed", "already_synced"):
-			report.append({"item_code": item_code, "status": status, "image_source": source or ""})
+			# Written per item, so a batch that dies part way still leaves the items it got through.
+			write_report([report_row(item_code, status, source)])
 		if status == "no_images":
 			logger.warning(f"GearStock images: {item_code} skipped, no images on Camo")
 
@@ -136,20 +153,20 @@ def run(start=0, counts=None, chain=True):
 			f"{' from ' + source if source else ''}"
 		)
 
-	write_report(report)
 	logger.info(f"GearStock images: batch done {end}/{len(items)} {dict(counts)}")
 
 	if end < len(items):
 		if chain:
-			enqueue_batch(end, dict(counts))
+			enqueue_batch(end, dict(counts), force=force, then_deduct=then_deduct)
 			frappe.db.commit()
 		return
 
 	webhook_queue.restore(JOB_ID)
-	# Last step of the run: adding the deduct qty row is what sends inventory to the website.
-	from metactical.patches.gearstock import add_deduct_qty
+	if then_deduct:
+		# Last step of the run: adding the deduct qty row is what sends inventory to the website.
+		from metactical.patches.gearstock import add_deduct_qty
 
-	add_deduct_qty.start()
+		add_deduct_qty.start()
 	frappe.db.commit()
 	logger.info(f"GearStock images finished: {dict(counts)}, report at {REPORT_FILE}")
 	frappe.log_error(
@@ -163,7 +180,7 @@ def get_items():
 
 	A variant row stands for its template, since variants share their template's image record.
 	"""
-	from apps.metactical.metactical.patches.gearstock.upsert_items_v7 import load_rows
+	from metactical.patches.gearstock.upsert_items_v7 import load_rows
 
 	rows = load_rows()
 
@@ -172,7 +189,7 @@ def get_items():
 	return [code for code in codes if code in existing], [code for code in codes if code not in existing]
 
 
-def push_item(item_code, logger):
+def push_item(item_code, logger, force=False):
 	"""Bring one item's images into S3 and onto GearStock.
 
 	Returns (counts key, Lead Source the images came from or None).
@@ -184,7 +201,7 @@ def push_item(item_code, logger):
 		# Raised so nobody loads images or changes a SKU on this item mid-run.
 		set_image_sync_flag(item_code, "Administrator", reason="Pushing images to GearStock")
 		try:
-			status, source = load_images(item_code, logger)
+			status, source = load_images(item_code, logger, force)
 		finally:
 			clear_image_sync_flag(item_code)
 	except Exception:
@@ -196,7 +213,7 @@ def push_item(item_code, logger):
 	return status, source
 
 
-def load_images(item_code, logger):
+def load_images(item_code, logger, force=False):
 	"""Load images from the first of IMAGE_SOURCES that has any, in one save that also adds
 	GearStock to every image on the record and pushes it.
 
@@ -208,7 +225,7 @@ def load_images(item_code, logger):
 			{price_list: lead_source},
 			extra_sites=[GEARSTOCK],
 			push=True,
-			skip_unchanged=True,
+			skip_unchanged=not force,
 		)
 		for message in result["messages"]:
 			logger.info(f"GearStock images: {item_code}: {frappe.utils.strip_html(message)}")
@@ -225,11 +242,15 @@ def load_images(item_code, logger):
 	return "no_images", None
 
 
+def report_row(item_code, status, source=None):
+	return {"item_code": item_code, "status": status, "reason": REASONS.get(status, ""), "image_source": source or ""}
+
+
 def write_report(rows, fresh=False):
 	"""Add rows to the report; `fresh` starts it again with just the header."""
 	new_file = fresh or not os.path.exists(REPORT_FILE)
 	with open(REPORT_FILE, "w" if new_file else "a", newline="") as f:
-		writer = csv.DictWriter(f, fieldnames=["item_code", "status", "image_source"])
+		writer = csv.DictWriter(f, fieldnames=["item_code", "status", "reason", "image_source"])
 		if new_file:
 			writer.writeheader()
 		writer.writerows(rows)
