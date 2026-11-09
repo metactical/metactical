@@ -14,7 +14,7 @@ the JSON file. Nothing that already exists is overwritten. Progress goes to the 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
 in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. The job
 waits for the migrate to finish before it starts. It goes in
-batches of 1000, committing and logging progress after each. The webhooks are background jobs, so
+batches of 500, committing after each item and logging progress after each batch. The webhooks are background jobs, so
 how fast they reach the websites is set by the workers, not by this loop. Everything runs on the
 default queue: the job itself and the webhooks it fires. If an earlier run left the webhooks on
 the long queue, they are put back first (see webhook_queue.py).
@@ -35,16 +35,23 @@ import frappe
 from frappe.integrations.doctype.webhook import run_webhooks
 from frappe.utils.synchronization import filelock
 
-from metactical.patches.gearstock import db_retry, webhook_queue
+from metactical.patches.gearstock import db_retry, log, webhook_queue
 
 PRICE_LIST = "RET - GearStock - USD"
 CAMO_PRICE_LIST = "RET - Camo"
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"
 MIGRATE_WAIT = 60 * 60  # seconds
+# How each change save_row reports reads in the log.
+CHANGE_LABELS = {
+	"slug_added": "GearStock item detail added or updated",
+	"camo_added": "Camo item detail added or updated",
+	"price_created": "GearStock item price created",
+	"fields_updated": "item group, brand or retail SKU updated",
+}
 
 
 def load_rows():
@@ -57,6 +64,18 @@ def execute():
 	if not frappe.db.exists("Price List", PRICE_LIST):
 		return
 
+	# Explicit, so the patch always loads from Camo whatever start()'s default is.
+	start(load_from_camo=True)
+
+
+# TEMPORARY for deverp testing: load_from_camo defaults to False here and in run(), so the image
+# step only saves the existing metadata records. Set both defaults back to True before prod.
+def start(load_from_camo=False):
+	"""Queue the full run (items, then images, then inventory) in a worker.
+
+	`load_from_camo` is passed on to the image push. False skips Camo and just saves the image
+	records that already have Website - GearStock, which fires their webhook (see push_images).
+	"""
 	frappe.enqueue(
 		"metactical.patches.gearstock.upsert_items_v7.run",
 		queue="default",
@@ -64,6 +83,7 @@ def execute():
 		job_id=JOB_ID,
 		deduplicate=True,
 		enqueue_after_commit=True,
+		load_from_camo=load_from_camo,
 	)
 
 
@@ -75,8 +95,10 @@ def wait_for_migrate():
 		pass
 
 
-def run(start=0, queue_images=True):
-	logger = frappe.logger("gearstock", allow_site=True)
+def run(start=0, queue_images=True, load_from_camo=False):  # TEMPORARY default, see start()
+	"""Upsert every catalogue row, then queue the image push (unless queue_images is False), which
+	gets `load_from_camo`."""
+	logger = log.get_logger()
 
 	wait_for_migrate()
 
@@ -90,13 +112,18 @@ def run(start=0, queue_images=True):
 		saved=0, missing=0, price_created=0, slug_added=0, camo_added=0, fields_updated=0, failed=0
 	)
 	missing, failed = [], []
-	logger.info(f"GearStock upsert: starting at {start} of {len(rows)} row(s)")
+	logger.info(
+		f"[Item Upsert] Started at row {int(start) + 1} of {len(rows)}, "
+		f"queue_images={queue_images}, load_from_camo={load_from_camo}"
+	)
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
-		for row in rows[offset : offset + BATCH_SIZE]:
-			upsert_item(row, counts, missing, failed)
+		for index, row in enumerate(rows[offset : offset + BATCH_SIZE], start=offset + 1):
+			upsert_item(row, counts, missing, failed, logger, f"{index}/{len(rows)}")
 
-		logger.info(f"GearStock upsert: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
+		logger.info(
+			f"[Item Upsert] Batch completed: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} rows, totals {dict(counts)}"
+		)
 		time.sleep(10)
 	write_missing(missing)
 
@@ -105,10 +132,12 @@ def run(start=0, queue_images=True):
 		# run queued: GearStock has the products and the SKUs are final before images go out.
 		from metactical.patches.gearstock import push_images
 
-		push_images.start()
-  
+		push_images.start(load_from_camo=load_from_camo)
+
 	frappe.db.commit()
-	logger.info(f"GearStock upsert finished: {dict(counts)}, failed: {failed}, missing items in {MISSING_FILE}")
+	logger.info(
+		f"[Item Upsert] Completed: totals {dict(counts)}, failed {failed}, items not in ERPNext listed in {MISSING_FILE}"
+	)
 	frappe.log_error(
 		title="GearStock item upsert finished",
 		message=json.dumps(
@@ -125,21 +154,40 @@ def write_missing(rows):
 		writer.writerows(rows)
 
 
-def upsert_item(row, counts, missing, failed):
+def upsert_item(row, counts, missing, failed, logger, position=""):
 	item_code = row["item_code"]
+	label = f"[Item Upsert] {item_code} ({describe_row(row)})"
+	logger.info(f"{label}: started ({position})")
+
 	if not frappe.db.exists("Item", item_code):
 		counts.missing += 1
 		missing.append(row)
+		logger.warning(f"{label}: skipped, item not found in ERPNext")
 		return
 
 	try:
-		for key in db_retry.run(lambda: save_row(row)):
+		changes = db_retry.run(lambda: save_row(row))
+		for key in changes:
 			counts[key] += 1
+		done = [CHANGE_LABELS[key] for key in changes if key in CHANGE_LABELS]
+		logger.info(
+			f"{label}: saved successfully, "
+			+ (f"changes: {'; '.join(done)}" if done else "no field changes, saved to trigger the webhooks")
+		)
 	except Exception:
 		db_retry.rollback_item()
 		counts.failed += 1
 		failed.append(item_code)
 		frappe.log_error(title=f"GearStock item upsert failed: {item_code}", message=frappe.get_traceback())
+		logger.error(f"{label}: failed, changes rolled back, see the Error Log")
+
+
+def describe_row(row):
+	"""Variant of <template>, Template or Standalone, for the log."""
+	item_type = row.get("item_type") or "Item"
+	if item_type == "Variant" and row.get("template"):
+		return f"Variant of {row['template']}"
+	return item_type
 
 
 def save_row(row):

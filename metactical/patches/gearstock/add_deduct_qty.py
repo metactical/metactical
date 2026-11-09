@@ -21,10 +21,10 @@ import time
 
 import frappe
 
-from metactical.patches.gearstock import db_retry
+from metactical.patches.gearstock import db_retry, log
 from metactical.patches.gearstock.upsert_items_v7 import load_rows
 
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 JOB_ID = "gearstock_add_deduct_qty"
 
 
@@ -41,57 +41,73 @@ def start():
 
 
 def run(start=0):
-	logger = frappe.logger("gearstock", allow_site=True)
+	logger = log.get_logger()
 	rows = load_rows()
 	counts = frappe._dict(saved=0, missing=0, failed=0)
 	failed = []
-	logger.info(f"GearStock deduct qty: starting at {start} of {len(rows)} row(s)")
+	logger.info(f"[Inventory] Started at row {int(start) + 1} of {len(rows)}")
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
-		for row in rows[offset : offset + BATCH_SIZE]:
-			update_item(row["item_code"], counts, failed)
+		for index, row in enumerate(rows[offset : offset + BATCH_SIZE], start=offset + 1):
+			update_item(row["item_code"], counts, failed, logger, f"{index}/{len(rows)}")
 
-		logger.info(f"GearStock deduct qty: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} {dict(counts)}")
+		logger.info(
+			f"[Inventory] Batch completed: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} rows, totals {dict(counts)}"
+		)
 		time.sleep(10)
 
-	logger.info(f"GearStock deduct qty finished: {dict(counts)}, failed: {failed}")
+	logger.info(f"[Inventory] Completed: totals {dict(counts)}, failed {failed}")
 	frappe.log_error(
 		title="GearStock deduct qty finished",
 		message=json.dumps({"counts": counts, "failed": failed}, indent=1),
 	)
 
 
-def update_item(item_code, counts, failed):
+def update_item(item_code, counts, failed, logger, position=""):
+	label = f"[Inventory] {item_code}"
+	logger.info(f"{label}: started ({position})")
+
 	if not frappe.db.exists("Item", item_code):
 		counts.missing += 1
+		logger.warning(f"{label}: skipped, item not found in ERPNext")
 		return
 
 	try:
-		db_retry.run(lambda: save_item(item_code))
+		change = db_retry.run(lambda: save_item(item_code))
 		counts.saved += 1
+		logger.info(f"{label}: saved successfully, {change}")
 	except Exception:
 		db_retry.rollback_item()
 		counts.failed += 1
 		failed.append(item_code)
 		frappe.log_error(title=f"GearStock deduct qty failed: {item_code}", message=frappe.get_traceback())
+		logger.error(f"{label}: failed, changes rolled back, see the Error Log")
 
 
 def save_item(item_code):
+	"""Update the item's Website Deduct Qty and save. Returns what changed, for the log."""
 	item = frappe.get_doc("Item", item_code)
-	add_website_deduct_qty(item)
+	change = add_website_deduct_qty(item)
 
 	# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
 	# and supplier rows onto every variant.
 	item.flags.dont_update_variants = True
 	item.save()
 	frappe.db.commit()
+	return change
 
 
 def add_website_deduct_qty(item):
-	"""Remove any rows in Website Deduct Qty and add the Website - GearStock row with qty 0."""
+	"""Remove any rows in Website Deduct Qty and add the Website - GearStock row with qty 0.
 
-	if item.get("custom_neb_website_deduct_qty"):
+	Returns what changed, for the log.
+	"""
+
+	rows = item.get("custom_neb_website_deduct_qty")
+	if rows:
+		removed = ", ".join(f"{row.lead_source} (qty {row.qty})" for row in rows)
 		item.custom_neb_website_deduct_qty = []
-		return
+		return f"removed {len(rows)} existing Website Deduct Qty row(s): {removed}"
 
 	item.append("custom_neb_website_deduct_qty", {"lead_source": "Website - GearStock", "qty": 0})
+	return "added Website Deduct Qty row: Website - GearStock, qty 0"
