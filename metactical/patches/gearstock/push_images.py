@@ -65,25 +65,63 @@ BATCH_TIMEOUT = 6 * 60 * 60  # seconds; one batch of 1000 runs about 1-2 hours
 SITE_DELAY = 5  # seconds after each website image load
 REPORT_FILE = os.path.join(os.path.dirname(__file__), "gearstock_images_report.csv")
 JOB_ID = "gearstock_push_images"
-COUNT_KEYS = ("pushed", "already_synced", "resaved", "no_images", "no_record", "busy", "failed", "not_in_erp")
-# The reason written next to each status in the report.
+COUNT_KEYS = (
+	"pushed",
+	"already_synced",
+	"resaved",
+	"no_record",
+	"no_gearstock",
+	"no_camo_detail",
+	"camo_not_configured",
+	"not_on_camo",
+	"camo_unreachable",
+	"camo_bad_response",
+	"no_images",
+	"camo_load_failed",
+	"busy",
+	"failed",
+	"not_in_erp",
+)
+# Statuses that mean the item reached GearStock (or already had its images there).
+SUCCESS = ("pushed", "already_synced", "resaved")
+# The reason written next to each status in the report. Every skip has its own status, so the
+# report can be filtered by cause.
 REASONS = {
-	"no_images": "No images on Camo",
-	"no_record": "No GearStock image record, Camo not loaded",
-	"not_in_erp": "Not in ERPNext",
-	"busy": "Another image sync was running on the item",
-	"failed": "Failed, see the Error Log",
+	"no_record": "No image metadata record for this item",
+	"no_gearstock": "Image metadata record exists but none of its images have Website - GearStock",
+	"no_camo_detail": "Item has no RET - Camo item detail row, so Camo was not called",
+	"camo_not_configured": "Camo image API or CDN URL is not set up, so Camo was not called",
+	"not_on_camo": "Camo does not have this product",
+	"camo_unreachable": "Camo could not be reached",
+	"camo_bad_response": "Camo returned an error or a response that could not be read",
+	"no_images": "Product found on Camo but it has no images",
+	"camo_load_failed": "Loading or saving the Camo images failed, see the Error Log",
+	"not_in_erp": "Item not found in ERPNext",
+	"busy": "Another image sync was in progress for this item",
+	"failed": "Unexpected error, see the Error Log",
 }
 # The result line written to the log for each status.
 LOG_RESULTS = {
 	"pushed": "completed, images loaded from Camo, metadata record saved and webhook triggered",
 	"already_synced": "completed, images loaded from Camo, metadata record unchanged so not saved (no webhook)",
 	"resaved": "completed, existing metadata record saved again without loading from Camo, webhook triggered",
-	"no_images": "skipped, no images found on Camo",
-	"no_record": "skipped, no metadata record with Website - GearStock and loading from Camo is off",
-	"busy": "skipped, another image sync is in progress for this item",
-	"failed": "failed, changes rolled back, see the Error Log",
+	**{status: f"skipped. Reason: {reason}" for status, reason in REASONS.items()},
+	"camo_load_failed": "failed, changes rolled back. Reason: " + REASONS["camo_load_failed"],
+	"failed": "failed, changes rolled back. Reason: " + REASONS["failed"],
 }
+# Camo messages from import_website_images, matched on their text, mapped to a status. Checked in
+# this order; the first match wins.
+CAMO_MESSAGES = (
+	("is not listed on it", "no_camo_detail"),
+	("No image API configured", "camo_not_configured"),
+	("No CDN URL set", "camo_not_configured"),
+	("No Lead Source with a Lead Source Domain", "camo_not_configured"),
+	("does not have this product", "not_on_camo"),
+	("returned no products", "not_on_camo"),
+	("could not be reached", "camo_unreachable"),
+	("could not read", "camo_bad_response"),
+	("returned HTTP", "camo_bad_response"),
+)
 
 
 def start(force=False, then_deduct=True, resave_existing=False, load_from_camo=True):
@@ -128,7 +166,7 @@ def run(
 	instead of queueing add_deduct_qty. `resave_existing` skips the Camo load for an item whose
 	record already has GearStock on it and just saves that record again, which fires the webhook.
 	Pass load_from_camo=False to never call Camo: only those records are saved again, and every
-	other item is listed in the report as no_record.
+	other item is listed in the report as no_record or no_gearstock.
 	"""
 	start = int(start)
 	logger = log.get_logger()
@@ -161,7 +199,7 @@ def run(
 			f"then_deduct={then_deduct}"
 		)
 		for item_code in not_in_erp:
-			logger.warning(f"[Image Push] {item_code}: skipped, item not found in ERPNext")
+			logger.warning(f"[Image Push] {item_code}: {LOG_RESULTS['not_in_erp']}")
 
 	end = min(start + BATCH_SIZE, len(items))
 	logger.info(f"[Image Push] Batch started: items {start + 1}-{end} of {len(items)}")
@@ -174,11 +212,11 @@ def run(
 		# webhook push fires on commit, so a failure later in the batch must not undo it.
 		frappe.db.commit()
 
-		if status not in ("pushed", "already_synced", "resaved"):
+		if status not in SUCCESS:
 			# Written per item, so a batch that dies part way still leaves the items it got through.
 			write_report([report_row(item_code, status, source)])
-		level = logger.info if status in ("pushed", "already_synced", "resaved") else logger.warning
-		if status == "failed":
+		level = logger.info if status in SUCCESS else logger.warning
+		if status in ("failed", "camo_load_failed"):
 			level = logger.error
 		level(f"[Image Push] {item_code}: {LOG_RESULTS[status]}")
 
@@ -244,18 +282,16 @@ def push_item(item_code, logger, force=False, resave_existing=False, load_from_c
 			# Without Camo, saving the existing record again is the only way to push.
 			if resave_existing or not load_from_camo:
 				status = resave_record(item_code, logger)
-			if not status:
-				if load_from_camo:
-					status, source = load_images(item_code, logger, force)
-				else:
-					status = "no_record"
+			# Not resaved: load from Camo, or keep the reason (no_record / no_gearstock) when off.
+			if status != "resaved" and load_from_camo:
+				status, source = load_images(item_code, logger, force)
 		finally:
 			clear_image_sync_flag(item_code)
 	except Exception:
 		status, source = "failed", None
 		frappe.log_error(title=f"GearStock image push failed: {item_code}", message=frappe.get_traceback())
 
-	if status == "failed":
+	if status in ("failed", "camo_load_failed"):
 		db_retry.rollback_item()
 	return status, source
 
@@ -264,7 +300,8 @@ def resave_record(item_code, logger):
 	"""Save the item's image record again with the push on, when it already has Website - GearStock
 	on its images, so the webhook sends them to GearStock without loading anything from Camo.
 
-	Returns "resaved", or None when there is no such record and the images should be loaded.
+	Returns "resaved", or why it was not saved: "no_record" (the item has no image record) or
+	"no_gearstock" (the record has no image with Website - GearStock).
 	"""
 	names = frappe.get_all(
 		"S3 Product Image Meta Data",
@@ -274,11 +311,11 @@ def resave_record(item_code, logger):
 		pluck="name",
 	)
 	if not names:
-		return None
+		return "no_record"
 
 	doc = frappe.get_doc("S3 Product Image Meta Data", names[0])
 	if not any(row.nat_site == GEARSTOCK for row in doc.nat_sites):
-		return None
+		return "no_gearstock"
 
 	# A legacy record submitted before it became editable cannot be saved; upsert_upload does the same.
 	if doc.docstatus == 1:
@@ -297,8 +334,10 @@ def load_images(item_code, logger, force=False):
 	"""Load images from the first of IMAGE_SOURCES that has any, in one save that also adds
 	GearStock to every image on the record and pushes it.
 
-	Returns (counts key, Lead Source the images came from or None).
+	Returns (counts key, Lead Source the images came from or None). When no source has images,
+	the status says why, from the last source tried (see camo_status).
 	"""
+	status = "no_images"
 	for price_list, lead_source in IMAGE_SOURCES:
 		result = import_website_images(
 			item_code,
@@ -315,11 +354,22 @@ def load_images(item_code, logger, force=False):
 			time.sleep(SITE_DELAY)
 
 		if result["error"]:
-			return "failed", lead_source
+			return "camo_load_failed", lead_source
 		if result["found"]:
 			return ("pushed" if result["saved"] else "already_synced"), lead_source
+		status = camo_status(result)
 
-	return "no_images", None
+	return status, None
+
+
+def camo_status(result):
+	"""Why a Camo load found no images: the first of CAMO_MESSAGES its messages contain, else
+	no_images (Camo had the product, with no images)."""
+	text = " ".join(frappe.utils.strip_html(message) for message in result["messages"])
+	for needle, status in CAMO_MESSAGES:
+		if needle in text:
+			return status
+	return "no_images"
 
 
 def report_row(item_code, status, source=None):
