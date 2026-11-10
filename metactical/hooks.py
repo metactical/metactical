@@ -936,6 +936,7 @@ fixtures = [{
 			"Tag Link-autocreated",
 			"Item Attribute Value-color",
 			"Item Attribute Value-short_name",
+			"Item Attribute Value-nat_swatch_image",
 			"Website Specification Label-custom_show_in_table",
 			"Item Attribute-custom__nat_show_in_table",
 			"Item Attribute-custom_is_search_filter",
