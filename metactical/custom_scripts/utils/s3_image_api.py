@@ -318,6 +318,43 @@ def sync_images_from_sb(item_code, user=None):
     website did not mention, and every other website's rows are all left exactly as they
     were — a CDN that is briefly unreachable must not delete good image records.
     """
+    try:
+        messages = import_website_images(item_code)["messages"]
+    finally:
+        clear_image_sync_flag(item_code)
+
+    if user:
+        frappe.publish_realtime(
+            "msgprint",
+            message="<b>Images loaded from Storebuilder for {0}</b><br><br>{1}".format(
+                frappe.utils.escape_html(item_code), "<br>".join(messages)
+            ),
+            user=user,
+        )
+
+    return messages
+
+
+def import_website_images(item_code, sites=None, extra_sites=None, push=False, skip_unchanged=False):
+    """The work behind sync_images_from_sb, without the in-progress flag or the popup.
+
+    `sites` limits the import to some websites: {price_list: lead_source}. Only the Item Detail
+    rows on those price lists are read, and their images are recorded under the Lead Source
+    given rather than one looked up from the price list (several Lead Sources can share a
+    price list). Left as None, every website the item is on is read, as the button does.
+
+    `extra_sites` are Lead Sources added to every image on the record when it is saved, `push`
+    lets that save fire the website webhook, and `skip_unchanged` leaves the record unsaved
+    when the merge changes nothing — so a re-run neither writes nor pushes again.
+
+    Returns a dict:
+      messages   what happened, as HTML lines
+      found      {(sku, order, role): {"path", "sites"}} for every image the websites gave;
+                 empty when nothing was found or the import failed
+      requested  True when at least one website was actually called
+      saved      True when the record was written
+      error      True when the import failed part way (see the Error Log)
+    """
     # Imported here rather than at module level: the uploader page imports upsert_upload from
     # the doctype module, so pulling both in at import time risks a circular import.
     from metactical.metactical.doctype.s3_product_image_meta_data.s3_product_image_meta_data import (
@@ -330,6 +367,9 @@ def sync_images_from_sb(item_code, user=None):
     # uploaded for the first site and found already present for the next. Counters would report
     # it twice and the totals would exceed the number of files that exist.
     stats = {"uploaded": set(), "skipped": set(), "errors": 0, "broken_links": 0}
+    found = {}
+    requested = False
+    saved = False
 
     try:
         template = frappe.get_doc("Item", item_code)
@@ -348,8 +388,18 @@ def sync_images_from_sb(item_code, user=None):
         s3_client = settings.get_client()
         bucket = settings.nat_bucket_name
 
-        found = {}
-        for item_detail in template.item_detail:
+        item_details = template.item_detail
+        if sites is not None:
+            item_details = [row for row in item_details if row.price_list in sites]
+            listed = {row.price_list for row in item_details}
+            for price_list in sites:
+                if price_list not in listed:
+                    messages.append(
+                        "<span class='text-warning'>{0}: this item is not listed on it.</span>".format(
+                            _sb_site_name(price_list))
+                    )
+
+        for item_detail in item_details:
             site_name = _sb_site_name(item_detail.price_list)
 
             config = configs.get(item_detail.price_list)
@@ -370,14 +420,17 @@ def sync_images_from_sb(item_code, user=None):
             # has nowhere to be recorded. Lead Source Domain must be set: it is the same
             # condition the uploader page picks its sites by (get_sites), so matching one
             # without it would record a site the uploader can never show or reselect.
-            lead_source = frappe.db.get_value(
-                "Lead Source",
-                {
-                    "custom_neb_price_list": item_detail.price_list,
-                    "lead_source_domain": ["is", "set"],
-                },
-                "name",
-            )
+            if sites is not None:
+                lead_source = sites[item_detail.price_list]
+            else:
+                lead_source = frappe.db.get_value(
+                    "Lead Source",
+                    {
+                        "custom_neb_price_list": item_detail.price_list,
+                        "lead_source_domain": ["is", "set"],
+                    },
+                    "name",
+                )
             if not lead_source:
                 messages.append(
                     "<span class='text-warning'>No Lead Source with a Lead Source Domain is "
@@ -386,6 +439,7 @@ def sync_images_from_sb(item_code, user=None):
                 )
                 continue
 
+            requested = True
             try:
                 product, error = _fetch_sb_product(config, external_id, item_detail.slug)
             except requests.exceptions.RequestException:
@@ -434,12 +488,21 @@ def sync_images_from_sb(item_code, user=None):
                     "<span class='text-warning'>{0}: no images found.</span>".format(site_name))
 
         if found:
-            _save_imported_images(item_code, found, _doc_state, upsert_upload, resolve_item_codes)
-            saved = len({(sku, order) for sku, order, _role in found})
-            messages.append(
-                "<span class='text-success'>{0} saved to this item.</span>".format(
-                    _plural(saved, "image"))
-            )
+            saved = bool(_save_imported_images(
+                item_code, found, _doc_state, upsert_upload, resolve_item_codes,
+                extra_sites=extra_sites, push=push, skip_unchanged=skip_unchanged,
+            ))
+            distinct = len({(sku, order) for sku, order, _role in found})
+            if saved:
+                messages.append(
+                    "<span class='text-success'>{0} saved to this item.</span>".format(
+                        _plural(distinct, "image"))
+                )
+            else:
+                messages.append(
+                    "<span class='text-muted'>{0} found, already on this item as they are, so "
+                    "it was not saved again.</span>".format(_plural(distinct, "image"))
+                )
             uploaded = len(stats["uploaded"])
             already = len(stats["skipped"] - stats["uploaded"])
             if uploaded:
@@ -469,7 +532,7 @@ def sync_images_from_sb(item_code, user=None):
                 "<span class='text-danger'>{0} could not be copied. Please check the Error "
                 "Log.</span>".format(_plural(stats["errors"], "file"))
             )
-        if found:
+        if found and not push:
             messages.append(
                 "<span class='text-muted'>Use <b>Drop and Create In Websites</b> when you want "
                 "the websites updated with these images.</span>"
@@ -484,29 +547,29 @@ def sync_images_from_sb(item_code, user=None):
             "<span class='text-danger'>Loading the images failed. "
             "Please check the Error Log.</span>"
         )
-    finally:
-        clear_image_sync_flag(item_code)
+        # Whatever was found was not saved, so do not report it as loaded.
+        return {"messages": messages, "found": {}, "requested": requested, "saved": False, "error": True}
 
-    if user:
-        frappe.publish_realtime(
-            "msgprint",
-            message="<b>Images loaded from Storebuilder for {0}</b><br><br>{1}".format(
-                frappe.utils.escape_html(item_code), "<br>".join(messages)
-            ),
-            user=user,
-        )
-
-    return messages
+    return {"messages": messages, "found": found, "requested": requested, "saved": saved, "error": False}
 
 
-def _save_imported_images(item_code, found, _doc_state, upsert_upload, resolve_item_codes):
+def _save_imported_images(item_code, found, _doc_state, upsert_upload, resolve_item_codes,
+                          extra_sites=None, push=False, skip_unchanged=False):
     """Fold this run's findings into the item's S3 record, adding and replacing only.
 
     Starts from whatever the record already holds and lays the new findings over the top, so
     sizes, variants and websites this run said nothing about survive untouched. The whole
     merged picture is then written in one call — upsert_upload rebuilds the child tables from
     what it is given, so handing it one website's images at a time would drop all the others.
+
+    `extra_sites` are added to every image on the merged record, not just the ones found now.
+    With `skip_unchanged`, nothing is saved when the merged record matches the stored one.
+    Returns the record name, or None when nothing was saved.
     """
+    from metactical.metactical.doctype.s3_product_image_meta_data.s3_product_image_meta_data import (
+        _new_state,
+    )
+
     existing = frappe.get_all(
         "S3 Product Image Meta Data",
         filters={"nat_product_template": item_code},
@@ -518,6 +581,7 @@ def _save_imported_images(item_code, found, _doc_state, upsert_upload, resolve_i
     merged = {}
     override = 0
     stored_item_codes = {}
+    state = None
     if existing:
         doc = frappe.get_doc("S3 Product Image Meta Data", existing[0])
         override = cint(doc.nat_override_full_product)
@@ -529,6 +593,10 @@ def _save_imported_images(item_code, found, _doc_state, upsert_upload, resolve_i
         entry = merged.setdefault(key, {"path": hit["path"], "sites": frozenset()})
         entry["path"] = hit["path"]
         entry["sites"] = frozenset(entry.get("sites") or frozenset()) | frozenset(hit["sites"])
+
+    if extra_sites:
+        for entry in merged.values():
+            entry["sites"] = frozenset(entry.get("sites") or frozenset()) | frozenset(extra_sites)
 
     # Storebuilder's SKUs only resolve to an Item when one carries them as its retail SKU, and
     # plenty do not — the mapping on the record may have been set by hand in the uploader. Keep
@@ -548,11 +616,14 @@ def _save_imported_images(item_code, found, _doc_state, upsert_upload, resolve_i
         for (sku, order, role), entry in merged.items()
     ]
 
+    if skip_unchanged and state is not None and _new_state(files) == state:
+        return None
+
     return upsert_upload(
         files,
         override_full_product=override,
         template_item=item_code,
-        suppress_push=True,
+        suppress_push=not push,
     )
 
 
