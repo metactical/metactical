@@ -380,7 +380,7 @@ td:hover > .pg-x,
 .pg-builder__actions, .pg-builder__choices { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
 .pg-pick__title { font-weight: 600; margin: 8px 0; }
 .pg-pick__table { width: 100%; }
-.pg-pick__table td { padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+.pg-pick__table td { padding: 8px; border-bottom: 1px solid var(--border-color); cursor: pointer; white-space: nowrap; }
 .pg-pick__table tr:hover td { background: var(--fg-hover-color, var(--subtle-fg)); }
 .pg-num { text-align: right; }
 
