@@ -7,7 +7,8 @@ Nothing on the items is changed.
 The patch only queues a runner job, because the inventory update fires webhooks and Frappe drops
 webhooks while a migrate is running. The runner waits for the migrate to finish, then queues the
 items in batches of BATCH_SIZE with a BATCH_DELAY wait between batches, so the default queue and
-the websites are not flooded. Items that are not in ERPNext are skipped. Progress goes to the
+the websites are not flooded. An item that is not in ERPNext, or fails to queue, is skipped and
+logged without stopping the batch. Progress goes to the
 "gearstock_inventory_output" log (sites/<site>/logs/gearstock_inventory_output.log), separate
 from the gearstock.log the upsert_items patch writes.
 
@@ -53,13 +54,9 @@ def get_logger():
 
 
 def get_item_codes():
-	"""The catalogue's item codes that exist in ERPNext, in file order, without duplicates:
-	(in ERPNext, not in ERPNext)."""
+	"""Every item code in the catalogue, in file order, without duplicates."""
 	with open(DATA_FILE) as f:
-		codes = list(dict.fromkeys(row["item_code"] for row in json.load(f)))
-
-	existing = set(frappe.get_all("Item", filters={"name": ["in", codes]}, pluck="name")) if codes else set()
-	return [code for code in codes if code in existing], [code for code in codes if code not in existing]
+		return list(dict.fromkeys(row["item_code"] for row in json.load(f)))
 
 
 def run(start=0):
@@ -69,26 +66,42 @@ def run(start=0):
 	with filelock("bench_migrate", timeout=MIGRATE_WAIT):
 		pass
 
-	items, missing = get_item_codes()
-	logger.info(
-		f"[Inventory] Started at item {int(start) + 1} of {len(items)}, {len(missing)} not in ERPNext: {missing}"
-	)
+	codes = get_item_codes()
+	logger.info(f"[Inventory] Started at item {int(start) + 1} of {len(codes)}")
 
-	queued = 0
-	for offset in range(int(start), len(items), BATCH_SIZE):
-		batch = items[offset : offset + BATCH_SIZE]
-		for item_code in batch:
-			frappe.enqueue(
-				update_item_inventory_output, item_code=item_code, voucher_type="Item", queue="default"
-			)
-		queued += len(batch)
-		logger.info(f"[Inventory] Batch queued: {offset + len(batch)}/{len(items)} items")
+	queued, missing, failed = 0, [], []
+	for offset in range(int(start), len(codes), BATCH_SIZE):
+		batch = codes[offset : offset + BATCH_SIZE]
+		for index, item_code in enumerate(batch, start=offset + 1):
+			# One bad item is logged and skipped; it never stops the batch.
+			if not frappe.db.exists("Item", item_code):
+				missing.append(item_code)
+				logger.warning(f"[Inventory] {item_code}: skipped, item not found in ERPNext ({index}/{len(codes)})")
+				continue
+			try:
+				frappe.enqueue(
+					update_item_inventory_output, item_code=item_code, voucher_type="Item", queue="default"
+				)
+				queued += 1
+			except Exception:
+				failed.append(item_code)
+				logger.error(f"[Inventory] {item_code}: failed to queue ({index}/{len(codes)}), see the Error Log")
+				frappe.log_error(
+					title=f"GearStock inventory update failed to queue: {item_code}", message=frappe.get_traceback()
+				)
 
-		if offset + BATCH_SIZE < len(items):
+		logger.info(
+			f"[Inventory] Batch done: {offset + len(batch)}/{len(codes)} items, "
+			f"totals queued {queued}, not in ERPNext {len(missing)}, failed {len(failed)}"
+		)
+		if offset + BATCH_SIZE < len(codes):
 			time.sleep(BATCH_DELAY)
 
-	logger.info(f"[Inventory] Completed: {queued} item(s) queued, {len(missing)} not in ERPNext")
+	logger.info(
+		f"[Inventory] Completed: {queued} item(s) queued, {len(missing)} not in ERPNext {missing}, "
+		f"{len(failed)} failed {failed}"
+	)
 	frappe.log_error(
 		title="GearStock inventory update queued",
-		message=json.dumps({"queued": queued, "missing": missing}, indent=1),
+		message=json.dumps({"queued": queued, "missing": missing, "failed": failed}, indent=1),
 	)
