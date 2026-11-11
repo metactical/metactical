@@ -249,6 +249,46 @@ def _change_batch_columns(batch, change, price_list):
 
 
 @frappe.whitelist()
+def set_batch_price(name, price_list, price):
+	"""Set a fixed price on every item of every page in the batch.
+
+	Called from the grid's bulk 'Set price' action when the revision belongs to
+	a batch, so items split across pages all get the same price in one shot.
+	Uses the fast-path save (save_item_edits) on each page so it stays fast
+	even on large batches.
+	"""
+	frappe.has_permission("Price Revision", "write", name, throw=True)
+	batch = frappe.db.get_value("Price Revision", name, "batch")
+	if not batch:
+		frappe.throw(_("{0} is not part of a batch.").format(name))
+	price = flt(price)
+	if not (price > 0):
+		frappe.throw(_("Price must be greater than zero."))
+
+	pages = frappe.get_all(
+		"Price Revision",
+		filters={"batch": batch, "docstatus": 0},
+		pluck="name",
+		order_by="page_no",
+	)
+	for page_name in pages:
+		jobs.ensure_idle(page_name)
+		doc = frappe.get_doc("Price Revision", page_name)
+		cells = [
+			{"item_code": i.item_code, "price_list": price_list, "new_price": price}
+			for i in doc.items
+		]
+		if not cells:
+			continue
+		affected = {i.item_code for i in doc.items}
+		_edits(doc, cells=cells, items=[])
+		doc.save_item_edits(affected)
+
+	frappe.get_doc("Price Revision Batch", batch).save_roll_up()
+	return _grid(frappe.get_doc("Price Revision", name))
+
+
+@frappe.whitelist()
 def selectable_price_lists(name):
 	"""Selling lists not yet on the revision, for the Add Price List picker."""
 	have = set(frappe.get_all("Price Revision Price List", filters={"parent": name}, pluck="price_list"))
@@ -609,3 +649,37 @@ def _grid(doc):
 		"lists": lists,
 		"rows": rows,
 	}
+
+
+@frappe.whitelist()
+def recent_revisions(limit=30):
+	"""Landing-page list for /app/price-grid.
+
+	Batch pages are collapsed: one row per Price Revision Batch (using the
+	batch's rolled-up totals), plus standalone revisions that belong to no
+	batch. Both are sorted by modified desc and capped at ``limit``.
+	"""
+	limit = cint(limit)
+	batches = frappe.get_all(
+		"Price Revision Batch",
+		filters={"docstatus": ("<", 2)},
+		fields=["name", "supplier", "supplier_name", "status", "rate_source",
+		        "total_items", "total_price_changes", "modified"],
+		order_by="modified desc",
+		limit=limit,
+	)
+	standalone = frappe.get_all(
+		"Price Revision",
+		filters={"docstatus": ("<", 2), "batch": ["is", "not set"]},
+		fields=["name", "supplier", "supplier_name", "status",
+		        "supplier_order_confirmation", "rate_source",
+		        "total_items", "total_price_changes", "modified"],
+		order_by="modified desc",
+		limit=limit,
+	)
+	combined = sorted(
+		list(batches) + list(standalone),
+		key=lambda r: r.get("modified") or "",
+		reverse=True,
+	)[:limit]
+	return combined

@@ -195,6 +195,8 @@ def _build(name, progress, codes, costs_list, duty_field=None):
 		progress.update(min(i + step, total), total * 1.25, _("Loading items {0} of {1}").format(min(i + step, total), total))
 	progress.update(total, total * 1.25, _("Working out prices for {0} items…").format(total))
 	doc.save()
+	if doc.batch:
+		frappe.get_doc("Price Revision Batch", doc.batch).save_roll_up()
 
 
 def _apply(name, progress):

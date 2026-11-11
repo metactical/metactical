@@ -460,14 +460,7 @@ export default {
 				this.page.set_title(__("Price Revisions"));
 				this.page.clear_indicator();
 				this.syncActions();
-				frappe.db
-					.get_list("Price Revision", {
-						fields: ["name", "supplier", "supplier_name", "status", "supplier_order_confirmation", "rate_source",
-							"total_items", "total_price_changes", "modified"],
-						filters: { docstatus: ["<", 2] },
-						order_by: "modified desc",
-						limit: 30,
-					})
+				this.call("recent_revisions")
 					.then((r) => (this.recent = r || []));
 				return;
 			}
@@ -953,32 +946,60 @@ export default {
 		},
 
 		bulkSetPrice(rows) {
+			const isBatch = !!this.doc.batch;
+			const fields = [
+				{
+					fieldname: "price_list",
+					fieldtype: "Select",
+					label: __("Price List"),
+					reqd: 1,
+					options: this.lists.map((l) => ({ value: l.name, label: l.label + " (" + l.currency + ")" })),
+				},
+				{
+					fieldname: "price",
+					fieldtype: "Currency",
+					label: __("Price"),
+					reqd: 1,
+				},
+			];
+			if (isBatch) {
+				fields.push({
+					fieldname: "scope",
+					fieldtype: "Select",
+					label: __("Apply to"),
+					reqd: 1,
+					default: "batch",
+					options: [
+						{ value: "batch", label: __("Whole batch (all pages)") },
+						{ value: "page", label: __("This page only ({0} visible rows)", [rows.length]) },
+					],
+				});
+			}
 			const d = new frappe.ui.Dialog({
 				title: __("Set Price"),
-				fields: [
-					{
-						fieldname: "price_list",
-						fieldtype: "Select",
-						label: __("Price List"),
-						reqd: 1,
-						options: this.lists.map((l) => ({ value: l.name, label: l.label + " (" + l.currency + ")" })),
-					},
-					{
-						fieldname: "price",
-						fieldtype: "Currency",
-						label: __("Price"),
-						reqd: 1,
-					},
-				],
+				fields,
 				primary_action_label: __("Set"),
-				primary_action: ({ price_list, price }) => {
+				primary_action: ({ price_list, price, scope }) => {
 					d.hide();
 					const l = this.lists.find((x) => x.name === price_list);
 					if (!l || !(price > 0)) return;
-					for (const row of rows) {
-						const v = cellView(row, l, this.store);
-						if (!v || v.removing) continue;
-						this.setCell(row, l, price);
+					if (isBatch && scope !== "page") {
+						frappe.call({
+							method: API + "set_batch_price",
+							args: { name: this.doc.name, price_list, price },
+							freeze: true,
+							freeze_message: __("Setting price across all pages…"),
+						}).then((r) => {
+							if (!r || !r.message) return;
+							this.take(r.message, true);
+							frappe.show_alert({ message: __("Price set across all pages"), indicator: "green" }, 4);
+						});
+					} else {
+						for (const row of rows) {
+							const v = cellView(row, l, this.store);
+							if (!v || v.removing) continue;
+							this.setCell(row, l, price);
+						}
 					}
 				},
 			});
@@ -1067,10 +1088,7 @@ export default {
 			if (!target) return;
 			const nav = () => this.loadPage(target);
 			if (this.dirtyCount) {
-				frappe.confirm(
-					__("Leave page {0} with {1} unsaved change(s)? They will be lost.", [b.page_no, this.dirtyCount]),
-					nav
-				);
+				this.save().then(() => { if (!this.busy) nav(); }).catch(() => {});
 			} else {
 				nav();
 			}
