@@ -1,0 +1,307 @@
+"""Push the GearStock catalogue (gearstock_items.json) to staging.gearstock through the webhooks.
+
+The items already exist, so Item From Excel skips them and nothing reaches the website. For each
+row this adds what is missing and saves the item, which fires the Item / Item Price webhooks:
+  - Template / Standalone: the RET - GearStock - USD Item Detail row carrying the slug.
+  - Template / Standalone: the RET - Camo Item Detail row with the Camo slug, item name and
+    description (camo_slug / camo_item_name / camo_description), which push_images loads the
+    images from.
+  - Variant / Standalone: the RET - GearStock - USD Item Price, if there is none yet.
+Items that are not in the system are skipped and listed in gearstock_items_not_in_erp.csv, next to
+the JSON file. Nothing that already exists is overwritten. Progress goes to the "gearstock" log
+(sites/<site>/logs/gearstock.log).
+
+Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
+in_patch / in_migrate), so the patch only enqueues the job; the work runs in a worker. The job
+waits for the migrate to finish before it starts. It goes in
+batches of 500, committing after each item and logging progress after each batch. The webhooks are background jobs, so
+how fast they reach the websites is set by the workers, not by this loop. Everything runs on the
+default queue: the job itself and the webhooks it fires. If an earlier run left the webhooks on
+the long queue, they are put back first (see webhook_queue.py).
+
+The full run goes in three steps, each queued by the one before it:
+  1. This job upserts every row in the JSON.
+  2. push_images loads every item's images from Camo and saves its S3 Product Image Meta Data
+     record once they are loaded, which pushes them to GearStock.
+  3. add_deduct_qty sets Website Deduct Qty, which sends the inventory.
+Pass queue_images=False to stop after step 1. Website Deduct Qty is not touched here, because
+changing that table is what queues the inventory update, and that has to go after the images.
+
+Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.upsert_items.run
+"""
+
+import csv
+import json
+import os
+import time
+
+import frappe
+from frappe.integrations.doctype.webhook import run_webhooks
+from frappe.utils.synchronization import filelock
+
+from metactical.patches.gearstock import db_retry, log, webhook_queue
+
+PRICE_LIST = "RET - GearStock - USD"
+CAMO_PRICE_LIST = "RET - Camo"
+BATCH_SIZE = 500
+DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
+MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
+MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
+JOB_ID = "gearstock_upsert_items"
+MIGRATE_WAIT = 60 * 60  # seconds
+# How each change save_row reports reads in the log.
+CHANGE_LABELS = {
+	"slug_added": "GearStock item detail added or updated",
+	"camo_added": "Camo item detail added or updated",
+	"price_created": "GearStock item price created",
+	"fields_updated": "item group, brand or retail SKU updated",
+}
+
+
+def load_rows():
+	"""All the catalogue rows. Shared with push_images and add_deduct_qty."""
+	with open(DATA_FILE) as f:
+		return json.load(f)
+
+
+def execute():
+	if not frappe.db.exists("Price List", PRICE_LIST):
+		return
+
+	start()
+
+
+def start():
+	"""Queue the full run (items, then images from Camo, then inventory) in a worker."""
+	frappe.enqueue(
+		"metactical.patches.gearstock.upsert_items.run",
+		queue="default",
+		timeout=24 * 60 * 60,
+		job_id=JOB_ID,
+		deduplicate=True,
+		enqueue_after_commit=True,
+	)
+
+
+def wait_for_migrate():
+	"""Wait until the migrate that queued this job has finished. Migrate holds this lock from start
+	to end. Saving items while it alters tabItem deadlocks, because the save reads the table and
+	then asks for a row lock while the ALTER waits for the read to finish."""
+	with filelock("bench_migrate", timeout=MIGRATE_WAIT):
+		pass
+
+
+def run(start=0, queue_images=True):
+	"""Upsert every catalogue row, then queue the image push from Camo (unless queue_images is
+	False), which queues the inventory when it is done."""
+	logger = log.get_logger()
+
+	wait_for_migrate()
+
+	rows = load_rows()
+
+	# Webhooks stay on their own queue (default). Only undo a long-queue move an earlier run left.
+	webhook_queue.restore(JOB_ID)
+	frappe.db.commit()
+
+	counts = frappe._dict(
+		saved=0, missing=0, price_created=0, slug_added=0, camo_added=0, fields_updated=0, failed=0
+	)
+	missing, failed = [], []
+	logger.info(
+		f"[Item Upsert] Started at row {int(start) + 1} of {len(rows)}, "
+		f"queue_images={queue_images}"
+	)
+
+	for offset in range(int(start), len(rows), BATCH_SIZE):
+		for index, row in enumerate(rows[offset : offset + BATCH_SIZE], start=offset + 1):
+			upsert_item(row, counts, missing, failed, logger, f"{index}/{len(rows)}")
+
+		logger.info(
+			f"[Item Upsert] Batch completed: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} rows, totals {dict(counts)}"
+		)
+		time.sleep(10)
+	write_missing(missing)
+
+	if queue_images:
+		# Queued now, not from patches.txt, so it lands behind every webhook and S3 rename job this
+		# run queued: GearStock has the products and the SKUs are final before images go out.
+		from metactical.patches.gearstock import push_images
+
+		push_images.start()
+
+	frappe.db.commit()
+	logger.info(
+		f"[Item Upsert] Completed: totals {dict(counts)}, failed {failed}, items not in ERPNext listed in {MISSING_FILE}"
+	)
+	frappe.log_error(
+		title="GearStock item upsert finished",
+		message=json.dumps(
+			{"counts": counts, "missing": [row["item_code"] for row in missing], "failed": failed}, indent=1
+		),
+	)
+
+
+def write_missing(rows):
+	"""The catalogue rows whose item is not in ERPNext, for someone to create or correct."""
+	with open(MISSING_FILE, "w", newline="") as f:
+		writer = csv.DictWriter(f, fieldnames=MISSING_COLUMNS, extrasaction="ignore")
+		writer.writeheader()
+		writer.writerows(rows)
+
+
+def upsert_item(row, counts, missing, failed, logger, position=""):
+	item_code = row["item_code"]
+	label = f"[Item Upsert] {item_code} ({describe_row(row)})"
+	logger.info(f"{label}: started ({position})")
+
+	if not frappe.db.exists("Item", item_code):
+		counts.missing += 1
+		missing.append(row)
+		logger.warning(f"{label}: skipped, item not found in ERPNext")
+		return
+
+	try:
+		changes = db_retry.run(lambda: save_row(row))
+		for key in changes:
+			counts[key] += 1
+		done = [CHANGE_LABELS[key] for key in changes if key in CHANGE_LABELS]
+		logger.info(
+			f"{label}: saved successfully, "
+			+ (f"changes: {'; '.join(done)}" if done else "no field changes, saved to trigger the webhooks")
+		)
+	except Exception:
+		db_retry.rollback_item()
+		counts.failed += 1
+		failed.append(item_code)
+		frappe.log_error(title=f"GearStock item upsert failed: {item_code}", message=frappe.get_traceback())
+		logger.error(f"{label}: failed, changes rolled back, see the Error Log")
+
+
+def describe_row(row):
+	"""Variant of <template>, Template or Standalone, for the log."""
+	item_type = row.get("item_type") or "Item"
+	if item_type == "Variant" and row.get("template"):
+		return f"Variant of {row['template']}"
+	return item_type
+
+
+def save_row(row):
+	"""Apply one catalogue row and commit. Returns the counts to add, once the item is saved."""
+	changes = ["saved"]
+	item = frappe.get_doc("Item", row["item_code"])
+
+	if row.get("slug"):
+		if add_item_detail(
+			item,
+			row["slug"],
+			row.get("item_name") or row.get("camo_item_name"),
+			row.get("camo_description"),
+		):
+			changes.append("slug_added")
+
+		# Alongside the GearStock row: the Camo row is what the load from SB (push_images)
+		# reads to fetch the images and details from the Camo website.
+		if row.get("camo_slug") and add_camo_detail(item, row):
+			changes.append("camo_added")
+
+	if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
+		changes.append("price_created")
+
+	if update_item_fields(item, row):
+		changes.append("fields_updated")
+
+	# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU
+	# and supplier rows onto every variant.
+	item.flags.dont_update_variants = True
+	item.save()
+	frappe.db.commit()
+	return changes
+
+
+# catalogue column -> Item field. The retail SKU lives in ifw_retailskusuffix; Item has no
+# retail_sku field, so setting that would be silently dropped on save.
+ITEM_FIELDS = {"item_group": "item_group", "brand": "brand", "retail_sku": "ifw_retailskusuffix"}
+
+
+def update_item_fields(item, row):
+	"""Set item_group, brand and the retail SKU from the catalogue where they differ.
+
+	Blank catalogue values leave the item alone. Returns True when any value changed. A changed
+	retail SKU makes Item.on_update queue the S3 image rename for it (queue_retail_sku_change).
+	"""
+	changed = False
+	for column, field in ITEM_FIELDS.items():
+		value = (row.get(column) or "").strip()
+		if value and value != (item.get(field) or "").strip():
+			item.set(field, value)
+			changed = True
+	return changed
+
+
+def add_item_detail(item, slug, item_name=None, description=None):
+	"""Add the GearStock row with its slug, item name and description. On an existing row, fill
+	the slug if it is blank, set the item name whenever it differs from the catalogue (even if the
+	slug is already set), and fill the description only if it is blank. The caller passes the Camo
+	name when the catalogue has none, and the Camo description. Returns True when something
+	changed."""
+	for detail in item.get("item_detail") or []:
+		if detail.price_list == PRICE_LIST:
+			changed = False
+			if not detail.slug:
+				detail.slug = slug
+				changed = True
+			if item_name and detail.item_name != item_name:
+				detail.item_name = item_name
+				changed = True
+			if description and not detail.description:
+				detail.description = description
+				changed = True
+			return changed
+
+	item.append(
+		"item_detail",
+		{"price_list": PRICE_LIST, "slug": slug, "item_name": item_name, "description": description},
+	)
+	return True
+
+
+def add_camo_detail(item, row):
+	"""Add the RET - Camo row with the Camo slug, item name and description. On an existing row,
+	only blank fields are filled: what is already on the item is not overwritten. Returns True
+	when something changed."""
+	values = {
+		"slug": row.get("camo_slug"),
+		"item_name": row.get("camo_item_name"),
+		"description": row.get("camo_description"),
+	}
+	for detail in item.get("item_detail") or []:
+		if detail.price_list == CAMO_PRICE_LIST:
+			changed = False
+			for field, value in values.items():
+				if value and not detail.get(field):
+					detail.set(field, value)
+					changed = True
+			return changed
+
+	item.append("item_detail", {"price_list": CAMO_PRICE_LIST, **values})
+	return True
+
+
+def create_item_price(item, rate):
+	if frappe.db.exists("Item Price", {"item_code": item.name, "price_list": PRICE_LIST}):
+		return False
+
+	item_price = frappe.get_doc(
+		{
+			"doctype": "Item Price",
+			"item_code": item.name,
+			"price_list": PRICE_LIST,
+			"price_list_rate": rate,
+		}
+	).insert()
+
+	# The website price webhooks listen on on_change, which Frappe never fires for an insert.
+	item_price.flags.in_insert = False
+	run_webhooks(item_price, "on_change")
+	return True
