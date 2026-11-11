@@ -1,4 +1,4 @@
-"""Push the GearStock catalogue (gearstock_items.json) to staging.gearstock through the webhooks.
+"""Push the GearStock items in gearstock_items_not_in_erp.json to GearStock through the webhooks.
 
 The items already exist, so Item From Excel skips them and nothing reaches the website. For each
 row this adds what is missing and saves the item, which fires the Item / Item Price webhooks:
@@ -44,7 +44,9 @@ from metactical.patches.gearstock import db_retry, log, webhook_queue
 PRICE_LIST = "RET - GearStock - USD"
 CAMO_PRICE_LIST = "RET - Camo"
 BATCH_SIZE = 500
-DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
+# The rows that were not in ERPNext on the first prod run (gearstock_items_not_in_erp.csv from
+# that run). update_inventory_output still uses the full gearstock_items.json.
+DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.json")
 MISSING_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items_not_in_erp.csv")
 MISSING_COLUMNS = ("item_code", "item_name", "item_type", "template", "slug", "price")
 JOB_ID = "gearstock_upsert_items"

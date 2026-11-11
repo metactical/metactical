@@ -1,9 +1,9 @@
 """The shared logger for the GearStock jobs: sites/<site>/logs/gearstock.log.
 
 Each step logs every item, in the order the steps run:
-  [Item Upsert]  upsert_items, every row in gearstock_items.json
+  [Item Upsert]  upsert_items, every row in gearstock_items_not_in_erp.json
   [Image Push]   push_images, every template and standalone item
-  [Inventory]    add_deduct_qty, every row in gearstock_items.json
+  [Inventory]    add_deduct_qty, every row in gearstock_items_not_in_erp.json
 
 Frappe sets new loggers to ERROR outside the dev server, which would drop every progress line,
 so the level is set to INFO here. Files rotate at MAX_SIZE, keeping FILE_COUNT old ones: a full

@@ -1,6 +1,6 @@
 """Load every GearStock item's images from Camo, save its metadata record and push it to GearStock.
 
-Runs over the templates and standalone items in gearstock_items.json, the same catalogue
+Runs over the templates and standalone items in gearstock_items_not_in_erp.json, the same rows
 upsert_items loads (variants share their template's record). Items not in ERPNext are skipped
 and listed in the report. For each one:
   1. Its images are loaded from Camo, the same way Load Data From SB does it: files the S3
@@ -21,7 +21,7 @@ S3 Product Image Meta Data webhooks they fire. If an earlier run left those webh
 queue, they are put back first (see webhook_queue.py).
 
 Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log). When the job finishes,
-gearstock_images_report.csv is written next to gearstock_items.json, listing every item that
+gearstock_images_report.csv is written next to the JSON, listing every item that
 did not reach GearStock and why.
 
 When the last batch is done it queues add_deduct_qty, which sends the inventory, unless
@@ -46,7 +46,6 @@ from metactical.custom_scripts.utils.s3_image_api import (
 )
 from metactical.patches.gearstock import db_retry, log, webhook_queue
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "gearstock_items.json")
 GEARSTOCK = "Website - GearStock"
 # (price list, Lead Source) in the order they are tried. Several Lead Sources share RET - Camo,
 # so the Lead Source is named here rather than looked up from the price list.
@@ -219,7 +218,7 @@ def run(start=0, counts=None, chain=True, then_deduct=True):
 
 
 def get_items():
-	"""The templates and standalone items in gearstock_items.json: (in ERPNext, not in ERPNext).
+	"""The templates and standalone items in gearstock_items_not_in_erp.json: (in ERPNext, not in ERPNext).
 
 	A variant row stands for its template, since variants share their template's image record.
 	"""
