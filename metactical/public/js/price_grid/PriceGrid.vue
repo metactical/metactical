@@ -849,10 +849,44 @@ export default {
 				{ label: __("Use suggested prices ({0} rows)", [n]), fn: () => this.useSuggested(rows, this.lists) },
 				{ label: __("Keep current prices ({0} rows)", [n]), fn: () => this.keepCurrent(rows, this.lists) },
 				{ label: __("Raise current prices by %… ({0} rows)", [n]), fn: () => this.raiseBy(rows, this.lists) },
+				{ label: __("Set price… ({0} rows)", [n]), fn: () => this.bulkSetPrice(rows) },
 				{ divider: true },
 				{ label: __("Clear hand-set prices"), fn: () => this.clearHandSet(rows, this.lists) },
 				{ label: __("Undo unsaved changes"), fn: () => this.take(this.grid) },
 			];
+		},
+
+		bulkSetPrice(rows) {
+			const d = new frappe.ui.Dialog({
+				title: __("Set Price"),
+				fields: [
+					{
+						fieldname: "price_list",
+						fieldtype: "Select",
+						label: __("Price List"),
+						reqd: 1,
+						options: this.lists.map((l) => ({ value: l.name, label: l.label + " (" + l.currency + ")" })),
+					},
+					{
+						fieldname: "price",
+						fieldtype: "Currency",
+						label: __("Price"),
+						reqd: 1,
+					},
+				],
+				primary_action_label: __("Set"),
+				primary_action: ({ price_list, price }) => {
+					d.hide();
+					const l = this.lists.find((x) => x.name === price_list);
+					if (!l || !(price > 0)) return;
+					for (const row of rows) {
+						const v = cellView(row, l, this.store);
+						if (!v || v.removing) continue;
+						this.setCell(row, l, price);
+					}
+				},
+			});
+			d.show();
 		},
 
 		listMenu(l) {
