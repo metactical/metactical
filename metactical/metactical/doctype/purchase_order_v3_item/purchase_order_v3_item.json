@@ -15,9 +15,12 @@
   "variant_attributes",
   "sec_qty",
   "qty",
+  "expected_qty",
   "uom",
   "rate",
   "amount",
+  "net_rate",
+  "net_amount",
   "last_purchase_rate",
   "cb_qty",
   "warehouse",
@@ -36,6 +39,7 @@
   "backorder_eta",
   "backorder_status",
   "backorder_cancel_reason",
+  "remarks",
   "material_request",
   "material_request_item",
   "erp_po_item"
@@ -85,7 +89,7 @@
   },
   {
    "fieldname": "variant_attributes",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Variant Attributes",
    "read_only": 1
   },
@@ -101,6 +105,17 @@
    "in_list_view": 1,
    "label": "Qty",
    "reqd": 1
+  },
+  {
+   "columns": 1,
+   "depends_on": "eval:doc.docstatus==1",
+   "description": "What this line now comes to after the supplier's confirmation and the receipts: ordered qty less what will not come and any open back-order, plus anything received over. The native PO line carries the same qty, and Amount is this qty at the rate.",
+   "fieldname": "expected_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Expected Qty",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fetch_from": "item_code.stock_uom",
@@ -248,6 +263,13 @@
    "options": "\nPast Cancel Date\nCancelled By Us\nCancelled By Supplier\nNo Longer Available\nPrice Changed\nOrdered Elsewhere\nOther"
   },
   {
+   "allow_on_submit": 1,
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks",
+   "no_copy": 1
+  },
+  {
    "fieldname": "erp_po_item",
    "fieldtype": "Data",
    "label": "ERP PO Item Row",
@@ -258,28 +280,45 @@
    "fieldname": "material_request",
    "fieldtype": "Link",
    "label": "Material Request",
-   "options": "Material Request",
-   "read_only": 1,
    "no_copy": 1,
+   "options": "Material Request",
    "print_hide": 1,
+   "read_only": 1,
    "search_index": 1
   },
   {
    "fieldname": "material_request_item",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Material Request Item",
-   "read_only": 1,
    "no_copy": 1,
    "print_hide": 1,
-   "hidden": 1,
+   "read_only": 1,
    "search_index": 1
+  },
+  {
+   "description": "Rate after the order's additional discount, as ERPNext works it out.",
+   "fieldname": "net_rate",
+   "fieldtype": "Currency",
+   "label": "Net Rate",
+   "options": "currency",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "print_hide": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-23 22:44:44.573905",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Purchase Order V3 Item",

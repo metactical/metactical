@@ -19,6 +19,8 @@
   "eta_tbd",
   "substitute_item_code",
   "confirmed_rate",
+  "net_rate",
+  "net_amount",
   "rate_variance_pct",
   "remarks"
  ],
@@ -66,7 +68,7 @@
   },
   {
    "columns": 1,
-   "description": "Quantity coming in THIS shipment. 0 for Back-ordered, Stock Out, Discontinued or Cancelled. For a split, enter what ships now and use \"Partial - Balance Back-ordered\".",
+   "description": "Quantity coming in THIS shipment. 0 for Back-ordered, Stock Out, Discontinued or Cancelled. For a split, enter what ships now and use \"Partial - Balance Back-ordered\". Above the ordered qty is \"Qty Increased\"; an item not on the order is \"New Item Added\".",
    "fieldname": "confirmed_qty",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -85,7 +87,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Line Status",
-   "options": "Confirmed\nPartial - Balance Cancelled\nPartial - Balance Back-ordered\nBack-ordered\nSupplier Stock Out\nDiscontinued\nSubstituted\nCancelled by Supplier",
+   "options": "Confirmed\nQty Increased\nPartial - Balance Cancelled\nPartial - Balance Back-ordered\nBack-ordered\nSupplier Stock Out\nDiscontinued\nSubstituted\nCancelled by Supplier\nNew Item Added",
    "reqd": 1
   },
   {
@@ -135,13 +137,30 @@
    "fieldname": "remarks",
    "fieldtype": "Data",
    "label": "Remarks"
+  },
+  {
+   "description": "Confirmed rate after the additional discount, as ERPNext works it out.",
+   "fieldname": "net_rate",
+   "fieldtype": "Currency",
+   "label": "Net Rate",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount",
+   "options": "currency",
+   "read_only": 1,
+   "print_hide": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-24 16:28:43.694349",
+ "modified": "2026-10-19 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Supplier Order Confirmation V3 Item",

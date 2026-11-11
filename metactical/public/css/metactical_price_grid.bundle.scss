@@ -70,6 +70,42 @@
 	margin-bottom: 8px;
 }
 .pg-count { opacity: 0.7; margin-left: 2px; }
+.pg-pager {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+	padding: 4px 8px;
+	background: var(--pg-accent-bg, var(--subtle-fg, #f4f5f6));
+	border-radius: 6px;
+	font-size: var(--text-sm, 13px);
+}
+.pg-pager__name { font-weight: 600; }
+.pg-pager__select { width: auto; max-width: 260px; height: 26px; }
+.pg-tablewrap { position: relative; }
+.pg-scroll--frozen { pointer-events: none; opacity: 0.45; filter: saturate(0.6); }
+.pg-loading-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	background: rgba(255, 255, 255, 0.55);
+	font-size: var(--text-sm, 13px);
+	color: var(--text-muted);
+}
+.pg-spinner {
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--gray-300, #d1d8dd);
+	border-top-color: var(--pg-accent, #2490ef);
+	border-radius: 50%;
+	animation: pg-spin 0.7s linear infinite;
+}
+@keyframes pg-spin { to { transform: rotate(360deg); } }
 .pg-switch {
 	display: inline-flex;
 	align-items: center;

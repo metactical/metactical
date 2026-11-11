@@ -1,0 +1,13 @@
+{% extends "templates/web.html" %}
+{% block title %}{{ _("Time Clock") }}{% endblock %}
+{% block page_content %}
+<style>
+  /* Clock page: no site navigation, like /tracker. */
+  nav.navbar, footer.web-footer { display: none; }
+</style>
+<link rel="stylesheet" href="/assets/metactical/css/time_clock.css">
+<div id="time_clock_ui"></div>
+{% endblock %}
+{% block script %}
+{{ include_script("time_clock_web.bundle.js") }}
+{% endblock %}

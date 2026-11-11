@@ -6,12 +6,30 @@ import json
 import frappe
 from frappe.model.document import Document
 
-from metactical.procurement_v3.utils import F, item_supplier_part_no, mirror_po3_status, v3_recalc_totals
+from metactical.procurement_v3.taxes import (
+	TAX_ROW_TOTALS,
+	TAX_SETTINGS,
+	TOTAL_FIELDS,
+	save_v3_totals,
+	set_v3_totals,
+	tax_rows,
+	v3_before_print,
+)
+from metactical.procurement_v3.utils import (
+	F,
+	item_supplier_part_no,
+	item_unavailable,
+	mirror_po3_status,
+	throw_unavailable,
+)
 
 
 class SupplierOrderConfirmationV3(Document):
 	def validate(self):
 		validate(self)
+
+	def before_print(self, settings=None):
+		v3_before_print(self)
 
 	def on_submit(self):
 		mirror_to_po3(self)
@@ -23,9 +41,8 @@ class SupplierOrderConfirmationV3(Document):
 		frappe.db.set_value(self.doctype, self.name, {
 			"total_ordered_qty": self.total_ordered_qty,
 			"total_qty": self.total_qty,
-			"total_backorder_qty": self.total_backorder_qty,
-			"total": self.total,
-			"base_total": self.base_total}, update_modified=False)
+			"total_backorder_qty": self.total_backorder_qty}, update_modified=False)
+		save_v3_totals(self, [d for d in self.items if d.item_code])
 
 	def before_cancel(self):
 		cancel_guard(self)
@@ -53,6 +70,15 @@ ZERO_QTY_STATUSES = ("Back-ordered", "Supplier Stock Out", "Discontinued", "Canc
 # what holds for pasted rows and the bulk-status API.
 ETA_REQUIRED_STATUSES = ("Back-ordered", "Supplier Stock Out")
 
+# The supplier is sending MORE than the order asked for:
+#   Qty Increased  - more of a line that is on the order; Confirmed Qty is above
+#                    the outstanding qty. The PO3 line keeps its qty; the extra
+#                    arrives as Over on the receipt
+#   New Item Added - an item that is not on the order at all; the row has no PO3
+#                    line, and nothing is added to the order for it
+QTY_INCREASED = "Qty Increased"
+NEW_ITEM = "New Item Added"
+
 
 def validate(doc):
 	def resolve_item(val):
@@ -74,25 +100,23 @@ def validate(doc):
 	doc.currency = po.currency
 	doc.conversion_rate = F(po.conversion_rate) or 1.0
 
+	# Taxes and Charges and the Additional Discount start as the order's; the
+	# confirmation can then record what the supplier actually charges.
+	if doc.is_new() and not doc.get("taxes"):
+		for f in TAX_SETTINGS:
+			doc.set(f, po.get(f))
+		doc.set("taxes", tax_rows(po))
+
 	rows = {}
 	for r in po.items:
 		rows[r.name] = r
-
-	# ONE confirmation per PO. Back-order balances live on this document's
-	# Back Orders tab; later supplier documents go on the Documents tab.
-	if doc.is_new() and not doc.supersedes:
-		prior = frappe.get_all("Supplier Order Confirmation V3",
-			filters={"purchase_order_v3": doc.purchase_order_v3, "name": ("!=", doc.name), "docstatus": ("<", 2)},
-			fields=["name"], limit_page_length=1)
-		if prior:
-			frappe.throw(po.name + " is already confirmed on " + prior[0].name
-				+ ". Track back-order balances on its Back Orders tab and attach later supplier "
-				+ "documents on its Documents tab. To replace it outright, set Supersedes.")
 
 	# Which PO3 lines are already spoken for by another confirmation?
 	# A back-ordered line is deliberately re-openable: that is how the supplier
 	# confirms the balance shipment later.
 	claimed = {}
+	# what the other confirmations confirmed to ship now, per PO3 line
+	confirmed_elsewhere = {}
 	for other in frappe.get_all("Supplier Order Confirmation V3",
 			filters={"purchase_order_v3": po.name, "name": ("!=", doc.name), "docstatus": ("<", 2)},
 			fields=["name"]):
@@ -100,16 +124,19 @@ def validate(doc):
 		if doc.supersedes and other.name == doc.supersedes:
 			continue
 		for ln in frappe.get_all("Supplier Order Confirmation V3 Item",
-				filters={"parent": other.name}, fields=["po3_item"]):
+				filters={"parent": other.name}, fields=["po3_item", "confirmed_qty"]):
 			claimed[ln.po3_item] = other.name
+			confirmed_elsewhere[ln.po3_item] = confirmed_elsewhere.get(ln.po3_item, 0) + float(ln.confirmed_qty or 0)
 
 	TERMINAL = ("Received", "Closed Short", "Cancelled", "Supplier Stock Out", "Discontinued")
 
 	# helpers cannot see script-level locals in this sandbox - pass everything in
-	def balance_qty(r, claimed_map):
-		# a re-opened back-ordered line offers only what has not been promised yet
+	def balance_qty(r, claimed_map, confirmed_map):
+		# a re-opened back-ordered line offers only what has not been confirmed yet.
+		# Counted off the other confirmations' lines, not the PO3 line's confirmed_qty:
+		# a Back-ordered line writes the whole ordered qty there as "still due later".
 		if r.line_status == "Back-ordered" and r.name in claimed_map:
-			done = float(r.confirmed_qty or 0)
+			done = float(confirmed_map.get(r.name, 0))
 			if float(r.received_qty or 0) > done:
 				done = float(r.received_qty or 0)
 			return float(r.qty or 0) - done
@@ -130,7 +157,7 @@ def validate(doc):
 			d = doc.append("items", {})
 			d.po3_item = r.name
 			d.item_code = r.item_code
-			d.ordered_qty = balance_qty(r, claimed)
+			d.ordered_qty = balance_qty(r, claimed, confirmed_elsewhere)
 			d.confirmed_qty = d.ordered_qty
 			d.line_status = "Confirmed"
 			d.confirmed_rate = r.rate
@@ -149,6 +176,9 @@ def validate(doc):
 			if not code:
 				frappe.throw("Row " + str(d.idx) + ": no item matches '" + str(d.item_code) + "'.")
 			d.item_code = code
+			# not on the order, so there is no PO line to match
+			if d.line_status == NEW_ITEM:
+				continue
 			match = None
 			for r in po.items:
 				if r.item_code == code and r.name not in used and outstanding(r, claimed):
@@ -156,7 +186,8 @@ def validate(doc):
 					break
 			if not match:
 				frappe.throw("Row " + str(d.idx) + ": " + code + " is not outstanding on " + po.name
-					+ " (already received, closed, or on another confirmation).")
+					+ " (already received, closed, or on another confirmation). If the supplier is "
+					+ "sending it as an extra item, set the line to '" + NEW_ITEM + "'.")
 			d.po3_item = match
 			used[match] = 1
 			if not d.line_status:
@@ -168,6 +199,9 @@ def validate(doc):
 	doc.revision_no = len(others) + 1
 
 	for d in doc.items:
+		if d.line_status == NEW_ITEM:
+			validate_new_item(doc, po, d)
+			continue
 		if d.po3_item not in rows:
 			frappe.throw("Row " + str(d.idx) + ": PO3 Line does not belong to " + po.name)
 		r = rows[d.po3_item]
@@ -180,7 +214,7 @@ def validate(doc):
 				+ "): already covered by " + claimed[d.po3_item] + ". Remove the row, or supersede that confirmation.")
 
 		d.item_code = r.item_code
-		d.ordered_qty = balance_qty(r, claimed)
+		d.ordered_qty = balance_qty(r, claimed, confirmed_elsewhere)
 		ii = item_identifiers(d.item_code, doc.supplier)
 		d.item_name = ii["item_name"]
 		d.retail_sku_suffix = ii["retail_sku_suffix"]
@@ -207,10 +241,14 @@ def validate(doc):
 		if s == "Confirmed" and q != o:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "")
 				+ "): 'Confirmed' means the full outstanding qty (" + str(o) + "), got " + str(q)
-				+ ". Use a 'Partial - ...' status for less.")
+				+ ". Use a 'Partial - ...' status for less, or '" + QTY_INCREASED + "' for more.")
 		if s in ("Partial - Balance Cancelled", "Partial - Balance Back-ordered") and not (0 < q < o):
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + s
 				+ "' requires 0 < Confirmed Qty < " + str(o))
+		if s == QTY_INCREASED and not q > o:
+			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + s
+				+ "' means the supplier is sending more than the outstanding qty (" + str(o)
+				+ ") - Confirmed Qty must be above it, got " + str(q) + ".")
 		if s == "Substituted" and not d.substitute_item_code:
 			frappe.throw("Row " + str(d.idx) + " (" + (d.item_code or "") + "): 'Substituted' requires the Substitute Item.")
 		if d.confirmed_rate and F(r.rate):
@@ -220,6 +258,13 @@ def validate(doc):
 		# a real date beats "to be determined"
 		if d.backorder_eta:
 			d.eta_tbd = 0
+
+	# an item new to the order -- one the supplier adds, or sends in place of
+	# another -- may not be one we have discontinued or disabled
+	added = [(d.idx, d.item_code if d.line_status == NEW_ITEM else d.substitute_item_code) for d in doc.items
+		if d.line_status in (NEW_ITEM, "Substituted")]
+	throw_unavailable([(idx, code, why) for idx, code in added
+		for why in [item_unavailable(code)] if why], "added to this order")
 	no_eta = [d for d in doc.items
 		if d.line_status in ETA_REQUIRED_STATUSES and not d.backorder_eta and not d.eta_tbd]
 	if no_eta:
@@ -264,6 +309,38 @@ def validate(doc):
 
 
 # ---------------------------------------------------------------------------
+# A line the supplier added that was never on the order.
+#
+# Nothing to measure it against, so Ordered Qty is 0 and the confirmation alone
+# says how many are coming and at what price. A row that was pulled off the
+# order cannot become one: more of an ordered item is Qty Increased.
+# ---------------------------------------------------------------------------
+def validate_new_item(doc, po, d):
+	label = "Row " + str(d.idx) + " (" + (d.item_code or "") + "): '" + NEW_ITEM + "'"
+	if d.po3_item:
+		frappe.throw(label + " is for items that are not on " + po.name
+			+ ". This line is on the order - use '" + QTY_INCREASED + "' for extra quantity.")
+	d.ordered_qty = 0
+	ii = item_identifiers(d.item_code, doc.supplier)
+	d.item_name = ii["item_name"]
+	d.retail_sku_suffix = ii["retail_sku_suffix"]
+	# what the supplier gave for an item new to the order is kept, the Item's
+	# own values only fill blanks -- a barcode only if it is this item's
+	if not (d.barcode and frappe.db.exists("Item Barcode", {"parent": d.item_code, "barcode": d.barcode})):
+		d.barcode = ii["barcode"]
+	d.supplier_part_no = d.supplier_part_no or ii["supplier_part_no"]
+	d.rate_variance_pct = 0
+	if F(d.confirmed_qty) <= 0:
+		frappe.throw(label + " needs the Confirmed Qty the supplier is sending.")
+	if not F(d.confirmed_rate) and po.buying_price_list:
+		d.confirmed_rate = F(frappe.db.get_value("Item Price",
+			{"item_code": d.item_code, "price_list": po.buying_price_list, "buying": 1},
+			"price_list_rate", order_by="valid_from desc"))
+	if not F(d.confirmed_rate):
+		frappe.throw(label + " needs a Confirmed Rate - there is no order price to fall back on.")
+
+
+# ---------------------------------------------------------------------------
 # Header totals, printed under the Lines grid.
 #
 # Deliberately derived and never typed: the grid is what the supplier said, and
@@ -274,11 +351,9 @@ def validate(doc):
 def set_totals(doc):
 	ordered = 0.0
 	confirmed = 0.0
-	amount = 0.0
 	for d in (doc.items or []):
 		ordered += F(d.ordered_qty)
 		confirmed += F(d.confirmed_qty)
-		amount += F(d.confirmed_qty) * F(d.confirmed_rate)
 
 	backordered = 0.0
 	for b in (doc.backorders or []):
@@ -287,30 +362,55 @@ def set_totals(doc):
 	doc.total_ordered_qty = ordered
 	doc.total_qty = confirmed
 	doc.total_backorder_qty = backordered
-	doc.total = amount
-	doc.base_total = amount * (F(doc.conversion_rate) or 1.0)
+	# total, taxes, discount and grand totals over the confirmed lines -- see
+	# procurement_v3/taxes.py
+	rows = [d for d in (doc.items or []) if d.item_code]
+	set_v3_totals(doc, [(d.item_code, d.confirmed_qty, d.confirmed_rate) for d in rows], rows)
 
 
 # ---------------------------------------------------------------------------
 # Migrated from Server Script "SOC3 Mirror To PO3"
 # (DocType Event / After Submit on Supplier Order Confirmation V3).
 #
-# Pushes each confirmed line back onto its PO3 line (confirmed qty, line status,
-# shortfall, backorder ETA), copies the confirmation number onto the header,
-# and moves the order to Acknowledged once the supplier has replied.
+# Records the supplier's answer on each PO3 line (confirmed qty, line status,
+# shortfall, backorder ETA, remarks), copies the confirmation number onto the
+# header and moves the order to Acknowledged once the supplier has replied.
+#
+# The PO is the source of truth for the order: a confirmation never changes
+# its items, quantities, rates, taxes or totals, on the PO3 or the native PO.
+# What the supplier sends beyond the order -- Qty Increased, New Item Added,
+# Substituted -- stays on the confirmation and arrives as Over / Unordered /
+# Wrong Item on the receipt, for a supplier claim.
 # ---------------------------------------------------------------------------
+def confirmed_on_other_socs(doc, po3_item):
+	"""Sum of confirmed_qty on this PO3 line across the other submitted confirmations."""
+	others = [s for s in frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": doc.purchase_order_v3, "docstatus": 1, "name": ("!=", doc.name)},
+			pluck="name") if s != doc.supersedes]
+	if not others:
+		return 0
+	return sum(F(q) for q in frappe.get_all("Supplier Order Confirmation V3 Item",
+			filters={"parent": ("in", others), "po3_item": po3_item}, pluck="confirmed_qty"))
+
+
 def mirror_to_po3(doc):
 	po = frappe.get_doc("Purchase Order V3", doc.purchase_order_v3)
 	discontinued_items = []
 
 	for d in doc.items:
 		s = d.line_status
+		if s == NEW_ITEM:
+			continue
 		prev = frappe.db.get_value("Purchase Order V3 Item", d.po3_item,
-			["line_status", "confirmed_qty"], as_dict=True)
+			["line_status", "confirmed_qty", "remarks"], as_dict=True)
 		total = F(d.confirmed_qty)
 		if prev and prev.line_status == "Back-ordered":
-			total = total + F(prev.confirmed_qty)
+			# a re-opened back-order: add what the earlier confirmations confirmed,
+			# not the PO3 line's confirmed_qty (a Back-ordered line holds the whole
+			# ordered qty there, which would count it twice)
+			total = total + confirmed_on_other_socs(doc, d.po3_item)
 		upd = {"confirmed_qty": total}
+		remarks = prev.remarks if prev else None
 		if s == "Confirmed":
 			upd["line_status"] = "Confirmed"
 		elif s == "Partial - Balance Cancelled":
@@ -343,7 +443,24 @@ def mirror_to_po3(doc):
 			upd["line_status"] = "Cancelled"
 			upd["short_qty"] = F(d.ordered_qty)
 		elif s == "Substituted":
+			# the ordered item is not coming; the substitute is not on the order
 			upd["line_status"] = "Substituted"
+			upd["confirmed_qty"] = total - F(d.confirmed_qty)
+			upd["short_qty"] = F(d.ordered_qty)
+			remarks = add_remark(remarks, "Supplier is sending " + (d.substitute_item_code or "")
+				+ " instead (" + fmt_qty(d.confirmed_qty) + ") - Supplier Order Confirmation V3 "
+				+ doc.name + ". Not added to the order.")
+		elif s == QTY_INCREASED:
+			# the order's quantity is all the PO3 confirms; the extra is over the order
+			upd["line_status"] = "Confirmed"
+			upd["confirmed_qty"] = total - F(d.confirmed_qty) + F(d.ordered_qty)
+			remarks = add_remark(remarks, "Supplier confirmed " + fmt_qty(d.confirmed_qty)
+				+ " against " + fmt_qty(d.ordered_qty) + " ordered - Supplier Order Confirmation V3 "
+				+ doc.name + ". The extra is not added to the order.")
+		if d.remarks:
+			remarks = add_remark(remarks, "Supplier (" + doc.name + "): " + d.remarks)
+		if remarks != (prev.remarks if prev else None):
+			upd["remarks"] = remarks
 		frappe.db.set_value("Purchase Order V3 Item", d.po3_item, upd)
 
 	if discontinued_items:
@@ -351,7 +468,7 @@ def mirror_to_po3(doc):
 			+ ", ".join(discontinued_items))
 
 	hdr = {}
-	if not po.confirmation_no and doc.confirmation_no:
+	if doc.confirmation_no:
 		hdr["confirmation_no"] = doc.confirmation_no
 		hdr["confirmation_date"] = doc.confirmation_date
 		hdr["confirmation_no_source"] = doc.confirmation_no_source or "Confirmation Number"
@@ -373,11 +490,55 @@ def mirror_to_po3(doc):
 
 	frappe.db.set_value("Purchase Order V3", po.name, hdr)
 
-	# lines just went dead (stock out, discontinued, cancelled, partial) and the
-	# order is long since submitted, so nothing else will re-add the header up
-	v3_recalc_totals(po.name)
+	mirror_to_native_po(po.name)
 
 	mirror_po3_status(po.name)
+
+
+# The native PO only takes the confirmation number and each back-ordered
+# line's ETA as its Expected Delivery Date -- never its items, quantities,
+# rates or taxes.
+def mirror_to_native_po(po3_name):
+	po3 = frappe.get_doc("Purchase Order V3", po3_name)
+	erp_po = po3.erp_purchase_order
+	if not erp_po or frappe.db.get_value("Purchase Order", erp_po, "docstatus") != 1:
+		return
+	if po3.confirmation_no:
+		frappe.db.set_value("Purchase Order", erp_po, {
+			"order_confirmation_no": po3.confirmation_no,
+			"order_confirmation_date": po3.confirmation_date}, update_modified=False)
+	for r in po3.items:
+		if r.backorder_eta and r.erp_po_item:
+			frappe.db.set_value("Purchase Order Item", r.erp_po_item, "expected_delivery_date",
+				r.backorder_eta, update_modified=False)
+
+
+# The PO3 line's remarks keep every note a confirmation made on it, so a
+# second one is appended rather than overwriting the first.
+def add_remark(existing, note):
+	return (existing + "\n" + note) if existing else note
+
+
+def fmt_qty(q):
+	q = F(q)
+	return str(int(q)) if q == int(q) else str(q)
+
+
+# The back-ordered balance still owed on each PO3 line, from the latest
+# submitted confirmation's Back Orders rows: {po3_item: qty}. Less whatever has
+# been received beyond what shipped with the confirmation.
+def open_backorder_qty(po3_name):
+	out = {}
+	for soc in frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": po3_name, "docstatus": 1},
+			order_by="creation desc", pluck="name"):
+		for b in frappe.get_all("Supplier Order Confirmation V3 Backorder", filters={"parent": soc},
+				fields=["po3_item", "status", "balance_qty", "shipping_now", "received_qty"]):
+			if not b.po3_item or b.po3_item in out:
+				continue
+			out[b.po3_item] = max(F(b.balance_qty) - max(F(b.received_qty) - F(b.shipping_now), 0), 0) \
+				if b.status in ("Open", "Shipped") else 0
+	return out
 
 
 # ---------------------------------------------------------------------------
@@ -396,15 +557,20 @@ def cancel_guard(doc):
 		blockers.append("shipment " + s.name + " (" + str(s.workflow_state)
 			+ ") was built from this confirmation")
 
-	if doc.purchase_order_v3:
+	# A PO can have several confirmations, so only goods received against this
+	# confirmation's own lines block it - not receipts against another one.
+	soc_lines = [d.name for d in doc.items if d.name]
+	if soc_lines:
 		got = 0.0
-		for r in frappe.get_all("Purchase Order V3 Item",
-				filters={"parent": doc.purchase_order_v3},
-				fields=["received_qty"], limit_page_length=0):
-			got = got + float(r.received_qty or 0)
+		receipts = set()
+		for gi in frappe.db.sql("""select g.name, gi.received_qty
+				from `tabPurchase Receipt V3 Item` gi join `tabPurchase Receipt V3` g on g.name = gi.parent
+				where g.docstatus = 1 and gi.soc3_item in %(lines)s""", {"lines": soc_lines}, as_dict=True):
+			got = got + float(gi.received_qty or 0)
+			receipts.add(gi.name)
 		if got > 0:
-			blockers.append("goods have already been received against "
-				+ doc.purchase_order_v3 + " (" + str(got) + " units)")
+			blockers.append("goods have already been received against this confirmation on "
+				+ ", ".join(sorted(receipts)) + " (" + str(got) + " units)")
 
 	if blockers:
 		frappe.throw("<b>" + doc.name + " cannot be cancelled.</b><br><br>"
@@ -454,6 +620,29 @@ def line_details(lines, supplier=None):
 			if ln.get("po3_item") else 0
 		out.append(d)
 	return out
+
+
+# ---------------------------------------------------------------------------
+# Taxes and totals for the form as it stands, unsaved -- the same set_totals()
+# that runs on save, so the numbers the form shows while taxes, discount or
+# lines are being keyed in are exactly the ones save will store, as they are on
+# the native PO. Nothing is written.
+#
+# Answers the header totals, each tax row's amounts (in row order) and each
+# line's net figures (in line order).
+# ---------------------------------------------------------------------------
+@frappe.whitelist()
+def preview_totals(doc):
+	if isinstance(doc, str):
+		doc = json.loads(doc)
+	frappe.has_permission("Supplier Order Confirmation V3", "write", throw=True)
+	doc = frappe.get_doc(doc)
+	set_totals(doc)
+	return {
+		"totals": {f: doc.get(f) for f in ("total",) + TOTAL_FIELDS},
+		"taxes": [{f: t.get(f) for f in ("description",) + TAX_ROW_TOTALS} for t in doc.get("taxes") or []],
+		"items": [{"net_rate": d.get("net_rate"), "net_amount": d.get("net_amount")} for d in doc.items or []],
+	}
 
 
 # ---------------------------------------------------------------------------

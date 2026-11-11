@@ -1,0 +1,56 @@
+{% extends "templates/web.html" %}
+{% block title %}QuickBooks Authorization{% endblock %}
+{% block page_content %}
+<div class="container mt-5" style="max-width:500px">
+  <div id="qbo-status">
+    <p class="text-muted">{{ _("Processing authorization...") }}</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const el = document.getElementById("qbo-status");
+
+  function show(ok, msg) {
+    el.innerHTML = ok
+      ? '<div class="alert alert-success"><h4>{{ _("Connected") }}</h4><p>' + msg + "</p></div>"
+      : '<div class="alert alert-danger"><h4>{{ _("Authorization Failed") }}</h4><p>' + msg + "</p></div>";
+    if (ok && window.opener) {
+      setTimeout(() => window.close(), 1500);
+    }
+  }
+
+  const error = params.get("error");
+  if (error) {
+    show(false, "QuickBooks denied access: " + error);
+    return;
+  }
+
+  const code = params.get("code");
+  const realmId = params.get("realmId");
+  const state = params.get("state");
+
+  if (!code || !state) {
+    show(false, "Missing authorization parameters. Please try connecting again.");
+    return;
+  }
+
+  frappe.call({
+    method: "metactical.metactical.doctype.qbo_settings.qbo_settings.oauth_callback",
+    args: { code: code, realmId: realmId, state: state },
+    callback(r) {
+      const data = r.message || {};
+      if (data.status === "success") {
+        show(true, "QuickBooks connected successfully. You can close this window.");
+      } else {
+        show(false, data.message || "An unknown error occurred.");
+      }
+    },
+    error(r) {
+      show(false, "Server error. Check the Error Log for details.");
+    },
+  });
+})();
+</script>
+{% endblock %}

@@ -19,6 +19,8 @@
   "whole_order",
   "use_suggested",
   "status",
+  "batch",
+  "page_no",
   "basis_section",
   "company",
   "company_currency",
@@ -144,6 +146,22 @@
    "label": "Status",
    "options": "Draft\nPending Review\nApplied\nReverted\nCancelled",
    "read_only": 1
+  },
+  {
+   "fieldname": "batch",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Batch",
+   "options": "Price Revision Batch",
+   "read_only": 1,
+   "description": "The collective this revision is one page of. Set when a large selection is split across several revisions."
+  },
+  {
+   "fieldname": "page_no",
+   "fieldtype": "Int",
+   "label": "Page",
+   "read_only": 1,
+   "description": "This revision's page number within its batch."
   },
   {
    "fieldname": "basis_section",

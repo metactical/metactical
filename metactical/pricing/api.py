@@ -74,13 +74,17 @@ def revisions_for_confirmation(confirmation):
 
 
 @frappe.whitelist()
-def get_grid(name):
+def get_grid(name, recompute=1):
+	# opening a batch (the collective) shows its first page by default
+	if frappe.db.exists("Price Revision Batch", name):
+		name = frappe.db.get_value("Price Revision", {"batch": name, "page_no": 1}) or name
 	doc = frappe.get_doc("Price Revision", name)
 	doc.check_permission("read")
-	if doc.docstatus == 0 and not jobs.is_busy(name) and not jobs.is_large(len(doc.items)):
+	if cint(recompute) and doc.docstatus == 0 and not jobs.is_busy(name) and not jobs.is_large(len(doc.items)):
 		# A draft can sit for days; show it against today's prices and
 		# settings. Nothing is written until the next save. (Skipped for a
-		# large revision, where it would make opening it slow.)
+		# large revision, where it would make opening it slow — and when just
+		# paging through a batch, where the stored prices are already current.)
 		doc.set_currencies()
 		doc.recalculate()
 		doc.roll_up_summary()
@@ -92,6 +96,88 @@ def job_state(name):
 	frappe.has_permission("Price Revision", "read", name, throw=True)
 	return frappe.db.get_value(
 		"Price Revision", name, ["job_status", "job_operation", "job_progress", "job_message", "status", "docstatus"],
+		as_dict=True,
+	)
+
+
+@frappe.whitelist()
+def batch_page_name(batch, page=1):
+	"""The revision that is a given page of a batch — what the grid routes to."""
+	frappe.has_permission("Price Revision Batch", "read", batch, throw=True)
+	name = frappe.db.get_value("Price Revision", {"batch": batch, "page_no": cint(page)})
+	if not name:
+		frappe.throw(_("{0} has no page {1}.").format(batch, cint(page)))
+	return name
+
+
+@frappe.whitelist()
+def search_batch(batch, query):
+	"""Which pages of a batch hold items matching the search, with a count each,
+	so the grid can jump to them. Matches item code, name, brand, item group and
+	retail SKU across every page of the collective."""
+	frappe.has_permission("Price Revision Batch", "read", batch, throw=True)
+	q = (query or "").strip()
+	if not q:
+		return []
+	page_of = {
+		p.name: cint(p.page_no) for p in frappe.get_all(
+			"Price Revision", filters={"batch": batch}, fields=["name", "page_no"])
+	}
+	if not page_of:
+		return []
+	# item_code -> page number (an item sits on exactly one page)
+	place = {
+		r.item_code: page_of[r.parent] for r in frappe.get_all(
+			"Price Revision Item", filters={"parent": ("in", list(page_of))},
+			fields=["item_code", "parent"])
+		if r.parent in page_of
+	}
+	if not place:
+		return []
+	like = "%{0}%".format(q)
+	or_filters = {
+		"name": ("like", like), "item_name": ("like", like),
+		"brand": ("like", like), "item_group": ("like", like),
+	}
+	if frappe.get_meta("Item").has_field("ifw_retailskusuffix"):
+		or_filters["ifw_retailskusuffix"] = ("like", like)
+	counts = {}
+	for m in frappe.get_all(
+		"Item", filters={"name": ("in", list(place))}, or_filters=or_filters, fields=["name"]):
+		pg = place[m.name]
+		counts[pg] = counts.get(pg, 0) + 1
+	return sorted(
+		({"page_no": pg, "matches": c} for pg, c in counts.items()),
+		key=lambda x: x["page_no"],
+	)
+
+
+@frappe.whitelist()
+def apply_batch(batch):
+	"""Submit and write every page of a batch, in the background."""
+	frappe.has_permission("Price Revision", "submit", throw=True)
+	frappe.has_permission("Price Revision Batch", "write", batch, throw=True)
+	jobs.batch_ensure_idle(batch)
+	jobs.start_batch(batch, "apply")
+	return {"queued": True, "batch": batch}
+
+
+@frappe.whitelist()
+def revert_batch(batch):
+	"""Put back every applied page of a batch, in the background."""
+	frappe.has_permission("Price Revision", "submit", throw=True)
+	frappe.has_permission("Price Revision Batch", "write", batch, throw=True)
+	jobs.batch_ensure_idle(batch)
+	jobs.start_batch(batch, "revert")
+	return {"queued": True, "batch": batch}
+
+
+@frappe.whitelist()
+def batch_job_state(batch):
+	frappe.has_permission("Price Revision Batch", "read", batch, throw=True)
+	return frappe.db.get_value(
+		"Price Revision Batch", batch,
+		["job_status", "job_operation", "job_progress", "job_message", "status"],
 		as_dict=True,
 	)
 
@@ -125,24 +211,41 @@ def set_use_suggested(name, on):
 
 @frappe.whitelist()
 def add_price_list(name, price_list):
-	"""Add a column: every item gets a cell on ``price_list``."""
+	"""Add a column: every item gets a cell on ``price_list``. On a batched
+	revision the column is added to every page, so the collective keeps one
+	shared set of columns."""
 	if not frappe.db.get_value("Price List", price_list, "enabled"):
 		frappe.throw(_("{0} is not an enabled price list.").format(price_list))
 	if price_list == frappe.db.get_value("Price Revision", name, "buying_price_list"):
 		frappe.throw(_("{0} is the supplier's cost list; the Cost column already covers it.").format(price_list))
+	batch = frappe.db.get_value("Price Revision", name, "batch")
+	if batch:
+		return _change_batch_columns(batch, "add_list", price_list)
 	return _change(name, "add_list", price_list=price_list)
 
 
 @frappe.whitelist()
 def drop_price_list(name, price_list):
-	"""Take a column out of this revision. Prices on the list are not touched."""
+	"""Take a column out of this revision. Prices on the list are not touched.
+	On a batched revision the column is dropped from every page."""
 	from metactical.icl_pricing.doctype.icl_pricing_settings.icl_pricing_settings import (
 		always_price_lists,
 	)
 
 	if price_list in always_price_lists():
 		frappe.throw(_("{0} is always included (ICL Pricing Settings).").format(price_list))
+	batch = frappe.db.get_value("Price Revision", name, "batch")
+	if batch:
+		return _change_batch_columns(batch, "drop_list", price_list)
 	return _change(name, "drop_list", price_list=price_list)
+
+
+def _change_batch_columns(batch, change, price_list):
+	"""Add/drop a column across every page of a batch, in the background."""
+	frappe.has_permission("Price Revision Batch", "write", batch, throw=True)
+	jobs.batch_ensure_idle(batch)
+	jobs.start_batch(batch, change, price_list=price_list)
+	return {"queued": True, "batch": batch}
 
 
 @frappe.whitelist()
@@ -220,6 +323,16 @@ def _change(name, change, **kw):
 		jobs.start(name, "edit", change=change, **kw)
 		return {"queued": True}
 	doc = frappe.get_doc("Price Revision", name)
+	if change == "edits":
+		# only the touched items can move, so rebuild and write just those
+		affected = {c.get("item_code") for c in (kw.get("cells") or [])}
+		affected |= {i.get("item_code") for i in (kw.get("items") or [])}
+		_edits(doc, **kw)
+		doc.save_item_edits(affected)
+		if doc.batch:
+			# keep the collective's totals and the pager in step with the page
+			frappe.get_doc("Price Revision Batch", doc.batch).save_roll_up()
+		return _grid(doc)
 	CHANGES[change](doc, **kw)
 	doc.save()
 	return _grid(doc)
@@ -304,6 +417,37 @@ def _parse(value):
 
 def _short(price_list):
 	return price_list[6:] if price_list.startswith("RET - ") else price_list
+
+
+def _batch_info(doc):
+	"""The collective a revision is a page of, with its sibling pages, so the
+	grid can show a pager and step between them. ``None`` for a standalone one."""
+	if not doc.get("batch"):
+		return None
+	b = frappe.db.get_value(
+		"Price Revision Batch", doc.batch,
+		["name", "status", "total_items", "total_price_changes", "page_count", "items_per_page"],
+		as_dict=True,
+	) or {}
+	pages = frappe.get_all(
+		"Price Revision", filters={"batch": doc.batch},
+		fields=["name", "page_no", "total_items", "status", "docstatus"],
+		order_by="page_no asc",
+	)
+	return {
+		"name": doc.batch,
+		"page_no": cint(doc.page_no),
+		"page_count": cint(b.get("page_count")) or len(pages),
+		"total_items": cint(b.get("total_items")),
+		"total_price_changes": cint(b.get("total_price_changes")),
+		"items_per_page": cint(b.get("items_per_page")),
+		"status": b.get("status"),
+		"pages": [
+			{"name": p.name, "page_no": cint(p.page_no),
+			 "total_items": cint(p.total_items), "status": p.status}
+			for p in pages
+		],
+	}
 
 
 def _grid(doc):
@@ -422,6 +566,7 @@ def _grid(doc):
 			"name": doc.name,
 			"status": doc.status,
 			"docstatus": doc.docstatus,
+			"batch": _batch_info(doc),
 			"editable": doc.docstatus == 0 and frappe.has_permission("Price Revision", "write", doc),
 			"can_apply": frappe.has_permission("Price Revision", "submit", doc),
 			"supplier": doc.supplier,

@@ -33,7 +33,8 @@ app_include_js = ["metactical.bundle.js", "metactical_price_grid.bundle.js"]
 # web_include_css = "/assets/metactical/css/metactical.css"
 web_include_css = [
 	"/assets/metactical/node_modules/intl-tel-input/build/css/intlTelInput.css", 
-	"/assets/metactical/css/metactical_time_tracker.css"
+	"/assets/metactical/css/metactical_time_tracker.css",
+	"/assets/metactical/css/metactical_login.css",
 ]
 # web_include_js = "/assets/metactical/js/metactical.js"
 web_include_js = "/assets/metactical/node_modules/intl-tel-input/build/js/intlTelInput.js"
@@ -69,6 +70,7 @@ doctype_js = {
 	"Operation": "custom_scripts/bom_operation/bom_operation.js",
 	# Adds the "Revise Prices" button that opens the ICL Pricing grid (merged from the icl_pricing app).
 	"Supplier Order Confirmation V3": "public/js/price_grid_supplier_order_confirmation_v3.js",
+	"Supplier": "custom_scripts/supplier/supplier.js",
 }
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 #doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -168,6 +170,8 @@ doc_events = {
 	# }, 
 	"Stock Ledger Entry": {
 		"on_update": "metactical.metactical.doctype.item_inventory_output.item_inventory_output.on_sle_update",
+		# stop Pending Purchase MRs once their items are back in stock
+		"on_submit": "metactical.custom_scripts.material_request.auto_close.on_sle_submit",
 	},
 	"Repost Item Valuation": {
 		"before_validate": "metactical.custom_scripts.repost_item_valuation.repost_item_valuation.clamp_repost_to_open_period"
@@ -189,6 +193,7 @@ override_doctype_class = {
 	"Packing Slip": "metactical.custom_scripts.packing_slip.packing_slip.CustomPackingSlip",
 	"Stock Reconciliation": "metactical.custom_scripts.stock_reconciliation.stock_reconciliation.CustomStockReconciliation",
 	"Purchase Order": "metactical.custom_scripts.purchase_order.purchase_order.CustomPurchaseOrder",
+	"Supplier": "metactical.custom_scripts.supplier.supplier.CustomSupplier",
 	"Purchase Receipt": "metactical.custom_scripts.purchase_receipt.purchase_receipt.CustomPurchaseReceipt",
 	"Purchase Invoice": "metactical.custom_scripts.purchase_invoice.purchase_invoice.CustomPurchaseInvoice",
 	"Stock Entry": "metactical.custom_scripts.stock_entry.stock_entry.CustomStockEntry",
@@ -234,6 +239,8 @@ scheduler_events = {
 			"metactical.custom_scripts.usaepay.usaepay_api.process_missed_usaepay_transactions",
 		], "*/1 * * * *": [
 			"metactical.metactical.doctype.failed_inventory_output.failed_inventory_output.process_failed_inventory_outputs"
+		], "*/10 * * * *": [
+			"metactical.time_tracker.reminders.run"
 		]
 	}
 }
@@ -929,6 +936,7 @@ fixtures = [{
 			"Tag Link-autocreated",
 			"Item Attribute Value-color",
 			"Item Attribute Value-short_name",
+			"Item Attribute Value-nat_swatch_image",
 			"Website Specification Label-custom_show_in_table",
 			"Item Attribute-custom__nat_show_in_table",
 			"Item Attribute-custom_is_search_filter",
@@ -985,7 +993,7 @@ fixtures = [{
 			"Purchase Order-custom_po3_status",
 			"Supplier Claim V3-workflow_state",
 			"Inbound Shipment V3-workflow_state",
-			"Goods Receipt V3-workflow_state",
+			"Purchase Receipt V3-workflow_state",
 			"Supplier Order Confirmation V3-workflow_state",
 			"Purchase Order V3-workflow_state",
 			"Purchase Order-custom_purchase_order_v3",
@@ -997,6 +1005,9 @@ fixtures = [{
 			"Supplier-custom_column_break_duesj",
 			"Supplier-custom_sender_address",
 			"Supplier-custom_sender_email",
+			"Supplier-nat_po3_bcc_email",
+			"Supplier-nat_po3_signature_user",
+			"Supplier-nat_po3_signature",
 			"Supplier-po3_section"
 		]]]
 	},
@@ -1593,6 +1604,11 @@ fixtures = [{
 			"Item-country_of_origin-depends_on",
 			"Item-customs_tariff_number-depends_on",
 			"Supplier-main-field_order",
+			"Sales Invoice-status-length",
+			"Sales Invoice-is_opening-length",
+			"Sales Invoice-apply_discount_on-length",
+			"Sales Invoice-language-length",
+			"Sales Order Item-warehouse-search_index",
 		]]]
 	},
   	{
@@ -1660,7 +1676,7 @@ fixtures = [{
 	{
 		"dt": "Workflow",
 		"filters": [["name", "in", [
-			"Goods Receipt V3 Flow",
+			"Purchase Receipt V3 Flow",
 			"Inbound Shipment V3 Flow",
 			"Purchase Order V3 Flow",
 			"Supplier Claim V3 Flow",

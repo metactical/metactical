@@ -6,13 +6,29 @@ import re
 
 import frappe
 from frappe.model.document import Document
-from frappe.contacts.doctype.address.address import render_address
+from frappe.contacts.doctype.address.address import get_default_address, render_address
+from erpnext.controllers.accounts_controller import validate_conversion_rate
+from erpnext.setup.utils import get_exchange_rate
 
+from metactical.procurement_v3.taxes import (
+	TAX_ROW_TOTALS,
+	TOTAL_FIELDS,
+	copy_taxes_to_native,
+	fill_taxes_from_template,
+	prepare_tax_rows,
+	set_v3_totals,
+	v3_before_print,
+)
 from metactical.procurement_v3.utils import (
 	F,
 	billable_qty,
+	clean_email_list,
+	email_list,
 	item_supplier_part_no,
+	item_unavailable,
 	mirror_po3_status,
+	require_email_signature,
+	throw_unavailable,
 	v3_may_close_native,
 	v3_open_bo,
 	v3_recalc_totals,
@@ -31,6 +47,9 @@ class PurchaseOrderV3(Document):
 
 	def validate(self):
 		validate(self)
+
+	def before_print(self, settings=None):
+		v3_before_print(self)
 
 	def on_submit(self):
 		auto_send_on_approve(self)
@@ -137,6 +156,11 @@ def shared_series_naming(doc):
 		npo.supplier = doc.supplier
 		npo.company = doc.company
 		set_native_addresses(npo, doc)
+		fill_taxes_from_template(doc)
+		# validate (which fills a blank Description from the account) has not run
+		# yet, and Description is mandatory on the twin's tax rows
+		prepare_tax_rows(doc)
+		copy_taxes_to_native(npo, doc)
 		npo.transaction_date = doc.order_date or frappe.utils.nowdate()
 		# PO3 has one date field, and it is a CANCEL date -- the point after which
 		# unfilled lines get dropped. It belongs in ais_cancel_date, which is what the
@@ -155,9 +179,7 @@ def shared_series_naming(doc):
 		# would be replaced by whatever lead time the items carry.
 		npo.schedule_date = po_ship_date(doc)
 		npo.ais_cancel_date = doc.required_by
-		npo.currency = doc.currency
-		npo.conversion_rate = F(doc.conversion_rate) or 1
-		npo.buying_price_list = doc.buying_price_list
+		set_native_currency(npo, doc)
 		npo.set_warehouse = doc.set_warehouse
 		if doc.notes_to_supplier:
 			npo.drop_ship_notes = doc.notes_to_supplier
@@ -173,6 +195,15 @@ def shared_series_naming(doc):
 			# as ordered off the NATIVE PO, not off the PO3
 			r.material_request = d.material_request
 			r.material_request_item = d.material_request_item
+			# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+			# see copy_line_identifiers
+			copy_line_identifiers(r, d)
+		# shipping_address is mandatory on Purchase Order, but a PO3 draft may
+		# not have one yet (require_addresses asks for it before approval, and
+		# approval copies it onto this twin before submitting it). Everything
+		# else mandatory is set above; submit checks mandatory again regardless.
+		if not doc.shipping_address:
+			npo.flags.ignore_mandatory = True
 		npo.insert(ignore_permissions=True)
 		doc.name = "PO3-" + npo.name
 		doc.flags.name_set = True
@@ -222,6 +253,36 @@ def require_cancel_date(doc):
 		title="Required By (Cancel Date) is required")
 
 
+# ---------------------------------------------------------------------------
+# Shipping and Billing Address: optional on a draft, required on the way to
+# approval -- like Required By above, but on every move out of Draft and every
+# later transition (Approve included), since approval submits the native PO and
+# shipping_address is mandatory there. Nothing falls back to the company's
+# address any more (resolve_addresses), so a supplier with none configured
+# leaves them for the buyer to pick.
+# ---------------------------------------------------------------------------
+def require_addresses(doc):
+	missing = [label for label, value in (("Shipping Address", doc.shipping_address),
+		("Billing Address", doc.billing_address)) if not value]
+	if not missing:
+		return
+
+	now = doc.workflow_state or "Draft"
+	if now == "Draft":
+		return
+	was = (frappe.db.get_value(doc.doctype, doc.name, "workflow_state")
+		if not doc.is_new() else None) or "Draft"
+	if now == was:
+		return
+
+	it = "them" if len(missing) > 1 else "it"
+	frappe.throw("<b>{0} {1} required.</b><br><br>"
+		"Select {2} on this order before sending it for approval. Supplier {3} has none "
+		"set - you can also set {2} on the Supplier, and new orders will then fill {2} in.".format(
+			" and ".join(missing), "are" if len(missing) > 1 else "is", it, frappe.bold(doc.supplier or "")),
+		title="Address required")
+
+
 def mirror_status_now(erp_po, state):
 	# Before Save: the new state is only on the in-memory doc, not yet in the DB
 	if erp_po:
@@ -231,9 +292,14 @@ def mirror_status_now(erp_po, state):
 
 def validate(doc):
 	require_cancel_date(doc)
+	# a discontinued or disabled item can't be ordered -- checked on every draft
+	# save and again on approval, in case it was discontinued in between
+	throw_unavailable([(d.idx, d.item_code, why) for d in doc.items
+		for why in [item_unavailable(d.item_code)] if why], "ordered")
 
 	resolve_currency(doc)
 	resolve_addresses(doc)
+	require_addresses(doc)
 	fill_item_identifiers(doc)
 
 	# Changing the Ship To Warehouse has to take the lines with it. Filling only
@@ -256,8 +322,9 @@ def validate(doc):
 				d.rate = price
 		# a line the supplier will never fill is worth nothing to this order, so
 		# it drops out of the totals - see billable_qty
-		billable = billable_qty(d.qty, d.short_qty)
+		billable = billable_qty(d.qty, d.short_qty, d.over_qty)
 		d.amount = billable * F(d.rate)
+		d.expected_qty = billable
 		total_qty += billable
 		total += d.amount
 		if not d.warehouse or moved_warehouse:
@@ -270,8 +337,11 @@ def validate(doc):
 			d.variant_attributes = ", ".join([(a.attribute + ": " + (a.attribute_value or "")) for a in attrs])
 
 	doc.total_qty = total_qty
-	doc.total = total
-	doc.base_grand_total = total * (F(doc.conversion_rate) or 1.0)
+	# Taxes and Charges, Additional Discount and the grand totals, the way the
+	# native twin will work them out -- see procurement_v3/taxes.py. The
+	# approval tier below goes by base_grand_total, so taxes count towards it.
+	fill_taxes_from_template(doc)
+	set_tax_totals(doc)
 
 	if doc.base_grand_total >= 50000:
 		doc.approval_tier = "L3 (Abdul) - over 50k"
@@ -285,19 +355,28 @@ def validate(doc):
 			doc.supplier_email = frappe.db.get_value("Supplier", doc.supplier, "po3_order_email")
 		if not doc.cc_email:
 			doc.cc_email = frappe.db.get_value("Supplier", doc.supplier, "po3_cc_email")
+		if not doc.bcc_email:
+			doc.bcc_email = frappe.db.get_value("Supplier", doc.supplier, "nat_po3_bcc_email")
+		if not doc.signature_user:
+			doc.signature_user = frappe.db.get_value("Supplier", doc.supplier, "nat_po3_signature_user")
 		if not doc.po_print_format:
 			doc.po_print_format = frappe.db.get_value("Supplier", doc.supplier, "po3_print_format")
 		if not doc.sender_email_account:
 			doc.sender_email_account = frappe.db.get_value(
 				"Supplier", doc.supplier, "nat_sender_email_account")
+		if not doc.tax_category:
+			doc.tax_category = frappe.db.get_value("Supplier", doc.supplier, "tax_category")
+		# Sender Email Address defaults from the supplier but stays editable, so a
+		# user's override is never replaced here -- only a blank one is filled.
+		if not doc.sender_email:
+			doc.sender_email = frappe.db.get_value("Supplier", doc.supplier, "nat_sender_email") \
+				or (frappe.db.get_value("Email Account", doc.sender_email_account, "email_id")
+					if doc.sender_email_account else None)
 
-	# sender_email is read-only and derived, so keep it tied to the account. The
-	# field's fetch_from resolves before validate runs, which misses an account
-	# defaulted from the supplier just above.
-	doc.sender_email = frappe.db.get_value("Email Account", doc.sender_email_account, "email_id") \
-		if doc.sender_email_account else None
-
-	doc.bcc_email = frappe.db.get_single_value("Procurement Settings V3", "bcc_email")
+	clean_email_list(doc, "cc_email")
+	clean_email_list(doc, "bcc_email")
+	if doc.docstatus == 0:
+		require_email_signature(doc, "signature_user")
 
 	if doc.set_warehouse:
 		w = frappe.db.get_value("Warehouse", doc.set_warehouse,
@@ -328,19 +407,36 @@ def validate(doc):
 # ahead of validate.
 # ---------------------------------------------------------------------------
 def resolve_addresses(doc):
+	# the supplier's own address: its default one, and never another supplier's
+	# (left behind when the supplier on the order is changed)
+	if doc.supplier_address and not frappe.db.exists("Dynamic Link", {"parenttype": "Address",
+			"parent": doc.supplier_address, "link_doctype": "Supplier", "link_name": doc.supplier}):
+		doc.supplier_address = None
+	if doc.supplier and not doc.supplier_address:
+		doc.supplier_address = get_default_address("Supplier", doc.supplier)
+	doc.address_display = render_address(doc.supplier_address, check_permissions=False) if doc.supplier_address else None
+
 	if doc.supplier and not (doc.shipping_address and doc.billing_address):
 		shipping, billing = frappe.db.get_value("Supplier", doc.supplier,
 			["nat_shipping_address", "nat_billing_address"]) or (None, None)
 		doc.shipping_address = doc.shipping_address or shipping
 		doc.billing_address = doc.billing_address or billing
+	# Only ever the supplier's configured addresses or the buyer's own pick. No
+	# fallback to the company's default address: that put an unrelated address
+	# (e.g. "Camo TO East York - Shipping") on orders whose supplier had none
+	# set. Blank is fine on a draft; require_addresses asks for them on the way
+	# to approval.
 
 	doc.shipping_address_display = render_address(doc.shipping_address, check_permissions=False) if doc.shipping_address else None
 	doc.billing_address_display = render_address(doc.billing_address, check_permissions=False) if doc.billing_address else None
 
 
-# Blank on the PO3 leaves the native PO's own default (the company address)
+# Blank on the PO3 (no company address either) leaves the native PO's own value
 # alone rather than wiping it -- shipping_address is mandatory on Purchase Order.
 def set_native_addresses(npo, doc):
+	if doc.supplier_address:
+		npo.supplier_address = doc.supplier_address
+		npo.address_display = doc.address_display
 	if doc.shipping_address:
 		npo.shipping_address = doc.shipping_address
 		npo.shipping_address_display = doc.shipping_address_display
@@ -371,6 +467,43 @@ def get_item_identifiers(item_code, supplier=None):
 	return item_identifiers(item_code, supplier)
 
 
+# ---------------------------------------------------------------------------
+# Taxes, Additional Discount and the grand totals over the billable lines --
+# see procurement_v3/taxes.py. validate() runs it on save; preview_totals runs
+# it on the form as it stands, so the numbers move while taxes, discount or
+# lines are being keyed in, as they do on the native PO.
+# ---------------------------------------------------------------------------
+def set_tax_totals(doc):
+	rows = [d for d in doc.items if d.item_code]
+	set_v3_totals(doc, [(d.item_code, billable_qty(d.qty, d.short_qty, d.over_qty), d.rate) for d in rows], rows)
+
+
+# Nothing is written. Answers the header totals, each tax row's amounts (in row
+# order) and each line's net figures (in line order).
+@frappe.whitelist()
+def preview_totals(doc):
+	if isinstance(doc, str):
+		doc = json.loads(doc)
+	frappe.has_permission("Purchase Order V3", "write", throw=True)
+	doc = frappe.get_doc(doc)
+	set_tax_totals(doc)
+	return {
+		"totals": {f: doc.get(f) for f in ("total",) + TOTAL_FIELDS},
+		"taxes": [{f: t.get(f) for f in ("description",) + TAX_ROW_TOTALS} for t in doc.get("taxes") or []],
+		"items": [{"net_rate": d.get("net_rate"), "net_amount": d.get("net_amount")} for d in doc.items or []],
+	}
+
+
+# The native twin's lines are built from item_code/qty/rate alone, leaving
+# ERPNext's get_item_details to fill the rest. It only fills barcode when the
+# item has exactly ONE barcode (erpnext update_barcode_value), so any item with
+# two or more came through with the PO3 line's barcode missing on the native PO
+# -- and on everything printed from it. Carry both identifiers across as-is.
+def copy_line_identifiers(r, d):
+	r.barcode = d.barcode
+	r.supplier_part_no = d.supplier_part_no
+
+
 def fill_item_identifiers(doc):
 	for d in doc.get("items"):
 		if not d.item_code:
@@ -383,6 +516,23 @@ def fill_item_identifiers(doc):
 		ids = item_identifiers(d.item_code, doc.supplier)
 		d.barcode = d.barcode or ids["barcode"]
 		d.supplier_part_no = d.supplier_part_no or ids["supplier_part_no"]
+
+
+# The twin is priced at the PO3's rate. Its price list rate has to be given too:
+# left blank, ERPNext looks one up -- once for the order and again for every line
+# -- at the order date, and for a future-dated order there is no rate to find,
+# so the user got one "Unable to find exchange rate" message per line.
+def set_native_currency(npo, doc):
+	npo.currency = doc.currency
+	npo.conversion_rate = F(doc.conversion_rate) or 1
+	npo.buying_price_list = doc.buying_price_list
+	plc = frappe.db.get_value("Price List", doc.buying_price_list, "currency") if doc.buying_price_list else None
+	if not plc or plc == doc.currency:
+		npo.price_list_currency = doc.currency
+		npo.plc_conversion_rate = npo.conversion_rate
+	elif plc == frappe.get_cached_value("Company", doc.company, "default_currency"):
+		npo.price_list_currency = plc
+		npo.plc_conversion_rate = 1
 
 
 # ---------------------------------------------------------------------------
@@ -413,20 +563,19 @@ def resolve_currency(doc):
 			doc.currency = sup.default_currency
 	if not doc.currency:
 		doc.currency = company_currency
-	if doc.currency and doc.currency != company_currency and F(doc.conversion_rate) in (0.0, 1.0):
-		rate = frappe.db.get_value("Currency Exchange",
-			{"from_currency": doc.currency, "to_currency": company_currency},
-			"exchange_rate", order_by="date desc")
-		if not rate:
-			try:
-				rate = frappe.call("erpnext.setup.utils.get_exchange_rate",
-					from_currency=doc.currency, to_currency=company_currency)
-			except Exception:
-				rate = None
-		if rate:
-			doc.conversion_rate = rate
-	if F(doc.conversion_rate) == 0:
+	# The rate as the native PO gets it (AccountsController.set_price_list_currency):
+	# the buying rate on the order date, by Accounts Settings' stale-rate rules.
+	# The field defaults to 1, so 1 on a foreign order means "not looked up yet",
+	# as get_item_details takes it. No rate is an error, as on the native PO -- not
+	# the latest one on file whatever its date, and never a silent 1.
+	if doc.currency == company_currency:
 		doc.conversion_rate = 1
+	else:
+		if F(doc.conversion_rate) in (0.0, 1.0):
+			doc.conversion_rate = get_exchange_rate(doc.currency, company_currency,
+				doc.order_date, "for_buying")
+		validate_conversion_rate(doc.currency, doc.conversion_rate,
+			doc.meta.get_label("conversion_rate"), doc.company)
 
 
 # ---------------------------------------------------------------------------
@@ -435,8 +584,46 @@ def resolve_currency(doc):
 #
 # On approval: syncs the final lines onto the native PO twin and submits it
 # (gated by Procurement Settings V3.posting_enabled), then emails the order to
-# the supplier and flips the state to Sent to Supplier when that succeeds.
+# the supplier and flips the state to Sent to Supplier when that succeeds --
+# unless Disable Sending Email is checked on the order.
 # ---------------------------------------------------------------------------
+# PO Print Format may hold a "<format> - PO3" copy, which only prints a PO3.
+# The email prints the native twin, so use the native format it was copied from.
+# Anything that is not a Purchase Order format falls back to Purchase Order's
+# default (None).
+def native_po_print_format(print_format):
+	if not print_format:
+		return None
+	if frappe.db.get_value("Print Format", print_format, "doc_type") == "Purchase Order":
+		return print_format
+	native = print_format[:-len(" - PO3")] if print_format.endswith(" - PO3") else None
+	if native and frappe.db.get_value("Print Format", native, "doc_type") == "Purchase Order":
+		return native
+	return None
+
+
+# The signature for an approved-PO email: the Email Signature on the User picked
+# as the PO's Main Signature (from the Supplier's, or changed on the PO). No user,
+# or a user with no signature, means no signature. A plain-text signature keeps
+# its line breaks, as Frappe's own email composer does.
+def po_email_signature(doc):
+	user = doc.signature_user or frappe.db.get_value("Supplier", doc.supplier, "nat_po3_signature_user")
+	sig = (frappe.db.get_value("User", user, "email_signature") or "").strip() if user else ""
+	if sig and not re.search(r"<[a-z][^>]*>", sig, re.I):
+		sig = sig.replace("\n", "<br>")
+	return sig
+
+
+def po_email_message(doc):
+	return ("<p>Hello,</p>"
+		"<p>Please find attached our new Purchase Order #" + (doc.erp_purchase_order or doc.name) + ".</p>"
+		"<p>Could you please let us know if any items are out of stock or discontinued and provide "
+		"the expected arrival dates (ETAs) for any items that are currently unavailable?</p>"
+		"<p>Once the order has been reviewed, please send us the order confirmation for our review.</p>"
+		"<p>Thank you in advance.</p>"
+		"<p>Best regards,</p>" + po_email_signature(doc))
+
+
 def auto_send_on_approve(doc):
 	posting = frappe.db.get_single_value("Procurement Settings V3", "posting_enabled")
 
@@ -449,11 +636,10 @@ def auto_send_on_approve(doc):
 			npo.transaction_date = doc.order_date
 			npo.schedule_date = po_ship_date(doc)
 			npo.ais_cancel_date = doc.required_by
-			npo.currency = doc.currency
-			npo.conversion_rate = F(doc.conversion_rate) or 1
-			npo.buying_price_list = doc.buying_price_list
+			set_native_currency(npo, doc)
 			npo.set_warehouse = doc.set_warehouse
 			set_native_addresses(npo, doc)
+			copy_taxes_to_native(npo, doc)
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.
@@ -476,6 +662,9 @@ def auto_send_on_approve(doc):
 				# as ordered off the NATIVE PO, not off the PO3
 				r.material_request = d.material_request
 				r.material_request_item = d.material_request_item
+				# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+				# see copy_line_identifiers
+				copy_line_identifiers(r, d)
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -507,41 +696,62 @@ def auto_send_on_approve(doc):
 				frappe.msgprint("<b>Native PO " + npo.name + " was NOT submitted.</b><br>"
 					+ err + "<br><br>Fix the cause, then use <b>Retry Native PO</b> on this order.")
 
-	if doc.workflow_state == "Approved" and doc.supplier_email:
+	# Disable Sending Email: the order stays Approved / Not Sent, to be sent by hand.
+	if doc.workflow_state == "Approved" and doc.supplier_email and not doc.disable_sending_email:
+		# Only send from the PO's own Sender Email Account, as an address that has
+		# an outgoing Email Account behind it. Never fall back to the default
+		# outgoing account: with no sender, or one Frappe can't match, it would
+		# quietly send the PO over the default account's server instead.
+		why = None
+		if not doc.sender_email_account:
+			why = "No Sender Email Account is set on this PO."
+		elif not doc.sender_email:
+			why = "No Sender Email Address is set on this PO."
+		elif not frappe.db.exists("Email Account",
+				{"email_id": doc.sender_email, "enable_outgoing": 1}):
+			why = ("No Email Account with Enable Outgoing uses the Sender Email Address <b>"
+				+ doc.sender_email + "</b>.")
+		if why:
+			frappe.db.set_value(doc.doctype, doc.name, {"send_status": "Failed"})
+			frappe.msgprint("<b>PO email was NOT sent.</b> " + why + " Fix the sender, "
+				"then send the PO to the supplier manually.", indicator="red")
+			mirror_po3_status(doc.name)
+			return
 		pdf = None
 		try:
-			# PO print formats are written against native Purchase Order fields
-			# (transaction_date, schedule_date, ...) which PO3 simply does not have,
-			# so rendering one against a PO3 blows up on the first missing field.
-			# Print the native twin instead: same order, in the field names the
-			# templates expect, and it is the document the supplier is being sent.
+			# The native twin, printed with the native version of the chosen PO
+			# Print Format: same order, in the field names the PO formats are
+			# written against. A "<format> - PO3" choice maps back to "<format>".
 			if doc.erp_purchase_order:
 				pdf = frappe.attach_print("Purchase Order", doc.erp_purchase_order,
-					print_format=doc.po_print_format or None)
-			else:
-				# no twin to print - fall back to PO3's own default format. The chosen
-				# po_print_format is deliberately NOT passed here: it belongs to
-				# Purchase Order and would fail against this doctype.
-				pdf = frappe.attach_print(doc.doctype, doc.name, doc=doc)
+					print_format=native_po_print_format(doc.po_print_format),
+					file_name=doc.erp_purchase_order)
 		except Exception:
 			pdf = None
+		# The PDF is the order itself: never send the email without it.
+		if not pdf:
+			frappe.db.set_value(doc.doctype, doc.name, {"send_status": "Failed"})
+			frappe.msgprint("<b>PO email was NOT sent.</b> "
+				+ ("The PO PDF could not be printed from native PO " + doc.erp_purchase_order
+					+ " with print format <b>" + (native_po_print_format(doc.po_print_format)
+						or "(Purchase Order default)") + "</b>."
+					if doc.erp_purchase_order else "This PO has no native Purchase Order to print.")
+				+ " Fix the cause, then send the PO to the supplier manually.", indicator="red")
+			mirror_po3_status(doc.name)
+			return
 		ok = False
 		try:
 			frappe.sendmail(
 				recipients=[doc.supplier_email],
-				# Sender Address -> Sender Email Address, so each order can go out
-				# from the address it belongs to. Frappe matches this against an
-				# outgoing Email Account (EmailAccount.find_outgoing); with no
-				# match it still sends, but over the default account's server.
-				sender=doc.sender_email or None,
-				cc=[doc.cc_email] if doc.cc_email else None,
-				bcc=[doc.bcc_email] if doc.bcc_email else None,
+				# Sender Email Address (from the supplier, or overridden on the PO),
+				# checked above to match an outgoing Email Account, so Frappe's
+				# EmailAccount.find_outgoing picks that account and not the default.
+				sender=doc.sender_email,
+				cc=email_list(doc.cc_email) or None,
+				bcc=email_list(doc.bcc_email) or None,
 				subject="Purchase Order " + (doc.erp_purchase_order or doc.name) + " - " + (doc.company or ""),
-				message="Please find attached purchase order " + (doc.erp_purchase_order or doc.name)
-					+ ".<br>Ship to: " + (doc.ship_to_display or "")
-					+ (("<br><br>" + doc.notes_to_supplier) if doc.notes_to_supplier else "")
-					+ "<br><br>Please reply with your order confirmation.",
-				attachments=[pdf] if pdf else None,
+				message=po_email_message(doc),
+				attachments=[pdf],
 				reference_doctype=doc.doctype, reference_name=doc.name)
 			ok = True
 		except Exception:
@@ -579,11 +789,10 @@ def submitted_updates(doc):
 			npo.transaction_date = doc.order_date
 			npo.schedule_date = po_ship_date(doc)
 			npo.ais_cancel_date = doc.required_by
-			npo.currency = doc.currency
-			npo.conversion_rate = F(doc.conversion_rate) or 1
-			npo.buying_price_list = doc.buying_price_list
+			set_native_currency(npo, doc)
 			npo.set_warehouse = doc.set_warehouse
 			set_native_addresses(npo, doc)
+			copy_taxes_to_native(npo, doc)
 			npo.custom_purchase_order_v3 = doc.name
 			# NOT npo.notes: Purchase Order has no such field, so that assignment
 			# was thrown away on every save and the note never reached the order.
@@ -606,6 +815,9 @@ def submitted_updates(doc):
 				# as ordered off the NATIVE PO, not off the PO3
 				r.material_request = d.material_request
 				r.material_request_item = d.material_request_item
+				# the PO3 line's own barcode / supplier SKU, not ERPNext's guess --
+				# see copy_line_identifiers
+				copy_line_identifiers(r, d)
 			npo.flags.ignore_permissions = True
 			npo.save()
 			submitted = False
@@ -709,7 +921,7 @@ def submitted_updates(doc):
 		frappe.db.set_value(doc.doctype, doc.name, {
 			"workflow_state": "Closed Short" if any_short else "Closed",
 			"receipt_status": "Closed Short" if any_short else "Received"})
-		open_grs = frappe.get_all("Goods Receipt V3",
+		open_grs = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": doc.name, "docstatus": 0},
 			fields=["name"], limit_page_length=1)
 		if any_short and doc.erp_purchase_order and not open_grs:
@@ -725,7 +937,7 @@ def submitted_updates(doc):
 	# ran from the receipt path, or when every line happened to be terminal.
 	if doc.erp_purchase_order:
 		native_now = frappe.db.get_value("Purchase Order", doc.erp_purchase_order, "status")
-		drafts = frappe.get_all("Goods Receipt V3",
+		drafts = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": doc.name, "docstatus": 0},
 			fields=["name"], limit_page_length=1)
 		# "Closed" is fully received - ERPNext shows that as To Bill and needs it
@@ -743,7 +955,7 @@ def submitted_updates(doc):
 				frappe.msgprint(gate["why"])
 			elif drafts:
 				frappe.msgprint("Native PO " + doc.erp_purchase_order
-					+ " left open - there is still a draft Goods Receipt against this order.")
+					+ " left open - there is still a draft Purchase Receipt 3 against this order.")
 		elif doc.workflow_state in ("Sent to Supplier", "Acknowledged",
 				"Partially Received", "Received") and native_now == "Closed":
 			try:
@@ -780,7 +992,7 @@ def cancel_guard(doc):
 		blockers.append("shipment " + s.name + " (" + str(s.workflow_state)
 			+ ") - goods are on the way; cancel or delete the shipment first")
 
-	for s in frappe.get_all("Goods Receipt V3",
+	for s in frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": doc.name, "docstatus": ("<", 2)},
 			fields=["name", "workflow_state"], limit_page_length=0):
 		blockers.append("receipt " + s.name + " (" + str(s.workflow_state)
@@ -997,6 +1209,9 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 
 	count = 0
 	skipped = []
+	# discontinued / disabled items are left off rather than failing the whole
+	# list on save (validate would refuse them); the caller is told which
+	unavailable = []
 	for it in raw_items:
 		qty = float(it.get("qty") or 0)
 		if qty <= 0:
@@ -1005,6 +1220,10 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 		if not code:
 			skipped.append(str(it.get("item_code")).strip())
 			continue
+		why = item_unavailable(code)
+		if why:
+			unavailable.append(code + " (" + why + ")")
+			continue
 		row = doc.append("items", {})
 		row.item_code = code
 		row.qty = qty
@@ -1012,7 +1231,8 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 			row.rate = float(it.get("rate"))
 		count += 1
 	if not count:
-		frappe.throw("No usable lines - every item was unknown or qty 0. Unknown: " + ", ".join(skipped))
+		frappe.throw("No usable lines - every item was unknown, discontinued, disabled or qty 0. Unknown: "
+			+ ", ".join(skipped) + (". Not available: " + ", ".join(unavailable) if unavailable else ""))
 
 	doc.insert()
 
@@ -1022,7 +1242,7 @@ def v3_create_po_from_buylist(supplier=None, items=None, required_by=None,
 		frappe.response["location"] = url
 	else:
 		frappe.response["message"] = {"po3": doc.name, "url": url, "lines": count,
-			"skipped": skipped, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
+			"skipped": skipped, "not_available": unavailable, "total": doc.total, "currency": doc.currency, "price_list": doc.buying_price_list}
 
 
 # ---------------------------------------------------------------------------
@@ -1052,11 +1272,12 @@ def v3_reconcile_receiving(po3=None):
 			names.append(p.name)
 
 	def v3_reconcile(po3_name):
-		soc = frappe.db.get_value("Supplier Order Confirmation V3",
-			{"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, "name")
-		if soc:
+		# a PO can have several confirmations, each with its own back orders
+		socs = frappe.get_all("Supplier Order Confirmation V3",
+			filters={"purchase_order_v3": po3_name, "docstatus": ("<", 2)}, pluck="name")
+		if socs:
 			for b in frappe.get_all("Supplier Order Confirmation V3 Backorder",
-					filters={"parent": soc}, fields=["name", "po3_item", "status"]):
+					filters={"parent": ("in", socs)}, fields=["name", "po3_item", "status"]):
 				line = frappe.db.get_value("Purchase Order V3 Item", b.po3_item,
 					["received_qty", "qty"], as_dict=True)
 				if not line:
@@ -1134,7 +1355,7 @@ def v3_sync_closed_short_natives():
 			skipped.append(p.erp_purchase_order + " (" + str(round(rec,1)) + "% received, "
 				+ str(round(bil,1)) + "% billed - still to invoice)")
 			continue
-		if frappe.get_all("Goods Receipt V3",
+		if frappe.get_all("Purchase Receipt V3",
 				filters={"purchase_order_v3": p.name, "docstatus": 0},
 				fields=["name"], limit_page_length=1):
 			skipped.append(p.erp_purchase_order + " (draft receipt open)")
@@ -1348,7 +1569,7 @@ def make_po3_based_on_supplier(source_name, target_doc=None, args=None):
 # The confirmation's version updates lines that are already there; this one
 # builds them, because a PO3 starts empty. Item resolution stays on the server:
 # the browser cannot search barcodes or supplier part numbers, and the same
-# identifier chain is used elsewhere in the flow (Goods Receipt V3 scanning).
+# identifier chain is used elsewhere in the flow (Purchase Receipt V3 scanning).
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
 def resolve_pasted_items(rows, supplier=None, price_list=None):

@@ -98,9 +98,10 @@
   },
   {
    "fieldname": "state",
-   "fieldtype": "Data",
-   "label": "Province/State",
-   "mandatory_depends_on": "eval:doc.branch != \"Online\""
+   "fieldtype": "Select",
+   "label": "Province/State (ISO)",
+   "mandatory_depends_on": "eval:doc.branch != \"Online\"",
+   "options": "\nCA-AB\nCA-BC\nCA-MB\nCA-NB\nCA-NL\nCA-NS\nCA-NT\nCA-NU\nCA-ON\nCA-PE\nCA-QC\nCA-SK\nCA-YT\nUS-AL\nUS-AK\nUS-AZ\nUS-AR\nUS-CA\nUS-CO\nUS-CT\nUS-DE\nUS-DC\nUS-FL\nUS-GA\nUS-HI\nUS-ID\nUS-IL\nUS-IN\nUS-IA\nUS-KS\nUS-KY\nUS-LA\nUS-ME\nUS-MD\nUS-MA\nUS-MI\nUS-MN\nUS-MS\nUS-MO\nUS-MT\nUS-NE\nUS-NV\nUS-NH\nUS-NJ\nUS-NM\nUS-NY\nUS-NC\nUS-ND\nUS-OH\nUS-OK\nUS-OR\nUS-PA\nUS-RI\nUS-SC\nUS-SD\nUS-TN\nUS-TX\nUS-UT\nUS-VT\nUS-VA\nUS-WA\nUS-WV\nUS-WI\nUS-WY\nOTHER"
   },
   {
    "fieldname": "zip_code",
@@ -326,7 +327,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-09-12 12:21:37.518104",
+ "modified": "2026-10-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Employee Sign Up",

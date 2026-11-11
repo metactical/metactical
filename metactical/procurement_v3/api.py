@@ -6,7 +6,7 @@
 Whitelisted methods that belong to the V3 flow as a whole rather than to any
 one doctype. Doctype-scoped APIs live on their own controllers instead --
 v3_retry_po_submit and friends on Purchase Order V3, the v3_gr3_* ones on
-Goods Receipt V3.
+Purchase Receipt V3.
 """
 
 import frappe

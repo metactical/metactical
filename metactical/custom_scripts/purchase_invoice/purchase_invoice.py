@@ -4,6 +4,7 @@ from frappe.utils import flt, cstr, now, get_datetime_str, file_lock, date_diff,
 from frappe import _, msgprint, is_whitelisted
 from metactical.custom_scripts.utils.metactical_utils import queue_action
 from frappe.model.docstatus import DocStatus
+from metactical.procurement_v3.utils import validate_rate_except_v3
 
 class CustomPurchaseInvoice(PurchaseInvoice):
 	def on_submit(self):
@@ -22,6 +23,15 @@ class CustomPurchaseInvoice(PurchaseInvoice):
 		# invoice is still submitted, or ERPNext refuses the status change.
 		v3_precancel_reopen_po(self)
 		super(CustomPurchaseInvoice, self).before_cancel()
+
+	def validate_rate_with_reference_doc(self, ref_details):
+		# billed from a Purchase Receipt V3: the confirmed rate it posted is checked
+		# against that receipt, not against the PO
+		pr_items = [d.pr_detail for d in self.items if d.get("pr_detail")]
+		v3 = set(frappe.get_all("Purchase Receipt Item", filters={"name": ("in", pr_items),
+			"neb_source_doctype": "Purchase Receipt V3"}, pluck="name")) if pr_items else set()
+		validate_rate_except_v3(self, ref_details, [d for d in self.items if d.get("pr_detail") in v3],
+			"po_detail")
 
 	def save(self):
 		if self.docstatus == DocStatus.submitted() and len(self.items) > 100 and \
@@ -62,7 +72,7 @@ def v3_close_short_closed_po(doc):
 			continue
 		if float(st.per_billed or 0) + 0.001 < float(st.per_received or 0):
 			continue                     # still something received but unbilled
-		drafts = frappe.get_all("Goods Receipt V3",
+		drafts = frappe.get_all("Purchase Receipt V3",
 			filters={"purchase_order_v3": p3.name, "docstatus": 0},
 			fields=["name"], limit_page_length=1)
 		if drafts:

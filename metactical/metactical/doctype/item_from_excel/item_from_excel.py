@@ -54,7 +54,36 @@ class ItemFromExcel(Document):
 		self.check_mandatory_fields(file_content[0], required_fields, is_template=True)
 		self.check_specs_availability(file_content[2])
 		self.check_mandatory_fields(file_content[1], required_fields, is_template=False)
-  
+		self.check_default_supplier(file_content[0], is_template=True)
+		self.check_default_supplier(file_content[1], is_template=False)
+
+	# The first Supplier (Supplier Items) value becomes the item's Default Supplier, so every
+	# item must have one. An item spans several rows; a row with a code/name starts a new one.
+	def check_default_supplier(self, data, is_template):
+		headers = data[0]
+		sheet = "Template" if is_template else "Variants"
+		if "Supplier (Supplier Items)" not in headers:
+			frappe.throw(f"Column <b>Supplier (Supplier Items)</b> not found in the {sheet} sheet. Every item needs a Default Supplier.")
+
+		supplier_column = headers.index("Supplier (Supplier Items)")
+		key_column = headers.index("Item Name") if not is_template and "Item Name" in headers else 0
+		items = {}
+		current = None
+		for idx, row in enumerate(data[1:], start=2):
+			if row[key_column]:
+				current = row[key_column]
+				items.setdefault(current, {"row": idx, "code": row[0], "has_supplier": False})
+			if current and row[supplier_column]:
+				items[current]["has_supplier"] = True
+
+		# existing templates are skipped by save_item, so they don't need a supplier here
+		missing = [f"Row {d['row']}: {d['code'] or name}" for name, d in items.items()
+			if not d["has_supplier"] and not (is_template and frappe.db.exists("Item", d["code"]))]
+		if missing:
+			frappe.throw(
+				f"Default Supplier is mandatory. Fill in <b>Supplier (Supplier Items)</b> for these items in the {sheet} sheet:<br>"
+				+ "<br>".join(missing))
+
 	def check_specs_availability(self, data):
 		headers = data[0]
 		specs = headers[1:]  # assuming first column is something else like Item Code
@@ -717,7 +746,8 @@ def remove_all_none_rows(data):
 	return [[row for row in table if not all(value is None for value in row)] for table in data]
 
 def remove_duplicate_child_table_values(data):
-	return {key: [dict(t) for t in {tuple(d.items()) for d in data[key]}] for key in data}
+	# keep the sheet's row order: the first Supplier Items row becomes the Default Supplier
+	return {key: [dict(t) for t in dict.fromkeys(tuple(d.items()) for d in data[key])] for key in data}
 
 # Refactored extract_and_validate_excel_data - Multiple Helper Methods
 def get_workbook_from_file(file_url):
