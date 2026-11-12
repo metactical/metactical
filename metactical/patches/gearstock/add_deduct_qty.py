@@ -9,7 +9,9 @@ upsert saves them first, then push_images sends the images, and the last image b
 
 Each save also fires the Item webhook again, so each product is sent a second time.
 
-It covers the same catalogue rows as upsert_items. Items not in ERPNext are skipped; the upsert
+It covers the same catalogue rows as upsert_items. A row whose item was merged into another item
+updates that item, using the map upsert_items saved (gearstock_merged_items.json); when several
+rows land on one item, only the first does it. Items not in ERPNext are skipped; the upsert
 already lists them. Progress goes to the "gearstock" log (sites/<site>/logs/gearstock.log).
 
 Safe to re-run by hand: bench --site <site> execute metactical.patches.gearstock.add_deduct_qty.run
@@ -21,7 +23,7 @@ import time
 
 import frappe
 
-from metactical.patches.gearstock import db_retry, log
+from metactical.patches.gearstock import db_retry, log, merged_items
 from metactical.patches.gearstock.upsert_items import load_rows
 
 BATCH_SIZE = 500
@@ -43,13 +45,26 @@ def start():
 def run(start=0):
 	logger = log.get_logger()
 	rows = load_rows()
-	counts = frappe._dict(saved=0, missing=0, failed=0)
+	mapping = merged_items.get(rows, logger)
+	codes = [merged_items.resolve(row["item_code"], mapping) for row in rows]
+	# The first row for each item does it; built over every row so a resumed run picks the same one.
+	first = {}
+	for index, code in enumerate(codes):
+		first.setdefault(code, index)
+	counts = frappe._dict(saved=0, missing=0, merged_skipped=0, failed=0)
 	failed = []
 	logger.info(f"[Inventory] Started at row {int(start) + 1} of {len(rows)}")
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
 		for index, row in enumerate(rows[offset : offset + BATCH_SIZE], start=offset + 1):
-			update_item(row["item_code"], counts, failed, logger, f"{index}/{len(rows)}")
+			code = codes[index - 1]
+			if first[code] != index - 1:
+				counts.merged_skipped += 1
+				logger.info(
+					f"[Inventory] {row['item_code']} -> {code}: skipped, already done from row {first[code] + 1}"
+				)
+				continue
+			update_item(code, counts, failed, logger, f"{index}/{len(rows)}")
 
 		logger.info(
 			f"[Inventory] Batch completed: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} rows, totals {dict(counts)}"

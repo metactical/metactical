@@ -7,8 +7,13 @@ row this adds what is missing and saves the item, which fires the Item / Item Pr
     description (camo_slug / camo_item_name / camo_description), which push_images loads the
     images from.
   - Variant / Standalone: the RET - GearStock - USD Item Price, if there is none yet.
-Items that are not in the system are skipped and listed in gearstock_items_not_in_erp.csv, next to
-the JSON file. Nothing that already exists is overwritten. Progress goes to the "gearstock" log
+Rows whose item was merged (or renamed) into another item are applied to that item: the map comes
+from Item Merge History (merged_items.py), is logged as "A, B merged into C" and saved to
+gearstock_merged_items.json for push_images and add_deduct_qty. A merged row only adds the item
+details and the price; it does not overwrite the target's item group, brand or retail SKU. When
+several rows land on one item, only one is upserted: the item's own row if the JSON has one,
+otherwise the first merged row. The rest are skipped. Items that are not in the system and have no
+merge history are skipped and listed in gearstock_items_not_in_erp.csv, next to the JSON file. Nothing that already exists is overwritten. Progress goes to the "gearstock" log
 (sites/<site>/logs/gearstock.log).
 
 Frappe drops webhooks while a patch or migrate is running (run_webhooks returns early on
@@ -39,7 +44,7 @@ import frappe
 from frappe.integrations.doctype.webhook import run_webhooks
 from frappe.utils.synchronization import filelock
 
-from metactical.patches.gearstock import db_retry, log, webhook_queue
+from metactical.patches.gearstock import db_retry, log, merged_items, webhook_queue
 
 PRICE_LIST = "RET - GearStock - USD"
 CAMO_PRICE_LIST = "RET - Camo"
@@ -101,13 +106,24 @@ def run(start=0, queue_images=True):
 	wait_for_migrate()
 
 	rows = load_rows()
+	# Built from every row even on a resumed run, so the same row wins each merged item.
+	mapping = merged_items.build(rows, logger)
+	owner = row_owners(rows, mapping)
 
 	# Webhooks stay on their own queue (default). Only undo a long-queue move an earlier run left.
 	webhook_queue.restore(JOB_ID)
 	frappe.db.commit()
 
 	counts = frappe._dict(
-		saved=0, missing=0, price_created=0, slug_added=0, camo_added=0, fields_updated=0, failed=0
+		saved=0,
+		missing=0,
+		merged=0,
+		merged_skipped=0,
+		price_created=0,
+		slug_added=0,
+		camo_added=0,
+		fields_updated=0,
+		failed=0,
 	)
 	missing, failed = [], []
 	logger.info(
@@ -117,7 +133,9 @@ def run(start=0, queue_images=True):
 
 	for offset in range(int(start), len(rows), BATCH_SIZE):
 		for index, row in enumerate(rows[offset : offset + BATCH_SIZE], start=offset + 1):
-			upsert_item(row, counts, missing, failed, logger, f"{index}/{len(rows)}")
+			upsert_item(
+				row, counts, missing, failed, logger, f"{index}/{len(rows)}", index - 1, mapping, owner
+			)
 
 		logger.info(
 			f"[Item Upsert] Batch completed: {min(offset + BATCH_SIZE, len(rows))}/{len(rows)} rows, totals {dict(counts)}"
@@ -139,7 +157,13 @@ def run(start=0, queue_images=True):
 	frappe.log_error(
 		title="GearStock item upsert finished",
 		message=json.dumps(
-			{"counts": counts, "missing": [row["item_code"] for row in missing], "failed": failed}, indent=1
+			{
+				"counts": counts,
+				"merged": mapping,
+				"missing": [row["item_code"] for row in missing],
+				"failed": failed,
+			},
+			indent=1,
 		),
 	)
 
@@ -152,10 +176,32 @@ def write_missing(rows):
 		writer.writerows(rows)
 
 
-def upsert_item(row, counts, missing, failed, logger, position=""):
-	item_code = row["item_code"]
-	label = f"[Item Upsert] {item_code} ({describe_row(row)})"
+def row_owners(rows, mapping):
+	"""item code -> index of the row that upserts it. An item's own row wins; otherwise the first
+	row merged into it. Every other row that lands on the same item is skipped."""
+	owner = {}
+	for index, row in enumerate(rows):
+		if row["item_code"] not in mapping:
+			owner.setdefault(row["item_code"], index)
+	for index, row in enumerate(rows):
+		if row["item_code"] in mapping:
+			owner.setdefault(mapping[row["item_code"]], index)
+	return owner
+
+
+def upsert_item(row, counts, missing, failed, logger, position="", index=None, mapping=None, owner=None):
+	mapping = mapping or {}
+	item_code = merged_items.resolve(row["item_code"], mapping)
+	merged = item_code != row["item_code"]
+	name = f"{row['item_code']} -> {item_code} (merged)" if merged else item_code
+	label = f"[Item Upsert] {name} ({describe_row(row)})"
 	logger.info(f"{label}: started ({position})")
+
+	if owner is not None and owner.get(item_code, index) != index:
+		counts.merged_skipped += 1
+		by = owner[item_code]
+		logger.info(f"{label}: skipped, {item_code} is upserted from row {by + 1} instead")
+		return
 
 	if not frappe.db.exists("Item", item_code):
 		counts.missing += 1
@@ -164,7 +210,9 @@ def upsert_item(row, counts, missing, failed, logger, position=""):
 		return
 
 	try:
-		changes = db_retry.run(lambda: save_row(row))
+		changes = db_retry.run(lambda: save_row(row, item_code, merged))
+		if merged:
+			counts.merged += 1
 		for key in changes:
 			counts[key] += 1
 		done = [CHANGE_LABELS[key] for key in changes if key in CHANGE_LABELS]
@@ -188,10 +236,12 @@ def describe_row(row):
 	return item_type
 
 
-def save_row(row):
-	"""Apply one catalogue row and commit. Returns the counts to add, once the item is saved."""
+def save_row(row, item_code=None, merged=False):
+	"""Apply one catalogue row to item_code (the row's own code, or the item it was merged into)
+	and commit. A merged row leaves the item's group, brand and retail SKU alone: the merge already
+	chose them. Returns the counts to add, once the item is saved."""
 	changes = ["saved"]
-	item = frappe.get_doc("Item", row["item_code"])
+	item = frappe.get_doc("Item", item_code or row["item_code"])
 
 	if row.get("slug"):
 		if add_item_detail(
@@ -210,7 +260,7 @@ def save_row(row):
 	if row.get("price") is not None and not item.has_variants and create_item_price(item, row["price"]):
 		changes.append("price_created")
 
-	if update_item_fields(item, row):
+	if not merged and update_item_fields(item, row):
 		changes.append("fields_updated")
 
 	# Without this, ERPNext's update_variants copies the template's item_detail, retail SKU

@@ -220,13 +220,19 @@ def run(start=0, counts=None, chain=True, then_deduct=True):
 def get_items():
 	"""The templates and standalone items in gearstock_items_not_in_erp.json: (in ERPNext, not in ERPNext).
 
-	A variant row stands for its template, since variants share their template's image record.
+	A variant row stands for its template, since variants share their template's image record. A
+	code that was merged into another item stands for that item (the map upsert_items saved), so
+	an item that several rows were merged into is pushed once.
 	"""
+	from metactical.patches.gearstock import merged_items
 	from metactical.patches.gearstock.upsert_items import load_rows
 
 	rows = load_rows()
+	mapping = merged_items.get(rows, log.get_logger())
 
-	codes = sorted({row.get("template") or row["item_code"] for row in rows})
+	codes = sorted(
+		{merged_items.resolve(row.get("template") or row["item_code"], mapping) for row in rows}
+	)
 	existing = set(frappe.get_all("Item", filters={"name": ["in", codes]}, pluck="name")) if codes else set()
 	return [code for code in codes if code in existing], [code for code in codes if code not in existing]
 
