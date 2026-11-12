@@ -38,3 +38,5 @@ metactical.patches.resave_item_prices_for_webhooks
 metactical.patches.cancel_duplicate_zero_invoices_for_icl_dns
 metactical.patches.gearstock.update_inventory_output
 metactical.patches.gearstock.upsert_items
+metactical.patches.remove_zoho_bank_custom_fields
+metactical.patches.item_group.update_item_groups
