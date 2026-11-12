@@ -8,7 +8,8 @@ Each row is checked first, and skipped with a reason in the log when:
   - the item is not in ERPNext
   - the item group is not in ERPNext
   - the item group is a group node (items can only go in a leaf group)
-  - the item is already in that group (so a re-run changes nothing)
+An item that is already in the group is still saved, so its webhook fires too; the log says the
+group was already correct.
 
 Frappe drops webhooks while a patch or migrate is running, so the patch only queues the job and
 the job waits for the migrate to finish before it starts. Rows go in batches of BATCH_SIZE with
@@ -42,7 +43,6 @@ REASONS = {
 	"item_not_found": "item not found in ERPNext",
 	"group_not_found": "item group not found in ERPNext",
 	"group_is_parent": "item group is a group node, items can only be assigned to a leaf group",
-	"already_in_group": "item is already in this item group",
 }
 
 
@@ -92,7 +92,7 @@ def run(start=0):
 	groups = {
 		g.name: g.is_group for g in frappe.get_all("Item Group", fields=["name", "is_group"])
 	}
-	counts = frappe._dict(updated=0, failed=0, **dict.fromkeys(REASONS, 0))
+	counts = frappe._dict(updated=0, already_in_group=0, failed=0, **dict.fromkeys(REASONS, 0))
 	skipped, failed = [], []
 	total = len(rows)
 	logger.info(f"{LOG_PREFIX} Started at row {int(start) + 1} of {total}")
@@ -123,8 +123,6 @@ def check_row(item_code, item_group, current_group, groups):
 		reasons.append("group_not_found")
 	elif groups[item_group]:
 		reasons.append("group_is_parent")
-	if not reasons and current_group == item_group:
-		reasons.append("already_in_group")
 	return reasons
 
 
@@ -139,14 +137,17 @@ def update_row(row, groups, counts, skipped, failed, logger, position):
 			counts[reason] += 1
 		text = "; ".join(REASONS[reason] for reason in reasons)
 		skipped.append({"item_code": item_code, "item_group": item_group, "reason": text})
-		level = logger.info if reasons == ["already_in_group"] else logger.warning
-		level(f"{label}: skipped, {text}")
+		logger.warning(f"{label}: skipped, {text}")
 		return
 
 	try:
 		db_retry.run(lambda: save_item(item_code, item_group))
-		counts.updated += 1
-		logger.info(f"{label}: updated from '{current_group}'")
+		if current_group == item_group:
+			counts.already_in_group += 1
+			logger.info(f"{label}: saved, item group was already correct")
+		else:
+			counts.updated += 1
+			logger.info(f"{label}: updated from '{current_group}'")
 	except Exception:
 		db_retry.rollback_item()
 		counts.failed += 1
