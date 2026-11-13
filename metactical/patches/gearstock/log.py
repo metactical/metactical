@@ -1,6 +1,7 @@
 """The shared logger for the GearStock jobs: sites/<site>/logs/gearstock.log.
 
 Each step logs every item, in the order the steps run:
+  [Item Merge]   upsert_items, rows whose item was merged into another (from Item Merge History)
   [Item Upsert]  upsert_items, every row in gearstock_items_not_in_erp.json
   [Image Push]   push_images, every template and standalone item
   [Inventory]    add_deduct_qty, every row in gearstock_items_not_in_erp.json
