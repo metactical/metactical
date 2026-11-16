@@ -13,7 +13,8 @@
   "password",
   "can_disable_auto_logout",
   "can_see_item_cost",
-  "can_create_embedded_codes"
+  "can_create_embedded_codes",
+  "badge_id"
  ],
  "fields": [
   {
@@ -52,6 +53,12 @@
    "fieldname": "can_create_embedded_codes",
    "fieldtype": "Check",
    "label": " Can Create Embedded Codes"
+  },
+  {
+   "fieldname": "badge_id",
+   "fieldtype": "Password",
+   "label": "Badge ID",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -61,7 +68,7 @@
    "link_fieldname": "user"
   }
  ],
- "modified": "2026-01-13 05:04:53.478584",
+ "modified": "2026-11-16 04:01:56.543118",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "POS User Settings",
@@ -81,6 +88,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
