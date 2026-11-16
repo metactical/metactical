@@ -581,12 +581,13 @@ def group_invoice_data(credit_notes):
     return list(grouped_credit_notes.values())
 
 @frappe.whitelist()
-def get_password(doc):
-	if type(doc) == str:
+def get_password(doc, field=None):
+	if isinstance(doc, str):
 		doc = frappe._dict(json.loads(doc))
-  
-	doc = frappe.get_doc(doc.doctype, doc.name)	
-	return doc.get_password(raise_exception=False)
+
+	doc = frappe.get_doc(doc.doctype, doc.name)
+	fieldname = field or "password"
+	return doc.get_password(fieldname=fieldname, raise_exception=False)
 
 def sort_items_by_location(data):
 	# Sort data by location
