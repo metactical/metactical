@@ -6,7 +6,6 @@
  "engine": "InnoDB",
  "field_order": [
   "nat_bucket_name",
-  "nat_swatch_bucket_name",
   "nat_region",
   "nat_aws_access_key_id",
   "nat_aws_secret_access_key",
@@ -18,12 +17,6 @@
    "fieldname": "nat_bucket_name",
    "fieldtype": "Data",
    "label": "Bucket Name"
-  },
-  {
-   "description": "Bucket for the Swatch Images on Website Specification Label descriptions. Uses the same region and credentials.",
-   "fieldname": "nat_swatch_bucket_name",
-   "fieldtype": "Data",
-   "label": "Swatch Image Bucket Name"
   },
   {
    "default": "us-west-2",
@@ -52,7 +45,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-28 10:00:00.000000",
+ "modified": "2026-11-18 14:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "S3 Settings",

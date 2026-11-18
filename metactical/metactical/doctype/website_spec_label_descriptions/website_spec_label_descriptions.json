@@ -47,7 +47,6 @@
    "in_list_view": 1
   },
   {
-   "description": "Uploaded to the swatch image bucket in S3 Settings when the label is saved.",
    "fieldname": "nat_swatch_image",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -59,7 +58,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-11-10 13:00:00.000000",
+ "modified": "2026-11-18 14:30:00.000000",
  "modified_by": "Administrator",
  "module": "Metactical",
  "name": "Website Spec Label Descriptions",
