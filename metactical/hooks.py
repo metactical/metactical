@@ -186,6 +186,7 @@ doc_events = {
 # Override standard doctype classes
 
 override_doctype_class = {
+	"HD Ticket": "metactical.custom_scripts.hd_ticket.hd_ticket.CustomHDTicket",
 	"Sales Invoice": "metactical.custom_scripts.sales_invoice.sales_invoice.CustomSalesInvoice",
 	"Pick List": "metactical.custom_scripts.pick_list.pick_list.CustomPickList",
 	"Quotation": "metactical.custom_scripts.quotation.quotation.CustomQuotation",
