@@ -90,6 +90,11 @@ frappe.ui.form.on("Item", {
             });
         }
     },
+    validate: function (frm) {
+        const dropping = frm.doc.drop_and_create_in_websites
+            || (frm.doc.item_detail || []).some((row) => row.nat_drop_and_recreate);
+        if (!dropping || !frm.doc.item_code) return;
+    },
     neb_copy_from_item_group: function (frm) {
         if (!frm.doc.item_group) {
             frappe.msgprint(__("Please set Item Group first"));
