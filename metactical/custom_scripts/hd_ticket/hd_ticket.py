@@ -1,8 +1,49 @@
+import email.utils
+import re
 import frappe
 from frappe import _
-from frappe.email.email_body import get_message_id
 from helpdesk.helpdesk.doctype.hd_ticket.hd_ticket import HDTicket
 from helpdesk.utils import capture_event
+
+
+def _clean_subject(subject: str) -> str:
+    """Strip accumulated 'Re:' prefixes and '(#xxx)' ticket tags."""
+    subject = re.sub(r"^(Re:\s*)+", "", subject, flags=re.IGNORECASE)
+    subject = re.sub(r"\s*\(#[^)]+\)", "", subject)
+    return subject.strip()
+
+
+def inject_in_reply_to_on_email_queue(doc, method):
+    """before_insert hook for Email Queue.
+
+    Frappe's native in_reply_to→email_queue path never sets In-Reply-To:
+    email_queue.py expects Communication.message_id stored with angle brackets,
+    but receive.py strips them, so get_string_between always returns empty.
+    We work around by carrying the value in frappe.flags and injecting it into
+    the MIME message string before the EmailQueue document is saved.
+    """
+    in_reply_to = getattr(frappe.flags, "hd_ticket_in_reply_to", None)
+    if not in_reply_to or not doc.message:
+        return
+    if "In-Reply-To:" in doc.message:
+        return
+    # Frappe builds MIME with SMTP policy (CRLF line endings). Try CRLF first,
+    # fall back to LF for any normalised storage.
+    if "\r\n\r\n" in doc.message:
+        sep = "\r\n\r\n"
+        new_header = f"\r\nIn-Reply-To: {in_reply_to}"
+    elif "\n\n" in doc.message:
+        sep = "\n\n"
+        new_header = f"\nIn-Reply-To: {in_reply_to}"
+    else:
+        return
+    pos = doc.message.find(sep)
+    doc.message = (
+        doc.message[:pos]
+        + new_header
+        + doc.message[pos:]
+    )
+    frappe.flags.hd_ticket_in_reply_to = None
 
 
 class CustomHDTicket(HDTicket):
@@ -13,7 +54,7 @@ class CustomHDTicket(HDTicket):
 
 		skip_email_workflow = self.skip_email_workflow()
 		medium = "" if skip_email_workflow else "Email"
-		subject = f"Re: {self.subject} (#{self.name})"
+		subject = f"Re: {_clean_subject(self.subject)} (#{self.name})"
 		sender = frappe.session.user
 		recipients = self.raised_by
 		sender_email = None if skip_email_workflow else self.sender_email()
@@ -27,11 +68,14 @@ class CustomHDTicket(HDTicket):
 			admin_email = frappe.get_value("User", "Administrator", "email")
 			recipients = admin_email
 
-		# Set message_id on the Communication so Frappe can resolve the
-		# customer's reply In-Reply-To header directly against this record,
-		# rather than falling back to the EmailQueue lookup (which is less
-		# reliable once the queue entry ages out).
-		msg_id = get_message_id()
+		# Use the sender email's domain (e.g. metactical.com) so the Message-Id
+		# is a valid FQDN. frappe.local.site is the bench directory name
+		# (e.g. "metactical"), which is not a FQDN — Gmail will not set
+		# In-Reply-To on replies to emails with bare-hostname Message-Ids,
+		# breaking all ticket threading.
+		# Frappe's threading lookup strips angle brackets (receive.py), so store bare.
+		msg_domain = sender_email.email_id.split("@")[1] if sender_email else frappe.local.site
+		msg_id = email.utils.make_msgid(domain=msg_domain).strip("<>")
 
 		communication = frappe.get_doc(
 			{
@@ -73,6 +117,13 @@ class CustomHDTicket(HDTicket):
 			_attachments.append({"file_url": file_doc.file_url})
 
 		reply_to_email = sender_email.email_id
+		# Build In-Reply-To from the last communication in this thread so the
+		# outgoing email is properly chained in Gmail (and other clients).
+		# Frappe stores message_ids without angle brackets; re-wrap for the header.
+		in_reply_to = None
+		if last_communication and last_communication.message_id:
+			in_reply_to = f"<{last_communication.message_id.strip('<>')}>"
+
 		template = (
 			"new_reply_on_customer_portal_notification"
 			if self.via_customer_portal
@@ -89,6 +140,11 @@ class CustomHDTicket(HDTicket):
 		if self.instantly_send_email():
 			send_delayed = False
 			send_now = True
+
+		# Set flag so inject_in_reply_to_on_email_queue hook can inject
+		# In-Reply-To into the MIME message during EmailQueue.before_insert.
+		if in_reply_to:
+			frappe.flags.hd_ticket_in_reply_to = in_reply_to
 
 		try:
 			frappe.sendmail(
@@ -112,4 +168,6 @@ class CustomHDTicket(HDTicket):
 				with_container=False,
 			)
 		except Exception as e:
-			frappe.throw(_(e))
+			frappe.flags.hd_ticket_in_reply_to = None
+			frappe.log_error(frappe.get_traceback(), "HD Ticket reply_via_agent sendmail error")
+			frappe.throw(_(str(e)))
