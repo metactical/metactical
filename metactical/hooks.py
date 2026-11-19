@@ -178,6 +178,9 @@ doc_events = {
 	},
 	"Payment Entry": {
 		"before_insert": "metactical.custom_scripts.payment_entry.payment_entry.before_insert"
+	},
+	"Email Queue": {
+		"before_insert": "metactical.custom_scripts.hd_ticket.hd_ticket.inject_in_reply_to_on_email_queue"
 	}
 }
 
