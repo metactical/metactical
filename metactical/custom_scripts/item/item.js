@@ -98,7 +98,9 @@ frappe.ui.form.on("Item", {
         // and clearing `frappe.validated` stops it before any request goes out, so nothing is
         // written, nothing is rolled back, and the form keeps every change the user made.
         // "Continue anyway" then just saves again.
-        if (!frm.doc.drop_and_create_in_websites || !frm.doc.item_code) return;
+        const dropping = frm.doc.drop_and_create_in_websites
+            || (frm.doc.item_detail || []).some((row) => row.nat_drop_and_recreate);
+        if (!dropping || !frm.doc.item_code) return;
 
         // Set only by "Continue anyway", and consumed by the save it lets through — so the
         // next save asks again.

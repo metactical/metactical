@@ -300,7 +300,7 @@ class CustomItem(Item):
 
         self.description = self.item_name
             
-        if self.request_ai_suggestion and self.drop_and_create_in_websites:
+        if self.request_ai_suggestion and (self.drop_and_create_in_websites or self.rows_to_drop_and_recreate()):
             frappe.throw("You cannot 'Drop and Create in Websites' while requesting AI Suggestion. Please uncheck one of these options or wait until the AI Suggestion is completed.")
 
         validate_variants_in_websites(self)
@@ -320,7 +320,13 @@ class CustomItem(Item):
 
         self.sync_retail_sku_to_inventory_output()
 
-        if self.drop_and_create_in_websites:
+        if self.variant_of and (self.drop_and_create_in_websites or self.rows_to_drop_and_recreate()):
+            if self.drop_and_create_in_websites:
+                frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0, update_modified=False)
+                self.drop_and_create_in_websites = 0
+            self.clear_drop_and_recreate_rows(self.rows_to_drop_and_recreate())
+
+        elif self.drop_and_create_in_websites:
             if not self.item_detail:
                 frappe.throw("Please add at least one Item Detail to drop and create in websites.")
 
@@ -329,6 +335,10 @@ class CustomItem(Item):
             s3_image_api.block_if_image_job_running(self.item_code)
 
             self.create_item_deletion_log()
+
+        elif self.rows_to_drop_and_recreate():
+            s3_image_api.block_if_image_job_running(self.item_code)
+            self.create_item_deletion_log(self.rows_to_drop_and_recreate())
 
         frappe.flags.renaming = False
 
@@ -439,15 +449,26 @@ class CustomItem(Item):
             "ifw_retailskusuffix", new_sku, update_modified=False,
         )
 
-    def create_item_deletion_log(self):
-        existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters={"product": self.item_code, "status": "Issued"}, pluck="name")
+    def rows_to_drop_and_recreate(self):
+        """The Item Detail rows ticked Drop and Recreate - one price list each."""
+        return [row for row in self.get("item_detail") or [] if row.get("nat_drop_and_recreate")]
+
+    def clear_drop_and_recreate_rows(self, rows):
+        for row in rows:
+            frappe.db.set_value("Item Detail", row.name, "nat_drop_and_recreate", 0, update_modified=False)
+
+    def create_item_deletion_log(self, rows=None):
+        filters = {"product": self.item_code, "status": "Issued"}
+        if rows is not None:
+            filters["price_list"] = ["in", [row.price_list for row in rows]]
+        existing_active_logs = frappe.db.get_all("Item Drop and Create Log", filters=filters, pluck="name")
         for log in existing_active_logs:
             try:
                 frappe.db.delete("Item Drop and Create Log", log)
             except Exception as e:
                 frappe.log_error(title="Error deleting existing Item Drop and Create Log", message=frappe.get_traceback())
         
-        for source in self.item_detail:
+        for source in (self.item_detail if rows is None else rows):
             if not source.slug:
                 frappe.throw("Slug is required for Item Detail with price list <b>{0}</b>".format(source.price_list))
                 
@@ -466,7 +487,9 @@ class CustomItem(Item):
         from metactical.custom_scripts.utils.item_rmq_api import schedule_recreate_watchdog
         schedule_recreate_watchdog(self.item_code, frappe.session.user)
 
-        frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
+        if rows is None:
+            frappe.db.set_value(self.doctype, self.name, "drop_and_create_in_websites", 0)
+        self.clear_drop_and_recreate_rows(rows if rows is not None else self.rows_to_drop_and_recreate())
         self.reload()
 
 def validate_website_specifications(doc):
