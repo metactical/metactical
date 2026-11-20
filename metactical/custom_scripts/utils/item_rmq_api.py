@@ -55,7 +55,7 @@ def _completed_batch(item_code):
         "Item Drop and Create Log",
         filters={"product": item_code, "status": "Issued", "deleted": 1},
         order_by="creation asc",
-        fields=["name", "skip_recreate"],
+        fields=["name", "skip_recreate", "price_list"],
     )
 
 
@@ -156,7 +156,10 @@ def receive_deletion_message(parsedContent):
             )
 
             if not remaining_logs:
-                completion_message = f"Item Deletion for {item_code} is completed in all price lists."
+                # Name the price lists this drop covered: a row-level drop is only one or two of
+                # them, so "all price lists" would claim websites that were never touched.
+                dropped_lists = ", ".join(sorted({log.price_list for log in _completed_batch(item_code)}))
+                completion_message = f"Item Deletion for {item_code} is completed in: {dropped_lists}."
                 frappe.publish_realtime("msgprint", message=completion_message, user=user)
 
                 # The re-create is the item.save() loop below: each save re-fires the Item
